@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build
+dist/
+**/dist/
+build/
+**/build/
+.next/
+.turbo/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs / coverage
+logs/
+*.log
+coverage/
+**/coverage/
+
+# Prisma
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+
+# Test / Playwright
+test-results/
+playwright-report/
+apps/web/playwright-report/
+apps/web/test-results/
+
+# Misc
+*.tsbuildinfo
+.cache/
+.blendify/

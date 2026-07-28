@@ -1,0 +1,34 @@
+{
+  "name": "blendify",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build Spotify playlists from your favorite artists",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:api": "npm run start:dev -w @blendify/api",
+    "dev:web": "npm run dev -w @blendify/web",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:api": "npm run test -w @blendify/api",
+    "test:web": "npm run test -w @blendify/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:fix": "npm run lint:fix --workspaces --if-present",
+    "format": "npm run format --workspaces --if-present",
+    "format:check": "npm run format:check --workspaces --if-present",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "db:migrate": "npm run prisma:migrate -w @blendify/api",
+    "db:generate": "npm run prisma:generate -w @blendify/api",
+    "start": "./scripts/start.sh",
+    "stop": "./scripts/stop.sh",
+    "stop:all": "./scripts/stop.sh --infra",
+    "restart": "./scripts/restart.sh",
+    "reset": "./scripts/reset.sh --yes"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: blendify-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: blendify
+      POSTGRES_PASSWORD: blendify
+      POSTGRES_DB: blendify
+    ports:
+      - "5432:5432"
+    volumes:
+      - blendify_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blendify -d blendify"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: blendify-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - blendify_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  blendify_pg_data:
+  blendify_redis_data:

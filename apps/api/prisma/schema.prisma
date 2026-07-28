@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  spotifyId    String     @unique
+  displayName  String
+  email        String?
+  imageUrl     String?
+  accessToken  String
+  refreshToken String
+  tokenExpiresAt DateTime
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  playlists    Playlist[]
+
+  @@map("users")
+}
+
+model Playlist {
+  id              String         @id @default(cuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  description     String         @default("")
+  spotifyId       String?
+  spotifyUrl      String?
+  songsPerArtist  Int
+  shuffle         Boolean        @default(true)
+  status          PlaylistStatus @default(PENDING)
+  totalDurationMs Int            @default(0)
+  artistCount     Int            @default(0)
+  trackCount      Int            @default(0)
+  artistsJson     Json
+  tracksJson      Json
+  paramsJson      Json
+  errorMessage    String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([userId, createdAt])
+  @@map("playlists")
+}
+
+enum PlaylistStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
