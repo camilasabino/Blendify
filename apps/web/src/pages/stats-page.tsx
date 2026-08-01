@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { useT } from '@/i18n/use-t'
+import { isUsageStatsEmpty } from '@/lib/usage-stats'
 
 export function StatsPage() {
   const t = useT()
@@ -26,12 +27,7 @@ export function StatsPage() {
     },
   })
 
-  const canReset =
-    Boolean(data) &&
-    (data!.uniqueArtists > 0 ||
-      data!.uniqueGenres > 0 ||
-      data!.artistMixCount > 0 ||
-      data!.genreMixCount > 0)
+  const canReset = data != null && !isUsageStatsEmpty(data)
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8 animate-fade-up">

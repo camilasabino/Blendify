@@ -140,71 +140,78 @@ export function DiscoverPlaylistForm() {
     setResult(null)
     setRequestedTrackCount(values.targetTrackCount)
 
-    const seedName =
-      seedMode === 'artist' ? artist!.name : track!.name
+    const sharedBase = {
+      targetTrackCount: values.targetTrackCount,
+      popularity: values.popularity,
+      orderMode: values.orderMode,
+      persistToLibrary: readPersistToLibraryPreference(),
+    }
 
-    const playlistName = buildDiscoverPlaylistName(seedName)
-    const description =
-      seedMode === 'track' && track
-        ? t('playlist.discoverDescription.track', {
-            seed: track.name,
-            artist: track.artistName,
-          })
-        : t('playlist.discoverDescription.artist', { seed: seedName })
+    if (seedMode === 'track') {
+      if (!track) return
+      const seedTrack = track
+      const playlistName = buildDiscoverPlaylistName(seedTrack.name)
+      const description = t('playlist.discoverDescription.track', {
+        seed: seedTrack.name,
+        artist: seedTrack.artistName,
+      })
+      let coverImageBase64: string | undefined
+      try {
+        coverImageBase64 = await renderPlaylistCoverBase64({
+          title: playlistName,
+          kind: 'discover',
+          imageUrls: seedTrack.albumImageUrl ? [seedTrack.albumImageUrl] : [],
+        })
+      } catch {
+        setCoverError(t('create.coverFailed'))
+      }
+      discoverMutation.mutate({
+        kind: 'discover_track',
+        trackId: seedTrack.id,
+        track: {
+          id: seedTrack.id,
+          name: seedTrack.name,
+          artistId: seedTrack.artistId,
+          artistName: seedTrack.artistName,
+          albumImageUrl: seedTrack.albumImageUrl ?? null,
+          uri: seedTrack.uri,
+          durationMs: seedTrack.durationMs,
+          popularity: seedTrack.popularity,
+        },
+        description,
+        coverImageBase64,
+        ...sharedBase,
+      })
+      return
+    }
 
+    if (!artist) return
+    const seedArtist = artist
+    const playlistName = buildDiscoverPlaylistName(seedArtist.name)
+    const description = t('playlist.discoverDescription.artist', {
+      seed: seedArtist.name,
+    })
     let coverImageBase64: string | undefined
     try {
       coverImageBase64 = await renderPlaylistCoverBase64({
         title: playlistName,
         kind: 'discover',
-        imageUrls:
-          seedMode === 'track' && track?.albumImageUrl
-            ? [track.albumImageUrl]
-            : seedMode === 'artist' && artist?.imageUrl
-              ? [artist.imageUrl]
-              : [],
+        imageUrls: seedArtist.imageUrl ? [seedArtist.imageUrl] : [],
       })
     } catch {
       setCoverError(t('create.coverFailed'))
     }
-
-    const shared = {
-      targetTrackCount: values.targetTrackCount,
-      popularity: values.popularity,
-      orderMode: values.orderMode,
-      description,
-      coverImageBase64,
-      persistToLibrary: readPersistToLibraryPreference(),
-    }
-
-    if (seedMode === 'track' && track) {
-      discoverMutation.mutate({
-        kind: 'discover_track',
-        trackId: track.id,
-        track: {
-          id: track.id,
-          name: track.name,
-          artistId: track.artistId,
-          artistName: track.artistName,
-          albumImageUrl: track.albumImageUrl ?? null,
-          uri: track.uri,
-          durationMs: track.durationMs,
-          popularity: track.popularity,
-        },
-        ...shared,
-      })
-      return
-    }
-
     discoverMutation.mutate({
       kind: 'discover_artist',
-      artistId: artist!.id,
+      artistId: seedArtist.id,
       artist: {
-        id: artist!.id,
-        name: artist!.name,
-        imageUrl: artist!.imageUrl ?? null,
+        id: seedArtist.id,
+        name: seedArtist.name,
+        imageUrl: seedArtist.imageUrl ?? null,
       },
-      ...shared,
+      description,
+      coverImageBase64,
+      ...sharedBase,
     })
   }
 

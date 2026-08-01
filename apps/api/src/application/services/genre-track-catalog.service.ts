@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { PopularityMode } from '@blendify/contracts';
 import { pickStrictArtistMatch } from '../../domain/artist/artist-name-match';
 import { Artist } from '../../domain/artist/artist.entity';
@@ -40,6 +40,8 @@ export interface GenreTrackCatalogResult {
 
 @Injectable()
 export class GenreTrackCatalogService {
+  private readonly logger = new Logger(GenreTrackCatalogService.name);
+
   constructor(
     @Inject(DISCOVERY_CATALOG)
     private readonly discoveryCatalog: DiscoveryCatalogPort,
@@ -227,6 +229,11 @@ export class GenreTrackCatalogService {
           if (collected.length === 0) throw error;
           break;
         }
+        this.logger.warn(
+          `Genre artist search failed for ${artist.name}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
         continue;
       }
 
@@ -289,6 +296,11 @@ export class GenreTrackCatalogService {
             if (resolved.length === 0) throw error;
             break;
           }
+          this.logger.warn(
+            `Seed artist resolve failed for ${candidate.name}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
         }
       }
 

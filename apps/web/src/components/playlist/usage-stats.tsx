@@ -7,6 +7,20 @@ import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 import { isUsageStatsEmpty } from '@/lib/usage-stats'
 
+const PODIUM_BAR_TONES = [
+  'from-amber-400 via-amber-500 to-amber-600',
+  'from-cream-200/90 via-amber-300/80 to-amber-500/70',
+  'from-amber-600/80 to-amber-700/70',
+  'from-amber-700/55 to-amber-800/40',
+] as const
+
+const STAT_ACCENT_CLASS = {
+  amber: 'text-amber-400',
+  emerald: 'text-emerald-300',
+  rose: 'text-red-300',
+  cream: 'text-cream-50',
+} as const
+
 function StatCard({
   label,
   value,
@@ -14,16 +28,9 @@ function StatCard({
 }: {
   label: string
   value: number | string
-  accent?: 'amber' | 'emerald' | 'cream' | 'rose'
+  accent?: keyof typeof STAT_ACCENT_CLASS
 }) {
-  const valueClass =
-    accent === 'amber'
-      ? 'text-amber-400'
-      : accent === 'emerald'
-        ? 'text-emerald-300'
-        : accent === 'rose'
-          ? 'text-red-300'
-          : 'text-cream-50'
+  const valueClass = STAT_ACCENT_CLASS[accent ?? 'cream']
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-cream-200/10 bg-charcoal-800/50 p-5">
@@ -129,14 +136,7 @@ function RankBars({
                 : 0
             const isTop = index === 0
             const isPodium = index < 3
-            const barTone =
-              index === 0
-                ? 'from-amber-400 via-amber-500 to-amber-600'
-                : index === 1
-                  ? 'from-cream-200/90 via-amber-300/80 to-amber-500/70'
-                  : index === 2
-                    ? 'from-amber-600/80 to-amber-700/70'
-                    : 'from-amber-700/55 to-amber-800/40'
+            const barTone = PODIUM_BAR_TONES[Math.min(index, PODIUM_BAR_TONES.length - 1)]
 
             return (
               <li

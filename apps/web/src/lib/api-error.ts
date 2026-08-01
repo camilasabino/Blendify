@@ -105,6 +105,12 @@ export function getApiErrorMessage(
       ? t('errors.artistResolveNamed', { name })
       : t('errors.artistResolve')
   }
+  if (error.code === 'TRACK_RESOLVE_FAILED') {
+    const name = error.details?.name
+    return typeof name === 'string'
+      ? t('errors.trackResolveNamed', { name })
+      : t('discover.resolveFailed')
+  }
 
   if (error.code === 'EMPTY_ARTIST_SELECTION') return t('create.addArtist')
   if (error.code === 'EMPTY_GENRE_SELECTION') return t('create.addGenre')

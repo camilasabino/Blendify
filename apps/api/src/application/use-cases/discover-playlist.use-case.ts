@@ -467,7 +467,7 @@ export class DiscoverPlaylistUseCase {
 
     throw new BusinessRuleError(
       'Seed track could not be resolved on Spotify.',
-      'ARTIST_RESOLVE_FAILED',
+      'TRACK_RESOLVE_FAILED',
       { id: trackId, name: snapshot.name },
     );
   }

@@ -209,6 +209,8 @@ export const pt: Record<MessageKey, string> = {
     'Não encontramos um dos artistas selecionados no Spotify. Tente buscá-lo.',
   'errors.artistResolveNamed':
     'Não encontramos “{name}” no Spotify. Tente buscar esse artista.',
+  'errors.trackResolveNamed':
+    'Não encontramos a faixa “{name}” no Spotify. Tente outra semente.',
   'genre.searchPlaceholder': 'Buscar gêneros…',
   'genre.loadError': 'Não foi possível carregar os gêneros. Tente de novo.',
   'genre.empty': 'Nenhum gênero correspondente encontrado.',

@@ -21,6 +21,16 @@ const MAX_COVER_BYTES = 250 * 1024
 const MAX_COVER_IMAGES = 4
 const IMAGE_LOAD_TIMEOUT_MS = 5_000
 const JPEG_QUALITIES = [0.92, 0.85, 0.75, 0.65, 0.55] as const
+const TITLE_LEN_XL = 32
+const TITLE_LEN_LG = 22
+const TITLE_LEN_MD = 14
+
+function headlineFontSize(length: number): number {
+  if (length > TITLE_LEN_XL) return 26
+  if (length > TITLE_LEN_LG) return 32
+  if (length > TITLE_LEN_MD) return 38
+  return 44
+}
 
 /**
  * Renders a 640×640 JPEG cover for Spotify (≤256 KB).
@@ -208,29 +218,43 @@ function paintPhotoField(
   images: HTMLImageElement[],
 ): void {
   const count = Math.min(images.length, 4)
+  const at = (index: number) => images[index]
+  const first = at(0)
+  if (!first) return
+
   if (count === 1) {
-    drawCoverImage(ctx, images[0]!, 0, 0, size, artH)
+    drawCoverImage(ctx, first, 0, 0, size, artH)
     return
   }
+
+  const second = at(1)
+  if (!second) return
+
   if (count === 2) {
     const w = size / 2
-    drawCoverImage(ctx, images[0]!, 0, 0, w, artH)
-    drawCoverImage(ctx, images[1]!, w, 0, w, artH)
+    drawCoverImage(ctx, first, 0, 0, w, artH)
+    drawCoverImage(ctx, second, w, 0, w, artH)
     return
   }
-  if (count === 3) {
-    const half = size / 2
-    drawCoverImage(ctx, images[0]!, 0, 0, half, artH)
-    drawCoverImage(ctx, images[1]!, half, 0, half, artH / 2)
-    drawCoverImage(ctx, images[2]!, half, artH / 2, half, artH / 2)
-    return
-  }
+
+  const third = at(2)
+  if (!third) return
   const half = size / 2
+
+  if (count === 3) {
+    drawCoverImage(ctx, first, 0, 0, half, artH)
+    drawCoverImage(ctx, second, half, 0, half, artH / 2)
+    drawCoverImage(ctx, third, half, artH / 2, half, artH / 2)
+    return
+  }
+
+  const fourth = at(3)
+  if (!fourth) return
   const cellH = artH / 2
-  drawCoverImage(ctx, images[0]!, 0, 0, half, cellH)
-  drawCoverImage(ctx, images[1]!, half, 0, half, cellH)
-  drawCoverImage(ctx, images[2]!, 0, cellH, half, cellH)
-  drawCoverImage(ctx, images[3]!, half, cellH, half, cellH)
+  drawCoverImage(ctx, first, 0, 0, half, cellH)
+  drawCoverImage(ctx, second, half, 0, half, cellH)
+  drawCoverImage(ctx, third, 0, cellH, half, cellH)
+  drawCoverImage(ctx, fourth, half, cellH, half, cellH)
 }
 
 function drawCoverImage(
@@ -353,8 +377,7 @@ function paintBottomBar(
   ctx.font = `800 15px ${body}`
   ctx.fillText(kindLabel, 28, y0 + 26)
 
-  const fontSize =
-    headline.length > 32 ? 26 : headline.length > 22 ? 32 : headline.length > 14 ? 38 : 44
+  const fontSize = headlineFontSize(headline.length)
   ctx.fillStyle = palette.barText
   ctx.font = `800 ${fontSize}px ${display}`
   const lines = wrapText(ctx, headline, size - 56, 2)

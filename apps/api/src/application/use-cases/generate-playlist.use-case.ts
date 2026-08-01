@@ -40,6 +40,7 @@ import {
   preferPopularTracks,
   preferRareTracks,
   rankTracksForMix,
+  type ArtistTrackQuery,
 } from '../../domain/genre/artist-mix-queries';
 import {
   isSpotifyQuotaError,
@@ -61,6 +62,17 @@ import {
 
 function isPendingArtistId(id: string): boolean {
   return id.startsWith('pending:');
+}
+
+/** Popularity ceiling used when preferring rarer chart tracks. */
+const RARITY_POPULARITY_CEILING = 55;
+
+function rankModeForPopularity(
+  mode: PopularityModeValue,
+): ArtistTrackQuery['rank'] {
+  if (mode === PopularityMode.POPULAR) return 'popularity_desc';
+  if (mode === PopularityMode.RARITIES) return 'popularity_asc';
+  return 'as_found';
 }
 
 @Injectable()
@@ -340,18 +352,15 @@ export class GeneratePlaylistUseCase {
         },
       );
 
-      let ranked = rankTracksForMix(
-        collected,
-        mode === PopularityMode.POPULAR
-          ? 'popularity_desc'
-          : mode === PopularityMode.RARITIES
-            ? 'popularity_asc'
-            : 'as_found',
-      );
+      let ranked = rankTracksForMix(collected, rankModeForPopularity(mode));
       if (mode === PopularityMode.POPULAR) {
         ranked = preferPopularTracks(ranked, fetchBudget);
       } else if (mode === PopularityMode.RARITIES) {
-        ranked = preferRareTracks(ranked, fetchBudget, 55);
+        ranked = preferRareTracks(
+          ranked,
+          fetchBudget,
+          RARITY_POPULARITY_CEILING,
+        );
       }
 
       matched = Math.min(
@@ -404,6 +413,12 @@ export class GeneratePlaylistUseCase {
       } catch (error) {
         if (isSpotifyQuotaError(error)) {
           if (collected.length === 0) throw error;
+        } else {
+          this.logger.warn(
+            `Artist track search fallback failed for ${artist.name}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
         }
       }
     }

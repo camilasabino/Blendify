@@ -52,15 +52,24 @@ export function ArtistSimilarSuggestions({
     [selected],
   )
 
+  const seedName = seed?.name
   const similarQuery = useQuery({
-    queryKey: ['artists', 'similar', seed?.name, page, excludeNames.join('|')],
-    queryFn: () =>
-      api.similarArtists(seed!.name, {
+    queryKey: ['artists', 'similar', seedName, page, excludeNames.join('|')],
+    queryFn: () => {
+      if (!seedName) {
+        return Promise.resolve({
+          artists: [] as SimilarArtistSuggestion[],
+          hasMore: false,
+          source: 'lastfm' as const,
+        })
+      }
+      return api.similarArtists(seedName, {
         excludeNames,
         offset: page * PAGE_SIZE,
         limit: PAGE_SIZE,
-      }),
-    enabled: Boolean(seed?.name) && !atLimit,
+      })
+    },
+    enabled: Boolean(seedName) && !atLimit,
     staleTime: 120_000,
     retry: false,
   })

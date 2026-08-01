@@ -12,6 +12,9 @@ import { InPagePlaylistPlayer } from '@/components/playlist/in-page-playlist-pla
 
 type ListenMode = 'here' | 'device'
 
+const DEVICE_WAKE_MS = 3200
+const DEVICE_RETRY_MS = 2200
+
 type PlaylistPreviewProps = {
   tracks?: TrackDto[]
   spotifyId?: string | null
@@ -102,13 +105,13 @@ export function PlaylistPreview({
     }) => {
       setLastPlay(input.play)
       if (input.openedSpotify) {
-        await sleep(3200)
+        await sleep(DEVICE_WAKE_MS)
       }
       try {
         return await api.playOnSpotify(input.play)
       } catch (error) {
         if (input.openedSpotify && isDeviceMissingError(error)) {
-          await sleep(2200)
+          await sleep(DEVICE_RETRY_MS)
           return await api.playOnSpotify(input.play)
         }
         throw error

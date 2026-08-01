@@ -16,6 +16,18 @@ import { useT } from '@/i18n/use-t'
 
 const PAGE_SIZE = 5
 
+function deleteConfirmKey(
+  purge: boolean,
+  missingOnSpotify: boolean,
+):
+  | 'library.purgeSpotifyConfirm'
+  | 'library.deleteConfirmDeleted'
+  | 'library.deleteConfirmActive' {
+  if (purge) return 'library.purgeSpotifyConfirm'
+  if (missingOnSpotify) return 'library.deleteConfirmDeleted'
+  return 'library.deleteConfirmActive'
+}
+
 export function LibraryList() {
   const t = useT()
   const queryClient = useQueryClient()
@@ -184,11 +196,7 @@ export function LibraryList() {
     return {
       title: t(purge ? 'library.purgeTitle' : 'library.deleteTitle'),
       description: t(
-        purge
-          ? 'library.purgeSpotifyConfirm'
-          : pending.playlist.missingOnSpotify
-            ? 'library.deleteConfirmDeleted'
-            : 'library.deleteConfirmActive',
+        deleteConfirmKey(purge, pending.playlist.missingOnSpotify),
         { name: pending.playlist.name },
       ),
       danger: true,

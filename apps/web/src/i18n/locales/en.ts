@@ -199,6 +199,8 @@ export const en = {
     'Couldn’t match one of the selected artists on Spotify. Try searching for it instead.',
   'errors.artistResolveNamed':
     'Couldn’t find “{name}” on Spotify. Try searching for it instead.',
+  'errors.trackResolveNamed':
+    'Couldn’t find the track “{name}” on Spotify. Try another seed.',
   'genre.searchPlaceholder': 'Search genres…',
   'genre.loadError': 'Couldn’t load genres. Please try again.',
   'genre.empty': 'No matching genres found.',
