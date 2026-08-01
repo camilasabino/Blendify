@@ -14,8 +14,14 @@
   <img alt="NestJS" src="https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white" />
   <img alt="Spotify" src="https://img.shields.io/badge/Spotify-Web%20API-1DB954?logo=spotify&logoColor=white" />
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" />
+</p>
+
+<p align="center">
   <a href="https://sonarcloud.io/summary/new_code?id=camilasabino_Blendify">
-    <img alt="Quality gate status" src="https://sonarcloud.io/api/project_badges/measure?project=camilasabino_Blendify&amp;metric=alert_status&amp;token=e6a94ec79ca3faaaad1b8770dbc7eb9fbcb47a45" />
+    <img alt="Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=camilasabino_Blendify&metric=alert_status&token=e6a94ec79ca3faaaad1b8770dbc7eb9fbcb47a45" />
+  </a>
+  <a href="https://sonarcloud.io/summary/new_code?id=camilasabino_Blendify">
+    <img alt="Coverage" src="https://sonarcloud.io/api/project_badges/measure?project=camilasabino_Blendify&metric=coverage&token=e6a94ec79ca3faaaad1b8770dbc7eb9fbcb47a45" />
   </a>
 </p>
 
