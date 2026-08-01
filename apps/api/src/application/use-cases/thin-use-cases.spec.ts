@@ -141,4 +141,67 @@ describe('thin application use cases', () => {
     );
     expect(del).toHaveBeenCalledWith('playlist-1');
   });
+
+  it('RemovePlaylistFromLibraryUseCase purges Spotify then marks missing', async () => {
+    const playlist = makePlaylist();
+    playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
+    const save = jest
+      .fn()
+      .mockImplementation((p: Playlist) => Promise.resolve(p));
+    const deletePlaylist = jest.fn().mockResolvedValue(undefined);
+    const del = jest.fn();
+    const playlists = {
+      findById: jest.fn().mockResolvedValue(playlist),
+      save,
+      delete: del,
+    } as unknown as PlaylistRepositoryPort;
+    const providers = {
+      forUser: () => ({ deletePlaylist }),
+    } as unknown as MusicProviderFactoryPort;
+
+    await new RemovePlaylistFromLibraryUseCase(playlists, providers).execute(
+      'user-1',
+      'playlist-1',
+      { fromSpotify: true },
+    );
+
+    expect(deletePlaylist).toHaveBeenCalledWith('sp1');
+    expect(playlist.missingOnSpotify).toBe(true);
+    expect(save).toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it('RemovePlaylistFromLibraryUseCase surfaces Spotify purge failures', async () => {
+    const playlist = makePlaylist();
+    playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
+    const playlists = {
+      findById: jest.fn().mockResolvedValue(playlist),
+      save: jest.fn(),
+    } as unknown as PlaylistRepositoryPort;
+    const providers = {
+      forUser: () => ({
+        deletePlaylist: jest.fn().mockRejectedValue(new Error('spotify down')),
+      }),
+    } as unknown as MusicProviderFactoryPort;
+
+    await expect(
+      new RemovePlaylistFromLibraryUseCase(playlists, providers).execute(
+        'user-1',
+        'playlist-1',
+        { fromSpotify: true },
+      ),
+    ).rejects.toThrow('spotify down');
+  });
+
+  it('RemovePlaylistFromLibraryUseCase rejects foreign playlists', async () => {
+    const playlists = {
+      findById: jest.fn().mockResolvedValue(null),
+    } as unknown as PlaylistRepositoryPort;
+
+    await expect(
+      new RemovePlaylistFromLibraryUseCase(playlists, {
+        forUser: jest.fn(),
+      }).execute('user-1', 'missing'),
+    ).rejects.toMatchObject({ code: 'PLAYLIST_NOT_FOUND' });
+  });
 });

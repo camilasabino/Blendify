@@ -1,6 +1,7 @@
-import { PopularityMode } from '@blendify/contracts';
+import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
 import {
   buildGenreQueries,
+  GenrePlaylistGenerationService,
   selectTracksWithArtistDiversity,
   tracksPerSeedArtist,
 } from './genre-playlist-generation.service';
@@ -96,5 +97,48 @@ describe('selectTracksWithArtistDiversity', () => {
 describe('tracksPerSeedArtist', () => {
   it('stays small when many seeds cover the budget', () => {
     expect(tracksPerSeedArtist(40, 28)).toBe(2);
+  });
+
+  it('defaults when there are no seed artists', () => {
+    expect(tracksPerSeedArtist(10, 0)).toBe(2);
+  });
+
+  it('caps fetch depth at three tracks per artist', () => {
+    expect(tracksPerSeedArtist(40, 2)).toBe(3);
+  });
+});
+
+describe('selectTracksWithArtistDiversity edge cases', () => {
+  it('returns empty when nothing is needed', () => {
+    expect(selectTracksWithArtistDiversity([track('a', 'A1')], 0)).toEqual([]);
+  });
+});
+
+describe('GenrePlaylistGenerationService', () => {
+  it('dedupes across genres and respects MAX_TRACKS ordering', () => {
+    const service = new GenrePlaylistGenerationService();
+    const tracksByGenre = new Map([
+      [
+        'jazz',
+        [
+          track('a', 'A1'),
+          track('a', 'A1 - Live', 'a-live'),
+          track('b', 'B1'),
+          track('c', 'C1'),
+        ],
+      ],
+      ['soul', [track('b', 'B1 Dup', 'b-dup'), track('d', 'D1')]],
+    ]);
+
+    const result = service.generate({
+      tracksByGenre,
+      tracksPerSeed: 3,
+      orderMode: TrackOrderMode.ARTIST,
+    });
+
+    expect(result.allocation.get('jazz')).toBeGreaterThan(0);
+    expect(result.tracks.length).toBeGreaterThan(0);
+    const names = result.tracks.map((t) => t.name);
+    expect(names).not.toContain('A1 - Live');
   });
 });
