@@ -1,4 +1,4 @@
-import { RedisCacheService } from './redis-cache.service';
+import { RedisCacheService, sanitizeRedisUrl } from './redis-cache.service';
 import { ConfigService } from '@nestjs/config';
 
 describe('RedisCacheService memory fallback', () => {
@@ -12,5 +12,13 @@ describe('RedisCacheService memory fallback', () => {
     await expect(
       cache.getJson<{ ok: boolean }>('blendify:test:key'),
     ).resolves.toEqual({ ok: true });
+  });
+
+  it('redacts passwords in Redis URLs', () => {
+    expect(sanitizeRedisUrl('redis://:s3cret@localhost:6379/0')).toContain(
+      '***',
+    );
+    expect(sanitizeRedisUrl('redis://localhost:6379')).toContain('localhost');
+    expect(sanitizeRedisUrl('not-a-url')).toBe('redis://***');
   });
 });

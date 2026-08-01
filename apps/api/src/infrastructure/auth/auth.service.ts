@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { CookieOptions, Response } from 'express';
 import { randomUUID } from 'crypto';
@@ -33,7 +32,6 @@ export class AuthService {
     private readonly spotifyAuth: SpotifyAuthClient,
     @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
     private readonly jwt: JwtService,
-    private readonly config: ConfigService,
   ) {}
 
   getLoginUrl(state: string): string {
@@ -102,14 +100,15 @@ export class AuthService {
     }
   }
 
-  /** Shared cookie flags for session + OAuth state (must match on clearCookie). */
+  /**
+   * Shared cookie flags for session + OAuth state (must match on clearCookie).
+   * Always Secure: browsers treat http://localhost as a secure context; use that
+   * (not 127.0.0.1) for local HTTP so OAuth session cookies still stick.
+   */
   cookieOptions(maxAgeMs: number): CookieOptions {
-    const isProd = this.config.get('NODE_ENV') === 'production';
-    // API and web share 127.0.0.1 in local; SameSite=Lax is enough. Prefer Lax
-    // in production too when front/API are same-site (avoid None unless needed).
     return {
       httpOnly: true,
-      secure: isProd,
+      secure: true,
       sameSite: 'lax',
       maxAge: maxAgeMs,
       path: '/',

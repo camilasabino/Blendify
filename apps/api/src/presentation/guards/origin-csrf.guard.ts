@@ -19,7 +19,7 @@ export class OriginCsrfGuard implements CanActivate {
 
   constructor(config: ConfigService) {
     this.allowedOrigin = (
-      config.get<string>('FRONTEND_URL') ?? 'http://127.0.0.1:5173'
+      config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173'
     ).replace(/\/$/, '');
   }
 

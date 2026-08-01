@@ -3,7 +3,7 @@ import { OriginCsrfGuard } from './origin-csrf.guard';
 describe('OriginCsrfGuard', () => {
   const guard = new OriginCsrfGuard({
     get: (key: string) =>
-      key === 'FRONTEND_URL' ? 'http://127.0.0.1:5173' : undefined,
+      key === 'FRONTEND_URL' ? 'http://localhost:5173' : undefined,
   } as never);
 
   function ctx(partial: {
@@ -42,7 +42,7 @@ describe('OriginCsrfGuard', () => {
   it('allows matching Origin on mutations', () => {
     expect(
       guard.canActivate(
-        ctx({ method: 'POST', origin: 'http://127.0.0.1:5173' }),
+        ctx({ method: 'POST', origin: 'http://localhost:5173' }),
       ),
     ).toBe(true);
   });
@@ -53,7 +53,7 @@ describe('OriginCsrfGuard', () => {
         ctx({
           method: 'DELETE',
           origin: undefined,
-          referer: 'http://127.0.0.1:5173/app/library',
+          referer: 'http://localhost:5173/app/library',
         }),
       ),
     ).toBe(true);

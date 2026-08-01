@@ -128,7 +128,7 @@ COOKIE_SECRET=replace-with-a-long-random-value
 Use this exact Spotify redirect URI:
 
 ```text
-http://127.0.0.1:3000/api/auth/spotify/callback
+http://localhost:3000/api/auth/spotify/callback
 ```
 
 Required Spotify scopes:
@@ -140,7 +140,7 @@ ugc-image-upload
 user-read-playback-state user-modify-playback-state
 ```
 
-Use `127.0.0.1` consistently. Mixing it with `localhost` prevents the OAuth session cookie from matching.
+Use `localhost` consistently (not `127.0.0.1`). Session cookies are always `Secure`; browsers treat `http://localhost` as a secure context, but plain `http://127.0.0.1` will not store them.
 
 ### 2. Start infrastructure and prepare Prisma
 
@@ -162,11 +162,11 @@ npm run dev:api
 npm run dev:web
 ```
 
-Open http://127.0.0.1:5173.
+Open http://localhost:5173.
 
-- API: http://127.0.0.1:3000
-- Swagger: http://127.0.0.1:3000/api/docs
-- Health: http://127.0.0.1:3000/api/health
+- API: http://localhost:3000
+- Swagger: http://localhost:3000/api/docs
+- Health: http://localhost:3000/api/health
 
 For a one-command local start, run `npm run start`. Lifecycle logs are written to `.blendify/logs/`.
 
