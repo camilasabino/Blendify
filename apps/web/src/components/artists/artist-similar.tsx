@@ -16,11 +16,130 @@ import { cn, focusRing, normalizeArtistName } from '@/lib/utils'
 
 const PAGE_SIZE = 8
 
-type ArtistSimilarProps = {
+type ArtistSimilarProps = Readonly<{
   selected: Artist[]
   max: number
   onSelect: (artist: Artist) => void
   className?: string
+}>
+
+function mergeSimilarBatch(
+  prev: SimilarArtistSuggestion[],
+  batch: SimilarArtistSuggestion[],
+  selectedNames: Set<string>,
+  page: number,
+): SimilarArtistSuggestion[] {
+  const nextBatch = batch.filter(
+    (artist) => !selectedNames.has(normalizeArtistName(artist.name)),
+  )
+  if (page === 0) return nextBatch
+  const seen = new Set(prev.map((artist) => normalizeArtistName(artist.name)))
+  return [
+    ...prev,
+    ...nextBatch.filter(
+      (artist) => !seen.has(normalizeArtistName(artist.name)),
+    ),
+  ]
+}
+
+function ExploreSeedPicker({
+  selected,
+  seedId,
+  onSetSeedId,
+}: {
+  selected: Artist[]
+  seedId: string
+  onSetSeedId: (id: string) => void
+}) {
+  const t = useT()
+  if (selected.length <= 1) return null
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-[11px] text-cream-500">
+        {t('artist.exploreSeedHint')}
+      </span>
+      {selected.map((artist) => (
+        <SeedChip
+          key={artist.id}
+          active={artist.id === seedId}
+          onClick={() => onSetSeedId(artist.id)}
+        >
+          {artist.name}
+        </SeedChip>
+      ))}
+    </div>
+  )
+}
+
+function SimilarSuggestionsList({
+  suggestions,
+  resolvingName,
+  resolvePending,
+  onResolve,
+}: {
+  suggestions: SimilarArtistSuggestion[]
+  resolvingName: string | null
+  resolvePending: boolean
+  onResolve: (name: string) => void
+}) {
+  if (suggestions.length === 0) return null
+  return (
+    <ul className="flex flex-wrap gap-2">
+      {suggestions.map((artist) => {
+        const busy = resolvingName === artist.name
+        return (
+          <li key={`${artist.mbid ?? artist.name}`}>
+            <button
+              type="button"
+              disabled={resolvePending}
+              onClick={() => onResolve(artist.name)}
+              className={cn(
+                'group inline-flex max-w-full items-center gap-2 rounded-full border border-cream-200/10 bg-charcoal-950/35 px-3.5 py-2 text-left text-sm text-cream-100 transition',
+                'hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-cream-50',
+                'disabled:cursor-wait disabled:opacity-60',
+                focusRing,
+              )}
+            >
+              <span className="truncate font-medium tracking-tight">
+                {artist.name}
+              </span>
+              {busy ? (
+                <Spinner size="sm" className="shrink-0" />
+              ) : (
+                <Plus className="size-3.5 shrink-0 text-amber-400/70 transition group-hover:text-amber-300" />
+              )}
+            </button>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function SuggestMoreButton({
+  hasMore,
+  fetching,
+  onLoadMore,
+}: {
+  hasMore: boolean
+  fetching: boolean
+  onLoadMore: () => void
+}) {
+  const t = useT()
+  return (
+    <button
+      type="button"
+      disabled={fetching || !hasMore}
+      onClick={onLoadMore}
+      className={cn(
+        'inline-flex items-center gap-2 text-sm text-amber-300/90 transition hover:text-amber-200 disabled:opacity-40',
+        focusRing,
+      )}
+    >
+      {fetching ? <Spinner size="sm" /> : <RefreshCw className="size-3.5" />}
+      {hasMore ? t('artist.suggestMore') : t('artist.exploreExhausted')}
+    </button>
+  )
 }
 
 export function ArtistSimilarSuggestions({
@@ -77,21 +196,7 @@ export function ArtistSimilarSuggestions({
   useEffect(() => {
     const batch = similarQuery.data?.artists
     if (!batch) return
-    setItems((prev) => {
-      const nextBatch = batch.filter(
-        (artist) => !selectedNames.has(normalizeArtistName(artist.name)),
-      )
-      if (page === 0) return nextBatch
-      const seen = new Set(
-        prev.map((artist) => normalizeArtistName(artist.name)),
-      )
-      return [
-        ...prev,
-        ...nextBatch.filter(
-          (artist) => !seen.has(normalizeArtistName(artist.name)),
-        ),
-      ]
-    })
+    setItems((prev) => mergeSimilarBatch(prev, batch, selectedNames, page))
   }, [similarQuery.data, page, selectedNames])
 
   const resolveMutation = useMutation({
@@ -121,6 +226,9 @@ export function ArtistSimilarSuggestions({
   const resolvingName = resolveMutation.isPending
     ? (resolveMutation.variables ?? null)
     : null
+  const showLoadMore = hasMore || suggestions.length > 0
+  const emptyLabel =
+    page > 0 ? t('artist.exploreExhausted') : t('artist.exploreEmpty')
 
   if (selected.length === 0 || atLimit || !seed) return null
 
@@ -141,22 +249,11 @@ export function ArtistSimilarSuggestions({
         </p>
       </div>
 
-      {selected.length > 1 ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-cream-500">
-            {t('artist.exploreSeedHint')}
-          </span>
-          {selected.map((artist) => (
-            <SeedChip
-              key={artist.id}
-              active={artist.id === seed.id}
-              onClick={() => setSeedId(artist.id)}
-            >
-              {artist.name}
-            </SeedChip>
-          ))}
-        </div>
-      ) : null}
+      <ExploreSeedPicker
+        selected={selected}
+        seedId={seed.id}
+        onSetSeedId={setSeedId}
+      />
 
       {similarQuery.isLoading ? (
         <div className="flex items-center gap-2 py-2 text-sm text-cream-400">
@@ -174,60 +271,22 @@ export function ArtistSimilarSuggestions({
       {resolveError ? <FieldError>{resolveError}</FieldError> : null}
 
       {!similarQuery.isLoading && suggestions.length === 0 ? (
-        <p className="text-sm text-cream-400">
-          {page > 0 ? t('artist.exploreExhausted') : t('artist.exploreEmpty')}
-        </p>
+        <p className="text-sm text-cream-400">{emptyLabel}</p>
       ) : null}
 
-      {suggestions.length > 0 ? (
-        <ul className="flex flex-wrap gap-2">
-          {suggestions.map((artist) => {
-            const busy = resolvingName === artist.name
-            return (
-              <li key={`${artist.mbid ?? artist.name}`}>
-                <button
-                  type="button"
-                  disabled={resolveMutation.isPending}
-                  onClick={() => resolveMutation.mutate(artist.name)}
-                  className={cn(
-                    'group inline-flex max-w-full items-center gap-2 rounded-full border border-cream-200/10 bg-charcoal-950/35 px-3.5 py-2 text-left text-sm text-cream-100 transition',
-                    'hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-cream-50',
-                    'disabled:cursor-wait disabled:opacity-60',
-                    focusRing,
-                  )}
-                >
-                  <span className="truncate font-medium tracking-tight">
-                    {artist.name}
-                  </span>
-                  {busy ? (
-                    <Spinner size="sm" className="shrink-0" />
-                  ) : (
-                    <Plus className="size-3.5 shrink-0 text-amber-400/70 transition group-hover:text-amber-300" />
-                  )}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      ) : null}
+      <SimilarSuggestionsList
+        suggestions={suggestions}
+        resolvingName={resolvingName}
+        resolvePending={resolveMutation.isPending}
+        onResolve={(name) => resolveMutation.mutate(name)}
+      />
 
-      {hasMore || suggestions.length > 0 ? (
-        <button
-          type="button"
-          disabled={similarQuery.isFetching || !hasMore}
-          onClick={() => setPage((p) => p + 1)}
-          className={cn(
-            'inline-flex items-center gap-2 text-sm text-amber-300/90 transition hover:text-amber-200 disabled:opacity-40',
-            focusRing,
-          )}
-        >
-          {similarQuery.isFetching ? (
-            <Spinner size="sm" />
-          ) : (
-            <RefreshCw className="size-3.5" />
-          )}
-          {hasMore ? t('artist.suggestMore') : t('artist.exploreExhausted')}
-        </button>
+      {showLoadMore ? (
+        <SuggestMoreButton
+          hasMore={hasMore}
+          fetching={similarQuery.isFetching}
+          onLoadMore={() => setPage((p) => p + 1)}
+        />
       ) : null}
     </div>
   )

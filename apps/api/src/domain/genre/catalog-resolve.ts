@@ -59,33 +59,17 @@ export async function resolveCatalogTracks(
     i += concurrency
   ) {
     const batch = refs.slice(i, i + concurrency);
-    const resolved = await Promise.all(
-      batch.map(async (ref) => {
-        try {
-          return await provider.resolveTrack(ref.artistName, ref.trackName, {
-            artistId,
-          });
-        } catch (error) {
-          if (isSpotifyQuotaError(error)) throw error;
-          return null;
-        }
-      }),
-    );
-
+    const resolved = await resolveCatalogBatch(provider, batch, artistId);
     attempted += batch.length;
 
-    for (const track of resolved) {
-      if (!track || collected.length >= needed) continue;
-      if (artistId && track.artistId.getValue() !== artistId) continue;
-      const id = track.id.getValue();
-      if (seenIds.has(id)) continue;
-      const trackArtistId = track.artistId.getValue();
-      const used = perArtist.get(trackArtistId) ?? 0;
-      if (used >= maxPerArtist) continue;
-      seenIds.add(id);
-      perArtist.set(trackArtistId, used + 1);
-      collected.push(track);
-    }
+    acceptResolvedTracks(resolved, {
+      needed,
+      artistId,
+      maxPerArtist,
+      collected,
+      seenIds,
+      perArtist,
+    });
 
     options.onProgress?.({
       matched: collected.length,
@@ -95,6 +79,52 @@ export async function resolveCatalogTracks(
   }
 
   return collected;
+}
+
+async function resolveCatalogBatch(
+  provider: MusicProviderPort,
+  batch: CatalogTrackRef[],
+  artistId: string | undefined,
+): Promise<Array<Track | null>> {
+  return Promise.all(
+    batch.map(async (ref) => {
+      try {
+        return await provider.resolveTrack(ref.artistName, ref.trackName, {
+          artistId,
+        });
+      } catch (error) {
+        if (isSpotifyQuotaError(error)) throw error;
+        return null;
+      }
+    }),
+  );
+}
+
+function acceptResolvedTracks(
+  resolved: Array<Track | null>,
+  state: {
+    needed: number;
+    artistId: string | undefined;
+    maxPerArtist: number;
+    collected: Track[];
+    seenIds: Set<string>;
+    perArtist: Map<string, number>;
+  },
+): void {
+  for (const track of resolved) {
+    if (!track || state.collected.length >= state.needed) continue;
+    if (state.artistId && track.artistId.getValue() !== state.artistId) {
+      continue;
+    }
+    const id = track.id.getValue();
+    if (state.seenIds.has(id)) continue;
+    const trackArtistId = track.artistId.getValue();
+    const used = state.perArtist.get(trackArtistId) ?? 0;
+    if (used >= state.maxPerArtist) continue;
+    state.seenIds.add(id);
+    state.perArtist.set(trackArtistId, used + 1);
+    state.collected.push(track);
+  }
 }
 
 /** How many Spotify resolves to attempt for a target playlist size. */

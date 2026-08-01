@@ -37,13 +37,12 @@ function ProtectedRoute() {
 
   if (!isInitialized || isLoading) {
     return (
-      <div
+      <output
         className="bg-atmosphere flex min-h-svh items-center justify-center"
-        role="status"
         aria-label={t('common.loading')}
       >
         <Spinner size="lg" />
-      </div>
+      </output>
     )
   }
 
@@ -76,12 +75,11 @@ export default function App() {
 function RouteLoading() {
   const t = useT()
   return (
-    <div
+    <output
       className="bg-atmosphere flex min-h-svh items-center justify-center"
-      role="status"
       aria-label={t('common.loading')}
     >
       <Spinner size="lg" />
-    </div>
+    </output>
   )
 }

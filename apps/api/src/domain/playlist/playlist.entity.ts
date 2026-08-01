@@ -40,7 +40,7 @@ export interface PlaylistCreateInput {
 
 export class Playlist {
   private _name: PlaylistName;
-  private _description: string;
+  private readonly _description: string;
   private _spotifyId?: string;
   private _spotifyUrl?: string;
   private _tracks: Track[];

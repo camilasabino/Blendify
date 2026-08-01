@@ -145,7 +145,7 @@ describe('sliceCatalogWindow', () => {
       10,
       pickLast,
     );
-    expect(picked.length).toBe(catalogCandidateBudget(10));
+    expect(picked).toHaveLength(catalogCandidateBudget(10));
     for (const item of picked) {
       expect(entries.indexOf(item)).toBeLessThan(20);
     }
@@ -158,7 +158,7 @@ describe('sliceCatalogWindow', () => {
       10,
       pickLast,
     );
-    expect(picked.length).toBe(catalogCandidateBudget(10));
+    expect(picked).toHaveLength(catalogCandidateBudget(10));
     for (const item of picked) {
       expect(entries.indexOf(item)).toBeGreaterThanOrEqual(30);
     }
@@ -171,7 +171,7 @@ describe('sliceCatalogWindow', () => {
       10,
       pickLast,
     );
-    expect(picked.length).toBe(catalogCandidateBudget(10));
+    expect(picked).toHaveLength(catalogCandidateBudget(10));
     expect(new Set(picked).size).toBe(picked.length);
   });
 
@@ -183,7 +183,7 @@ describe('sliceCatalogWindow', () => {
       pickLast,
     );
     // needed 25 → budget 33, initial pool 20 → must expand past 40%
-    expect(picked.length).toBe(catalogCandidateBudget(25));
+    expect(picked).toHaveLength(catalogCandidateBudget(25));
     expect(picked.some((item) => entries.indexOf(item) >= 20)).toBe(true);
   });
 

@@ -2,12 +2,12 @@ import { useId, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type RadioCardOption<T extends string | number> = {
+export type RadioCardOption<T extends string | number> = Readonly<{
   value: T
   label: ReactNode
   hint?: ReactNode
   icon?: LucideIcon
-}
+}>
 
 export function RadioCardGroup<T extends string | number>({
   label,

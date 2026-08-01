@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   canonicalizeGenreTag,
   formatGenreDisplayName,
@@ -144,14 +144,19 @@ function tokensOf(value: string): string[] {
   const lower = value.toLowerCase().trim();
   const tokens = new Set<string>();
 
-  for (const compound of lower.match(/[a-z0-9]+(?:\s*&\s*[a-z0-9]+)+/g) ?? []) {
-    const compact = compound.replace(/\s+/g, '');
-    tokens.add(compact);
-    tokens.add(compound.replace(/\s*&\s*/g, 'and'));
-    tokens.add(compound.replace(/\s*&\s*/g, ''));
+  // Collapse "r & b" → "r&b" without nested \s* quantifiers, then tokenize.
+  const ampCollapsed = lower
+    .split('&')
+    .map((part) => part.trim())
+    .join('&');
+  for (const compound of ampCollapsed.match(/[a-z0-9]+(?:&[a-z0-9]+)+/g) ??
+    []) {
+    tokens.add(compound);
+    tokens.add(compound.replaceAll('&', 'and'));
+    tokens.add(compound.replaceAll('&', ''));
   }
 
-  for (const part of lower.replace(/&/g, ' ').split(/[\s/_+-]+/)) {
+  for (const part of lower.replaceAll('&', ' ').split(/[\s/_+-]+/)) {
     const t = part.trim();
     if (t.length >= 2) tokens.add(t);
   }
@@ -220,7 +225,7 @@ export function getExploreSuggestions(
     unique.push(id);
   }
 
-  const seedId = unique[unique.length - 1];
+  const seedId = unique.at(-1);
   if (!seedId) {
     return { genres: [], hasMore: false };
   }

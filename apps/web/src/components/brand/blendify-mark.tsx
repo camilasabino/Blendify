@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils'
 
-type BlendifyMarkProps = {
+type BlendifyMarkProps = Readonly<{
   className?: string
   title?: string
-}
+}>
 
 export function BlendifyMark({
   className,

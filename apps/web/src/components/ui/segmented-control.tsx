@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
 import { cn, focusRing } from '@/lib/utils'
 
-type SegmentedOption<T extends string> = {
+type SegmentedOption<T extends string> = Readonly<{
   value: T
   label: ReactNode
-}
+}>
 
-type SegmentedControlProps<T extends string> = {
+type SegmentedControlProps<T extends string> = Readonly<{
   options: SegmentedOption<T>[]
   value: T
   onChange: (value: T) => void
@@ -14,7 +14,7 @@ type SegmentedControlProps<T extends string> = {
   className?: string
   size?: 'sm' | 'md'
   layout?: 'inline' | 'grid'
-}
+}>
 
 export function SegmentedControl<T extends string>({
   options,

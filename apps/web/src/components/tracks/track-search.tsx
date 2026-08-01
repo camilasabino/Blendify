@@ -4,12 +4,12 @@ import { SearchCombobox } from '@/components/ui/search-combobox'
 import { useT } from '@/i18n/use-t'
 import { formatDuration } from '@/lib/utils'
 
-type TrackSearchProps = {
+type TrackSearchProps = Readonly<{
   selectedIds: Set<string>
   onSelect: (track: TrackDto) => void
   disabled?: boolean
   className?: string
-}
+}>
 
 export function TrackSearch(props: TrackSearchProps) {
   const t = useT()

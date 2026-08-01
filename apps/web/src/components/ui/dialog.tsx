@@ -5,13 +5,13 @@ import { Spinner } from '@/components/ui/spinner'
 import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 
-type DialogProps = {
+type DialogProps = Readonly<{
   open: boolean
   onClose: () => void
   title: string
   children: ReactNode
   className?: string
-}
+}>
 
 function Dialog({
   open,
@@ -56,6 +56,8 @@ function Dialog({
       />
       <div
         ref={panelRef}
+        // S6819: keep role="dialog" — switching to <dialog> would require
+        // showModal()/close() and break the existing portal + overlay + focus restore flow.
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -77,7 +79,7 @@ function Dialog({
   )
 }
 
-export type ConfirmDialogProps = {
+export type ConfirmDialogProps = Readonly<{
   open: boolean
   title: string
   description: string
@@ -88,7 +90,7 @@ export type ConfirmDialogProps = {
   busy?: boolean
   onConfirm: () => void
   onCancel: () => void
-}
+}>
 
 export function ConfirmDialog({
   open,
@@ -113,14 +115,13 @@ export function ConfirmDialog({
     >
       <p className="text-sm leading-relaxed text-cream-300">{description}</p>
       {busy && workingLabel ? (
-        <p
+        <output
           className="mt-3 flex items-center gap-2 text-sm text-amber-400/90"
-          role="status"
           aria-live="polite"
         >
           <Spinner size="sm" className="text-amber-400" />
           {workingLabel}
-        </p>
+        </output>
       ) : null}
       <div className="mt-5 flex flex-wrap justify-end gap-2">
         {cancelLabel ? (

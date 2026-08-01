@@ -43,7 +43,7 @@ const SENSITIVE_BODY_KEYS = new Set([
 export function sanitizeOutboundUrl(rawUrl: string): string {
   try {
     const url = new URL(rawUrl);
-    for (const key of [...url.searchParams.keys()]) {
+    for (const key of url.searchParams.keys()) {
       if (SENSITIVE_QUERY_KEYS.has(key) || /secret|token|password/i.test(key)) {
         url.searchParams.set(key, '***');
       }
@@ -64,7 +64,15 @@ export function resolveOutboundUrl(config: InternalAxiosRequestConfig): string {
     if (!path) return base;
     if (/^https?:\/\//i.test(path)) return path;
     if (!base) return path;
-    return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+    let baseTrimmed = base;
+    while (baseTrimmed.endsWith('/')) {
+      baseTrimmed = baseTrimmed.slice(0, -1);
+    }
+    let pathTrimmed = path;
+    while (pathTrimmed.startsWith('/')) {
+      pathTrimmed = pathTrimmed.slice(1);
+    }
+    return `${baseTrimmed}/${pathTrimmed}`;
   })();
 
   try {
@@ -239,49 +247,11 @@ export function parseOutboundRequestBody(data: unknown): unknown {
     typeof URLSearchParams !== 'undefined' &&
     data instanceof URLSearchParams
   ) {
-    const obj: Record<string, string> = {};
-    for (const [key, value] of data.entries()) {
-      obj[key] = value;
-    }
-    return obj;
+    return entriesToObject(data.entries());
   }
 
   if (typeof data === 'string') {
-    const trimmed = data.trim();
-    if (
-      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-      (trimmed.startsWith('[') && trimmed.endsWith(']'))
-    ) {
-      try {
-        return JSON.parse(trimmed) as unknown;
-      } catch {
-        // fall through
-      }
-    }
-
-    if (looksLikeBase64Blob(data)) {
-      return {
-        _type: 'base64',
-        chars: data.length,
-        note: 'binary/base64 body omitted',
-      };
-    }
-
-    // application/x-www-form-urlencoded (Spotify token exchange, etc.)
-    if (data.includes('=') && !trimmed.startsWith('<')) {
-      try {
-        const params = new URLSearchParams(data);
-        const obj: Record<string, string> = {};
-        for (const [key, value] of params.entries()) {
-          obj[key] = value;
-        }
-        if (Object.keys(obj).length > 0) return obj;
-      } catch {
-        // fall through
-      }
-    }
-
-    return data;
+    return parseOutboundStringBody(data);
   }
 
   if (typeof data === 'object') {
@@ -289,6 +259,63 @@ export function parseOutboundRequestBody(data: unknown): unknown {
   }
 
   return data;
+}
+
+function entriesToObject(
+  entries: IterableIterator<[string, string]>,
+): Record<string, string> {
+  const obj: Record<string, string> = {};
+  for (const [key, value] of entries) {
+    obj[key] = value;
+  }
+  return obj;
+}
+
+function parseOutboundStringBody(data: string): unknown {
+  const trimmed = data.trim();
+  const jsonBody = tryParseJsonBody(trimmed);
+  if (jsonBody !== undefined) return jsonBody;
+
+  if (looksLikeBase64Blob(data)) {
+    return {
+      _type: 'base64',
+      chars: data.length,
+      note: 'binary/base64 body omitted',
+    };
+  }
+
+  const formBody = tryParseFormUrlEncoded(data, trimmed);
+  if (formBody !== undefined) return formBody;
+
+  return data;
+}
+
+function tryParseJsonBody(trimmed: string): unknown {
+  const looksLikeJson =
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'));
+  if (!looksLikeJson) return undefined;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function tryParseFormUrlEncoded(
+  data: string,
+  trimmed: string,
+): Record<string, string> | undefined {
+  // application/x-www-form-urlencoded (Spotify token exchange, etc.)
+  if (!data.includes('=') || trimmed.startsWith('<')) return undefined;
+  try {
+    const params = new URLSearchParams(data);
+    const obj = entriesToObject(params.entries());
+    if (Object.keys(obj).length > 0) return obj;
+  } catch {
+    // fall through
+  }
+  return undefined;
 }
 
 function methodMayHaveBody(method: string): boolean {

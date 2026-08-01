@@ -25,10 +25,10 @@ type OrderFields = FieldValues & { orderMode: TrackOrderMode }
 export function PopularityModeSection<T extends PopularityFields>({
   control,
   step,
-}: {
+}: Readonly<{
   control: Control<T>
   step: number
-}) {
+}>) {
   const t = useT()
   return (
     <FormSection
@@ -60,10 +60,10 @@ export function PopularityModeSection<T extends PopularityFields>({
 export function OrderModeSection<T extends OrderFields>({
   control,
   step,
-}: {
+}: Readonly<{
   control: Control<T>
   step: number
-}) {
+}>) {
   const t = useT()
   return (
     <FormSection
@@ -92,7 +92,7 @@ export function OrderModeSection<T extends OrderFields>({
   )
 }
 
-export function CoverErrorNotice({ message }: { message: string | null }) {
+export function CoverErrorNotice({ message }: Readonly<{ message: string | null }>) {
   const t = useT()
   if (!message) return null
   return (
@@ -110,14 +110,14 @@ export function GenerationSubmitBar({
   idleLabel,
   busyLabel,
   icon: Icon,
-}: {
+}: Readonly<{
   isGenerating: boolean
   disabled: boolean
   error: string | null
   idleLabel: string
   busyLabel: string
   icon: LucideIcon
-}) {
+}>) {
   return (
     <div className="space-y-4">
       {error ? <FieldError>{error}</FieldError> : null}

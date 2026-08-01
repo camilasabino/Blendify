@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { CookieOptions, Response } from 'express';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { SpotifyAuthClient } from '../spotify/spotify-auth.client';
 import { User } from '../../domain/user/user.entity';
 import {

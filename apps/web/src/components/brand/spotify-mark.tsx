@@ -1,10 +1,10 @@
 import { cn } from '@/lib/utils'
 
-type SpotifyMarkProps = {
+type SpotifyMarkProps = Readonly<{
   className?: string
   variant?: 'color' | 'mono'
   title?: string
-}
+}>
 
 export function SpotifyMark({
   className,

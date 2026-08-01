@@ -36,7 +36,7 @@ export function normalizeArtistName(name: string): string {
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/&/g, 'and')
+    .replaceAll('&', 'and')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 }

@@ -50,55 +50,54 @@ function formatRetryWaitLabel(
     : t('errors.wait.seconds', { n: 20 })
 }
 
-export function getApiErrorMessage(
-  error: unknown,
+function readRetryAfterSeconds(details?: Record<string, unknown>): number | null {
+  const retryRaw = details?.retryAfterSeconds
+  if (typeof retryRaw === 'number' && Number.isFinite(retryRaw)) return retryRaw
+  return null
+}
+
+function mapSpotifyThrottleMessage(
+  error: ApiError,
   t: Translate,
-  fallbackKey: MessageKey = 'create.failed',
-): string {
-  if (!(error instanceof ApiError)) {
-    return t(fallbackKey)
-  }
-
-  const retryRaw = error.details?.retryAfterSeconds
-  const retryAfterSeconds =
-    typeof retryRaw === 'number' && Number.isFinite(retryRaw)
-      ? retryRaw
-      : null
-
+): string | null {
+  const retryAfterSeconds = readRetryAfterSeconds(error.details)
   if (error.code === 'SPOTIFY_QUOTA_EXCEEDED') {
     return t('errors.spotifyQuota', {
       wait: formatRetryWaitLabel(t, retryAfterSeconds, true),
     })
   }
-
   if (error.code === 'SPOTIFY_RATE_LIMITED' || error.status === 429) {
     return t('errors.spotifyRateLimit', {
       wait: formatRetryWaitLabel(t, retryAfterSeconds, false),
     })
   }
+  return null
+}
 
+function mapMaxSelectionMessage(
+  error: ApiError,
+  t: Translate,
+  fallbackKey: MessageKey,
+): string | null {
   if (error.code === 'TOO_MANY_ARTISTS') {
     const max = error.details?.max
     return typeof max === 'number'
       ? t('create.maxArtists', { max })
       : t(fallbackKey)
   }
-
   if (error.code === 'TOO_MANY_GENRES') {
     const max = error.details?.max
     return typeof max === 'number'
       ? t('create.maxGenres', { max })
       : t(fallbackKey)
   }
+  return null
+}
 
-  if (error.code === 'LASTFM_NOT_CONFIGURED') return t('errors.lastfmMissing')
-  if (error.code === 'LASTFM_SIMILAR_FAILED') return t('errors.lastfmSimilar')
-  if (error.code === 'DISCOVER_NOT_ENOUGH_SIMILAR')
-    return t('discover.notEnoughSimilar')
-  if (error.code === 'DISCOVER_RESOLVE_FAILED')
-    return t('discover.resolveFailed')
-  if (error.code === 'GENRE_LOOKUP_UNAVAILABLE')
-    return t('errors.genreLookupUnavailable')
+function mapNamedResolveMessage(
+  error: ApiError,
+  t: Translate,
+): string | null {
   if (error.code === 'ARTIST_RESOLVE_FAILED') {
     const name = error.details?.name
     return typeof name === 'string'
@@ -111,16 +110,47 @@ export function getApiErrorMessage(
       ? t('errors.trackResolveNamed', { name })
       : t('discover.resolveFailed')
   }
+  return null
+}
 
-  if (error.code === 'EMPTY_ARTIST_SELECTION') return t('create.addArtist')
-  if (error.code === 'EMPTY_GENRE_SELECTION') return t('create.addGenre')
-  if (error.code === 'NO_TRACKS_FOUND') return t('create.noTracksFound')
-  if (error.code === 'PREMIUM_REQUIRED') return t('preview.premiumRequired')
-  if (error.code === 'PLAYBACK_UNAUTHORIZED')
-    return t('preview.sessionExpired')
-  if (error.code === 'PLAYBACK_INVALID')
-    return t('preview.invalidPlayback')
-  if (error.code === 'PLAYBACK_FAILED') return t('preview.playError')
+const STATIC_ERROR_MESSAGES: Record<string, MessageKey> = {
+  LASTFM_NOT_CONFIGURED: 'errors.lastfmMissing',
+  LASTFM_SIMILAR_FAILED: 'errors.lastfmSimilar',
+  DISCOVER_NOT_ENOUGH_SIMILAR: 'discover.notEnoughSimilar',
+  DISCOVER_RESOLVE_FAILED: 'discover.resolveFailed',
+  GENRE_LOOKUP_UNAVAILABLE: 'errors.genreLookupUnavailable',
+  EMPTY_ARTIST_SELECTION: 'create.addArtist',
+  EMPTY_GENRE_SELECTION: 'create.addGenre',
+  NO_TRACKS_FOUND: 'create.noTracksFound',
+  PREMIUM_REQUIRED: 'preview.premiumRequired',
+  PLAYBACK_UNAUTHORIZED: 'preview.sessionExpired',
+  PLAYBACK_INVALID: 'preview.invalidPlayback',
+  PLAYBACK_FAILED: 'preview.playError',
+}
 
-  return t(fallbackKey)
+function mapStaticCodeMessage(
+  code: string | undefined,
+  t: Translate,
+): string | null {
+  if (!code) return null
+  const key = STATIC_ERROR_MESSAGES[code]
+  return key ? t(key) : null
+}
+
+export function getApiErrorMessage(
+  error: unknown,
+  t: Translate,
+  fallbackKey: MessageKey = 'create.failed',
+): string {
+  if (!(error instanceof ApiError)) {
+    return t(fallbackKey)
+  }
+
+  return (
+    mapSpotifyThrottleMessage(error, t) ??
+    mapMaxSelectionMessage(error, t, fallbackKey) ??
+    mapNamedResolveMessage(error, t) ??
+    mapStaticCodeMessage(error.code, t) ??
+    t(fallbackKey)
+  )
 }

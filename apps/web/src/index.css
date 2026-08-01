@@ -138,6 +138,44 @@
   select:not(:disabled) {
     cursor: pointer;
   }
+
+  progress.generation-progress {
+    appearance: none;
+    display: block;
+    border: none;
+    background-color: var(--color-charcoal-700);
+    color: var(--color-amber-500);
+  }
+
+  progress.generation-progress::-webkit-progress-bar {
+    background-color: var(--color-charcoal-700);
+    border-radius: 9999px;
+  }
+
+  progress.generation-progress::-webkit-progress-value {
+    background-color: var(--color-amber-500);
+    border-radius: 9999px;
+    transition: width 300ms ease-out;
+  }
+
+  progress.generation-progress::-moz-progress-bar {
+    background-color: var(--color-amber-500);
+    border-radius: 9999px;
+  }
+
+  progress.generation-progress--indeterminate::-webkit-progress-bar {
+    overflow: hidden;
+  }
+
+  progress.generation-progress--indeterminate::-webkit-progress-value {
+    width: 40% !important;
+    animation: progress-indeterminate 1.35s ease-in-out infinite;
+  }
+
+  progress.generation-progress--indeterminate::-moz-progress-bar {
+    width: 40%;
+    animation: progress-indeterminate 1.35s ease-in-out infinite;
+  }
 }
 
 @layer utilities {

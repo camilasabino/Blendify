@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement>
 
-export function Input({ className, type = 'text', ...props }: InputProps) {
+export function Input({ className, type = 'text', ...props }: Readonly<InputProps>) {
   return (
     <input
       type={type}

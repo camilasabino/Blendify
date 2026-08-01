@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cn, focusRing } from '@/lib/utils'
 
-type SearchFieldProps = {
+type SearchFieldProps = Readonly<{
   value: string
   onChange: (value: string) => void
   placeholder: string
@@ -12,7 +12,7 @@ type SearchFieldProps = {
   className?: string
   inputClassName?: string
   'aria-label'?: string
-}
+}>
 
 export function SearchField({
   value,
@@ -42,7 +42,8 @@ export function SearchField({
         <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
           <Spinner size="sm" />
         </span>
-      ) : value && clearLabel ? (
+      ) : null}
+      {!loading && value && clearLabel ? (
         <button
           type="button"
           onClick={() => onChange('')}

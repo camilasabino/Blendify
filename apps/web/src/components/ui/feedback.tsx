@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-type EmptyStateProps = {
+type EmptyStateProps = Readonly<{
   title: string
   body: string
   action?: { to: string; label: string }
   className?: string
-}
+}>
 
 export function EmptyState({ title, body, action, className }: EmptyStateProps) {
   return (
@@ -29,13 +29,13 @@ export function EmptyState({ title, body, action, className }: EmptyStateProps) 
   )
 }
 
-type ErrorStateProps = {
+type ErrorStateProps = Readonly<{
   message: string
   retryLabel?: string
   onRetry?: () => void
   className?: string
   children?: ReactNode
-}
+}>
 
 export function ErrorState({
   message,

@@ -6,7 +6,7 @@ export class AlternateVersionSpecification {
     const name = track.name;
     return ALTERNATE_KEYWORDS.some((keyword) => {
       const pattern = new RegExp(
-        `(?:^|[\\s\\-–—(])${keyword.replace(/\s+/g, '\\s+')}(?:$|[\\s\\-–—)])`,
+        String.raw`(?:^|[\s\-–—(])${keyword.replace(/\s+/g, String.raw`\s+`)}(?:$|[\s\-–—)])`,
         'i',
       );
       return pattern.test(name);

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Query, Res, Req, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Response, Request } from 'express';
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import { AuthService } from '../../infrastructure/auth/auth.service';
 import type { AuthSession, OkResponse } from '@blendify/contracts';
 

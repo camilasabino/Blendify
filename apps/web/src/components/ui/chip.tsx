@@ -32,7 +32,7 @@ export function SelectableChip({
   )
 }
 
-type RemovableChipProps = {
+type RemovableChipProps = Readonly<{
   label: string
   onRemove: () => void
   removeLabel: string
@@ -40,7 +40,7 @@ type RemovableChipProps = {
   leading?: ReactNode
   highlighted?: boolean
   className?: string
-}
+}>
 
 export function RemovableChip({
   label,
@@ -68,7 +68,8 @@ export function RemovableChip({
           alt=""
           className="size-6 rounded-full object-cover"
         />
-      ) : !leading ? (
+      ) : null}
+      {!imageUrl && !leading ? (
         <span className="flex size-6 items-center justify-center rounded-full bg-charcoal-600 text-[10px]">
           {label.slice(0, 1)}
         </span>

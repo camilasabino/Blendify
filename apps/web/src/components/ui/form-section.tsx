@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-type FormSectionProps = {
+type FormSectionProps = Readonly<{
   step?: number | string
   title: string
   description?: string
   children: ReactNode
   className?: string
   accent?: 'amber' | 'soft'
-}
+}>
 
 export function FormSection({
   step,

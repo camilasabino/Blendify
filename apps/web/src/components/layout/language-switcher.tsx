@@ -24,9 +24,9 @@ const LOCALE_NAME_KEY = {
   pt: 'lang.ptName',
 } as const
 
-type LanguageSwitcherProps = {
+type LanguageSwitcherProps = Readonly<{
   className?: string
-}
+}>
 
 export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
   const locale = useLocaleStore((s) => s.locale)
@@ -86,6 +86,8 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
       {open && (
         <div
           id={panelId}
+          // S6819: skip native <select> — custom popover listbox keeps the
+          // compact trigger + flag UI that a native control would break.
           role="listbox"
           aria-label={t('lang.label')}
           className={cn(

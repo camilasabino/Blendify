@@ -161,7 +161,7 @@ describe('resolveCatalogWithPoolExpand', () => {
       { concurrency: 1, random: () => 0 },
     );
 
-    expect(tracks.length).toBe(5);
+    expect(tracks).toHaveLength(5);
     expect(calls).toBeGreaterThan(20);
   });
 });

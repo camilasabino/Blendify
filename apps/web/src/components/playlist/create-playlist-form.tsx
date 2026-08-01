@@ -334,12 +334,18 @@ export function MixPlaylistForm() {
   }
 
   const isGenerating = createMutation.isPending
-  const requestedTrackCount = result
-    ? result.generation.kind === 'artist_mix' ||
+  let requestedTrackCount = 0
+  if (result) {
+    if (
+      result.generation.kind === 'artist_mix' ||
       result.generation.kind === 'genre_mix'
-      ? result.generation.tracksPerSeed * result.generation.seeds.length
-      : result.trackCount
-    : 0
+    ) {
+      requestedTrackCount =
+        result.generation.tracksPerSeed * result.generation.seeds.length
+    } else {
+      requestedTrackCount = result.trackCount
+    }
+  }
   const canSubmit =
     mode === 'artists' ? artists.length > 0 : genres.length > 0
 
@@ -479,7 +485,7 @@ export function MixPlaylistForm() {
                       value={Number.isFinite(field.value) ? field.value : ''}
                       onChange={(e) => {
                         const raw = e.target.valueAsNumber
-                        field.onChange(Number.isFinite(raw) ? raw : NaN)
+                        field.onChange(Number.isFinite(raw) ? raw : Number.NaN)
                       }}
                       onBlur={() => {
                         const raw = field.value
@@ -513,7 +519,7 @@ export function MixPlaylistForm() {
                       value={Number.isFinite(field.value) ? field.value : ''}
                       onChange={(e) => {
                         const raw = e.target.valueAsNumber
-                        field.onChange(Number.isFinite(raw) ? raw : NaN)
+                        field.onChange(Number.isFinite(raw) ? raw : Number.NaN)
                       }}
                       onBlur={() => {
                         const raw = field.value

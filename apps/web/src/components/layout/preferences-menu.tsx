@@ -63,6 +63,8 @@ export function PreferencesMenu() {
       {open && (
         <div
           id={panelId}
+          // S6819: skip native <dialog> — this is a positioned popover menu;
+          // <dialog>/showModal would break absolute placement and click-outside close.
           role="dialog"
           aria-label={t('preferences.title')}
           className={cn(

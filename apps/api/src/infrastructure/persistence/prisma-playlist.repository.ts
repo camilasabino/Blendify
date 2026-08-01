@@ -200,5 +200,5 @@ function parseSeeds(value: Prisma.JsonValue): PlaylistSeedDto[] {
 }
 
 function toJson(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  return structuredClone(value) as Prisma.InputJsonValue;
 }

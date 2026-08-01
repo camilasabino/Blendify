@@ -1,4 +1,4 @@
-import type { RankedSeedUsage, UserUsageStats } from '@blendify/contracts';
+import type { UserUsageStats } from '@blendify/contracts';
 
 export const USAGE_STATS_REPOSITORY = 'USAGE_STATS_REPOSITORY' as const;
 
@@ -11,7 +11,7 @@ export type SeedUsageInput = {
   imageUrl?: string | null;
 };
 
-export type { RankedSeedUsage };
+export type { RankedSeedUsage } from '@blendify/contracts';
 export type UserUsageStatsSnapshot = UserUsageStats;
 
 export interface UsageStatsRepositoryPort {

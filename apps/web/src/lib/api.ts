@@ -4,14 +4,12 @@ import type {
   BulkLibraryResult,
   CreateDiscoverRequest,
   CreateMixRequest,
-  DiscoverTrackTarget,
   GenreDto,
   GenerationProgress,
   OkResponse,
   PlaybackDeviceDto,
   PlaylistDetail,
   PlaylistLibraryPage,
-  RankedSeedUsage,
   StartPlaybackRequest,
   TrackDto,
   UserDto,
@@ -36,13 +34,12 @@ export type {
   BulkLibraryResult,
   CreateDiscoverRequest,
   CreateMixRequest,
-  DiscoverTrackTarget,
   GenerationProgress,
   PlaylistDetail,
   PlaylistLibraryPage,
-  RankedSeedUsage,
   UserUsageStats,
 }
+export type { DiscoverTrackTarget, RankedSeedUsage } from '@blendify/contracts'
 
 export type SimilarArtistSuggestion = {
   name: string
@@ -241,9 +238,8 @@ export const api = {
     if (options.offset != null) params.set('offset', String(options.offset))
     if (options.q?.trim()) params.set('q', options.q.trim())
     const query = params.toString()
-    return request<PlaylistLibraryPage>(
-      `/api/playlists${query ? `?${query}` : ''}`,
-    )
+    const path = query ? `/api/playlists?${query}` : '/api/playlists'
+    return request<PlaylistLibraryPage>(path)
   },
 
   getPlaylist: (id: string) =>

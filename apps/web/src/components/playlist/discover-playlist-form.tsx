@@ -363,14 +363,14 @@ function SelectedSeed({
   imageRounded,
   removeLabel,
   onRemove,
-}: {
+}: Readonly<{
   imageUrl?: string | null
   title: string
   subtitle?: string
   imageRounded?: boolean
   removeLabel: string
   onRemove: () => void
-}) {
+}>) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2.5">
       {imageUrl ? (

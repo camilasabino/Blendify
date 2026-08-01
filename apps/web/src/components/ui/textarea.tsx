@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 
 export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>
 
-export function Textarea({ className, ...props }: TextareaProps) {
+export function Textarea({ className, ...props }: Readonly<TextareaProps>) {
   return (
     <textarea
       className={cn(

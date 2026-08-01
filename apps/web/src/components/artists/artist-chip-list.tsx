@@ -3,12 +3,12 @@ import { RemovableChip } from '@/components/ui/chip'
 import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 
-type ArtistChipListProps = {
+type ArtistChipListProps = Readonly<{
   artists: Artist[]
   onRemove: (id: string) => void
   onClear?: () => void
   className?: string
-}
+}>
 
 export function ArtistChipList({
   artists,

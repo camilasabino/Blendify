@@ -13,13 +13,235 @@ import { cn, focusRing } from '@/lib/utils'
 
 const EXPLORE_PAGE_SIZE = 8
 
-type GenrePickerProps = {
+type GenrePickerProps = Readonly<{
   selected: CuratedGenre[]
   max: number
   onToggle: (genre: CuratedGenre) => void
   onRemove: (id: string) => void
   onClear?: () => void
   className?: string
+}>
+
+function SelectedGenres({
+  selected,
+  seedId,
+  onRemove,
+  onClear,
+}: {
+  selected: CuratedGenre[]
+  seedId: string | undefined
+  onRemove: (id: string) => void
+  onClear?: () => void
+}) {
+  const t = useT()
+  if (selected.length === 0) return null
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-end">
+        {onClear ? (
+          <button
+            type="button"
+            onClick={onClear}
+            className={cn(
+              'text-xs text-cream-400 transition-colors hover:text-cream-200',
+              focusRing,
+            )}
+          >
+            {t('create.clearAll')}
+          </button>
+        ) : null}
+      </div>
+      <ul className="flex flex-wrap gap-2">
+        {selected.map((genre) => (
+          <RemovableChip
+            key={genre.id}
+            label={genre.name}
+            highlighted={seedId === genre.id}
+            leading={<GenreIcon name={genre.name} id={genre.id} />}
+            onRemove={() => onRemove(genre.id)}
+            removeLabel={t('genre.remove', { name: genre.name })}
+          />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function GenreCatalogResults({
+  searching,
+  visible,
+  selectedIds,
+  atLimit,
+  searchFetching,
+  searchEmpty,
+  onSelect,
+}: {
+  searching: boolean
+  visible: CuratedGenre[]
+  selectedIds: Set<string>
+  atLimit: boolean
+  searchFetching: boolean
+  searchEmpty: boolean
+  onSelect: (genre: CuratedGenre) => void
+}) {
+  const t = useT()
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-cream-300">
+        {searching ? t('genre.results') : t('genre.mains')}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {visible.map((genre) => {
+          const isSelected = selectedIds.has(genre.id)
+          return (
+            <SelectableChip
+              key={genre.id}
+              selected={isSelected}
+              disabled={!isSelected && atLimit}
+              onClick={() => onSelect(genre)}
+            >
+              {genre.name}
+            </SelectableChip>
+          )
+        })}
+        {searching && !searchFetching && searchEmpty ? (
+          <p className="text-sm text-cream-400">{t('genre.empty')}</p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function GenreExploreSection({
+  seed,
+  selected,
+  explore,
+  explorePage,
+  exploreLoading,
+  exploreFetching,
+  exploreHasMore,
+  atLimit,
+  onSetSeedId,
+  onSelect,
+  onLoadMore,
+}: {
+  seed: CuratedGenre
+  selected: CuratedGenre[]
+  explore: CuratedGenre[]
+  explorePage: number
+  exploreLoading: boolean
+  exploreFetching: boolean
+  exploreHasMore: boolean
+  atLimit: boolean
+  onSetSeedId: (id: string) => void
+  onSelect: (genre: CuratedGenre) => void
+  onLoadMore: () => void
+}) {
+  const t = useT()
+  const showLoadMore = exploreHasMore || explore.length > 0
+  const emptyLabel =
+    explorePage > 0 ? t('genre.exploreExhausted') : t('genre.exploreEmpty')
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-amber-500/15 bg-gradient-to-b from-amber-500/[0.07] to-transparent p-4">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 text-sm font-medium text-amber-300/90">
+          <Sparkles className="size-3.5" />
+          {t('genre.exploreFor', { query: seed.name })}
+        </div>
+        <p className="text-sm leading-relaxed text-cream-400">
+          {t('genre.exploreHint')}
+        </p>
+      </div>
+
+      {selected.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-cream-500">
+            {t('genre.exploreSeedHint')}
+          </span>
+          {selected.map((genre) => (
+            <SeedChip
+              key={genre.id}
+              active={genre.id === seed.id}
+              onClick={() => onSetSeedId(genre.id)}
+            >
+              {genre.name}
+            </SeedChip>
+          ))}
+        </div>
+      ) : null}
+
+      {exploreLoading ? (
+        <div className="flex items-center gap-2 py-2 text-sm text-cream-400">
+          <Spinner size="sm" />
+          {t('common.loading')}
+        </div>
+      ) : null}
+
+      {!exploreLoading && explore.length === 0 ? (
+        <p className="text-sm text-cream-400">{emptyLabel}</p>
+      ) : null}
+
+      {explore.length > 0 ? (
+        <ul className="flex flex-wrap gap-2">
+          {explore.map((genre) => (
+            <li key={genre.id}>
+              <button
+                type="button"
+                disabled={atLimit}
+                onClick={() => onSelect(genre)}
+                className={cn(
+                  'group inline-flex max-w-full items-center gap-2 rounded-full border border-cream-200/10 bg-charcoal-950/35 px-3.5 py-2 text-left text-sm text-cream-100 transition',
+                  'hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-cream-50',
+                  'disabled:cursor-not-allowed disabled:opacity-40',
+                  focusRing,
+                )}
+              >
+                <span className="truncate font-medium tracking-tight">
+                  {genre.name}
+                </span>
+                <Plus className="size-3.5 shrink-0 text-amber-400/70 transition group-hover:text-amber-300" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {showLoadMore ? (
+        <button
+          type="button"
+          disabled={exploreFetching || !exploreHasMore}
+          onClick={onLoadMore}
+          className={cn(
+            'inline-flex items-center gap-2 text-sm text-amber-300/90 transition hover:text-amber-200 disabled:opacity-40',
+            focusRing,
+          )}
+        >
+          {exploreFetching ? (
+            <Spinner size="sm" />
+          ) : (
+            <RefreshCw className="size-3.5" />
+          )}
+          {exploreHasMore
+            ? t('genre.suggestMore')
+            : t('genre.exploreExhausted')}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function mergeExploreBatch(
+  prev: CuratedGenre[],
+  batch: CuratedGenre[],
+  selectedIds: Set<string>,
+  explorePage: number,
+): CuratedGenre[] {
+  const nextBatch = batch.filter((g) => !selectedIds.has(g.id))
+  if (explorePage === 0) return nextBatch
+  const seen = new Set(prev.map((g) => g.id))
+  return [...prev, ...nextBatch.filter((g) => !seen.has(g.id))]
 }
 
 export function GenrePicker({
@@ -91,23 +313,15 @@ export function GenrePicker({
   useEffect(() => {
     const batch = exploreQuery.data?.genres
     if (!batch || searching) return
-    setExploreItems((prev) => {
-      const nextBatch = batch.filter((g) => !selectedIds.has(g.id))
-      if (explorePage === 0) return nextBatch
-      const seen = new Set(prev.map((g) => g.id))
-      return [...prev, ...nextBatch.filter((g) => !seen.has(g.id))]
-    })
+    setExploreItems((prev) =>
+      mergeExploreBatch(prev, batch, selectedIds, explorePage),
+    )
   }, [exploreQuery.data, explorePage, selectedIds, searching])
 
   const catalog = catalogQuery.data?.genres ?? []
   const searchResults = searchQuery.data?.genres ?? []
   const visible = searching ? searchResults : catalog
-
   const explore = exploreItems.filter((g) => !selectedIds.has(g.id))
-  const exploreHasMore = exploreQuery.data?.hasMore ?? false
-  const exploreLoading = exploreQuery.isLoading
-  const exploreFetching = exploreQuery.isFetching
-
   const atLimit = selected.length >= max
   const showExplore =
     selected.length > 0 && !atLimit && !searching && Boolean(seed)
@@ -133,159 +347,41 @@ export function GenrePicker({
         loading={catalogQuery.isFetching || (searching && searchQuery.isFetching)}
       />
 
-      {selected.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-end">
-            {onClear && (
-              <button
-                type="button"
-                onClick={onClear}
-                className={cn(
-                  'text-xs text-cream-400 transition-colors hover:text-cream-200',
-                  focusRing,
-                )}
-              >
-                {t('create.clearAll')}
-              </button>
-            )}
-          </div>
-          <ul className="flex flex-wrap gap-2">
-            {selected.map((genre) => (
-              <RemovableChip
-                key={genre.id}
-                label={genre.name}
-                highlighted={seed?.id === genre.id}
-                leading={<GenreIcon name={genre.name} id={genre.id} />}
-                onRemove={() => onRemove(genre.id)}
-                removeLabel={t('genre.remove', { name: genre.name })}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
+      <SelectedGenres
+        selected={selected}
+        seedId={seed?.id}
+        onRemove={onRemove}
+        onClear={onClear}
+      />
 
-      {catalogQuery.isError && (
+      {catalogQuery.isError ? (
         <FieldError>{t('genre.loadError')}</FieldError>
-      )}
-
-      {!catalogQuery.isError && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-cream-300">
-            {searching ? t('genre.results') : t('genre.mains')}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {visible.map((genre) => {
-              const isSelected = selectedIds.has(genre.id)
-              return (
-                <SelectableChip
-                  key={genre.id}
-                  selected={isSelected}
-                  disabled={!isSelected && atLimit}
-                  onClick={() => selectGenre(genre)}
-                >
-                  {genre.name}
-                </SelectableChip>
-              )
-            })}
-            {searching &&
-              !searchQuery.isFetching &&
-              searchResults.length === 0 && (
-                <p className="text-sm text-cream-400">{t('genre.empty')}</p>
-              )}
-          </div>
-        </div>
+      ) : (
+        <GenreCatalogResults
+          searching={searching}
+          visible={visible}
+          selectedIds={selectedIds}
+          atLimit={atLimit}
+          searchFetching={searchQuery.isFetching}
+          searchEmpty={searchResults.length === 0}
+          onSelect={selectGenre}
+        />
       )}
 
       {showExplore && seed ? (
-        <div className="space-y-3 rounded-2xl border border-amber-500/15 bg-gradient-to-b from-amber-500/[0.07] to-transparent p-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-sm font-medium text-amber-300/90">
-              <Sparkles className="size-3.5" />
-              {t('genre.exploreFor', { query: seed.name })}
-            </div>
-            <p className="text-sm leading-relaxed text-cream-400">
-              {t('genre.exploreHint')}
-            </p>
-          </div>
-
-          {selected.length > 1 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-cream-500">
-                {t('genre.exploreSeedHint')}
-              </span>
-              {selected.map((genre) => (
-                <SeedChip
-                  key={genre.id}
-                  active={genre.id === seed.id}
-                  onClick={() => setSeedId(genre.id)}
-                >
-                  {genre.name}
-                </SeedChip>
-              ))}
-            </div>
-          ) : null}
-
-          {exploreLoading ? (
-            <div className="flex items-center gap-2 py-2 text-sm text-cream-400">
-              <Spinner size="sm" />
-              {t('common.loading')}
-            </div>
-          ) : null}
-
-          {!exploreLoading && explore.length === 0 ? (
-            <p className="text-sm text-cream-400">
-              {explorePage > 0
-                ? t('genre.exploreExhausted')
-                : t('genre.exploreEmpty')}
-            </p>
-          ) : null}
-
-          {explore.length > 0 ? (
-            <ul className="flex flex-wrap gap-2">
-              {explore.map((genre) => (
-                <li key={genre.id}>
-                  <button
-                    type="button"
-                    disabled={atLimit}
-                    onClick={() => selectGenre(genre)}
-                    className={cn(
-                      'group inline-flex max-w-full items-center gap-2 rounded-full border border-cream-200/10 bg-charcoal-950/35 px-3.5 py-2 text-left text-sm text-cream-100 transition',
-                      'hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-cream-50',
-                      'disabled:cursor-not-allowed disabled:opacity-40',
-                      focusRing,
-                    )}
-                  >
-                    <span className="truncate font-medium tracking-tight">
-                      {genre.name}
-                    </span>
-                    <Plus className="size-3.5 shrink-0 text-amber-400/70 transition group-hover:text-amber-300" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {exploreHasMore || explore.length > 0 ? (
-            <button
-              type="button"
-              disabled={exploreFetching || !exploreHasMore}
-              onClick={() => setExplorePage((p) => p + 1)}
-              className={cn(
-                'inline-flex items-center gap-2 text-sm text-amber-300/90 transition hover:text-amber-200 disabled:opacity-40',
-                focusRing,
-              )}
-            >
-              {exploreFetching ? (
-                <Spinner size="sm" />
-              ) : (
-                <RefreshCw className="size-3.5" />
-              )}
-              {exploreHasMore
-                ? t('genre.suggestMore')
-                : t('genre.exploreExhausted')}
-            </button>
-          ) : null}
-        </div>
+        <GenreExploreSection
+          seed={seed}
+          selected={selected}
+          explore={explore}
+          explorePage={explorePage}
+          exploreLoading={exploreQuery.isLoading}
+          exploreFetching={exploreQuery.isFetching}
+          exploreHasMore={exploreQuery.data?.hasMore ?? false}
+          atLimit={atLimit}
+          onSetSeedId={setSeedId}
+          onSelect={selectGenre}
+          onLoadMore={() => setExplorePage((p) => p + 1)}
+        />
       ) : null}
     </div>
   )

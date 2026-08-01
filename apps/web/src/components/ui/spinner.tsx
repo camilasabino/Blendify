@@ -7,10 +7,10 @@ const sizes = {
   lg: 'size-8',
 } as const
 
-type SpinnerProps = {
+type SpinnerProps = Readonly<{
   className?: string
   size?: keyof typeof sizes
-}
+}>
 
 export function Spinner({ className, size = 'md' }: SpinnerProps) {
   return (
@@ -21,19 +21,18 @@ export function Spinner({ className, size = 'md' }: SpinnerProps) {
   )
 }
 
-type LoadingStateProps = {
+type LoadingStateProps = Readonly<{
   label: string
   className?: string
-}
+}>
 
 export function LoadingState({ label, className }: LoadingStateProps) {
   return (
-    <div
+    <output
       className={cn('flex items-center gap-2 text-cream-400', className)}
-      role="status"
     >
       <Spinner />
       {label}
-    </div>
+    </output>
   )
 }

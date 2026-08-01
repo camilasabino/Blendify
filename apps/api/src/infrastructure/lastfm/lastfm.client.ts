@@ -434,7 +434,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
 
   private assertNoError(data: { error?: number; message?: string }): void {
     if (typeof data.error === 'number') {
-      throw new Error(
+      throw new TypeError(
         `Last.fm error ${data.error}: ${data.message ?? 'unknown'}`,
       );
     }
@@ -462,18 +462,18 @@ function normalizeSimilarTrackList(
   return Array.isArray(value) ? value : [value];
 }
 
+function coerceFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value);
+  return undefined;
+}
+
 function mapSimilarArtist(
   node: LastFmArtistNode,
 ): SimilarArtistCandidate | null {
   const name = node.name?.trim();
   if (!name) return null;
-  const matchRaw = node.match;
-  const match =
-    typeof matchRaw === 'number'
-      ? matchRaw
-      : typeof matchRaw === 'string'
-        ? Number(matchRaw)
-        : undefined;
+  const match = coerceFiniteNumber(node.match);
   return {
     name,
     mbid: node.mbid?.trim() || undefined,
@@ -492,13 +492,7 @@ function mapSimilarTrack(
   const artistName =
     typeof artistRaw === 'string' ? artistRaw.trim() : artistRaw?.name?.trim();
   if (!artistName) return null;
-  const matchRaw = node.match;
-  const match =
-    typeof matchRaw === 'number'
-      ? matchRaw
-      : typeof matchRaw === 'string'
-        ? Number(matchRaw)
-        : undefined;
+  const match = coerceFiniteNumber(node.match);
   return {
     name,
     artistName,
@@ -523,20 +517,8 @@ function mapTagTrack(
       : artistRaw?.name?.trim()) || fallbackArtist?.trim();
   if (!artistName) return null;
 
-  const playRaw = node.playcount;
-  const playcount =
-    typeof playRaw === 'number'
-      ? playRaw
-      : typeof playRaw === 'string'
-        ? Number(playRaw)
-        : undefined;
-  const rankRaw = node['@attr']?.rank ?? fallbackRank;
-  const rank =
-    typeof rankRaw === 'number'
-      ? rankRaw
-      : typeof rankRaw === 'string'
-        ? Number(rankRaw)
-        : fallbackRank;
+  const playcount = coerceFiniteNumber(node.playcount);
+  const rank = coerceFiniteNumber(node['@attr']?.rank ?? fallbackRank);
 
   return {
     artistName,

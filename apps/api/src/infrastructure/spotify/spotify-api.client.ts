@@ -131,10 +131,11 @@ export class SpotifyApiClient {
       'Spotify request failed';
     const retryAfterSeconds = readRetryAfterSeconds(ax);
 
+    const reasonSuffix = reason ? `/${reason}` : '';
+    const retrySuffix =
+      retryAfterSeconds != null ? ` retry-after=${retryAfterSeconds}` : '';
     this.logger.error(
-      `Spotify ${operation} failed (${status}${reason ? `/${reason}` : ''}${
-        retryAfterSeconds != null ? ` retry-after=${retryAfterSeconds}` : ''
-      }): ${message}`,
+      `Spotify ${operation} failed (${status}${reasonSuffix}${retrySuffix}): ${message}`,
     );
 
     if (status === 429 || ax.code === 'ERR_SPOTIFY_COOLDOWN') {

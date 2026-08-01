@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { MAX_TRACKS } from '../../domain/constants';
 import {
   CreateProviderPlaylistInput,
@@ -164,37 +164,20 @@ export class SpotifyPlaylistClient {
 
     try {
       while (true) {
-        // Avoid aggressive `fields` filtering — Spotify often returns stubs
-        // that omit uri/duration and we would wipe the local track list.
-        const { data } = await this.api.raw<{
-          items?: Array<{
-            track?: SpotifyPlaylistTrack | null;
-            item?: SpotifyPlaylistTrack | null;
-          } | null>;
-          total?: number;
-          next?: string | null;
-        }>(token, {
-          method: 'GET',
-          url: `/playlists/${playlistId}/items`,
-          params: {
-            limit,
-            offset,
-            additional_types: 'track',
-          },
-        });
+        const page = await this.fetchPlaylistItemsPage(
+          token,
+          playlistId,
+          limit,
+          offset,
+        );
         fetched = true;
-        if (typeof data.total === 'number') total = data.total;
+        if (typeof page.total === 'number') total = page.total;
 
-        for (const entry of data.items ?? []) {
-          // Spotify /items uses `item`; older /tracks responses used `track`.
-          const track = mapPlaylistTrack(entry?.item ?? entry?.track);
-          if (!track) continue;
-          totalDurationMs += track.durationMs;
-          if (tracks.length < MAX_TRACKS) tracks.push(track);
-        }
+        const mapped = appendMappedPlaylistTracks(page.items, tracks);
+        totalDurationMs += mapped.addedDurationMs;
 
         offset += limit;
-        if (!data.next || (data.items?.length ?? 0) === 0) break;
+        if (!page.next || page.items.length === 0) break;
         if (typeof total === 'number' && offset >= total) break;
         // Bound pagination for very large playlists during library sync.
         if (offset >= 200) break;
@@ -216,6 +199,44 @@ export class SpotifyPlaylistClient {
       }
       throw this.api.toSpotifyError(`fetchPlaylistItems(${playlistId})`, error);
     }
+  }
+
+  private async fetchPlaylistItemsPage(
+    token: string,
+    playlistId: string,
+    limit: number,
+    offset: number,
+  ): Promise<{
+    items: Array<{
+      track?: SpotifyPlaylistTrack | null;
+      item?: SpotifyPlaylistTrack | null;
+    } | null>;
+    total?: number;
+    next?: string | null;
+  }> {
+    // Avoid aggressive `fields` filtering — Spotify often returns stubs
+    // that omit uri/duration and we would wipe the local track list.
+    const { data } = await this.api.raw<{
+      items?: Array<{
+        track?: SpotifyPlaylistTrack | null;
+        item?: SpotifyPlaylistTrack | null;
+      } | null>;
+      total?: number;
+      next?: string | null;
+    }>(token, {
+      method: 'GET',
+      url: `/playlists/${playlistId}/items`,
+      params: {
+        limit,
+        offset,
+        additional_types: 'track',
+      },
+    });
+    return {
+      items: data.items ?? [],
+      total: data.total,
+      next: data.next,
+    };
   }
 
   async updatePlaylistDetails(
@@ -245,8 +266,22 @@ export class SpotifyPlaylistClient {
   async deletePlaylist(playlistId: string): Promise<void> {
     const token = await this.api.accessToken(this.userId);
     const uri = `spotify:playlist:${playlistId}`;
-    let cleared = false;
 
+    const cleared = await this.clearPlaylistItems(token, playlistId);
+    if (!cleared) {
+      this.logger.warn(
+        `Could not empty playlist ${playlistId} — still attempting unfollow`,
+      );
+    }
+
+    await this.privatizeDeletedPlaylist(token, playlistId);
+    await this.unfollowPlaylist(token, playlistId, uri);
+  }
+
+  private async clearPlaylistItems(
+    token: string,
+    playlistId: string,
+  ): Promise<boolean> {
     for (const endpoint of [
       `/playlists/${playlistId}/items`,
       `/playlists/${playlistId}/tracks`,
@@ -258,21 +293,20 @@ export class SpotifyPlaylistClient {
           data: { uris: [] },
           headers: { 'Content-Type': 'application/json' },
         });
-        cleared = true;
-        break;
+        return true;
       } catch (error) {
         if (this.api.isStatus(error, 429)) {
           throw this.api.toSpotifyError(`deletePlaylist(${playlistId})`, error);
         }
       }
     }
+    return false;
+  }
 
-    if (!cleared) {
-      this.logger.warn(
-        `Could not empty playlist ${playlistId} — still attempting unfollow`,
-      );
-    }
-
+  private async privatizeDeletedPlaylist(
+    token: string,
+    playlistId: string,
+  ): Promise<void> {
     try {
       await this.api.raw(token, {
         method: 'PUT',
@@ -292,7 +326,13 @@ export class SpotifyPlaylistClient {
         `Could not privatize playlist ${playlistId}: ${errorMessage(error)}`,
       );
     }
+  }
 
+  private async unfollowPlaylist(
+    token: string,
+    playlistId: string,
+    uri: string,
+  ): Promise<void> {
     try {
       await this.api.raw(token, {
         method: 'DELETE',
@@ -303,24 +343,29 @@ export class SpotifyPlaylistClient {
       if (this.api.isStatus(error, 429)) {
         throw this.api.toSpotifyError(`deletePlaylist(${playlistId})`, error);
       }
-      try {
-        await this.api.raw(token, {
-          method: 'DELETE',
-          url: `/playlists/${playlistId}/followers`,
-        });
-      } catch (followError) {
-        if (this.api.isStatus(followError, 429)) {
-          throw this.api.toSpotifyError(
-            `deletePlaylist(${playlistId})`,
-            followError,
-          );
-        }
-        this.logger.warn(
-          `Playlist ${playlistId} unfollow failed: ${errorMessage(
-            followError,
-          )}`,
+      await this.unfollowPlaylistFollowers(token, playlistId);
+    }
+  }
+
+  private async unfollowPlaylistFollowers(
+    token: string,
+    playlistId: string,
+  ): Promise<void> {
+    try {
+      await this.api.raw(token, {
+        method: 'DELETE',
+        url: `/playlists/${playlistId}/followers`,
+      });
+    } catch (followError) {
+      if (this.api.isStatus(followError, 429)) {
+        throw this.api.toSpotifyError(
+          `deletePlaylist(${playlistId})`,
+          followError,
         );
       }
+      this.logger.warn(
+        `Playlist ${playlistId} unfollow failed: ${errorMessage(followError)}`,
+      );
     }
   }
 
@@ -384,6 +429,24 @@ export class SpotifyPlaylistClient {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function appendMappedPlaylistTracks(
+  items: Array<{
+    track?: SpotifyPlaylistTrack | null;
+    item?: SpotifyPlaylistTrack | null;
+  } | null>,
+  tracks: Track[],
+): { addedDurationMs: number } {
+  let addedDurationMs = 0;
+  for (const entry of items) {
+    // Spotify /items uses `item`; older /tracks responses used `track`.
+    const track = mapPlaylistTrack(entry?.item ?? entry?.track);
+    if (!track) continue;
+    addedDurationMs += track.durationMs;
+    if (tracks.length < MAX_TRACKS) tracks.push(track);
+  }
+  return { addedDurationMs };
 }
 
 function mapPlaylistTrack(item?: SpotifyPlaylistTrack | null): Track | null {

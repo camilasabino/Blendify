@@ -108,7 +108,7 @@ export function attachSpotifyRateLimit(
       logger?.warn(
         `Spotify blocked ${getSpotifyQuotaRetryAfterSeconds()}s — failing fast`,
       );
-      return Promise.reject(synthetic429(cfg));
+      throw synthetic429(cfg);
     }
 
     let release!: () => void;
@@ -126,7 +126,7 @@ export function attachSpotifyRateLimit(
       logger?.warn(
         `Spotify short cooldown ${Math.ceil(wait / 1000)}s — failing fast`,
       );
-      return Promise.reject(synthetic429(cfg));
+      throw synthetic429(cfg);
     }
 
     if (wait > 0) await sleep(wait);

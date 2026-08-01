@@ -48,6 +48,9 @@ export class SpotifyTokenService {
     });
 
     try {
+      const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString(
+        'base64',
+      );
       const { data } = await this.accountsApi.post<{
         access_token: string;
         refresh_token?: string;
@@ -55,7 +58,7 @@ export class SpotifyTokenService {
       }>('/api/token', body.toString(), {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+          Authorization: `Basic ${basicAuth}`,
         },
       });
 

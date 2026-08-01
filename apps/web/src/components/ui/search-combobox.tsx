@@ -25,7 +25,7 @@ export function SearchCombobox<T extends { id: string }>({
   errorLabel,
   disabled,
   className,
-}: {
+}: Readonly<{
   queryKey: string
   search: (query: string) => Promise<T[]>
   selectedIds: Set<string>
@@ -37,7 +37,7 @@ export function SearchCombobox<T extends { id: string }>({
   errorLabel: (error: unknown) => string
   disabled?: boolean
   className?: string
-}) {
+}>) {
   const inputId = useId()
   const listId = useId()
   const [query, setQuery] = useState('')
@@ -100,7 +100,7 @@ export function SearchCombobox<T extends { id: string }>({
         if (position < 0) {
           return delta > 0
             ? selectable[0].index
-            : selectable[selectable.length - 1].index
+            : selectable.at(-1)!.index
         }
         const next = (position + delta + selectable.length) % selectable.length
         return selectable[next].index
@@ -162,6 +162,8 @@ export function SearchCombobox<T extends { id: string }>({
       {showResults ? (
         <ul
           id={listId}
+          // S6819: skip native <select> — custom combobox needs typeahead,
+          // async results, and multi-select chips that a native listbox cannot provide.
           role="listbox"
           className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-cream-200/10 bg-charcoal-800 py-1 shadow-xl animate-fade-in"
         >

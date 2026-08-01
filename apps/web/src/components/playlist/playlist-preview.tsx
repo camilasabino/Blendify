@@ -15,13 +15,13 @@ type ListenMode = 'here' | 'device'
 const DEVICE_WAKE_MS = 3200
 const DEVICE_RETRY_MS = 2200
 
-type PlaylistPreviewProps = {
+type PlaylistPreviewProps = Readonly<{
   tracks?: TrackDto[]
   spotifyId?: string | null
   spotifyUrl?: string | null
   className?: string
   mode?: 'full' | 'embed'
-}
+}>
 
 function isDeviceMissingError(error: unknown): boolean {
   if (!(error instanceof ApiError)) return false
@@ -345,12 +345,10 @@ export function PlaylistPreview({
       )}
 
       {mode === 'full' && listenMode === 'device' && status && !playError && (
-        <p className="text-sm text-cream-300" role="status">
-          {status}
-        </p>
+        <output className="block text-sm text-cream-300">{status}</output>
       )}
       {mode === 'full' && listenMode === 'device' && playError && (
-        <div className="space-y-2" role="status">
+        <output className="block space-y-2">
           <p className="text-sm text-amber-200/90">{playError}</p>
           <div className="flex flex-wrap gap-2">
             {embedId && (
@@ -376,7 +374,7 @@ export function PlaylistPreview({
               </Button>
             )}
           </div>
-        </div>
+        </output>
       )}
     </div>
   )

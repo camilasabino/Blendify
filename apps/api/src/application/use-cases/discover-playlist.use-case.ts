@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { randomInt, randomUUID } from 'crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { PopularityMode, type PlaylistDetail } from '@blendify/contracts';
 import type { z } from 'zod';
 import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
@@ -411,7 +411,7 @@ export class DiscoverPlaylistUseCase {
   ) {
     const artistId = input.artistId;
     const snapshot = input.artist;
-    if (snapshot && snapshot.id === artistId) {
+    if (snapshot?.id === artistId) {
       const byId = await provider.getArtistsByIds([artistId]);
       if (byId[0]) return byId[0];
       const matches = await provider.searchArtists(snapshot.name, 3);

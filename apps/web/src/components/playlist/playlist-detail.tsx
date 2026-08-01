@@ -3,9 +3,9 @@ import { PlaylistPreview } from '@/components/playlist/playlist-preview'
 
 export default function PlaylistDetail({
   playlist,
-}: {
+}: Readonly<{
   playlist: PlaylistDetailDto
-}) {
+}>) {
   return (
     <PlaylistPreview
       mode="embed"

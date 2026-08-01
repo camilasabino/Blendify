@@ -17,12 +17,14 @@ export function pickResolvedTrack(
   const artistMatched = candidates.filter(
     (track) => normalizeArtistName(track.artistName) === wantedArtist,
   );
-  const pool =
-    artistMatched.length > 0
-      ? artistMatched
-      : options.requireArtistNameMatch === false
-        ? candidates
-        : [];
+  let pool: Track[];
+  if (artistMatched.length > 0) {
+    pool = artistMatched;
+  } else if (options.requireArtistNameMatch === false) {
+    pool = candidates;
+  } else {
+    pool = [];
+  }
   if (pool.length === 0) return null;
   const exact = pool.find(
     (track) => normalizeArtistName(track.name) === wantedTitle,

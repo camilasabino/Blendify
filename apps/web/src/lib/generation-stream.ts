@@ -8,6 +8,37 @@ import { ApiError } from '@/lib/api-error'
 
 export type GenerationProgressHandler = (progress: GenerationProgress) => void
 
+type StreamAccumulator = {
+  playlist: PlaylistDetail | null
+}
+
+function applyGenerationEvent(
+  event: GenerationStreamEvent,
+  onProgress: GenerationProgressHandler | undefined,
+  state: StreamAccumulator,
+): void {
+  if (event.type === 'progress') {
+    onProgress?.(event)
+    return
+  }
+  if (event.type === 'result') {
+    state.playlist = event.playlist
+    return
+  }
+  throw new ApiError(event.message, event.statusCode, event)
+}
+
+function consumeGenerationLines(
+  lines: string[],
+  onProgress: GenerationProgressHandler | undefined,
+  state: StreamAccumulator,
+): void {
+  for (const line of lines) {
+    const event = parseGenerationStreamLine(line)
+    if (event) applyGenerationEvent(event, onProgress, state)
+  }
+}
+
 export async function readGenerationStream(
   response: Response,
   onProgress?: GenerationProgressHandler,
@@ -19,7 +50,7 @@ export async function readGenerationStream(
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  let playlist: PlaylistDetail | null = null
+  const state: StreamAccumulator = { playlist: null }
 
   while (true) {
     const { done, value } = await reader.read()
@@ -27,35 +58,15 @@ export async function readGenerationStream(
     buffer += decoder.decode(value, { stream: true })
     const lines = buffer.split('\n')
     buffer = lines.pop() ?? ''
-
-    for (const line of lines) {
-      const event = parseGenerationStreamLine(line)
-      if (!event) continue
-      if (event.type === 'progress') {
-        onProgress?.(event)
-      } else if (event.type === 'result') {
-        playlist = event.playlist
-      } else if (event.type === 'error') {
-        throw new ApiError(event.message, event.statusCode, event)
-      }
-    }
+    consumeGenerationLines(lines, onProgress, state)
   }
 
-  const trailing = parseGenerationStreamLine(buffer)
-  if (trailing) {
-    if (trailing.type === 'progress') {
-      onProgress?.(trailing)
-    } else if (trailing.type === 'result') {
-      playlist = trailing.playlist
-    } else if (trailing.type === 'error') {
-      throw new ApiError(trailing.message, trailing.statusCode, trailing)
-    }
-  }
+  consumeGenerationLines([buffer], onProgress, state)
 
-  if (!playlist) {
+  if (!state.playlist) {
     throw new ApiError('Generation stream ended without a result', 502)
   }
-  return playlist
+  return state.playlist
 }
 
 export function parseGenerationStreamLine(

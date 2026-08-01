@@ -2,7 +2,28 @@
  * Query variants for Last.fm track.getSimilar.
  * Spotify titles often include remasters / feat. credits that Last.fm rejects.
  */
-const ARTIST_ALIAS_SEPARATOR = /\s+\/\s+|\s+feat(?:uring)?\.?\s+|\s+ft\.?\s+/i;
+const ARTIST_ALIAS_SEPARATOR =
+  /\s+\/\s+|\s+featuring\.?\s+|\s+feat\.?\s+|\s+ft\.?\s+/i;
+
+const FEAT_INNER = /\b(?:feat\.?|ft\.?|featuring)\b/i;
+
+/** Fully expanded alternatives — no nested optional quantifiers (S5843). */
+const VERSION_INNER =
+  /\b(?:remastered\s+\d{2,4}|remastered|remaster\s+\d{2,4}|remaster|live|acoustic|deluxe|anniversary|radio\s*edit|demo|mono|stereo|bonus\s+track|extended|edit|version|from\s+"[^"]+")\b/i;
+
+function stripBracketedMatches(title: string, innerMarker?: RegExp): string {
+  const shouldStrip = (inner: string) =>
+    innerMarker == null || inner.search(innerMarker) >= 0;
+
+  // Character-class bounded groups avoid .*? backtracking across brackets.
+  let result = title.replace(/\s*\(([^)]*)\)/gi, (full, inner: string) =>
+    shouldStrip(inner) ? '' : full,
+  );
+  result = result.replace(/\s*\[([^\]]*)\]/gi, (full, inner: string) =>
+    shouldStrip(inner) ? '' : full,
+  );
+  return result;
+}
 
 export function primaryArtistName(artistName: string): string {
   const trimmed = artistName.trim();
@@ -37,16 +58,10 @@ export function cleanDiscoveryTrackTitle(trackName: string): string {
   let title = trackName.trim();
   if (!title) return '';
 
+  title = stripBracketedMatches(title, FEAT_INNER);
+  title = stripBracketedMatches(title, VERSION_INNER);
   title = title.replace(
-    /\s*[([].*?\b(feat\.?|ft\.?|featuring)\b.*?[)\]]/gi,
-    '',
-  );
-  title = title.replace(
-    /\s*[([].*?\b(remaster(?:ed)?(?:\s+\d{2,4})?|live|acoustic|deluxe|anniversary|radio\s*edit|demo|mono|stereo|bonus\s+track|extended|edit|version|from\s+"[^"]+")\b.*?[)\]]/gi,
-    '',
-  );
-  title = title.replace(
-    /\s+[-–—]\s+(?:remaster(?:ed)?(?:\s+\d{2,4})?|live|acoustic|deluxe|anniversary|radio\s*edit|demo|from\s+.+)$/i,
+    /\s+[-–—]\s+(?:remastered\s+\d{2,4}|remastered|remaster\s+\d{2,4}|remaster|live|acoustic|deluxe|anniversary|radio\s*edit|demo|from\s+.+)$/i,
     '',
   );
 

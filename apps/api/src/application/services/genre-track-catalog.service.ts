@@ -218,44 +218,87 @@ export class GenreTrackCatalogService {
       if (collected.length >= fetchTarget) break;
       this.quota.assertAvailable();
 
-      let page: Track[];
-      try {
-        page = await provider.searchTracks(`artist:"${artist.name}"`, {
-          limit: 10,
-          offset: 0,
-        });
-      } catch (error) {
-        if (isSpotifyQuotaError(error)) {
-          if (collected.length === 0) throw error;
-          break;
-        }
-        this.logger.warn(
-          `Genre artist search failed for ${artist.name}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        continue;
-      }
+      const page = await this.searchTracksForSeedArtist(
+        provider,
+        artist,
+        collected.length,
+      );
+      if (page === 'stop') break;
+      if (page === null) continue;
 
-      const artistId = artist.id.getValue();
-      for (const track of page) {
-        if (track.artistId.getValue() !== artistId) continue;
-        if (this.isJunkTrack(track)) continue;
-        const id = track.id.getValue();
-        if (seen.has(id)) continue;
-        const used = perArtistSeen.get(artistId) ?? 0;
-        if (used >= tracksPerArtist) break;
-        seen.add(id);
-        perArtistSeen.set(artistId, used + 1);
-        collected.push(track);
-        if (collected.length >= fetchTarget) break;
-      }
+      this.collectMatchingSeedTracks({
+        page,
+        artistId: artist.id.getValue(),
+        tracksPerArtist,
+        fetchTarget,
+        collected,
+        seen,
+        perArtistSeen,
+      });
     }
 
     return {
       tracks: rankTracksForMix(collected, plan.rank),
       coverUrl: seedArtists[0]?.imageUrl,
     };
+  }
+
+  /** Returns tracks, `null` to skip artist, or `'stop'` to end the seed loop. */
+  private async searchTracksForSeedArtist(
+    provider: MusicProviderPort,
+    artist: Artist,
+    collectedCount: number,
+  ): Promise<Track[] | null | 'stop'> {
+    try {
+      return await provider.searchTracks(`artist:"${artist.name}"`, {
+        limit: 10,
+        offset: 0,
+      });
+    } catch (error) {
+      if (isSpotifyQuotaError(error)) {
+        if (collectedCount === 0) throw error;
+        return 'stop';
+      }
+      this.logger.warn(
+        `Genre artist search failed for ${artist.name}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  private collectMatchingSeedTracks(input: {
+    page: Track[];
+    artistId: string;
+    tracksPerArtist: number;
+    fetchTarget: number;
+    collected: Track[];
+    seen: Set<string>;
+    perArtistSeen: Map<string, number>;
+  }): void {
+    const {
+      page,
+      artistId,
+      tracksPerArtist,
+      fetchTarget,
+      collected,
+      seen,
+      perArtistSeen,
+    } = input;
+
+    for (const track of page) {
+      if (track.artistId.getValue() !== artistId) continue;
+      if (this.isJunkTrack(track)) continue;
+      const id = track.id.getValue();
+      if (seen.has(id)) continue;
+      const used = perArtistSeen.get(artistId) ?? 0;
+      if (used >= tracksPerArtist) break;
+      seen.add(id);
+      perArtistSeen.set(artistId, used + 1);
+      collected.push(track);
+      if (collected.length >= fetchTarget) break;
+    }
   }
 
   private async resolveSeedArtists(
@@ -280,34 +323,52 @@ export class GenreTrackCatalogService {
         if (resolved.length >= limit) break;
         this.quota.assertAvailable();
 
-        try {
-          const artists = await provider.searchArtists(candidate.name, 3);
-          const match = pickStrictArtistMatch(
-            candidate.name,
-            artists.filter((artist) => !this.isJunkArtist(artist)),
-          );
-          if (!match) continue;
-          const id = match.id.getValue();
-          if (seen.has(id)) continue;
-          seen.add(id);
-          resolved.push(match);
-        } catch (error) {
-          if (isSpotifyQuotaError(error)) {
-            if (resolved.length === 0) throw error;
-            break;
-          }
-          this.logger.warn(
-            `Seed artist resolve failed for ${candidate.name}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-        }
+        const outcome = await this.resolveOneSeedArtist(
+          provider,
+          candidate.name,
+          seen,
+          resolved.length,
+        );
+        if (outcome === 'stop') break;
+        if (outcome) resolved.push(outcome);
       }
 
       return resolved;
     } catch (error) {
       if (isSpotifyQuotaError(error)) throw error;
       return [];
+    }
+  }
+
+  /** Returns a match, `null` to skip, or `'stop'` on quota with partial results. */
+  private async resolveOneSeedArtist(
+    provider: MusicProviderPort,
+    candidateName: string,
+    seen: Set<string>,
+    resolvedCount: number,
+  ): Promise<Artist | null | 'stop'> {
+    try {
+      const artists = await provider.searchArtists(candidateName, 3);
+      const match = pickStrictArtistMatch(
+        candidateName,
+        artists.filter((artist) => !this.isJunkArtist(artist)),
+      );
+      if (!match) return null;
+      const id = match.id.getValue();
+      if (seen.has(id)) return null;
+      seen.add(id);
+      return match;
+    } catch (error) {
+      if (isSpotifyQuotaError(error)) {
+        if (resolvedCount === 0) throw error;
+        return 'stop';
+      }
+      this.logger.warn(
+        `Seed artist resolve failed for ${candidateName}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
     }
   }
 

@@ -1,30 +1,37 @@
 import { ALTERNATE_KEYWORDS } from '../constants';
 
+const FEAT_INNER = /\b(?:feat\.?|ft\.?|featuring)\b/i;
+
+function stripBracketedMatches(title: string, innerMarker?: RegExp): string {
+  const shouldStrip = (inner: string) =>
+    innerMarker == null || inner.search(innerMarker) >= 0;
+
+  let result = title.replace(/\s*\(([^)]*)\)/g, (full, inner: string) =>
+    shouldStrip(inner) ? '' : full,
+  );
+  result = result.replace(/\s*\[([^\]]*)\]/g, (full, inner: string) =>
+    shouldStrip(inner) ? '' : full,
+  );
+  return result;
+}
+
 export class TrackNormalizer {
-  private static readonly FEATURE_PATTERN =
-    /\s*[([].*?\b(feat\.?|ft\.?|featuring)\b.*?[)\]]/gi;
-
-  private static readonly BRACKET_VERSION_PATTERN = /\s*[([].*?[)\]]/g;
-
-  private static readonly DASH_VERSION_PATTERN = /\s+[-–—]\s+.+$/g;
-
   normalize(title: string): string {
     let result = title.normalize('NFKD').toLowerCase().trim();
 
-    result = result.replace(TrackNormalizer.FEATURE_PATTERN, '');
+    result = stripBracketedMatches(result, FEAT_INNER);
 
     for (const keyword of ALTERNATE_KEYWORDS) {
-      const escaped = keyword.replace(/\s+/g, '\\s+');
+      const escaped = keyword.replace(/\s+/g, String.raw`\s+`);
       const keywordPattern = new RegExp(
-        `\\s*[([\\-–—]?\\s*${escaped}\\s*[)\\]]?`,
+        String.raw`\s*[([\-–—]?\s*${escaped}\s*[)\]]?`,
         'gi',
       );
       result = result.replace(keywordPattern, '');
     }
 
-    result = result
-      .replace(TrackNormalizer.BRACKET_VERSION_PATTERN, '')
-      .replace(TrackNormalizer.DASH_VERSION_PATTERN, '')
+    result = stripBracketedMatches(result)
+      .replace(/\s+[-–—]\s+.+$/g, '')
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .replace(/\s+/g, ' ')
       .trim();

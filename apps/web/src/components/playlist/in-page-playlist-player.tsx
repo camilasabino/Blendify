@@ -6,10 +6,10 @@ import { cn, focusRing, formatDuration } from '@/lib/utils'
 export function InPagePlaylistPlayer({
   tracks,
   spotifyId,
-}: {
+}: Readonly<{
   tracks: TrackDto[]
   spotifyId: string
-}) {
+}>) {
   const t = useT()
   const list = tracks.filter((track) => track.id && track.name)
   const [index, setIndex] = useState(0)

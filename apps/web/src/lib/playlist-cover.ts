@@ -97,7 +97,10 @@ function inferKind(title: string): PlaylistCoverKind {
 
 function splitTitle(raw: string): { eyebrow: string; headline: string } {
   const stripped = stripBrandPrefix(raw.trim()) || 'Untitled blend'
-  const parts = stripped.split(/\s*[·•\-–—|:]\s*/).filter(Boolean)
+  const parts = stripped
+    .split(/[·•\-–—|:]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
   if (parts.length >= 2) {
     const maybeKind = parts[0].toLowerCase()
     if (maybeKind === 'mix' || maybeKind === 'discover') {
@@ -176,7 +179,7 @@ function pickPalette(kind: PlaylistCoverKind, seed: string): CoverPalette {
 
   let hash = 0
   for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
+    hash = (hash * 31 + (seed.codePointAt(i) ?? 0)) >>> 0
   }
   return palettes[hash % palettes.length]!
 }

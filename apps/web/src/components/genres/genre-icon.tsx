@@ -1,12 +1,12 @@
 import { resolveGenreIcon } from '@/lib/genre-icon-map'
 import { cn } from '@/lib/utils'
 
-type GenreIconProps = {
+type GenreIconProps = Readonly<{
   name: string
   id?: string
   className?: string
   iconClassName?: string
-}
+}>
 
 export function GenreIcon({
   name,

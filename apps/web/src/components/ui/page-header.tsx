@@ -1,8 +1,8 @@
-type PageHeaderProps = {
+type PageHeaderProps = Readonly<{
   eyebrow: string
   title: string
   description?: string
-}
+}>
 
 export function PageHeader({ eyebrow, title, description }: PageHeaderProps) {
   return (

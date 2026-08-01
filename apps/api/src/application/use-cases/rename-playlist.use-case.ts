@@ -28,7 +28,7 @@ export class RenamePlaylistUseCase {
     name: string,
   ): Promise<PlaylistDetail> {
     const playlist = await this.playlists.findById(playlistId);
-    if (!playlist || playlist.userId !== userId) {
+    if (playlist?.userId !== userId) {
       throw BusinessRuleError.playlistNotFound(playlistId);
     }
 

@@ -2,12 +2,12 @@ import { api, getApiErrorMessage, isSpotifyRateLimited, type Artist } from '@/li
 import { SearchCombobox } from '@/components/ui/search-combobox'
 import { useT } from '@/i18n/use-t'
 
-type ArtistSearchProps = {
+type ArtistSearchProps = Readonly<{
   selectedIds: Set<string>
   onSelect: (artist: Artist) => void
   disabled?: boolean
   className?: string
-}
+}>
 
 export function ArtistSearch(props: ArtistSearchProps) {
   const t = useT()

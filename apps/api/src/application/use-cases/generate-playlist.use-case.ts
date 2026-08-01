@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import {
   PopularityMode,
   type PlaylistDetail,
@@ -259,56 +259,22 @@ export class GeneratePlaylistUseCase {
 
     for (const id of artistIds) {
       index += 1;
-      if (isPendingArtistId(id)) {
-        const snapshot = fromClient.get(id);
-        const name = snapshot?.name?.trim();
-        if (!name) {
-          throw new BusinessRuleError(
-            'Pending artist is missing a name.',
-            'ARTIST_RESOLVE_FAILED',
-            { id },
-          );
-        }
-        const matches = await provider.searchArtists(name, 3);
-        const best = pickBestArtistMatch(name, matches);
-        if (!best) {
-          throw new BusinessRuleError(
-            `Could not find Spotify artist for "${name}".`,
-            'ARTIST_RESOLVE_FAILED',
-            { name },
-          );
-        }
-        const spotifyId = best.id.getValue();
-        if (seen.has(spotifyId)) {
-          tracker?.report('resolving_seeds', index, artistIds.length);
-          continue;
-        }
-        seen.add(spotifyId);
-        artists.push(best);
+      const resolved = isPendingArtistId(id)
+        ? await this.resolvePendingArtist(provider, id, fromClient)
+        : this.resolveKnownArtist(id, fromClient, fetchedById);
+
+      if (!resolved) {
         tracker?.report('resolving_seeds', index, artistIds.length);
         continue;
       }
 
-      const snapshot = fromClient.get(id);
-      const artist = snapshot
-        ? Artist.create({
-            id: ArtistId.create(snapshot.id),
-            name: snapshot.name,
-            imageUrl: snapshot.imageUrl ?? undefined,
-          })
-        : fetchedById.get(id);
-
-      if (!artist) {
-        tracker?.report('resolving_seeds', index, artistIds.length);
-        continue;
-      }
-      const spotifyId = artist.id.getValue();
+      const spotifyId = resolved.id.getValue();
       if (seen.has(spotifyId)) {
         tracker?.report('resolving_seeds', index, artistIds.length);
         continue;
       }
       seen.add(spotifyId);
-      artists.push(artist);
+      artists.push(resolved);
       tracker?.report('resolving_seeds', index, artistIds.length);
     }
 
@@ -316,6 +282,54 @@ export class GeneratePlaylistUseCase {
       throw BusinessRuleError.emptyArtistSelection();
     }
     return artists;
+  }
+
+  private async resolvePendingArtist(
+    provider: MusicProviderPort,
+    id: string,
+    fromClient: Map<
+      string,
+      { id: string; name: string; imageUrl?: string | null }
+    >,
+  ): Promise<Artist> {
+    const snapshot = fromClient.get(id);
+    const name = snapshot?.name?.trim();
+    if (!name) {
+      throw new BusinessRuleError(
+        'Pending artist is missing a name.',
+        'ARTIST_RESOLVE_FAILED',
+        { id },
+      );
+    }
+    const matches = await provider.searchArtists(name, 3);
+    const best = pickBestArtistMatch(name, matches);
+    if (!best) {
+      throw new BusinessRuleError(
+        `Could not find Spotify artist for "${name}".`,
+        'ARTIST_RESOLVE_FAILED',
+        { name },
+      );
+    }
+    return best;
+  }
+
+  private resolveKnownArtist(
+    id: string,
+    fromClient: Map<
+      string,
+      { id: string; name: string; imageUrl?: string | null }
+    >,
+    fetchedById: Map<string, Artist>,
+  ): Artist | undefined {
+    const snapshot = fromClient.get(id);
+    if (snapshot) {
+      return Artist.create({
+        id: ArtistId.create(snapshot.id),
+        name: snapshot.name,
+        imageUrl: snapshot.imageUrl ?? undefined,
+      });
+    }
+    return fetchedById.get(id);
   }
 
   private async fetchTracksForMix(
@@ -396,34 +410,50 @@ export class GeneratePlaylistUseCase {
 
     if (collected.length < tracksPerSeed) {
       this.quota.assertAvailable();
-      try {
-        const page = await provider.searchTracks(`artist:"${artist.name}"`, {
-          limit: 10,
-          offset: 0,
-        });
-        const seen = new Set(collected.map((t) => t.id.getValue()));
-        for (const track of page) {
-          if (!this.trackMatchesArtist(track, artist)) continue;
-          const id = track.id.getValue();
-          if (seen.has(id)) continue;
-          seen.add(id);
-          collected.push(track);
-          onMatched?.(Math.min(collected.length, tracksPerSeed));
-        }
-      } catch (error) {
-        if (isSpotifyQuotaError(error)) {
-          if (collected.length === 0) throw error;
-        } else {
-          this.logger.warn(
-            `Artist track search fallback failed for ${artist.name}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-        }
-      }
+      await this.appendArtistSearchFallback(
+        provider,
+        artist,
+        collected,
+        tracksPerSeed,
+        onMatched,
+      );
     }
 
     return collected;
+  }
+
+  private async appendArtistSearchFallback(
+    provider: MusicProviderPort,
+    artist: Artist,
+    collected: Track[],
+    tracksPerSeed: number,
+    onMatched?: (matched: number) => void,
+  ): Promise<void> {
+    try {
+      const page = await provider.searchTracks(`artist:"${artist.name}"`, {
+        limit: 10,
+        offset: 0,
+      });
+      const seen = new Set(collected.map((t) => t.id.getValue()));
+      for (const track of page) {
+        if (!this.trackMatchesArtist(track, artist)) continue;
+        const id = track.id.getValue();
+        if (seen.has(id)) continue;
+        seen.add(id);
+        collected.push(track);
+        onMatched?.(Math.min(collected.length, tracksPerSeed));
+      }
+    } catch (error) {
+      if (isSpotifyQuotaError(error)) {
+        if (collected.length === 0) throw error;
+        return;
+      }
+      this.logger.warn(
+        `Artist track search fallback failed for ${artist.name}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   private async fetchTracksForArtistFromLastFm(
