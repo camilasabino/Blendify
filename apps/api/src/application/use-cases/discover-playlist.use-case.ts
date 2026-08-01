@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import { PopularityMode, type PlaylistDetail } from '@blendify/contracts';
 import type { z } from 'zod';
 import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
@@ -641,8 +641,12 @@ function selectTracksByPopularity(
         const mid = copy.slice(2, -1);
         const tail = copy.slice(-1);
         for (let i = mid.length - 1; i > 0; i -= 1) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [mid[i], mid[j]] = [mid[j], mid[i]];
+          const j = randomInt(0, i + 1);
+          const current = mid[i];
+          const swap = mid[j];
+          if (current === undefined || swap === undefined) continue;
+          mid[i] = swap;
+          mid[j] = current;
         }
         return [...head, ...mid, ...tail].slice(0, needed);
       }
