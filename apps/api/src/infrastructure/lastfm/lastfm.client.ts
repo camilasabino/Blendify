@@ -129,33 +129,32 @@ export class LastFmClient implements DiscoveryCatalogPort {
       'similar-v3',
       `${name.toLowerCase()}|${safeLimit}`,
     );
-    const cached = await this.cache.getJson<SimilarArtistCandidate[]>(cacheKey);
-    if (cached) return cached;
 
-    let artists: SimilarArtistCandidate[] = [];
-    let usedVariant = name;
-
-    for (const variant of artistNameVariants(name)) {
-      artists = await this.fetchSimilarArtistsOnce(variant, safeLimit);
-      if (artists.length > 0) {
-        usedVariant = variant;
-        break;
-      }
-    }
-
-    await this.cache.setJson(
+    return this.withCache(
       cacheKey,
-      artists,
-      artists.length > 0 ? LASTFM_CACHE_TTL_MS : LASTFM_EMPTY_CACHE_TTL_MS,
-    );
+      async () => {
+        let artists: SimilarArtistCandidate[] = [];
+        let usedVariant = name;
 
-    this.logger.debug(
-      `Last.fm similar for "${name}"` +
-        (usedVariant !== name ? ` via "${usedVariant}"` : '') +
-        `: ${artists.length} artist(s)`,
-    );
+        for (const variant of artistNameVariants(name)) {
+          artists = await this.fetchSimilarArtistsOnce(variant, safeLimit);
+          if (artists.length > 0) {
+            usedVariant = variant;
+            break;
+          }
+        }
 
-    return artists;
+        this.logger.debug(
+          `Last.fm similar for "${name}"` +
+            (usedVariant !== name ? ` via "${usedVariant}"` : '') +
+            `: ${artists.length} artist(s)`,
+        );
+
+        return artists;
+      },
+      (artists) =>
+        artists.length > 0 ? LASTFM_CACHE_TTL_MS : LASTFM_EMPTY_CACHE_TTL_MS,
+    );
   }
 
   private async fetchSimilarArtistsOnce(
@@ -203,40 +202,39 @@ export class LastFmClient implements DiscoveryCatalogPort {
       'similar-tracks-v3',
       `${artist.toLowerCase()}|${track.toLowerCase()}|${safeLimit}`,
     );
-    const cached = await this.cache.getJson<SimilarTrackCandidate[]>(cacheKey);
-    if (cached) return cached;
 
-    let best: SimilarTrackCandidate[] = [];
-    let usedVariant: { artist: string; track: string } | null = null;
-
-    for (const variant of buildSimilarTrackQueryVariants(artist, track)) {
-      const tracks = await this.fetchSimilarTracksOnce(
-        variant.artist,
-        variant.track,
-        safeLimit,
-      );
-      if (tracks.length > best.length) {
-        best = tracks;
-        usedVariant = variant;
-      }
-      if (best.length >= safeLimit) break;
-    }
-
-    await this.cache.setJson(
+    return this.withCache(
       cacheKey,
-      best,
-      best.length > 0 ? LASTFM_CACHE_TTL_MS : LASTFM_EMPTY_CACHE_TTL_MS,
-    );
+      async () => {
+        let best: SimilarTrackCandidate[] = [];
+        let usedVariant: { artist: string; track: string } | null = null;
 
-    this.logger.debug(
-      `Last.fm similar tracks for "${artist}" — "${track}"` +
-        (usedVariant
-          ? ` via "${usedVariant.artist}" / "${usedVariant.track}"`
-          : '') +
-        `: ${best.length}`,
-    );
+        for (const variant of buildSimilarTrackQueryVariants(artist, track)) {
+          const tracks = await this.fetchSimilarTracksOnce(
+            variant.artist,
+            variant.track,
+            safeLimit,
+          );
+          if (tracks.length > best.length) {
+            best = tracks;
+            usedVariant = variant;
+          }
+          if (best.length >= safeLimit) break;
+        }
 
-    return best;
+        this.logger.debug(
+          `Last.fm similar tracks for "${artist}" — "${track}"` +
+            (usedVariant
+              ? ` via "${usedVariant.artist}" / "${usedVariant.track}"`
+              : '') +
+            `: ${best.length}`,
+        );
+
+        return best;
+      },
+      (tracks) =>
+        tracks.length > 0 ? LASTFM_CACHE_TTL_MS : LASTFM_EMPTY_CACHE_TTL_MS,
+    );
   }
 
   private async fetchSimilarTracksOnce(
@@ -284,30 +282,33 @@ export class LastFmClient implements DiscoveryCatalogPort {
 
     const safeLimit = Math.min(Math.max(limit, 1), 50);
     const cacheKey = this.key('tag-artists', `${name}|${safeLimit}`);
-    const cached = await this.cache.getJson<SimilarArtistCandidate[]>(cacheKey);
-    if (cached) return cached;
 
-    const { data } = await this.http.get<LastFmTagTopArtistsResponse>('', {
-      params: {
-        method: 'tag.getTopArtists',
-        tag: name,
-        limit: safeLimit,
-        api_key: this.apiKey,
-        format: 'json',
+    return this.withCache(
+      cacheKey,
+      async () => {
+        const { data } = await this.http.get<LastFmTagTopArtistsResponse>('', {
+          params: {
+            method: 'tag.getTopArtists',
+            tag: name,
+            limit: safeLimit,
+            api_key: this.apiKey,
+            format: 'json',
+          },
+        });
+
+        this.assertNoError(data);
+
+        const artists = normalizeArtistList(data.topartists?.artist)
+          .map(mapSimilarArtist)
+          .filter((artist): artist is SimilarArtistCandidate =>
+            Boolean(artist),
+          );
+
+        this.logger.debug(`Last.fm tag "${name}": ${artists.length} artist(s)`);
+        return artists;
       },
-    });
-
-    this.assertNoError(data);
-
-    const artists = normalizeArtistList(data.topartists?.artist)
-      .map(mapSimilarArtist)
-      .filter((artist): artist is SimilarArtistCandidate => Boolean(artist));
-
-    await this.cache.setJson(cacheKey, artists, LASTFM_CACHE_TTL_MS);
-
-    this.logger.debug(`Last.fm tag "${name}": ${artists.length} artist(s)`);
-
-    return artists;
+      () => LASTFM_CACHE_TTL_MS,
+    );
   }
 
   /**
@@ -332,33 +333,34 @@ export class LastFmClient implements DiscoveryCatalogPort {
       'tag-tracks',
       `${name}|${safeLimit}|p${safePage}`,
     );
-    const cached = await this.cache.getJson<CatalogTrackCandidate[]>(cacheKey);
-    if (cached) return cached;
 
-    const { data } = await this.http.get<LastFmTagTopTracksResponse>('', {
-      params: {
-        method: 'tag.getTopTracks',
-        tag: name,
-        limit: safeLimit,
-        page: safePage,
-        api_key: this.apiKey,
-        format: 'json',
+    return this.withCache(
+      cacheKey,
+      async () => {
+        const { data } = await this.http.get<LastFmTagTopTracksResponse>('', {
+          params: {
+            method: 'tag.getTopTracks',
+            tag: name,
+            limit: safeLimit,
+            page: safePage,
+            api_key: this.apiKey,
+            format: 'json',
+          },
+        });
+
+        this.assertNoError(data);
+
+        const tracks = normalizeTagTrackList(data.tracks?.track)
+          .map((node) => mapTagTrack(node))
+          .filter((track): track is CatalogTrackCandidate => Boolean(track));
+
+        this.logger.debug(
+          `Last.fm tag tracks "${name}" p${safePage}: ${tracks.length}`,
+        );
+        return tracks;
       },
-    });
-
-    this.assertNoError(data);
-
-    const tracks = normalizeTagTrackList(data.tracks?.track)
-      .map((node) => mapTagTrack(node))
-      .filter((track): track is CatalogTrackCandidate => Boolean(track));
-
-    await this.cache.setJson(cacheKey, tracks, LASTFM_CACHE_TTL_MS);
-
-    this.logger.debug(
-      `Last.fm tag tracks "${name}" p${safePage}: ${tracks.length}`,
+      () => LASTFM_CACHE_TTL_MS,
     );
-
-    return tracks;
   }
 
   /**
@@ -381,37 +383,53 @@ export class LastFmClient implements DiscoveryCatalogPort {
       'artist-tracks',
       `${name.toLowerCase()}|${safeLimit}`,
     );
-    const cached = await this.cache.getJson<CatalogTrackCandidate[]>(cacheKey);
-    if (cached) return cached;
 
-    const { data } = await this.http.get<LastFmArtistTopTracksResponse>('', {
-      params: {
-        method: 'artist.getTopTracks',
-        artist: encodeLastFmParam(name),
-        autocorrect: 1,
-        limit: safeLimit,
-        api_key: this.apiKey,
-        format: 'json',
+    return this.withCache(
+      cacheKey,
+      async () => {
+        const { data } = await this.http.get<LastFmArtistTopTracksResponse>(
+          '',
+          {
+            params: {
+              method: 'artist.getTopTracks',
+              artist: encodeLastFmParam(name),
+              autocorrect: 1,
+              limit: safeLimit,
+              api_key: this.apiKey,
+              format: 'json',
+            },
+          },
+        );
+
+        this.assertNoError(data);
+
+        const tracks = normalizeTagTrackList(data.toptracks?.track)
+          .map((node, index) => mapTagTrack(node, name, index + 1))
+          .filter((track): track is CatalogTrackCandidate => Boolean(track));
+
+        this.logger.debug(
+          `Last.fm artist tracks "${name}": ${tracks.length} track(s)`,
+        );
+        return tracks;
       },
-    });
-
-    this.assertNoError(data);
-
-    const tracks = normalizeTagTrackList(data.toptracks?.track)
-      .map((node, index) => mapTagTrack(node, name, index + 1))
-      .filter((track): track is CatalogTrackCandidate => Boolean(track));
-
-    await this.cache.setJson(cacheKey, tracks, LASTFM_CACHE_TTL_MS);
-
-    this.logger.debug(
-      `Last.fm artist tracks "${name}": ${tracks.length} track(s)`,
+      () => LASTFM_CACHE_TTL_MS,
     );
-
-    return tracks;
   }
 
   private key(kind: string, suffix: string): string {
     return `blendify:lastfm:${kind}:${suffix}`;
+  }
+
+  private async withCache<T>(
+    cacheKey: string,
+    load: () => Promise<T>,
+    ttlMs: (value: T) => number,
+  ): Promise<T> {
+    const cached = await this.cache.getJson<T>(cacheKey);
+    if (cached !== null && cached !== undefined) return cached;
+    const value = await load();
+    await this.cache.setJson(cacheKey, value, ttlMs(value));
+    return value;
   }
 
   private assertNoError(data: { error?: number; message?: string }): void {

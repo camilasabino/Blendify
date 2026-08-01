@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Response } from 'express';
+import { CookieOptions, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { SpotifyAuthClient } from '../spotify/spotify-auth.client';
 import { User } from '../../domain/user/user.entity';
@@ -16,7 +16,9 @@ export interface SessionPayload {
 }
 
 const COOKIE_NAME = 'blendify_session';
+const OAUTH_STATE_COOKIE = 'oauth_state';
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Browsers occasionally hit the OAuth callback twice; coalesce by code. */
 const inFlightCallbacks = new Map<
@@ -100,24 +102,45 @@ export class AuthService {
     }
   }
 
-  setSessionCookie(res: Response, token: string): void {
+  /** Shared cookie flags for session + OAuth state (must match on clearCookie). */
+  cookieOptions(maxAgeMs: number): CookieOptions {
     const isProd = this.config.get('NODE_ENV') === 'production';
-    res.cookie(COOKIE_NAME, token, {
+    // API and web share 127.0.0.1 in local; SameSite=Lax is enough. Prefer Lax
+    // in production too when front/API are same-site (avoid None unless needed).
+    return {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      maxAge: maxAgeMs,
       path: '/',
-    });
+    };
+  }
+
+  setOAuthStateCookie(res: Response, state: string): void {
+    res.cookie(
+      OAUTH_STATE_COOKIE,
+      state,
+      this.cookieOptions(OAUTH_STATE_TTL_MS),
+    );
+  }
+
+  clearOAuthStateCookie(res: Response): void {
+    res.clearCookie(OAUTH_STATE_COOKIE, this.cookieOptions(0));
+  }
+
+  setSessionCookie(res: Response, token: string): void {
+    res.cookie(COOKIE_NAME, token, this.cookieOptions(SESSION_TTL_MS));
   }
 
   clearSessionCookie(res: Response): void {
-    res.clearCookie(COOKIE_NAME, { path: '/' });
+    res.clearCookie(COOKIE_NAME, this.cookieOptions(0));
   }
 
   async getUserFromToken(token: string): Promise<User | null> {
     try {
-      const payload = await this.jwt.verifyAsync<SessionPayload>(token);
+      const payload = await this.jwt.verifyAsync<SessionPayload>(token, {
+        algorithms: ['HS256'],
+      });
       return this.getUserFromPayload(payload);
     } catch {
       return null;
@@ -130,5 +153,9 @@ export class AuthService {
 
   static get cookieName(): string {
     return COOKIE_NAME;
+  }
+
+  static get oauthStateCookieName(): string {
+    return OAUTH_STATE_COOKIE;
   }
 }

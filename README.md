@@ -282,6 +282,8 @@ CI sends TypeScript analysis and test coverage from the API, web app, and shared
 
 To enable scans, add an Actions repository secret named `SONAR_TOKEN` containing a SonarCloud analysis token. The token used by the public status badge is not the analysis token.
 
+**Required:** disable SonarCloud Automatic Analysis so CI-based scans can run (they cannot run together). In the project: **Administration → Analysis Method → turn off Automatic Analysis**.
+
 ## Security
 
 - Spotify access and refresh tokens are stored only in PostgreSQL.

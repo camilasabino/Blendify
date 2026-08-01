@@ -18,7 +18,6 @@ import {
   MAX_ARTISTS,
   MAX_GENRES,
   type PopularityMode,
-  type TrackOrderMode,
 } from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
 import { ArtistChipList } from '@/components/artists/artist-chip-list'
@@ -26,9 +25,12 @@ import { ArtistSimilarSuggestions } from '@/components/artists/artist-similar'
 import { GenrePicker } from '@/components/genres/genre-picker'
 import { GenerationResultPanel } from '@/components/playlist/generation-result-panel'
 import {
-  ORDER_OPTIONS,
-  POPULARITY_OPTIONS,
-} from '@/components/playlist/generation-options'
+  CoverErrorNotice,
+  GENERATION_ORDER_MODES,
+  GenerationSubmitBar,
+  OrderModeSection,
+  PopularityModeSection,
+} from '@/components/playlist/generation-form-shared'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/feedback'
 import { Input } from '@/components/ui/input'
@@ -36,13 +38,11 @@ import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
 import { FormSection } from '@/components/ui/form-section'
 import { SegmentedControl } from '@/components/ui/segmented-control'
-import { RadioCardGroup } from '@/components/ui/radio-card-group'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { useT } from '@/i18n/use-t'
 import { readPersistToLibraryPreference } from '@/lib/persist-to-library-preference'
 import {
-  cn,
   estimateTrackCount,
   maxTracksPerArtist,
   maxTracksPerGenre,
@@ -59,8 +59,7 @@ import { useCopiedLink } from '@/hooks/use-generation-feedback'
 const DEFAULT_TRACKS_PER_ARTIST = 10
 const DEFAULT_TRACKS_PER_GENRE = 25
 
-const ORDER_MODES = ['artist', 'title', 'random'] as const satisfies readonly TrackOrderMode[]
-type VisibleOrderMode = (typeof ORDER_MODES)[number]
+type VisibleOrderMode = (typeof GENERATION_ORDER_MODES)[number]
 
 type MixSeedMode = 'artists' | 'genres'
 
@@ -94,7 +93,7 @@ export function MixPlaylistForm() {
         tracksPerArtist: z.number().int().min(1).max(artistTrackMax),
         tracksPerGenre: z.number().int().min(1).max(genreTrackMax),
         popularity: z.enum(['popular', 'balanced', 'rarities']),
-        orderMode: z.enum(ORDER_MODES),
+        orderMode: z.enum(GENERATION_ORDER_MODES),
         generateCover: z.boolean(),
       }),
     [artistTrackMax, genreTrackMax],
@@ -454,29 +453,7 @@ export function MixPlaylistForm() {
           )}
         </FormSection>
 
-        <FormSection
-          step={2}
-          title={t('create.reach')}
-          description={t('create.mixHint')}
-        >
-          <Controller
-            control={form.control}
-            name="popularity"
-            render={({ field }) => (
-              <RadioCardGroup
-                label={t('create.reach')}
-                value={field.value}
-                onChange={field.onChange}
-                options={POPULARITY_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: t(option.labelKey),
-                  hint: t(option.hintKey),
-                  icon: option.icon,
-                }))}
-              />
-            )}
-          />
-        </FormSection>
+        <PopularityModeSection control={form.control} step={2} />
 
         <FormSection
           step={3}
@@ -576,39 +553,10 @@ export function MixPlaylistForm() {
               />
             </div>
           </div>
-          {coverError && (
-            <div className="space-y-1">
-              <FieldError>{coverError}</FieldError>
-              <p className="text-xs text-cream-500">
-                {t('create.coverScopeHint')}
-              </p>
-            </div>
-          )}
+          <CoverErrorNotice message={coverError} />
         </FormSection>
 
-        <FormSection
-          step={4}
-          title={t('create.order')}
-          description={t('create.orderHint')}
-        >
-          <Controller
-            control={form.control}
-            name="orderMode"
-            render={({ field }) => (
-              <RadioCardGroup
-                label={t('create.order')}
-                value={field.value}
-                onChange={field.onChange}
-                options={ORDER_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: t(option.labelKey),
-                  hint: t(option.hintKey),
-                  icon: option.icon,
-                }))}
-              />
-            )}
-          />
-        </FormSection>
+        <OrderModeSection control={form.control} step={4} />
 
         <div className="space-y-4">
           <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 to-amber-500/5 px-4 py-3">
@@ -634,26 +582,19 @@ export function MixPlaylistForm() {
             </p>
           </div>
 
-          {(form.formState.errors.root || createMutation.isError) && (
-            <FieldError>
-              {form.formState.errors.root?.message ??
-                getApiErrorMessage(createMutation.error, t, 'create.failed')}
-            </FieldError>
-          )}
-
-          <Button
-            type="submit"
-            size="lg"
-            className={cn(
-              'w-full sm:w-auto',
-              isGenerating ? 'animate-pulse-glow' : '',
-            )}
-            loading={isGenerating}
+          <GenerationSubmitBar
+            isGenerating={isGenerating}
             disabled={!canSubmit}
-          >
-            {!isGenerating ? <Sparkles className="size-4" /> : null}
-            {isGenerating ? t('create.generating') : t('create.generate')}
-          </Button>
+            error={
+              form.formState.errors.root?.message ??
+              (createMutation.isError
+                ? getApiErrorMessage(createMutation.error, t, 'create.failed')
+                : null)
+            }
+            idleLabel={t('create.generate')}
+            busyLabel={t('create.generating')}
+            icon={Sparkles}
+          />
         </div>
       </form>
 

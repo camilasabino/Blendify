@@ -11,16 +11,17 @@ import {
   type DiscoverTrackTarget,
   type GenerationProgress,
 } from '@/lib/api'
-import type { TrackDto, TrackOrderMode } from '@blendify/contracts'
+import type { TrackDto } from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
 import { TrackSearch } from '@/components/tracks/track-search'
 import { GenerationResultPanel } from '@/components/playlist/generation-result-panel'
 import {
-  ORDER_OPTIONS,
-  POPULARITY_OPTIONS,
-} from '@/components/playlist/generation-options'
-import { Button } from '@/components/ui/button'
-import { FieldError } from '@/components/ui/feedback'
+  CoverErrorNotice,
+  GENERATION_ORDER_MODES,
+  GenerationSubmitBar,
+  OrderModeSection,
+  PopularityModeSection,
+} from '@/components/playlist/generation-form-shared'
 import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
 import { FormSection } from '@/components/ui/form-section'
@@ -37,12 +38,10 @@ type SeedMode = 'artist' | 'track'
 
 const TRACK_TARGETS: DiscoverTrackTarget[] = [15, 30, 50]
 
-const ORDER_MODES = ['artist', 'title', 'random'] as const satisfies readonly TrackOrderMode[]
-
 const formSchema = z.object({
   popularity: z.enum(['popular', 'balanced', 'rarities']),
   targetTrackCount: z.union([z.literal(15), z.literal(30), z.literal(50)]),
-  orderMode: z.enum(ORDER_MODES),
+  orderMode: z.enum(GENERATION_ORDER_MODES),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -289,29 +288,7 @@ export function DiscoverPlaylistForm() {
           )}
         </FormSection>
 
-        <FormSection
-          step={2}
-          title={t('create.reach')}
-          description={t('create.mixHint')}
-        >
-          <Controller
-            control={form.control}
-            name="popularity"
-            render={({ field }) => (
-              <RadioCardGroup
-                label={t('create.reach')}
-                value={field.value}
-                onChange={field.onChange}
-                options={POPULARITY_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: t(option.labelKey),
-                  hint: t(option.hintKey),
-                  icon: option.icon,
-                }))}
-              />
-            )}
-          />
-        </FormSection>
+        <PopularityModeSection control={form.control} step={2} />
 
         <FormSection
           step={3}
@@ -334,66 +311,28 @@ export function DiscoverPlaylistForm() {
               />
             )}
           />
-          {coverError && (
-            <div className="space-y-1">
-              <FieldError>{coverError}</FieldError>
-              <p className="text-xs text-cream-500">
-                {t('create.coverScopeHint')}
-              </p>
-            </div>
-          )}
+          <CoverErrorNotice message={coverError} />
         </FormSection>
 
-        <FormSection
-          step={4}
-          title={t('create.order')}
-          description={t('create.orderHint')}
-        >
-          <Controller
-            control={form.control}
-            name="orderMode"
-            render={({ field }) => (
-              <RadioCardGroup
-                label={t('create.order')}
-                value={field.value}
-                onChange={field.onChange}
-                options={ORDER_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: t(option.labelKey),
-                  hint: t(option.hintKey),
-                  icon: option.icon,
-                }))}
-              />
-            )}
-          />
-        </FormSection>
+        <OrderModeSection control={form.control} step={4} />
 
-        <div className="space-y-4">
-          {(form.formState.errors.root || discoverMutation.isError) && (
-            <FieldError>
-              {form.formState.errors.root?.message ??
-                getApiErrorMessage(
+        <GenerationSubmitBar
+          isGenerating={isGenerating}
+          disabled={seedMode === 'artist' ? !artist : !track}
+          error={
+            form.formState.errors.root?.message ??
+            (discoverMutation.isError
+              ? getApiErrorMessage(
                   discoverMutation.error,
                   t,
                   'discover.failed',
-                )}
-            </FieldError>
-          )}
-
-          <Button
-            type="submit"
-            size="lg"
-            className={cn(
-              'w-full sm:w-auto',
-              isGenerating ? 'animate-pulse-glow' : '',
-            )}
-            loading={isGenerating}
-            disabled={seedMode === 'artist' ? !artist : !track}
-          >
-            {!isGenerating ? <Compass className="size-4" /> : null}
-            {isGenerating ? t('discover.generating') : t('discover.generate')}
-          </Button>
-        </div>
+                )
+              : null)
+          }
+          idleLabel={t('discover.generate')}
+          busyLabel={t('discover.generating')}
+          icon={Compass}
+        />
       </form>
 
       <GenerationResultPanel

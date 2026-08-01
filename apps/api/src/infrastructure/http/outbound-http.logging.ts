@@ -37,6 +37,7 @@ const SENSITIVE_BODY_KEYS = new Set([
   'authorization',
   'password',
   'secret',
+  'code',
 ]);
 
 export function sanitizeOutboundUrl(rawUrl: string): string {

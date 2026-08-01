@@ -46,7 +46,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
     });
     redis.on('ready', () => {
       this.ready = true;
-      this.logger.log(`Redis cache connected (${this.url})`);
+      this.logger.log(`Redis cache connected (${sanitizeRedisUrl(this.url)})`);
     });
     redis.on('end', () => {
       this.ready = false;
@@ -62,7 +62,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       redis.disconnect();
       this.client = null;
       this.logger.warn(
-        `Redis unavailable at ${this.url} — using in-memory cache fallback (${
+        `Redis unavailable at ${sanitizeRedisUrl(this.url)} — using in-memory cache fallback (${
           error instanceof Error ? error.message : String(error)
         })`,
       );
@@ -133,5 +133,17 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       value: encoded,
       expiresAt: Date.now() + ttlMs,
     });
+  }
+}
+
+/** Avoid logging Redis passwords embedded in connection URLs. */
+export function sanitizeRedisUrl(raw: string): string {
+  try {
+    const url = new URL(raw);
+    if (url.password) url.password = '***';
+    if (url.username) url.username = url.username ? '***' : '';
+    return url.toString();
+  } catch {
+    return 'redis://***';
   }
 }

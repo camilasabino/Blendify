@@ -59,6 +59,7 @@ describe('outbound http logging', () => {
       request: {
         uris: ['spotify:track:1', 'spotify:track:2'],
         access_token: 'secret',
+        code: 'oauth-code',
       },
       response: { snapshot_id: 'snap' },
     });
@@ -66,6 +67,7 @@ describe('outbound http logging', () => {
     expect(payload.request).toEqual({
       uris: ['spotify:track:1', 'spotify:track:2'],
       access_token: '***',
+      code: '***',
     });
     expect(payload.response).toEqual({ snapshot_id: 'snap' });
   });

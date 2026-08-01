@@ -20,12 +20,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Start Spotify OAuth login' })
   login(@Res() res: Response): void {
     const state = randomBytes(16).toString('hex');
-    res.cookie('oauth_state', state, {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 10 * 60 * 1000,
-      path: '/',
-    });
+    this.auth.setOAuthStateCookie(res, state);
     res.redirect(this.auth.getLoginUrl(state));
   }
 
@@ -46,7 +41,8 @@ export class AuthController {
       return;
     }
 
-    const storedState = req.cookies?.['oauth_state'] as string | undefined;
+    const storedState = req.cookies?.[AuthService.oauthStateCookieName] as
+      string | undefined;
     if (!storedState || storedState !== state) {
       res.redirect(`${frontend}/?auth=invalid_state`);
       return;
@@ -61,7 +57,7 @@ export class AuthController {
     try {
       const { token } = await this.auth.handleCallback(code);
       this.auth.setSessionCookie(res, token);
-      res.clearCookie('oauth_state', { path: '/' });
+      this.auth.clearOAuthStateCookie(res);
       res.redirect(`${frontend}/app/mix`);
     } catch (err) {
       this.logger.error(

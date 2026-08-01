@@ -8,6 +8,7 @@ import axios, {
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { SpotifyTokenService } from '../auth/spotify-token.service';
 import { attachOutboundHttpLogging } from '../http/outbound-http.logging';
+import { createSpotifyQuotaError } from './spotify-quota-error';
 import { attachSpotifyRateLimit } from './spotify-rate-limit';
 
 type SpotifyErrorPayload = {
@@ -137,23 +138,10 @@ export class SpotifyApiClient {
     );
 
     if (status === 429 || ax.code === 'ERR_SPOTIFY_COOLDOWN') {
-      const quotaExceeded = reason === 'QUOTA_EXCEEDED';
-      return new BusinessRuleError(
-        quotaExceeded
-          ? `Spotify developer quota exceeded. Wait ${formatRetryWait(
-              retryAfterSeconds,
-              true,
-            )} before searching or creating again.`
-          : `Spotify rate limit. Wait ${formatRetryWait(
-              retryAfterSeconds,
-              false,
-            )} before searching or creating again.`,
-        quotaExceeded ? 'SPOTIFY_QUOTA_EXCEEDED' : 'SPOTIFY_RATE_LIMITED',
-        {
-          retryAfterSeconds,
-          reason: reason ?? (quotaExceeded ? 'QUOTA_EXCEEDED' : 'rate_limit'),
-        },
-      );
+      return createSpotifyQuotaError({
+        retryAfterSeconds,
+        reason: reason ?? 'rate_limit',
+      });
     }
 
     return new Error(`Spotify ${operation} failed (${status}): ${message}`);
@@ -172,17 +160,4 @@ function readRetryAfterSeconds(error: AxiosError): number | null {
       ? Number(candidate)
       : Number.NaN;
   return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : null;
-}
-
-function formatRetryWait(
-  seconds: number | null,
-  quotaExceeded: boolean,
-): string {
-  if (seconds != null && seconds > 0) {
-    if (seconds < 90) return `about ${seconds} seconds`;
-    if (seconds < 3600) return `about ${Math.ceil(seconds / 60)} minutes`;
-    const hours = Math.ceil(seconds / 3600);
-    return `about ${hours} hour${hours === 1 ? '' : 's'}`;
-  }
-  return quotaExceeded ? 'several hours' : 'about 20 seconds';
 }
