@@ -1,63 +1,70 @@
 import { Track } from '../../track/track.entity';
+import {
+  TrackOrderMode,
+  type TrackOrderMode as TrackOrderModeValue,
+} from '@blendify/contracts';
 
 export interface TrackOrderingStrategy {
   order(tracksByArtist: Map<string, Track[]>): Track[];
 }
 
-export class ShuffleInterleaveStrategy implements TrackOrderingStrategy {
-  constructor(private readonly random: () => number = Math.random) {}
-
+export class SortByArtistStrategy implements TrackOrderingStrategy {
   order(tracksByArtist: Map<string, Track[]>): Track[] {
-    const queues = Array.from(tracksByArtist.values())
-      .filter((tracks) => tracks.length > 0)
-      .map((tracks) => this.shuffle([...tracks]));
-
-    this.shuffleInPlace(queues);
-
-    const result: Track[] = [];
-    let remaining = queues.reduce((sum, q) => sum + q.length, 0);
-
-    while (remaining > 0) {
-      for (const queue of queues) {
-        if (queue.length === 0) {
-          continue;
-        }
-        result.push(queue.shift()!);
-        remaining -= 1;
-      }
-    }
-
-    return result;
-  }
-
-  private shuffle<T>(items: T[]): T[] {
-    const copy = [...items];
-    this.shuffleInPlace(copy);
-    return copy;
-  }
-
-  private shuffleInPlace<T>(items: T[]): void {
-    for (let i = items.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(this.random() * (i + 1));
-      [items[i], items[j]] = [items[j], items[i]];
-    }
+    const flat = flatten(tracksByArtist);
+    return flat.sort((a, b) => {
+      const byArtist = compareText(a.artistName, b.artistName);
+      if (byArtist !== 0) return byArtist;
+      return compareText(a.name, b.name);
+    });
   }
 }
 
-export class GroupByArtistStrategy implements TrackOrderingStrategy {
+export class SortByTitleStrategy implements TrackOrderingStrategy {
   order(tracksByArtist: Map<string, Track[]>): Track[] {
-    const result: Track[] = [];
-    for (const tracks of tracksByArtist.values()) {
-      result.push(...tracks);
+    const flat = flatten(tracksByArtist);
+    return flat.sort((a, b) => {
+      const byTitle = compareText(a.name, b.name);
+      if (byTitle !== 0) return byTitle;
+      return compareText(a.artistName, b.artistName);
+    });
+  }
+}
+
+export class RandomFlatStrategy implements TrackOrderingStrategy {
+  constructor(private readonly random: () => number = Math.random) {}
+
+  order(tracksByArtist: Map<string, Track[]>): Track[] {
+    const flat = flatten(tracksByArtist);
+    for (let i = flat.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(this.random() * (i + 1));
+      [flat[i], flat[j]] = [flat[j], flat[i]];
     }
-    return result;
+    return flat;
   }
 }
 
 export function createOrderingStrategy(
-  shuffle: boolean,
+  mode: TrackOrderModeValue,
 ): TrackOrderingStrategy {
-  return shuffle
-    ? new ShuffleInterleaveStrategy()
-    : new GroupByArtistStrategy();
+  switch (mode) {
+    case TrackOrderMode.ARTIST:
+      return new SortByArtistStrategy();
+    case TrackOrderMode.TITLE:
+      return new SortByTitleStrategy();
+    case TrackOrderMode.RANDOM:
+    default:
+      return new RandomFlatStrategy();
+  }
+}
+
+function flatten(tracksByArtist: Map<string, Track[]>): Track[] {
+  const result: Track[] = [];
+  for (const tracks of tracksByArtist.values()) {
+    result.push(...tracks);
+  }
+  return result;
+}
+
+function compareText(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { sensitivity: 'base' });
 }

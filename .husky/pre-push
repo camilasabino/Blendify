@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+set -e
+
+npm run lint
+
+# Validate Conventional Commits for every commit about to be pushed.
+while read -r _local_ref local_sha _remote_ref remote_sha
+do
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    if git rev-parse --verify origin/main >/dev/null 2>&1; then
+      from="$(git merge-base "$local_sha" origin/main)"
+    elif git rev-parse --verify origin/master >/dev/null 2>&1; then
+      from="$(git merge-base "$local_sha" origin/master)"
+    else
+      from="$(git rev-list --max-parents=0 "$local_sha")"
+    fi
+  else
+    from="$remote_sha"
+  fi
+
+  if [ "$from" = "$local_sha" ]; then
+    continue
+  fi
+
+  npx --no -- commitlint --from "$from" --to "$local_sha"
+done

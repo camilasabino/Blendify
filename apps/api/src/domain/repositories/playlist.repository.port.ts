@@ -2,15 +2,21 @@ import { Playlist } from '../playlist/playlist.entity';
 
 export const PLAYLIST_REPOSITORY = 'PLAYLIST_REPOSITORY' as const;
 
-export type PlaylistHistoryQuery = {
+type PlaylistLibraryQuery = {
   limit: number;
   offset: number;
   q?: string;
 };
 
-export type PlaylistHistoryPage = {
+type PlaylistLibraryResultPage = {
   items: Playlist[];
   total: number;
+};
+
+export type PlaylistLibraryFilter = {
+  q?: string;
+  playlistIds?: string[];
+  missingOnSpotify?: boolean;
 };
 
 export interface PlaylistRepositoryPort {
@@ -18,16 +24,19 @@ export interface PlaylistRepositoryPort {
 
   findById(id: string): Promise<Playlist | null>;
 
-  findByUserId(userId: string): Promise<Playlist[]>;
-
-  findByUserIdPage(
+  listLibrary(
     userId: string,
-    query: PlaylistHistoryQuery,
-  ): Promise<PlaylistHistoryPage>;
+    filter: PlaylistLibraryFilter,
+  ): Promise<Playlist[]>;
+
+  listLibraryPage(
+    userId: string,
+    query: PlaylistLibraryQuery,
+  ): Promise<PlaylistLibraryResultPage>;
 
   deleteFailedByUserId(userId: string): Promise<number>;
 
-  countPresence(
+  countLibraryPresence(
     userId: string,
     q?: string,
   ): Promise<{ total: number; active: number; deleted: number }>;

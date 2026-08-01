@@ -1,16 +1,26 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
-import { PrismaUserRepository } from '../persistence/prisma-user.repository';
+import { AxiosInstance } from 'axios';
+import {
+  USER_REPOSITORY,
+  type UserRepositoryPort,
+} from '../../domain/repositories/user.repository.port';
+import { createOutboundHttp } from '../http/outbound-http.logging';
 
 @Injectable()
 export class SpotifyTokenService {
   private readonly logger = new Logger(SpotifyTokenService.name);
+  private readonly accountsApi: AxiosInstance;
 
   constructor(
-    private readonly users: PrismaUserRepository,
+    @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
     private readonly config: ConfigService,
-  ) {}
+  ) {
+    this.accountsApi = createOutboundHttp({
+      baseURL: 'https://accounts.spotify.com',
+      timeout: 15_000,
+    });
+  }
 
   async getValidAccessToken(userId: string): Promise<string> {
     const creds = await this.users.findCredentialsById(userId);
@@ -38,11 +48,11 @@ export class SpotifyTokenService {
     });
 
     try {
-      const { data } = await axios.post<{
+      const { data } = await this.accountsApi.post<{
         access_token: string;
         refresh_token?: string;
         expires_in: number;
-      }>('https://accounts.spotify.com/api/token', body.toString(), {
+      }>('/api/token', body.toString(), {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,

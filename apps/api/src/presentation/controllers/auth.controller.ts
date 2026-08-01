@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Response, Request } from 'express';
 import { randomBytes } from 'crypto';
 import { AuthService } from '../../infrastructure/auth/auth.service';
+import type { AuthSession, OkResponse } from '@blendify/contracts';
 
 @ApiTags('auth')
 @Controller('api/auth')
@@ -51,11 +52,17 @@ export class AuthController {
       return;
     }
 
+    // Browsers sometimes hit the callback twice in parallel. Deduplicate by
+    // state + authorization code so we only exchange/profile-fetch once.
+    if (!this.auth.consumeOAuthState(state)) {
+      this.logger.warn('Duplicate OAuth callback — reusing in-flight login');
+    }
+
     try {
       const { token } = await this.auth.handleCallback(code);
       this.auth.setSessionCookie(res, token);
       res.clearCookie('oauth_state', { path: '/' });
-      res.redirect(`${frontend}/app`);
+      res.redirect(`${frontend}/app/mix`);
     } catch (err) {
       this.logger.error(
         'OAuth callback failed',
@@ -67,14 +74,7 @@ export class AuthController {
 
   @Get('me')
   @ApiOperation({ summary: 'Current session user' })
-  async me(@Req() req: Request): Promise<{
-    user: {
-      id: string;
-      displayName: string;
-      email?: string;
-      imageUrl?: string;
-    } | null;
-  }> {
+  async me(@Req() req: Request): Promise<AuthSession> {
     const token = req.cookies?.[AuthService.cookieName] as string | undefined;
     if (!token) {
       return { user: null };
@@ -89,15 +89,15 @@ export class AuthController {
       user: {
         id: found.id,
         displayName: found.displayName,
-        email: found.email,
-        imageUrl: found.imageUrl,
+        email: found.email ?? null,
+        imageUrl: found.imageUrl ?? null,
       },
     };
   }
 
   @Post('logout')
   @ApiOperation({ summary: 'Clear session cookie' })
-  logout(@Res({ passthrough: true }) res: Response): { ok: true } {
+  logout(@Res({ passthrough: true }) res: Response): OkResponse {
     this.auth.clearSessionCookie(res);
     return { ok: true };
   }

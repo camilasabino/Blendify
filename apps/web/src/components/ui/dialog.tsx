@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 
 type DialogProps = {
@@ -11,13 +13,14 @@ type DialogProps = {
   className?: string
 }
 
-export function Dialog({
+function Dialog({
   open,
   onClose,
   title,
   children,
   className,
 }: DialogProps) {
+  const t = useT()
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -47,7 +50,7 @@ export function Dialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t('common.close')}
         className="absolute inset-0 bg-charcoal-950/75 backdrop-blur-[2px] animate-fade-in"
         onClick={onClose}
       />
@@ -80,6 +83,7 @@ export type ConfirmDialogProps = {
   description: string
   confirmLabel: string
   cancelLabel?: string
+  workingLabel?: string
   danger?: boolean
   busy?: boolean
   onConfirm: () => void
@@ -92,14 +96,32 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   cancelLabel,
+  workingLabel,
   danger = false,
   busy = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   return (
-    <Dialog open={open} onClose={onCancel} title={title}>
+    <Dialog
+      open={open}
+      onClose={() => {
+        if (busy) return
+        onCancel()
+      }}
+      title={title}
+    >
       <p className="text-sm leading-relaxed text-cream-300">{description}</p>
+      {busy && workingLabel ? (
+        <p
+          className="mt-3 flex items-center gap-2 text-sm text-amber-400/90"
+          role="status"
+          aria-live="polite"
+        >
+          <Spinner size="sm" className="text-amber-400" />
+          {workingLabel}
+        </p>
+      ) : null}
       <div className="mt-5 flex flex-wrap justify-end gap-2">
         {cancelLabel ? (
           <Button
@@ -116,6 +138,7 @@ export function ConfirmDialog({
           type="button"
           size="sm"
           variant={danger ? 'danger' : 'default'}
+          loading={busy}
           disabled={busy}
           onClick={onConfirm}
         >

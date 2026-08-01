@@ -1,18 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { User } from '../../domain/user/user.entity';
-import { UserRepositoryPort } from '../../domain/repositories/user.repository.port';
+import {
+  type PersistableUser,
+  type UserRepositoryPort,
+} from '../../domain/repositories/user.repository.port';
 import { PrismaService } from './prisma.service';
-
-export interface PersistableUser {
-  id: string;
-  spotifyId: string;
-  displayName: string;
-  email?: string;
-  imageUrl?: string;
-  accessToken: string;
-  refreshToken: string;
-  tokenExpiresAt: Date;
-}
 
 @Injectable()
 export class PrismaUserRepository implements UserRepositoryPort {

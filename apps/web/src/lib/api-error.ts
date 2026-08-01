@@ -1,4 +1,5 @@
 import type { MessageKey } from '@/i18n/messages'
+import { ApiErrorResponseSchema } from '@blendify/contracts'
 
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string
 
@@ -13,19 +14,10 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
     this.body = body
-    if (typeof body === 'object' && body !== null) {
-      const payload = body as {
-        code?: unknown
-        details?: unknown
-      }
-      if (typeof payload.code === 'string') this.code = payload.code
-      if (
-        payload.details &&
-        typeof payload.details === 'object' &&
-        !Array.isArray(payload.details)
-      ) {
-        this.details = payload.details as Record<string, unknown>
-      }
+    const parsed = ApiErrorResponseSchema.safeParse(body)
+    if (parsed.success) {
+      this.code = parsed.data.code
+      this.details = parsed.data.details
     }
   }
 }
@@ -99,8 +91,30 @@ export function getApiErrorMessage(
       : t(fallbackKey)
   }
 
+  if (error.code === 'LASTFM_NOT_CONFIGURED') return t('errors.lastfmMissing')
+  if (error.code === 'LASTFM_SIMILAR_FAILED') return t('errors.lastfmSimilar')
+  if (error.code === 'DISCOVER_NOT_ENOUGH_SIMILAR')
+    return t('discover.notEnoughSimilar')
+  if (error.code === 'DISCOVER_RESOLVE_FAILED')
+    return t('discover.resolveFailed')
+  if (error.code === 'GENRE_LOOKUP_UNAVAILABLE')
+    return t('errors.genreLookupUnavailable')
+  if (error.code === 'ARTIST_RESOLVE_FAILED') {
+    const name = error.details?.name
+    return typeof name === 'string'
+      ? t('errors.artistResolveNamed', { name })
+      : t('errors.artistResolve')
+  }
+
   if (error.code === 'EMPTY_ARTIST_SELECTION') return t('create.addArtist')
   if (error.code === 'EMPTY_GENRE_SELECTION') return t('create.addGenre')
+  if (error.code === 'NO_TRACKS_FOUND') return t('create.noTracksFound')
+  if (error.code === 'PREMIUM_REQUIRED') return t('preview.premiumRequired')
+  if (error.code === 'PLAYBACK_UNAUTHORIZED')
+    return t('preview.sessionExpired')
+  if (error.code === 'PLAYBACK_INVALID')
+    return t('preview.invalidPlayback')
+  if (error.code === 'PLAYBACK_FAILED') return t('preview.playError')
 
   return t(fallbackKey)
 }

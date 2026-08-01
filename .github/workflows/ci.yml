@@ -6,6 +6,25 @@ on:
   pull_request:
 
 jobs:
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate PR commit messages
+        run: >
+          npx commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+          --verbose
+
   api:
     runs-on: ubuntu-latest
     defaults:
@@ -40,3 +59,32 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npx vitest run
+
+  sonar:
+    name: SonarCloud
+    needs: [api, web]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate -w @blendify/api
+      - run: npm run test:cov -w @blendify/api -- --runInBand
+      - run: npm run test:cov -w @blendify/web
+      - run: npm run test:cov -w @blendify/contracts
+      - run: npm run sonar:coverage
+      - name: Scan with SonarCloud
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}

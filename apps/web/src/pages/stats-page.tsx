@@ -1,39 +1,92 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { RotateCcw } from 'lucide-react'
 import { api } from '@/lib/api'
-import { HistoryStats } from '@/components/playlist/history-stats'
+import { UsageStatsView } from '@/components/playlist/usage-stats'
 import { ErrorState, LoadingState } from '@/components/ui/feedback'
 import { PageHeader } from '@/components/ui/page-header'
+import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/dialog'
 import { useT } from '@/i18n/use-t'
 
 export function StatsPage() {
   const t = useT()
+  const queryClient = useQueryClient()
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['playlists', 'stats'],
-    queryFn: () =>
-      api.listPlaylists({ sync: false, limit: 500, offset: 0 }),
+    queryKey: ['usage-stats'],
+    queryFn: () => api.getUsageStats(),
   })
 
-  const playlists = data?.playlists ?? []
+  const resetMutation = useMutation({
+    mutationFn: () => api.resetUsageStats(),
+    onSuccess: async () => {
+      setConfirmOpen(false)
+      await queryClient.invalidateQueries({ queryKey: ['usage-stats'] })
+    },
+  })
+
+  const canReset =
+    Boolean(data) &&
+    (data!.uniqueArtists > 0 ||
+      data!.uniqueGenres > 0 ||
+      data!.artistMixCount > 0 ||
+      data!.genreMixCount > 0)
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8 animate-fade-up">
-      <PageHeader
-        eyebrow={t('stats.eyebrow')}
-        title={t('stats.title')}
-        description={t('stats.subtitle')}
-      />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader
+          eyebrow={t('stats.eyebrow')}
+          title={t('stats.title')}
+          description={t('stats.subtitle')}
+        />
+        {canReset ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="shrink-0 self-start"
+            disabled={resetMutation.isPending}
+            onClick={() => setConfirmOpen(true)}
+          >
+            <RotateCcw className="size-3.5" />
+            {t('stats.reset')}
+          </Button>
+        ) : null}
+      </div>
 
-      {isLoading && <LoadingState label={t('history.loading')} />}
+      {isLoading && <LoadingState label={t('stats.loading')} />}
 
       {isError && (
         <ErrorState
-          message={t('history.loadError')}
-          retryLabel={t('history.retry')}
+          message={t('stats.loadError')}
+          retryLabel={t('common.retry')}
           onRetry={() => void refetch()}
         />
       )}
 
-      {!isLoading && !isError && <HistoryStats playlists={playlists} />}
+      {resetMutation.isError ? (
+        <ErrorState message={t('stats.resetError')} />
+      ) : null}
+
+      {!isLoading && !isError && data && <UsageStatsView stats={data} />}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={t('stats.resetTitle')}
+        description={t('stats.resetBody')}
+        confirmLabel={t('stats.resetConfirm')}
+        cancelLabel={t('common.cancel')}
+        workingLabel={t('stats.resetWorking')}
+        danger
+        busy={resetMutation.isPending}
+        onCancel={() => {
+          if (resetMutation.isPending) return
+          setConfirmOpen(false)
+        }}
+        onConfirm={() => resetMutation.mutate()}
+      />
     </div>
   )
 }

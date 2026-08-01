@@ -1,20 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  MUSIC_PROVIDER,
-  MusicProviderPort,
-  StartPlaybackInput,
-} from '../../domain/repositories/music-provider.port';
+  MUSIC_PROVIDER_FACTORY,
+  type MusicProviderFactoryPort,
+} from '../../domain/repositories/music-provider.factory.port';
+import type { StartPlaybackInput } from '../../domain/repositories/music-provider.port';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { SpotifyMusicProvider } from '../../infrastructure/spotify/spotify-music.provider';
 
 @Injectable()
 export class ControlPlaybackUseCase {
   constructor(
-    @Inject(MUSIC_PROVIDER) private readonly music: MusicProviderPort,
+    @Inject(MUSIC_PROVIDER_FACTORY)
+    private readonly providers: MusicProviderFactoryPort,
   ) {}
 
   async listDevices(userId: string) {
-    const provider = this.bind(userId);
+    const provider = this.providers.forUser(userId);
     return provider.listPlaybackDevices();
   }
 
@@ -25,14 +25,7 @@ export class ControlPlaybackUseCase {
         'PLAYBACK_INVALID',
       );
     }
-    const provider = this.bind(userId);
+    const provider = this.providers.forUser(userId);
     await provider.startPlayback(input);
-  }
-
-  private bind(userId: string): MusicProviderPort {
-    if (this.music instanceof SpotifyMusicProvider) {
-      return this.music.forUser(userId);
-    }
-    return this.music;
   }
 }

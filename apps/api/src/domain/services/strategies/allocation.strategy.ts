@@ -2,7 +2,7 @@ import { MAX_TRACKS } from '../../constants';
 
 export interface AllocationInput {
   artistIds: string[];
-  songsPerArtist: number;
+  tracksPerSeed: number;
   availableByArtist: Map<string, number>;
   maxTracks?: number;
 }
@@ -14,41 +14,51 @@ export interface AllocationStrategy {
 export class EquitableAllocationStrategy implements AllocationStrategy {
   allocate(input: AllocationInput): Map<string, number> {
     const maxTracks = input.maxTracks ?? MAX_TRACKS;
-    const { artistIds, songsPerArtist, availableByArtist } = input;
+    const { artistIds, tracksPerSeed, availableByArtist } = input;
 
     if (artistIds.length === 0) {
       return new Map();
     }
 
-    const requestedTotal = songsPerArtist * artistIds.length;
+    const requestedTotal = tracksPerSeed * artistIds.length;
+    const targetTotal = Math.min(requestedTotal, maxTracks);
     const mustProrate = requestedTotal > maxTracks;
 
-    if (!mustProrate) {
-      return this.allocateWithoutProration(
-        artistIds,
-        songsPerArtist,
-        availableByArtist,
-      );
-    }
+    const allocation = mustProrate
+      ? this.allocateWithProration(
+          artistIds,
+          tracksPerSeed,
+          availableByArtist,
+          maxTracks,
+        )
+      : this.allocateWithoutProration(
+          artistIds,
+          tracksPerSeed,
+          availableByArtist,
+        );
 
-    return this.allocateWithProration(
+    // If one seed underfills, top up from artists that still have surplus
+    // (requires a small over-fetch in the pool).
+    this.redistributeSurplus(
       artistIds,
-      songsPerArtist,
+      allocation,
       availableByArtist,
-      maxTracks,
+      targetTotal,
     );
+
+    return allocation;
   }
 
   private allocateWithoutProration(
     artistIds: string[],
-    songsPerArtist: number,
+    tracksPerSeed: number,
     availableByArtist: Map<string, number>,
   ): Map<string, number> {
     const allocation = new Map<string, number>();
 
     for (const artistId of artistIds) {
       const available = availableByArtist.get(artistId) ?? 0;
-      allocation.set(artistId, Math.min(songsPerArtist, available));
+      allocation.set(artistId, Math.min(tracksPerSeed, available));
     }
 
     return allocation;
@@ -56,7 +66,7 @@ export class EquitableAllocationStrategy implements AllocationStrategy {
 
   private allocateWithProration(
     artistIds: string[],
-    songsPerArtist: number,
+    tracksPerSeed: number,
     availableByArtist: Map<string, number>,
     maxTracks: number,
   ): Map<string, number> {
@@ -69,17 +79,10 @@ export class EquitableAllocationStrategy implements AllocationStrategy {
       if (remainder > 0) {
         remainder -= 1;
       }
-      const desired = Math.min(songsPerArtist, share);
+      const desired = Math.min(tracksPerSeed, share);
       const available = availableByArtist.get(artistId) ?? 0;
       allocation.set(artistId, Math.min(desired, available));
     }
-
-    this.redistributeSurplus(
-      artistIds,
-      allocation,
-      availableByArtist,
-      maxTracks,
-    );
 
     return allocation;
   }
@@ -91,9 +94,8 @@ export class EquitableAllocationStrategy implements AllocationStrategy {
     targetTotal: number,
   ): void {
     let allocated = sumValues(allocation);
-    let safety = artistIds.length * 2;
 
-    while (allocated < targetTotal && safety-- > 0) {
+    while (allocated < targetTotal) {
       let progressed = false;
 
       for (const artistId of artistIds) {

@@ -1,18 +1,10 @@
-export const MAX_ARTISTS = 25;
-export const MAX_GENRES = 15;
-export const MAX_TRACKS = 200;
-export const MAX_SONGS_PER_ARTIST = 25;
-export const MAX_SONGS_PER_GENRE = 200;
-export const MIN_GENRE_TRACK_TARGET = 10;
+import { MAX_ARTISTS, MAX_GENRES, MAX_TRACKS } from '@blendify/contracts';
 
-export function maxSongsPerArtistForCount(artistCount: number): number {
-  if (artistCount <= 0) return MAX_SONGS_PER_ARTIST;
-  return Math.min(MAX_SONGS_PER_ARTIST, Math.floor(MAX_TRACKS / artistCount));
-}
+export { MAX_ARTISTS, MAX_GENRES, MAX_TRACKS };
 
-export function maxSongsPerGenreForCount(genreCount: number): number {
-  if (genreCount <= 0) return MAX_SONGS_PER_GENRE;
-  return Math.min(MAX_SONGS_PER_GENRE, Math.floor(MAX_TRACKS / genreCount));
+export function maxTracksPerSeedForCount(seedCount: number): number {
+  if (seedCount <= 0) return MAX_TRACKS;
+  return Math.min(MAX_TRACKS, Math.floor(MAX_TRACKS / seedCount));
 }
 
 export const ALTERNATE_KEYWORDS = [
@@ -24,5 +16,3 @@ export const ALTERNATE_KEYWORDS = [
   'Radio Edit',
   'Demo',
 ] as const;
-
-export type AlternateKeyword = (typeof ALTERNATE_KEYWORDS)[number];

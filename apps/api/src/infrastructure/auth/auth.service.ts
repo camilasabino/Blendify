@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { randomUUID } from 'crypto';
 import { SpotifyAuthClient } from '../spotify/spotify-auth.client';
-import { PrismaUserRepository } from '../persistence/prisma-user.repository';
 import { User } from '../../domain/user/user.entity';
+import {
+  USER_REPOSITORY,
+  type UserRepositoryPort,
+} from '../../domain/repositories/user.repository.port';
 
 export interface SessionPayload {
   sub: string;
@@ -13,12 +16,20 @@ export interface SessionPayload {
 }
 
 const COOKIE_NAME = 'blendify_session';
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+
+/** Browsers occasionally hit the OAuth callback twice; coalesce by code. */
+const inFlightCallbacks = new Map<
+  string,
+  Promise<{ user: User; token: string }>
+>();
+const usedOAuthStates = new Map<string, number>();
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly spotifyAuth: SpotifyAuthClient,
-    private readonly users: PrismaUserRepository,
+    @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -27,7 +38,36 @@ export class AuthService {
     return this.spotifyAuth.getAuthorizationUrl(state);
   }
 
+  /**
+   * Mark an OAuth `state` as consumed. Returns false if it was already used
+   * (duplicate callback) or is empty.
+   */
+  consumeOAuthState(state: string | undefined): boolean {
+    const value = state?.trim();
+    if (!value) return false;
+    this.pruneUsedOAuthStates();
+    if (usedOAuthStates.has(value)) return false;
+    usedOAuthStates.set(value, Date.now() + OAUTH_STATE_TTL_MS);
+    return true;
+  }
+
   async handleCallback(code: string): Promise<{ user: User; token: string }> {
+    const key = code.trim();
+    const existingFlight = inFlightCallbacks.get(key);
+    if (existingFlight) {
+      return existingFlight;
+    }
+
+    const flight = this.runCallback(key).finally(() => {
+      inFlightCallbacks.delete(key);
+    });
+    inFlightCallbacks.set(key, flight);
+    return flight;
+  }
+
+  private async runCallback(
+    code: string,
+  ): Promise<{ user: User; token: string }> {
     const tokens = await this.spotifyAuth.exchangeCode(code);
     const profile = await this.spotifyAuth.getProfile(tokens.accessToken);
 
@@ -51,6 +91,13 @@ export class AuthService {
     } satisfies SessionPayload);
 
     return { user, token };
+  }
+
+  private pruneUsedOAuthStates(): void {
+    const now = Date.now();
+    for (const [state, expiresAt] of usedOAuthStates) {
+      if (expiresAt <= now) usedOAuthStates.delete(state);
+    }
   }
 
   setSessionCookie(res: Response, token: string): void {

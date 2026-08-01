@@ -66,4 +66,26 @@ export class BusinessRuleError extends DomainError {
       'EMPTY_GENRE_SELECTION',
     );
   }
+
+  static noTracksFound(details?: {
+    names?: string[];
+    popularity?: string;
+    source?: 'artists' | 'genres';
+  }): BusinessRuleError {
+    return new BusinessRuleError(
+      'No tracks found for this selection. Try another mix style or different genres/artists.',
+      'NO_TRACKS_FOUND',
+      details,
+    );
+  }
+
+  static genreLookupUnavailable(details?: {
+    reason?: 'not_configured' | 'failed';
+  }): BusinessRuleError {
+    return new BusinessRuleError(
+      'Could not find reliable artists for this genre right now.',
+      'GENRE_LOOKUP_UNAVAILABLE',
+      details,
+    );
+  }
 }

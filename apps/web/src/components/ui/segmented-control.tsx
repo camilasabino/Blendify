@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn, focusRing } from '@/lib/utils'
 
-export type SegmentedOption<T extends string> = {
+type SegmentedOption<T extends string> = {
   value: T
   label: ReactNode
 }
@@ -30,7 +30,7 @@ export function SegmentedControl<T extends string>({
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        'rounded-xl border border-cream-200/10 bg-charcoal-800/50 p-1',
+        'rounded-xl border border-cream-200/10 bg-charcoal-900/70 p-1 shadow-[inset_0_1px_0_rgb(232_168_56_/_0.06)]',
         layout === 'grid' ? 'grid grid-cols-2 gap-1' : 'inline-flex items-center',
         className,
       )}
@@ -45,14 +45,14 @@ export function SegmentedControl<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-lg font-medium transition-colors',
+              'rounded-lg font-medium transition-all duration-200',
               focusRing,
               size === 'sm'
                 ? 'rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide'
-                : 'px-3 py-2 text-sm',
+                : 'px-3 py-2.5 text-sm',
               selected
-                ? 'bg-amber-500/20 text-cream-50'
-                : 'text-cream-400 hover:text-cream-200',
+                ? 'bg-amber-500 text-charcoal-950 shadow-[0_8px_20px_-10px_rgb(232_168_56_/_0.7)]'
+                : 'text-cream-300 hover:bg-charcoal-700/70 hover:text-cream-50',
             )}
           >
             {option.label}

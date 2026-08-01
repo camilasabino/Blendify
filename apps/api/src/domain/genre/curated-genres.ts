@@ -1,9 +1,15 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import {
+  canonicalizeGenreTag,
+  formatGenreDisplayName,
+  toLastFmTag,
+} from './genre-display-name';
 
 export interface CuratedGenre {
   id: string;
   name: string;
+  /** Stable catalog / Last.fm tag key (may differ from display name). */
   spotifyGenre: string;
   keywords: string[];
   parentId?: string;
@@ -27,12 +33,17 @@ function loadCatalog(): CuratedGenre[] {
   for (const path of candidates) {
     if (!existsSync(path)) continue;
     const rows = JSON.parse(readFileSync(path, 'utf8')) as GenreJsonRow[];
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      spotifyGenre: row.spotifyGenre,
-      keywords: [],
-    }));
+    return rows.map((row) => {
+      const tag = canonicalizeGenreTag(row.spotifyGenre);
+      const name = formatGenreDisplayName(tag);
+      return {
+        id: row.id,
+        name,
+        // Same text as the label, lowercase — what Last.fm receives.
+        spotifyGenre: toLastFmTag(name),
+        keywords: [],
+      };
+    });
   }
 
   throw new Error(
@@ -42,49 +53,61 @@ function loadCatalog(): CuratedGenre[] {
 
 export const CURATED_GENRES: CuratedGenre[] = loadCatalog();
 
+/**
+ * Default “main” chips before search. Prefer broadly recognized genres
+ * (and LatAm staples) over niche electronic micro-styles — those stay
+ * searchable in the full catalog.
+ */
 const FEATURED_SPOTIFY_GENRES = [
+  // Core / global
   'pop',
   'rock',
   'hip hop',
   'rap',
+  'r&b',
+  'soul',
+  // Latin & Caribbean
   'latin',
+  'latin pop',
   'reggaeton',
+  'urbano latino',
   'trap',
+  'reggae',
+  'salsa',
+  'bachata',
+  'cumbia',
+  'rock en espanol',
+  // Indie / alt
   'indie pop',
   'indie rock',
   'alternative rock',
-  'r&b',
-  'soul',
+  // Dance / electronic (broad only)
   'edm',
   'house',
   'techno',
   'dance pop',
-  'electronica',
+  'electronic',
   'lo-fi',
   'ambient',
-  'chill out',
-  'deep house',
-  'drum and bass',
+  // Global / roots
   'afrobeats',
   'k-pop',
   'country',
   'folk',
   'jazz',
   'blues',
+  'funk',
+  'disco',
   'classical',
   'metal',
   'punk',
-  'synthwave',
-  'downtempo',
-  'funk',
-  'disco',
-  'acoustic pop',
 ] as const;
 
 const byId = new Map(CURATED_GENRES.map((g) => [g.id, g]));
 const bySpotify = new Map(
   CURATED_GENRES.map((g) => [g.spotifyGenre.toLowerCase(), g]),
 );
+const byName = new Map(CURATED_GENRES.map((g) => [g.name.toLowerCase(), g]));
 
 const featuredMains: CuratedGenre[] = FEATURED_SPOTIFY_GENRES.map((spotify) =>
   bySpotify.get(spotify),
@@ -110,16 +133,11 @@ export function findCuratedGenre(idOrName: string): CuratedGenre | undefined {
   }
 
   const q = raw.toLowerCase();
-  return byId.get(q) ?? bySpotify.get(q) ?? byId.get(raw);
+  return byId.get(q) ?? bySpotify.get(q) ?? byName.get(q) ?? byId.get(raw);
 }
 
 export function listMainGenres(): CuratedGenre[] {
   return featuredMains.length > 0 ? featuredMains : CURATED_GENRES.slice(0, 24);
-}
-
-export function listSubgenres(_parentId?: string): CuratedGenre[] {
-  void _parentId;
-  return [];
 }
 
 function tokensOf(value: string): string[] {
@@ -147,7 +165,7 @@ function tokensOf(value: string): string[] {
   return [...tokens];
 }
 
-export function getRelatedGenres(genreId: string, limit = 48): CuratedGenre[] {
+function getRelatedGenres(genreId: string, limit = 48): CuratedGenre[] {
   const seed = findCuratedGenre(genreId);
   if (!seed) return [];
 
@@ -264,20 +282,7 @@ export function searchCuratedGenres(query: string, limit = 16): CuratedGenre[] {
       return a.g.name.localeCompare(b.g.name);
     });
 
-  const results = ranked.slice(0, limit).map((x) => x.g);
-  const bestScore = ranked[0]?.score ?? 0;
-
-  if (trimmed.length >= 2 && bestScore < 60) {
-    const custom = findCuratedGenre(`custom:${encodeURIComponent(trimmed)}`);
-    if (custom) {
-      return [custom, ...results.filter((g) => g.id !== custom.id)].slice(
-        0,
-        limit,
-      );
-    }
-  }
-
-  return results;
+  return ranked.slice(0, limit).map((x) => x.g);
 }
 
 export function toGenreDto(genre: CuratedGenre) {
@@ -288,6 +293,6 @@ export function toGenreDto(genre: CuratedGenre) {
   };
 }
 
-export function genreToArtistId(genreId: string): string {
+export function genreTrackGroupKey(genreId: string): string {
   return `genre:${genreId}`;
 }

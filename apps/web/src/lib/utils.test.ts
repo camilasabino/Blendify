@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   cn,
-  estimateSongCount,
+  estimateTrackCount,
   formatDuration,
-  maxSongsPerArtist,
-  maxSongsPerGenre,
+  maxTracksPerArtist,
+  maxTracksPerGenre,
 } from '@/lib/utils'
 
 describe('cn', () => {
@@ -13,28 +13,28 @@ describe('cn', () => {
   })
 })
 
-describe('song limits', () => {
-  it('caps artists at 25 and divides 200 by count', () => {
-    expect(maxSongsPerArtist(1)).toBe(25)
-    expect(maxSongsPerArtist(2)).toBe(25)
-    expect(maxSongsPerArtist(8)).toBe(25)
-    expect(maxSongsPerArtist(25)).toBe(8)
+describe('track limits', () => {
+  it('divides the 50-track cap by artist count', () => {
+    expect(maxTracksPerArtist(1)).toBe(50)
+    expect(maxTracksPerArtist(2)).toBe(25)
+    expect(maxTracksPerArtist(8)).toBe(6)
+    expect(maxTracksPerArtist(12)).toBe(4)
   })
 
-  it('divides 200 by genre count', () => {
-    expect(maxSongsPerGenre(1)).toBe(200)
-    expect(maxSongsPerGenre(2)).toBe(100)
-    expect(maxSongsPerGenre(4)).toBe(50)
+  it('divides the 50-track cap by genre count', () => {
+    expect(maxTracksPerGenre(1)).toBe(50)
+    expect(maxTracksPerGenre(2)).toBe(25)
+    expect(maxTracksPerGenre(4)).toBe(12)
   })
 })
 
-describe('estimateSongCount', () => {
-  it('multiplies artists by songs per artist', () => {
-    expect(estimateSongCount(10, 5)).toEqual({ total: 50, capped: false })
+describe('estimateTrackCount', () => {
+  it('multiplies artists by tracks per artist', () => {
+    expect(estimateTrackCount(10, 5)).toEqual({ total: 50, capped: false })
   })
 
-  it('caps at 200 and flags when exceeded', () => {
-    expect(estimateSongCount(25, 10)).toEqual({ total: 200, capped: true })
+  it('caps at 50 and flags when exceeded', () => {
+    expect(estimateTrackCount(25, 10)).toEqual({ total: 50, capped: true })
   })
 })
 

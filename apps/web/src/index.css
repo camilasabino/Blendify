@@ -28,6 +28,7 @@
   --animate-chip-in: chip-in 0.25s ease-out;
   --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
   --animate-drift: drift 18s ease-in-out infinite alternate;
+  --animate-progress-indeterminate: progress-indeterminate 1.35s ease-in-out infinite;
 }
 
 @keyframes fade-up {
@@ -80,6 +81,15 @@
   }
 }
 
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -114,6 +124,20 @@
     background: rgb(232 168 56 / 0.35);
     color: var(--color-cream-50);
   }
+
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='menuitem'],
+  [role='option'],
+  [role='tab'],
+  a[href],
+  summary,
+  label[for],
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 @layer utilities {
@@ -121,19 +145,19 @@
     background-color: var(--color-charcoal-950);
     background-image:
       radial-gradient(
-        ellipse 80% 60% at 15% 20%,
-        rgb(232 168 56 / 0.14),
-        transparent 55%
+        ellipse 85% 65% at 12% 18%,
+        rgb(232 168 56 / 0.2),
+        transparent 58%
       ),
       radial-gradient(
-        ellipse 70% 50% at 85% 75%,
-        rgb(196 137 42 / 0.1),
-        transparent 50%
+        ellipse 75% 55% at 88% 72%,
+        rgb(196 137 42 / 0.14),
+        transparent 52%
       ),
       radial-gradient(
-        ellipse 50% 40% at 50% 100%,
-        rgb(36 31 26 / 0.9),
-        transparent 60%
+        ellipse 55% 45% at 48% 100%,
+        rgb(36 31 26 / 0.95),
+        transparent 62%
       );
   }
 

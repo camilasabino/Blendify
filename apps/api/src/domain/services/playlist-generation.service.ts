@@ -8,6 +8,7 @@ import {
   TrackOrderingStrategy,
   createOrderingStrategy,
 } from './strategies/track-ordering.strategy';
+import type { TrackOrderMode } from '@blendify/contracts';
 
 export interface PlaylistGenerationResult {
   tracks: Track[];
@@ -22,13 +23,14 @@ export class PlaylistGenerationService {
 
   generate(
     tracksByArtist: Map<string, Track[]>,
-    songsPerArtist: number,
-    shuffle: boolean,
+    tracksPerSeed: number,
+    orderMode: TrackOrderMode,
+    maxTracks?: number,
   ): PlaylistGenerationResult {
     const cleaned = this.deduplicate(tracksByArtist);
-    const allocation = this.allocate(cleaned, songsPerArtist);
+    const allocation = this.allocate(cleaned, tracksPerSeed, maxTracks);
     const selected = this.select(cleaned, allocation);
-    const ordered = this.order(selected, shuffle);
+    const ordered = this.order(selected, orderMode);
 
     return {
       tracks: ordered,
@@ -44,7 +46,8 @@ export class PlaylistGenerationService {
 
   protected allocate(
     tracksByArtist: Map<string, Track[]>,
-    songsPerArtist: number,
+    tracksPerSeed: number,
+    maxTracks?: number,
   ): Map<string, number> {
     const artistIds = Array.from(tracksByArtist.keys());
     const availableByArtist = new Map<string, number>();
@@ -55,8 +58,9 @@ export class PlaylistGenerationService {
 
     return this.allocationStrategy.allocate({
       artistIds,
-      songsPerArtist,
+      tracksPerSeed,
       availableByArtist,
+      maxTracks,
     });
   }
 
@@ -76,10 +80,10 @@ export class PlaylistGenerationService {
 
   protected order(
     tracksByArtist: Map<string, Track[]>,
-    shuffle: boolean,
+    orderMode: TrackOrderMode,
     strategy?: TrackOrderingStrategy,
   ): Track[] {
-    const ordering = strategy ?? createOrderingStrategy(shuffle);
+    const ordering = strategy ?? createOrderingStrategy(orderMode);
     return ordering.order(tracksByArtist);
   }
 }

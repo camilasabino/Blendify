@@ -1,27 +1,32 @@
-import { MixMode } from '../../domain/genre/mix-mode';
-import {
-  GeneratePlaylistSchema,
-  RenamePlaylistSchema,
-  assertRequestedTrackBudget,
-} from './generate-playlist.dto';
+import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
+import { GeneratePlaylistSchema } from './generate-playlist.dto';
 
 describe('GeneratePlaylistSchema', () => {
-  it('accepts a minimal valid payload and applies defaults', () => {
+  it('accepts a minimal valid payload with popularity', () => {
     const parsed = GeneratePlaylistSchema.parse({
+      kind: 'artist_mix',
       userId: 'user-1',
       artistIds: ['a1'],
+      tracksPerSeed: 10,
+      popularity: PopularityMode.BALANCED,
     });
 
-    expect(parsed.songsPerArtist).toBe(10);
-    expect(parsed.mixMode).toBe(MixMode.BALANCED);
-    expect(parsed.shuffle).toBe(true);
-    expect(parsed.isPublic).toBe(false);
+    expect(parsed.kind).toBe('artist_mix');
+    expect(parsed.tracksPerSeed).toBe(10);
+    expect(parsed.popularity).toBe(PopularityMode.BALANCED);
+    expect(parsed.orderMode).toBe(TrackOrderMode.RANDOM);
+    expect(parsed.persistToLibrary).toBe(true);
+    expect(parsed.name).toBe('');
+    expect(parsed.description).toBe('');
   });
 
   it('accepts client artist snapshots', () => {
     const parsed = GeneratePlaylistSchema.parse({
+      kind: 'artist_mix',
       userId: 'user-1',
       artistIds: ['a1'],
+      tracksPerSeed: 20,
+      popularity: PopularityMode.POPULAR,
       artists: [{ id: 'a1', name: 'Sade', imageUrl: null }],
     });
     expect(parsed.artists?.[0]?.name).toBe('Sade');
@@ -29,29 +34,23 @@ describe('GeneratePlaylistSchema', () => {
 
   it('rejects empty artistIds', () => {
     expect(() =>
-      GeneratePlaylistSchema.parse({ userId: 'u', artistIds: [] }),
-    ).toThrow();
-  });
-});
-
-describe('RenamePlaylistSchema', () => {
-  it('requires a non-empty name', () => {
-    expect(() =>
-      RenamePlaylistSchema.parse({
-        playlistId: 'p1',
-        userId: 'u1',
-        name: '',
+      GeneratePlaylistSchema.parse({
+        kind: 'artist_mix',
+        userId: 'u',
+        artistIds: [],
+        tracksPerSeed: 10,
+        popularity: PopularityMode.BALANCED,
       }),
     ).toThrow();
   });
-});
 
-describe('assertRequestedTrackBudget', () => {
-  it('allows budgets within the hard cap', () => {
-    expect(() => assertRequestedTrackBudget(10, 10)).not.toThrow();
-  });
-
-  it('rejects budgets over the hard cap', () => {
-    expect(() => assertRequestedTrackBudget(25, 20)).toThrow(/200/);
+  it('requires the artist mix discriminator and track count', () => {
+    expect(() =>
+      GeneratePlaylistSchema.parse({
+        userId: 'u',
+        artistIds: ['a1'],
+        popularity: PopularityMode.BALANCED,
+      }),
+    ).toThrow();
   });
 });

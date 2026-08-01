@@ -10,7 +10,8 @@ type RateLimitedConfig = InternalAxiosRequestConfig & {
   __releaseRateGate?: () => void;
 };
 
-const MIN_GAP_MS = 350;
+/** Minimum gap between successful Spotify calls (Dev Mode budget). */
+const MIN_GAP_MS = 400;
 const LOCAL_COOLDOWN_MS = 20_000;
 const MAX_QUEUE_WAIT_MS = 1_500;
 
@@ -72,6 +73,26 @@ function synthetic429(config: InternalAxiosRequestConfig): AxiosError {
   );
 }
 
+/** True while Spotify has told us to wait (Retry-After window). */
+export function isSpotifyQuotaBlocked(): boolean {
+  return Date.now() < quotaBlockedUntil;
+}
+
+export function getSpotifyQuotaRetryAfterSeconds(): number | null {
+  if (!isSpotifyQuotaBlocked()) return null;
+  return Math.max(1, Math.ceil((quotaBlockedUntil - Date.now()) / 1000));
+}
+
+export function getSpotifyQuotaReason(): string | undefined {
+  return lastQuotaReason;
+}
+
+/** For tests only. */
+export function __resetSpotifyRateLimitForTests(): void {
+  quotaBlockedUntil = 0;
+  lastQuotaReason = undefined;
+}
+
 export function attachSpotifyRateLimit(
   api: AxiosInstance,
   logger?: Logger,
@@ -81,6 +102,14 @@ export function attachSpotifyRateLimit(
 
   api.interceptors.request.use(async (config) => {
     const cfg = config as RateLimitedConfig;
+
+    // Honor Spotify's Retry-After fully — never probe again until it expires.
+    if (isSpotifyQuotaBlocked()) {
+      logger?.warn(
+        `Spotify blocked ${getSpotifyQuotaRetryAfterSeconds()}s — failing fast`,
+      );
+      return Promise.reject(synthetic429(cfg));
+    }
 
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
@@ -129,7 +158,7 @@ export function attachSpotifyRateLimit(
         const reason = readQuotaReason(error) ?? 'rate_limit';
         lastQuotaReason = reason;
         quotaBlockedUntil = Date.now() + retrySec * 1000;
-        nextSlot = Date.now() + LOCAL_COOLDOWN_MS;
+        nextSlot = Date.now() + Math.max(LOCAL_COOLDOWN_MS, retrySec * 1000);
         logger?.warn(
           `Spotify 429 (${reason}) Retry-After=${retrySec}s (~${(
             retrySec / 3600

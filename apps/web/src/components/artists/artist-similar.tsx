@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { RefreshCw, Sparkles } from 'lucide-react'
-import { api, type Artist } from '@/lib/api'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Plus, RefreshCw, Sparkles } from 'lucide-react'
+import {
+  api,
+  getApiErrorMessage,
+  type Artist,
+  type SimilarArtistSuggestion,
+} from '@/lib/api'
 import { SeedChip } from '@/components/ui/chip'
 import { FieldError } from '@/components/ui/feedback'
 import { Spinner } from '@/components/ui/spinner'
 import { useSuggestionSeed } from '@/hooks/use-suggestion-seed'
 import { useT } from '@/i18n/use-t'
-import { cn, focusRing } from '@/lib/utils'
+import { cn, focusRing, normalizeArtistName } from '@/lib/utils'
 
 const PAGE_SIZE = 8
 
@@ -25,32 +30,37 @@ export function ArtistSimilarSuggestions({
   className,
 }: ArtistSimilarProps) {
   const t = useT()
-  const selectedIds = selected.map((a) => a.id)
   const atLimit = selected.length >= max
   const [page, setPage] = useState(0)
-  const [items, setItems] = useState<Artist[]>([])
-  const [opened, setOpened] = useState(false)
+  const [items, setItems] = useState<SimilarArtistSuggestion[]>([])
+  const [resolveError, setResolveError] = useState<string | null>(null)
   const { seed, setSeedId } = useSuggestionSeed(selected)
+
+  const selectedNames = useMemo(
+    () => new Set(selected.map((artist) => normalizeArtistName(artist.name))),
+    [selected],
+  )
 
   useEffect(() => {
     setPage(0)
     setItems([])
-    setOpened(false)
+    setResolveError(null)
   }, [seed?.id])
 
-  const requestIds = useMemo(() => {
-    if (!seed) return []
-        return [...selectedIds.filter((id) => id !== seed.id), seed.id]
-  }, [selectedIds, seed])
+  const excludeNames = useMemo(
+    () => selected.map((artist) => artist.name),
+    [selected],
+  )
 
   const similarQuery = useQuery({
-    queryKey: ['artists', 'similar', seed?.id, page],
+    queryKey: ['artists', 'similar', seed?.name, page, excludeNames.join('|')],
     queryFn: () =>
-      api.similarArtists(requestIds, {
+      api.similarArtists(seed!.name, {
+        excludeNames,
         offset: page * PAGE_SIZE,
         limit: PAGE_SIZE,
       }),
-        enabled: opened && Boolean(seed) && !atLimit,
+    enabled: Boolean(seed?.name) && !atLimit,
     staleTime: 120_000,
     retry: false,
   })
@@ -59,31 +69,68 @@ export function ArtistSimilarSuggestions({
     const batch = similarQuery.data?.artists
     if (!batch) return
     setItems((prev) => {
-      const exclude = new Set(selectedIds)
-      const nextBatch = batch.filter((artist) => !exclude.has(artist.id))
+      const nextBatch = batch.filter(
+        (artist) => !selectedNames.has(normalizeArtistName(artist.name)),
+      )
       if (page === 0) return nextBatch
-      const seen = new Set(prev.map((a) => a.id))
-      return [...prev, ...nextBatch.filter((a) => !seen.has(a.id))]
+      const seen = new Set(
+        prev.map((artist) => normalizeArtistName(artist.name)),
+      )
+      return [
+        ...prev,
+        ...nextBatch.filter(
+          (artist) => !seen.has(normalizeArtistName(artist.name)),
+        ),
+      ]
     })
-  }, [similarQuery.data, page, selectedIds])
+  }, [similarQuery.data, page, selectedNames])
 
-  const suggestions = items.filter((artist) => !selectedIds.includes(artist.id))
+  const resolveMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const { artists } = await api.resolveArtists([name])
+      return artists[0] ?? null
+    },
+    onMutate: () => setResolveError(null),
+    onSuccess: (artist) => {
+      if (!artist) {
+        setResolveError(t('artist.exploreResolveError'))
+        return
+      }
+      onSelect(artist)
+    },
+    onError: (error) => {
+      setResolveError(
+        getApiErrorMessage(error, t, 'artist.exploreResolveError'),
+      )
+    },
+  })
+
+  const suggestions = items.filter(
+    (artist) => !selectedNames.has(normalizeArtistName(artist.name)),
+  )
   const hasMore = similarQuery.data?.hasMore ?? false
+  const resolvingName = resolveMutation.isPending
+    ? (resolveMutation.variables ?? null)
+    : null
 
   if (selected.length === 0 || atLimit || !seed) return null
 
   return (
     <div
       className={cn(
-        'space-y-2 rounded-xl border border-amber-500/15 bg-amber-500/5 p-3',
+        'space-y-3 rounded-2xl border border-amber-500/15 bg-gradient-to-b from-amber-500/[0.07] to-transparent p-4',
         className,
       )}
     >
-      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-amber-400/90">
-        <Sparkles className="size-3.5" />
-        {t('artist.exploreFor', { name: seed.name })}
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-amber-400/90">
+          <Sparkles className="size-3.5" />
+          {t('artist.exploreFor', { name: seed.name })}
+        </div>
+        <p className="text-sm leading-relaxed text-cream-400">
+          {t('artist.exploreHint')}
+        </p>
       </div>
-      <p className="text-xs text-cream-400">{t('artist.exploreHint')}</p>
 
       {selected.length > 1 ? (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -102,66 +149,60 @@ export function ArtistSimilarSuggestions({
         </div>
       ) : null}
 
-      {!opened ? (
-        <button
-          type="button"
-          onClick={() => setOpened(true)}
-          className={cn(
-            'inline-flex items-center gap-2 rounded-lg bg-amber-500/15 px-3 py-2 text-sm text-amber-100 transition hover:bg-amber-500/25',
-            focusRing,
-          )}
-        >
-          <Sparkles className="size-3.5" />
-          {t('artist.exploreOpen')}
-        </button>
-      ) : null}
-
-      {opened && similarQuery.isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-cream-400">
+      {similarQuery.isLoading ? (
+        <div className="flex items-center gap-2 py-2 text-sm text-cream-400">
           <Spinner size="sm" />
           {t('common.loading')}
         </div>
       ) : null}
 
-      {opened && similarQuery.isError ? (
-        <FieldError>{t('artist.exploreError')}</FieldError>
+      {similarQuery.isError ? (
+        <FieldError>
+          {getApiErrorMessage(similarQuery.error, t, 'artist.exploreError')}
+        </FieldError>
       ) : null}
 
-      {opened && !similarQuery.isLoading && suggestions.length === 0 ? (
+      {resolveError ? <FieldError>{resolveError}</FieldError> : null}
+
+      {!similarQuery.isLoading && suggestions.length === 0 ? (
         <p className="text-sm text-cream-400">
           {page > 0 ? t('artist.exploreExhausted') : t('artist.exploreEmpty')}
         </p>
       ) : null}
 
       {suggestions.length > 0 ? (
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {suggestions.map((artist) => (
-            <li key={artist.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(artist)}
-                className={cn(
-                  'flex w-full items-center gap-2 rounded-lg bg-charcoal-950/40 px-2 py-1.5 text-left text-sm transition hover:bg-charcoal-900/80',
-                  focusRing,
-                )}
-              >
-                {artist.imageUrl ? (
-                  <img
-                    src={artist.imageUrl}
-                    alt=""
-                    className="size-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="size-8 rounded-full bg-charcoal-800" />
-                )}
-                <span className="truncate text-cream-100">{artist.name}</span>
-              </button>
-            </li>
-          ))}
+        <ul className="flex flex-wrap gap-2">
+          {suggestions.map((artist) => {
+            const busy = resolvingName === artist.name
+            return (
+              <li key={`${artist.mbid ?? artist.name}`}>
+                <button
+                  type="button"
+                  disabled={resolveMutation.isPending}
+                  onClick={() => resolveMutation.mutate(artist.name)}
+                  className={cn(
+                    'group inline-flex max-w-full items-center gap-2 rounded-full border border-cream-200/10 bg-charcoal-950/35 px-3.5 py-2 text-left text-sm text-cream-100 transition',
+                    'hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-cream-50',
+                    'disabled:cursor-wait disabled:opacity-60',
+                    focusRing,
+                  )}
+                >
+                  <span className="truncate font-medium tracking-tight">
+                    {artist.name}
+                  </span>
+                  {busy ? (
+                    <Spinner size="sm" className="shrink-0" />
+                  ) : (
+                    <Plus className="size-3.5 shrink-0 text-amber-400/70 transition group-hover:text-amber-300" />
+                  )}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       ) : null}
 
-      {opened && (hasMore || suggestions.length > 0) ? (
+      {hasMore || suggestions.length > 0 ? (
         <button
           type="button"
           disabled={similarQuery.isFetching || !hasMore}

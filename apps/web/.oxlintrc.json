@@ -5,7 +5,7 @@
     "react/rules-of-hooks": "error",
     "react/only-export-components": [
       "warn",
-      { "allowConstantExport": true, "allowExportNames": ["buttonVariants", "computeHistoryStats"] }
+      { "allowConstantExport": true, "allowExportNames": ["buttonVariants"] }
     ],
     "eslint/no-unused-vars": [
       "error",

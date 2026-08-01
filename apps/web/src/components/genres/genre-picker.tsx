@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { RefreshCw, Sparkles } from 'lucide-react'
+import { Plus, RefreshCw, Sparkles } from 'lucide-react'
 import { api, type CuratedGenre } from '@/lib/api'
-import {
-  RemovableChip,
-  SeedChip,
-  SelectableChip,
-} from '@/components/ui/chip'
+import { GenreIcon } from '@/components/genres/genre-icon'
+import { RemovableChip, SeedChip, SelectableChip } from '@/components/ui/chip'
 import { FieldError } from '@/components/ui/feedback'
 import { SearchField } from '@/components/ui/search-field'
 import { Spinner } from '@/components/ui/spinner'
@@ -83,6 +80,7 @@ export function GenrePicker({
         limit: EXPLORE_PAGE_SIZE,
       }),
     enabled: selected.length > 0 && !searching && Boolean(seed),
+    staleTime: 120_000,
   })
 
   const selectedIds = useMemo(
@@ -106,12 +104,13 @@ export function GenrePicker({
   const visible = searching ? searchResults : catalog
 
   const explore = exploreItems.filter((g) => !selectedIds.has(g.id))
-
   const exploreHasMore = exploreQuery.data?.hasMore ?? false
+  const exploreLoading = exploreQuery.isLoading
   const exploreFetching = exploreQuery.isFetching
 
   const atLimit = selected.length >= max
-  const showExplore = selected.length > 0 && !atLimit && !searching && Boolean(seed)
+  const showExplore =
+    selected.length > 0 && !atLimit && !searching && Boolean(seed)
 
   function selectGenre(genre: CuratedGenre) {
     onToggle(genre)
@@ -131,7 +130,7 @@ export function GenrePicker({
         }}
         placeholder={t('genre.searchPlaceholder')}
         clearLabel={t('search.clear')}
-        loading={catalogQuery.isFetching || exploreFetching}
+        loading={catalogQuery.isFetching || (searching && searchQuery.isFetching)}
       />
 
       {selected.length > 0 && (
@@ -156,6 +155,7 @@ export function GenrePicker({
                 key={genre.id}
                 label={genre.name}
                 highlighted={seed?.id === genre.id}
+                leading={<GenreIcon name={genre.name} id={genre.id} />}
                 onRemove={() => onRemove(genre.id)}
                 removeLabel={t('genre.remove', { name: genre.name })}
               />
@@ -170,7 +170,7 @@ export function GenrePicker({
 
       {!catalogQuery.isError && (
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-cream-400">
+          <p className="text-sm font-medium text-cream-300">
             {searching ? t('genre.results') : t('genre.mains')}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -193,90 +193,100 @@ export function GenrePicker({
                 <p className="text-sm text-cream-400">{t('genre.empty')}</p>
               )}
           </div>
-          {searching && searchResults.some((g) => g.id.startsWith('custom:')) ? (
-            <p className="text-xs text-cream-500">{t('genre.customHint')}</p>
-          ) : null}
         </div>
       )}
 
-      {showExplore && seed && (
-        <div className="space-y-2 rounded-xl border border-amber-500/15 bg-amber-500/5 p-3">
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-amber-400/90">
-            <Sparkles className="size-3.5" />
-            {t('genre.exploreFor', { query: seed.name })}
-            {exploreFetching && <Spinner size="sm" />}
-          </div>
-          <p className="text-xs text-cream-400">{t('genre.exploreHint')}</p>
-
-          {selected.length > 1 && (
-            <div className="space-y-1.5">
-              <p className="text-[11px] text-cream-500">
-                {t('genre.exploreSeedHint')}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {selected.map((genre) => (
-                  <SeedChip
-                    key={genre.id}
-                    active={genre.id === seed.id}
-                    onClick={() => setSeedId(genre.id)}
-                  >
-                    {genre.name}
-                  </SeedChip>
-                ))}
-              </div>
+      {showExplore && seed ? (
+        <div className="space-y-3 rounded-2xl border border-amber-500/15 bg-gradient-to-b from-amber-500/[0.07] to-transparent p-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm font-medium text-amber-300/90">
+              <Sparkles className="size-3.5" />
+              {t('genre.exploreFor', { query: seed.name })}
             </div>
-          )}
+            <p className="text-sm leading-relaxed text-cream-400">
+              {t('genre.exploreHint')}
+            </p>
+          </div>
 
-          {explore.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {explore.map((genre) => (
-                <SelectableChip
+          {selected.length > 1 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-cream-500">
+                {t('genre.exploreSeedHint')}
+              </span>
+              {selected.map((genre) => (
+                <SeedChip
                   key={genre.id}
-                  selected={false}
-                  disabled={atLimit}
-                  onClick={() => selectGenre(genre)}
+                  active={genre.id === seed.id}
+                  onClick={() => setSeedId(genre.id)}
                 >
                   {genre.name}
-                </SelectableChip>
+                </SeedChip>
               ))}
             </div>
-          ) : (
-            !exploreFetching && (
-              <p className="text-sm text-cream-400">
-                {t('genre.exploreEmpty')}
-              </p>
-            )
-          )}
+          ) : null}
 
-          <div className="flex flex-wrap items-center gap-3 pt-1">
-            {exploreHasMore ? (
-              <button
-                type="button"
-                onClick={() => setExplorePage((p) => p + 1)}
-                disabled={exploreFetching}
-                className={cn(
-                  'inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 transition-colors hover:text-amber-300 disabled:opacity-50',
-                  focusRing,
-                )}
-              >
-                <RefreshCw
-                  className={cn(
-                    'size-3.5',
-                    exploreFetching && 'animate-spin',
-                  )}
-                />
-                {t('genre.suggestMore')}
-              </button>
-            ) : (
-              explore.length > 0 && (
-                <p className="text-xs text-cream-500">
-                  {t('genre.exploreExhausted')}
-                </p>
-              )
-            )}
-          </div>
+          {exploreLoading ? (
+            <div className="flex items-center gap-2 py-2 text-sm text-cream-400">
+              <Spinner size="sm" />
+              {t('common.loading')}
+            </div>
+          ) : null}
+
+          {!exploreLoading && explore.length === 0 ? (
+            <p className="text-sm text-cream-400">
+              {explorePage > 0
+                ? t('genre.exploreExhausted')
+                : t('genre.exploreEmpty')}
+            </p>
+          ) : null}
+
+          {explore.length > 0 ? (
+            <ul className="flex flex-wrap gap-2">
+              {explore.map((genre) => (
+                <li key={genre.id}>
+                  <button
+                    type="button"
+                    disabled={atLimit}
+                    onClick={() => selectGenre(genre)}
+                    className={cn(
+                      'group inline-flex max-w-full items-center gap-2 rounded-full border border-cream-200/10 bg-charcoal-950/35 px-3.5 py-2 text-left text-sm text-cream-100 transition',
+                      'hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-cream-50',
+                      'disabled:cursor-not-allowed disabled:opacity-40',
+                      focusRing,
+                    )}
+                  >
+                    <span className="truncate font-medium tracking-tight">
+                      {genre.name}
+                    </span>
+                    <Plus className="size-3.5 shrink-0 text-amber-400/70 transition group-hover:text-amber-300" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {exploreHasMore || explore.length > 0 ? (
+            <button
+              type="button"
+              disabled={exploreFetching || !exploreHasMore}
+              onClick={() => setExplorePage((p) => p + 1)}
+              className={cn(
+                'inline-flex items-center gap-2 text-sm text-amber-300/90 transition hover:text-amber-200 disabled:opacity-40',
+                focusRing,
+              )}
+            >
+              {exploreFetching ? (
+                <Spinner size="sm" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              {exploreHasMore
+                ? t('genre.suggestMore')
+                : t('genre.exploreExhausted')}
+            </button>
+          ) : null}
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

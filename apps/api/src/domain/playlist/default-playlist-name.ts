@@ -1,28 +1,34 @@
-import { MixMode } from '../genre/mix-mode';
+export function buildDefaultPlaylistName(input: { names: string[] }): string {
+  const names = input.names.map((n) => n.trim()).filter(Boolean);
 
-const MIX_LABEL: Record<MixMode, string> = {
-  [MixMode.POPULAR]: 'Popular',
-  [MixMode.BALANCED]: 'Balanced',
-  [MixMode.RARITIES]: 'Rarities',
-  [MixMode.MOOD_ENERGETIC]: 'Energetic',
-  [MixMode.MOOD_CHILL]: 'Chill',
-  [MixMode.MOOD_MELANCHOLIC]: 'Melancholic',
-};
+  if (names.length === 0) return 'Blendify · Mix';
+  if (names.length === 1) return truncate(`Blendify · Mix · ${names[0]}`);
+  if (names.length === 2) {
+    return truncate(`Blendify · Mix · ${names[0]} + ${names[1]}`);
+  }
+  return truncate(`Blendify · Mix · ${names[0]} + ${names.length - 1}`);
+}
 
-export function buildDefaultPlaylistName(input: {
+export function buildDefaultPlaylistDescription(input: {
   names: string[];
-  mixMode?: string | MixMode;
 }): string {
   const names = input.names.map((n) => n.trim()).filter(Boolean);
-  const mixKey = (input.mixMode as MixMode) ?? MixMode.BALANCED;
-  const mix = MIX_LABEL[mixKey] ?? 'Balanced';
-
-  if (names.length === 0) return `Blendify · ${mix}`;
-  if (names.length === 1) return truncate(`Blendify · ${names[0]} · ${mix}`);
-  if (names.length === 2) {
-    return truncate(`Blendify · ${names[0]} + ${names[1]} · ${mix}`);
+  if (names.length === 0) {
+    return 'Made with Blendify.';
   }
-  return truncate(`Blendify · ${names[0]} + ${names.length - 1} · ${mix}`);
+  if (names.length === 1) {
+    return truncate(`Made with Blendify from ${names[0]}.`, 300);
+  }
+  if (names.length === 2) {
+    return truncate(
+      `Made with Blendify from ${names[0]} and ${names[1]}.`,
+      300,
+    );
+  }
+  return truncate(
+    `Made with Blendify from ${names[0]} and ${names.length - 1} more.`,
+    300,
+  );
 }
 
 function truncate(value: string, max = 100): string {

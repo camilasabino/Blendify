@@ -1,18 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
-  MUSIC_PROVIDER,
-  MusicProviderPort,
-} from '../../domain/repositories/music-provider.port';
+  MUSIC_PROVIDER_FACTORY,
+  type MusicProviderFactoryPort,
+} from '../../domain/repositories/music-provider.factory.port';
 import {
   PLAYLIST_REPOSITORY,
   PlaylistRepositoryPort,
 } from '../../domain/repositories/playlist.repository.port';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import {
-  PlaylistResponseDto,
-  toPlaylistResponse,
-} from '../dto/playlist-response.dto';
-import { SpotifyMusicProvider } from '../../infrastructure/spotify/spotify-music.provider';
+import { toPlaylistDetail } from '../dto/playlist-response.dto';
+import type { PlaylistDetail } from '@blendify/contracts';
 
 @Injectable()
 export class RenamePlaylistUseCase {
@@ -21,14 +18,15 @@ export class RenamePlaylistUseCase {
   constructor(
     @Inject(PLAYLIST_REPOSITORY)
     private readonly playlists: PlaylistRepositoryPort,
-    @Inject(MUSIC_PROVIDER) private readonly music: MusicProviderPort,
+    @Inject(MUSIC_PROVIDER_FACTORY)
+    private readonly providers: MusicProviderFactoryPort,
   ) {}
 
   async execute(
     userId: string,
     playlistId: string,
     name: string,
-  ): Promise<PlaylistResponseDto> {
+  ): Promise<PlaylistDetail> {
     const playlist = await this.playlists.findById(playlistId);
     if (!playlist || playlist.userId !== userId) {
       throw BusinessRuleError.playlistNotFound(playlistId);
@@ -38,7 +36,7 @@ export class RenamePlaylistUseCase {
 
     if (playlist.spotifyId && !playlist.missingOnSpotify) {
       try {
-        const provider = this.bind(userId);
+        const provider = this.providers.forUser(userId);
         await provider.updatePlaylistDetails(playlist.spotifyId, { name });
       } catch (error) {
         this.logger.warn(
@@ -50,13 +48,6 @@ export class RenamePlaylistUseCase {
     }
 
     const saved = await this.playlists.save(playlist);
-    return toPlaylistResponse(saved);
-  }
-
-  private bind(userId: string): MusicProviderPort {
-    if (this.music instanceof SpotifyMusicProvider) {
-      return this.music.forUser(userId);
-    }
-    return this.music;
+    return toPlaylistDetail(saved);
   }
 }

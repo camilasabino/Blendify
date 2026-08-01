@@ -1,8 +1,10 @@
 import { Artist } from '../artist/artist.entity';
 import { Track } from '../track/track.entity';
 import { User } from '../user/user.entity';
-
-export const MUSIC_PROVIDER = 'MUSIC_PROVIDER' as const;
+import type {
+  PlaybackDeviceDto,
+  StartPlaybackRequest,
+} from '@blendify/contracts';
 
 export interface CreateProviderPlaylistInput {
   userId: string;
@@ -23,6 +25,8 @@ export interface PlaylistRemoteSnapshot {
   trackCount: number;
   totalDurationMs: number;
   imageUrl?: string;
+  /** Present when items were fetched from Spotify; omit to leave stored tracks unchanged. */
+  tracks?: Track[];
 }
 
 export interface SearchTracksOptions {
@@ -30,19 +34,27 @@ export interface SearchTracksOptions {
   offset?: number;
 }
 
+export interface ResolveTrackOptions {
+  /** When set, only accept Spotify tracks that include this artist. */
+  artistId?: string;
+}
+
 export interface MusicProviderPort {
   searchArtists(query: string, limit?: number): Promise<Artist[]>;
 
   searchTracks(query: string, options?: SearchTracksOptions): Promise<Track[]>;
 
+  /**
+   * Resolve a specific artist+track title to a Spotify track (precise search).
+   * Preferred over paginated artist search for catalog charts from Last.fm.
+   */
+  resolveTrack(
+    artistName: string,
+    trackName: string,
+    options?: ResolveTrackOptions,
+  ): Promise<Track | null>;
+
   getArtistsByIds(ids: string[]): Promise<Artist[]>;
-
-  getSimilarArtists(
-    artistId: string,
-    options?: { limit?: number; offset?: number },
-  ): Promise<{ artists: Artist[]; hasMore: boolean }>;
-
-  getTopTracks(artistId: string, limit?: number): Promise<Track[]>;
 
   createPlaylist(input: CreateProviderPlaylistInput): Promise<ProviderPlaylist>;
 
@@ -70,16 +82,5 @@ export interface MusicProviderPort {
   getCurrentUser(accessToken?: string): Promise<User>;
 }
 
-export type PlaybackDevice = {
-  id: string;
-  name: string;
-  type: string;
-  isActive: boolean;
-};
-
-export type StartPlaybackInput = {
-  contextUri?: string;
-  uris?: string[];
-  offsetUri?: string;
-  deviceId?: string;
-};
+export type PlaybackDevice = PlaybackDeviceDto;
+export type StartPlaybackInput = StartPlaybackRequest;

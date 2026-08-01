@@ -1,59 +1,12 @@
-import { PlaylistStatus } from '../../domain/playlist/playlist-status';
+import type {
+  PlaylistDetail,
+  PlaylistSummary,
+  TrackDto,
+} from '@blendify/contracts';
 import { Playlist } from '../../domain/playlist/playlist.entity';
-import { Artist } from '../../domain/artist/artist.entity';
 import { Track } from '../../domain/track/track.entity';
 
-export interface ArtistResponseDto {
-  id: string;
-  name: string;
-  imageUrl?: string;
-}
-
-export interface TrackResponseDto {
-  id: string;
-  name: string;
-  artistId: string;
-  artistName: string;
-  durationMs: number;
-  popularity: number;
-  uri: string;
-  albumName?: string;
-  albumImageUrl?: string;
-  previewUrl?: string;
-}
-
-export interface PlaylistResponseDto {
-  id: string;
-  userId: string;
-  name: string;
-  description: string;
-  spotifyId?: string;
-  spotifyUrl?: string | null;
-  artists: ArtistResponseDto[];
-  tracks: TrackResponseDto[];
-  artistCount: number;
-  songsPerArtist: number;
-  shuffle: boolean;
-  status: PlaylistStatus;
-  totalDurationMs: number;
-  trackCount: number;
-  missingOnSpotify: boolean;
-  source?: 'artists' | 'genres';
-  mixMode?: string;
-  imageUrl?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export function toArtistResponse(artist: Artist): ArtistResponseDto {
-  return {
-    id: artist.id.getValue(),
-    name: artist.name,
-    imageUrl: artist.imageUrl,
-  };
-}
-
-export function toTrackResponse(track: Track): TrackResponseDto {
+export function toTrackResponse(track: Track): TrackDto {
   return {
     id: track.id.getValue(),
     name: track.name,
@@ -68,35 +21,30 @@ export function toTrackResponse(track: Track): TrackResponseDto {
   };
 }
 
-export function toPlaylistResponse(playlist: Playlist): PlaylistResponseDto {
-  const durationFromTracks = playlist.tracks.reduce(
-    (sum, t) => sum + t.durationMs,
-    0,
-  );
-
+export function toPlaylistSummary(playlist: Playlist): PlaylistSummary {
   return {
     id: playlist.id,
-    userId: playlist.userId,
     name: playlist.name.getValue(),
     description: playlist.description,
-    spotifyId: playlist.spotifyId,
-    spotifyUrl: playlist.spotifyUrl ?? null,
-    artists: playlist.artists.map(toArtistResponse),
-    tracks: playlist.tracks.map(toTrackResponse),
-    artistCount: playlist.artists.length,
-    songsPerArtist: playlist.songsPerArtist,
-    shuffle: playlist.shuffle,
-    status: playlist.status,
-    totalDurationMs:
-      playlist.totalDurationMs > 0
-        ? playlist.totalDurationMs
-        : durationFromTracks,
+    kind: playlist.kind,
+    seeds: [...playlist.seeds],
+    seedCount: playlist.seeds.length,
     trackCount: playlist.trackCount,
+    totalDurationMs: playlist.totalDurationMs,
+    spotifyUrl: playlist.spotifyUrl ?? null,
+    spotifyId: playlist.spotifyId,
+    status: playlist.status,
     missingOnSpotify: playlist.missingOnSpotify,
-    source: playlist.source,
-    mixMode: playlist.mixMode,
     imageUrl: playlist.imageUrl ?? null,
     createdAt: playlist.createdAt.toISOString(),
     updatedAt: playlist.updatedAt.toISOString(),
+  };
+}
+
+export function toPlaylistDetail(playlist: Playlist): PlaylistDetail {
+  return {
+    ...toPlaylistSummary(playlist),
+    tracks: playlist.tracks.map(toTrackResponse),
+    generation: playlist.generation,
   };
 }

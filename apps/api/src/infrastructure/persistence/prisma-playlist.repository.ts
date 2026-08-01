@@ -2,22 +2,23 @@ import { Injectable } from '@nestjs/common';
 import {
   Playlist as PlaylistModel,
   PlaylistStatus as PrismaStatus,
+  Prisma,
 } from '@prisma/client';
+import {
+  PlaylistGenerationSchema,
+  PlaylistSeedSchema,
+  type PlaylistSeedDto,
+} from '@blendify/contracts';
 import { Playlist } from '../../domain/playlist/playlist.entity';
-import { PlaylistStatus } from '../../domain/playlist/playlist-status';
 import { PlaylistName } from '../../domain/value-objects/playlist-name.vo';
-import { Artist } from '../../domain/artist/artist.entity';
 import { Track } from '../../domain/track/track.entity';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
-import { PlaylistRepositoryPort } from '../../domain/repositories/playlist.repository.port';
+import {
+  PlaylistRepositoryPort,
+  type PlaylistLibraryFilter,
+} from '../../domain/repositories/playlist.repository.port';
 import { PrismaService } from './prisma.service';
-
-interface ArtistJson {
-  id: string;
-  name: string;
-  imageUrl?: string;
-}
 
 interface TrackJson {
   id: string;
@@ -28,8 +29,8 @@ interface TrackJson {
   popularity: number;
   uri: string;
   albumName?: string;
-  albumImageUrl?: string;
-  previewUrl?: string;
+  albumImageUrl?: string | null;
+  previewUrl?: string | null;
 }
 
 @Injectable()
@@ -37,45 +38,41 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
   constructor(private readonly prisma: PrismaService) {}
 
   async save(playlist: Playlist): Promise<Playlist> {
+    const tracksPerSeed =
+      'tracksPerSeed' in playlist.generation
+        ? playlist.generation.tracksPerSeed
+        : null;
     const data = {
       userId: playlist.userId,
       name: playlist.name.getValue(),
       description: playlist.description,
       spotifyId: playlist.spotifyId ?? null,
       spotifyUrl: playlist.spotifyUrl ?? null,
-      songsPerArtist: playlist.songsPerArtist,
-      shuffle: playlist.shuffle,
-      status: this.toPrismaStatus(playlist.status),
+      kind: playlist.kind,
+      status: playlist.status,
       totalDurationMs: playlist.totalDurationMs,
-      artistCount: playlist.artists.length,
+      seedCount: playlist.seeds.length,
       trackCount: playlist.trackCount,
-      artistsJson: playlist.artists.map((a) => ({
-        id: a.id.getValue(),
-        name: a.name,
-        imageUrl: a.imageUrl,
-      })),
-      tracksJson: playlist.tracks.map((t) => ({
-        id: t.id.getValue(),
-        name: t.name,
-        artistId: t.artistId.getValue(),
-        artistName: t.artistName,
-        durationMs: t.durationMs,
-        popularity: t.popularity,
-        uri: t.uri,
-        albumName: t.albumName,
-        albumImageUrl: t.albumImageUrl,
-        previewUrl: t.previewUrl,
-      })),
-      paramsJson: {
-        songsPerArtist: playlist.songsPerArtist,
-        shuffle: playlist.shuffle,
-        artistIds: playlist.artists.map((a) => a.id.getValue()),
-        source: playlist.source,
-        mixMode: playlist.mixMode ?? null,
-        missingOnSpotify: playlist.missingOnSpotify,
-        syncedTrackCount: playlist.syncedTrackCount ?? null,
-        imageUrl: playlist.imageUrl ?? null,
-      },
+      tracksPerSeed,
+      seeds: toJson(playlist.seeds),
+      tracks: toJson(
+        playlist.tracks.map((track) => ({
+          id: track.id.getValue(),
+          name: track.name,
+          artistId: track.artistId.getValue(),
+          artistName: track.artistName,
+          durationMs: track.durationMs,
+          popularity: track.popularity,
+          uri: track.uri,
+          albumName: track.albumName,
+          albumImageUrl: track.albumImageUrl,
+          previewUrl: track.previewUrl,
+        })),
+      ),
+      generation: toJson(playlist.generation),
+      missingOnSpotify: playlist.missingOnSpotify,
+      syncedTrackCount: playlist.syncedTrackCount ?? null,
+      imageUrl: playlist.imageUrl ?? null,
     };
 
     const saved = await this.prisma.playlist.upsert({
@@ -83,7 +80,6 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
       create: { id: playlist.id, ...data },
       update: data,
     });
-
     return this.toDomain(saved);
   }
 
@@ -92,32 +88,22 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
     return row ? this.toDomain(row) : null;
   }
 
-  async findByUserId(userId: string): Promise<Playlist[]> {
+  async listLibrary(
+    userId: string,
+    filter: PlaylistLibraryFilter,
+  ): Promise<Playlist[]> {
     const rows = await this.prisma.playlist.findMany({
-      where: { userId },
+      where: this.libraryWhere(userId, filter),
       orderBy: { createdAt: 'desc' },
     });
     return rows.map((row) => this.toDomain(row));
   }
 
-  async findByUserIdPage(
+  async listLibraryPage(
     userId: string,
     query: { limit: number; offset: number; q?: string },
   ): Promise<{ items: Playlist[]; total: number }> {
-    const q = query.q?.trim();
-    const where = {
-      userId,
-      status: { not: PrismaStatus.FAILED },
-      ...(q
-        ? {
-            name: {
-              contains: q,
-              mode: 'insensitive' as const,
-            },
-          }
-        : {}),
-    };
-
+    const where = this.libraryWhere(userId, { q: query.q });
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.playlist.count({ where }),
       this.prisma.playlist.findMany({
@@ -127,11 +113,7 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
         skip: query.offset,
       }),
     ]);
-
-    return {
-      total,
-      items: rows.map((row) => this.toDomain(row)),
-    };
+    return { total, items: rows.map((row) => this.toDomain(row)) };
   }
 
   async deleteFailedByUserId(userId: string): Promise<number> {
@@ -141,32 +123,17 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
     return result.count;
   }
 
-  async countPresence(
+  async countLibraryPresence(
     userId: string,
     q?: string,
   ): Promise<{ total: number; active: number; deleted: number }> {
-    const query = q?.trim();
-    const rows = await this.prisma.playlist.findMany({
-      where: {
-        userId,
-        status: { not: PrismaStatus.FAILED },
-        ...(query
-          ? {
-              name: {
-                contains: query,
-                mode: 'insensitive' as const,
-              },
-            }
-          : {}),
-      },
-      select: { paramsJson: true },
-    });
-    let deleted = 0;
-    for (const row of rows) {
-      const params = (row.paramsJson ?? {}) as { missingOnSpotify?: boolean };
-      if (params.missingOnSpotify) deleted += 1;
-    }
-    const total = rows.length;
+    const base = this.libraryWhere(userId, { q });
+    const [total, deleted] = await this.prisma.$transaction([
+      this.prisma.playlist.count({ where: base }),
+      this.prisma.playlist.count({
+        where: { ...base, missingOnSpotify: true },
+      }),
+    ]);
     return { total, deleted, active: total - deleted };
   }
 
@@ -174,17 +141,26 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
     await this.prisma.playlist.delete({ where: { id } });
   }
 
-  private toDomain(row: PlaylistModel): Playlist {
-    const artistsJson = row.artistsJson as unknown as ArtistJson[];
-    const tracksJson = row.tracksJson as unknown as TrackJson[];
-    const params = (row.paramsJson ?? {}) as {
-      source?: 'artists' | 'genres';
-      mixMode?: string | null;
-      missingOnSpotify?: boolean;
-      syncedTrackCount?: number | null;
-      imageUrl?: string | null;
+  private libraryWhere(
+    userId: string,
+    filter: PlaylistLibraryFilter,
+  ): Prisma.PlaylistWhereInput {
+    const q = filter.q?.trim();
+    return {
+      userId,
+      status: { not: PrismaStatus.FAILED },
+      ...(filter.missingOnSpotify === undefined
+        ? {}
+        : { missingOnSpotify: filter.missingOnSpotify }),
+      ...(filter.playlistIds?.length ? { id: { in: filter.playlistIds } } : {}),
+      ...(q ? { name: { contains: q, mode: 'insensitive' as const } } : {}),
     };
+  }
 
+  private toDomain(row: PlaylistModel): Playlist {
+    const seeds = parseSeeds(row.seeds);
+    const generation = PlaylistGenerationSchema.parse(row.generation);
+    const tracks = row.tracks as unknown as TrackJson[];
     return Playlist.rehydrate({
       id: row.id,
       userId: row.userId,
@@ -192,52 +168,37 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
       description: row.description,
       spotifyId: row.spotifyId ?? undefined,
       spotifyUrl: row.spotifyUrl ?? undefined,
-      artists: artistsJson.map((a) =>
-        Artist.create({
-          id: ArtistId.create(a.id),
-          name: a.name,
-          imageUrl: a.imageUrl,
-        }),
-      ),
-      tracks: tracksJson.map((t) =>
+      seeds,
+      tracks: tracks.map((track) =>
         Track.create({
-          id: TrackId.create(t.id),
-          name: t.name,
-          artistId: ArtistId.create(t.artistId),
-          artistName: t.artistName,
-          durationMs: t.durationMs,
-          popularity: t.popularity,
-          uri: t.uri,
-          albumName: t.albumName,
-          albumImageUrl: t.albumImageUrl,
-          previewUrl: t.previewUrl,
+          id: TrackId.create(track.id),
+          name: track.name,
+          artistId: ArtistId.create(track.artistId),
+          artistName: track.artistName,
+          durationMs: track.durationMs,
+          popularity: track.popularity,
+          uri: track.uri,
+          albumName: track.albumName,
+          albumImageUrl: track.albumImageUrl ?? undefined,
+          previewUrl: track.previewUrl ?? undefined,
         }),
       ),
-      songsPerArtist: row.songsPerArtist,
-      shuffle: row.shuffle,
-      status: this.toDomainStatus(row.status),
-      totalDurationMs:
-        row.totalDurationMs > 0
-          ? row.totalDurationMs
-          : tracksJson.reduce((sum, t) => sum + (t.durationMs ?? 0), 0),
+      generation,
+      status: row.status,
+      totalDurationMs: row.totalDurationMs,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      source: params.source ?? 'artists',
-      mixMode: params.mixMode ?? undefined,
-      missingOnSpotify: params.missingOnSpotify ?? false,
-      syncedTrackCount:
-        typeof params.syncedTrackCount === 'number'
-          ? params.syncedTrackCount
-          : undefined,
-      imageUrl: params.imageUrl?.trim() || undefined,
+      missingOnSpotify: row.missingOnSpotify,
+      syncedTrackCount: row.syncedTrackCount ?? undefined,
+      imageUrl: row.imageUrl ?? undefined,
     });
   }
+}
 
-  private toPrismaStatus(status: PlaylistStatus): PrismaStatus {
-    return status;
-  }
+function parseSeeds(value: Prisma.JsonValue): PlaylistSeedDto[] {
+  return PlaylistSeedSchema.array().parse(value);
+}
 
-  private toDomainStatus(status: PrismaStatus): PlaylistStatus {
-    return status as unknown as PlaylistStatus;
-  }
+function toJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }

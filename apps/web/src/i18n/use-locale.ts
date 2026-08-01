@@ -4,9 +4,15 @@ import { isLocale, type Locale } from './messages'
 const STORAGE_KEY = 'blendify.locale'
 
 const META_DESCRIPTION: Record<Locale, string> = {
-  en: 'Blendify — Build Spotify playlists from artists or genres.',
-  es: 'Blendify — Crea playlists de Spotify con artistas o géneros.',
-  pt: 'Blendify — Crie playlists do Spotify com artistas ou gêneros.',
+  en: 'Blendify — Create and discover Spotify playlists.',
+  es: 'Blendify — Crea y descubre playlists en Spotify.',
+  pt: 'Blendify — Crie e descubra playlists no Spotify.',
+}
+
+const DOCUMENT_TITLE: Record<Locale, string> = {
+  en: 'Blendify — Mix & Discover',
+  es: 'Blendify — Mezcla y descubre',
+  pt: 'Blendify — Misture e descubra',
 }
 
 function detectLocale(): Locale {
@@ -27,6 +33,7 @@ function detectLocale(): Locale {
 function syncDocumentLocale(locale: Locale) {
   if (typeof document === 'undefined') return
   document.documentElement.lang = locale === 'pt' ? 'pt-BR' : locale
+  document.title = DOCUMENT_TITLE[locale]
   const meta = document.querySelector('meta[name="description"]')
   if (meta) meta.setAttribute('content', META_DESCRIPTION[locale])
 }

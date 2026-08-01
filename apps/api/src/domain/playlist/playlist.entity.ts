@@ -1,8 +1,12 @@
-import { Artist } from '../artist/artist.entity';
+import type {
+  PlaylistGeneration,
+  PlaylistKind,
+  PlaylistSeedDto,
+} from '@blendify/contracts';
+import { BusinessRuleError } from '../errors/business-rule.error';
 import { Track } from '../track/track.entity';
 import { PlaylistName } from '../value-objects/playlist-name.vo';
-import { BusinessRuleError } from '../errors/business-rule.error';
-import { MAX_ARTISTS, MAX_TRACKS } from '../constants';
+import { MAX_TRACKS } from '../constants';
 import { PlaylistStatus } from './playlist-status';
 
 export interface PlaylistProps {
@@ -12,32 +16,26 @@ export interface PlaylistProps {
   description: string;
   spotifyId?: string;
   spotifyUrl?: string;
-  artists: Artist[];
+  seeds: PlaylistSeedDto[];
   tracks: Track[];
-  songsPerArtist: number;
-  shuffle: boolean;
+  generation: PlaylistGeneration;
   status: PlaylistStatus;
   totalDurationMs: number;
   createdAt: Date;
   updatedAt: Date;
-  source?: 'artists' | 'genres';
-  mixMode?: string;
   missingOnSpotify?: boolean;
   syncedTrackCount?: number;
   imageUrl?: string;
 }
 
-export interface CreatePlaylistInput {
+export interface PlaylistCreateInput {
   id: string;
   userId: string;
   name: string;
   description?: string;
-  artists: Artist[];
+  seeds: PlaylistSeedDto[];
   tracks: Track[];
-  songsPerArtist: number;
-  shuffle: boolean;
-  source?: 'artists' | 'genres';
-  mixMode?: string;
+  generation: PlaylistGeneration;
 }
 
 export class Playlist {
@@ -45,22 +43,19 @@ export class Playlist {
   private _description: string;
   private _spotifyId?: string;
   private _spotifyUrl?: string;
-  private _artists: Artist[];
   private _tracks: Track[];
   private _status: PlaylistStatus;
   private _totalDurationMs: number;
   private _updatedAt: Date;
-
-  readonly id: string;
-  readonly userId: string;
-  readonly songsPerArtist: number;
-  readonly shuffle: boolean;
-  readonly createdAt: Date;
-  readonly source: 'artists' | 'genres';
-  readonly mixMode?: string;
   private _missingOnSpotify: boolean;
   private _syncedTrackCount?: number;
   private _imageUrl?: string;
+
+  readonly id: string;
+  readonly userId: string;
+  readonly seeds: readonly PlaylistSeedDto[];
+  readonly generation: PlaylistGeneration;
+  readonly createdAt: Date;
 
   private constructor(props: PlaylistProps) {
     this.id = props.id;
@@ -69,27 +64,24 @@ export class Playlist {
     this._description = props.description;
     this._spotifyId = props.spotifyId;
     this._spotifyUrl = props.spotifyUrl;
-    this._artists = [...props.artists];
+    this.seeds = structuredClone(props.seeds);
     this._tracks = [...props.tracks];
-    this.songsPerArtist = props.songsPerArtist;
-    this.shuffle = props.shuffle;
+    this.generation = structuredClone(props.generation);
     this._status = props.status;
     this._totalDurationMs = props.totalDurationMs;
     this.createdAt = props.createdAt;
     this._updatedAt = props.updatedAt;
-    this.source = props.source ?? 'artists';
-    this.mixMode = props.mixMode;
     this._missingOnSpotify = props.missingOnSpotify ?? false;
     this._syncedTrackCount = props.syncedTrackCount;
     this._imageUrl = props.imageUrl;
   }
 
-  static create(input: CreatePlaylistInput): Playlist {
-    if (input.artists.length === 0) {
-      throw BusinessRuleError.emptyArtistSelection();
-    }
-    if (input.artists.length > MAX_ARTISTS) {
-      throw BusinessRuleError.tooManyArtists(input.artists.length);
+  static create(input: PlaylistCreateInput): Playlist {
+    if (input.seeds.length === 0) {
+      throw new BusinessRuleError(
+        'At least one seed is required.',
+        'EMPTY_SEED_SELECTION',
+      );
     }
     if (input.tracks.length > MAX_TRACKS) {
       throw BusinessRuleError.tooManyTracks(input.tracks.length);
@@ -97,23 +89,18 @@ export class Playlist {
 
     const now = new Date();
     const tracks = [...input.tracks];
-    const totalDurationMs = tracks.reduce((sum, t) => sum + t.durationMs, 0);
-
     return new Playlist({
       id: input.id,
       userId: input.userId,
       name: PlaylistName.create(input.name),
       description: input.description?.trim() ?? '',
-      artists: [...input.artists],
+      seeds: input.seeds,
       tracks,
-      songsPerArtist: input.songsPerArtist,
-      shuffle: input.shuffle,
+      generation: input.generation,
       status: PlaylistStatus.PENDING,
-      totalDurationMs,
+      totalDurationMs: tracks.reduce((sum, track) => sum + track.durationMs, 0),
       createdAt: now,
       updatedAt: now,
-      source: input.source ?? 'artists',
-      mixMode: input.mixMode,
     });
   }
 
@@ -137,12 +124,12 @@ export class Playlist {
     return this._spotifyUrl;
   }
 
-  get artists(): readonly Artist[] {
-    return this._artists;
-  }
-
   get tracks(): readonly Track[] {
     return this._tracks;
+  }
+
+  get kind(): PlaylistKind {
+    return this.generation.kind;
   }
 
   get status(): PlaylistStatus {
@@ -150,7 +137,9 @@ export class Playlist {
   }
 
   get totalDurationMs(): number {
-    return this._totalDurationMs;
+    if (this._totalDurationMs > 0) return this._totalDurationMs;
+    if (this._tracks.length === 0) return this._totalDurationMs;
+    return this._tracks.reduce((sum, track) => sum + track.durationMs, 0);
   }
 
   get updatedAt(): Date {
@@ -173,6 +162,11 @@ export class Playlist {
     return this._imageUrl;
   }
 
+  setImageUrl(url: string | undefined): void {
+    this._imageUrl = url?.trim() || undefined;
+    this.touch();
+  }
+
   rename(name: string): void {
     this._name = PlaylistName.create(name);
     this.touch();
@@ -191,18 +185,33 @@ export class Playlist {
     trackCount: number;
     totalDurationMs: number;
     imageUrl?: string;
+    tracks?: Track[];
   }): void {
     const safeName =
       snapshot.name.trim().slice(0, 100) || this._name.getValue();
     this._name = PlaylistName.create(safeName);
     this._spotifyUrl = snapshot.url;
     this._syncedTrackCount = Math.max(0, snapshot.trackCount);
-    if (snapshot.totalDurationMs > 0 || snapshot.trackCount === 0) {
+
+    if (snapshot.tracks !== undefined) {
+      // Ignore empty payloads when Spotify still reports tracks — keeps local copy.
+      if (snapshot.tracks.length > 0 || snapshot.trackCount === 0) {
+        this._tracks = [...snapshot.tracks];
+      }
+      const fromTracks = snapshot.tracks.reduce(
+        (sum, track) => sum + track.durationMs,
+        0,
+      );
+      const nextDuration =
+        snapshot.totalDurationMs > 0 ? snapshot.totalDurationMs : fromTracks;
+      if (nextDuration > 0 || snapshot.trackCount === 0) {
+        this._totalDurationMs = nextDuration;
+      }
+    } else if (snapshot.totalDurationMs > 0 || snapshot.trackCount === 0) {
       this._totalDurationMs = snapshot.totalDurationMs;
     }
-    if (snapshot.imageUrl) {
-      this._imageUrl = snapshot.imageUrl;
-    }
+
+    if (snapshot.imageUrl) this._imageUrl = snapshot.imageUrl;
     this._missingOnSpotify = false;
     this.touch();
   }
@@ -219,27 +228,6 @@ export class Playlist {
 
   markFailed(): void {
     this._status = PlaylistStatus.FAILED;
-    this.touch();
-  }
-
-  replaceTracks(tracks: Track[], artists?: Artist[]): void {
-    if (tracks.length > MAX_TRACKS) {
-      throw BusinessRuleError.tooManyTracks(tracks.length);
-    }
-    if (artists) {
-      if (artists.length === 0) {
-        throw BusinessRuleError.emptyArtistSelection();
-      }
-      if (artists.length > MAX_ARTISTS) {
-        throw BusinessRuleError.tooManyArtists(artists.length);
-      }
-      this._artists = [...artists];
-    }
-    this._tracks = [...tracks];
-    this._syncedTrackCount = undefined;
-    this._missingOnSpotify = false;
-    this._totalDurationMs = tracks.reduce((sum, t) => sum + t.durationMs, 0);
-    this._status = PlaylistStatus.PENDING;
     this.touch();
   }
 

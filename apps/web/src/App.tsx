@@ -1,12 +1,35 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
 import { useT } from '@/i18n/use-t'
 import { AppShell } from '@/components/layout/app-shell'
 import { Spinner } from '@/components/ui/spinner'
-import { LandingPage } from '@/pages/landing-page'
-import { CreatePlaylistPage } from '@/pages/create-playlist-page'
-import { HistoryPage } from '@/pages/history-page'
-import { StatsPage } from '@/pages/stats-page'
+
+const LandingPage = lazy(() =>
+  import('@/pages/landing-page').then((module) => ({
+    default: module.LandingPage,
+  })),
+)
+const MixPlaylistPage = lazy(() =>
+  import('@/pages/mix-playlist-page').then((module) => ({
+    default: module.MixPlaylistPage,
+  })),
+)
+const DiscoverPlaylistPage = lazy(() =>
+  import('@/pages/discover-playlist-page').then((module) => ({
+    default: module.DiscoverPlaylistPage,
+  })),
+)
+const LibraryPage = lazy(() =>
+  import('@/pages/library-page').then((module) => ({
+    default: module.LibraryPage,
+  })),
+)
+const StatsPage = lazy(() =>
+  import('@/pages/stats-page').then((module) => ({
+    default: module.StatsPage,
+  })),
+)
 
 function ProtectedRoute() {
   const { isAuthenticated, isLoading, isInitialized } = useAuth()
@@ -33,16 +56,32 @@ function ProtectedRoute() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route element={<ProtectedRoute />}>
-        <Route path="/app" element={<AppShell />}>
-          <Route index element={<CreatePlaylistPage />} />
-          <Route path="history" element={<HistoryPage />} />
-          <Route path="stats" element={<StatsPage />} />
+    <Suspense fallback={<RouteLoading />}>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/app" element={<AppShell />}>
+            <Route path="mix" element={<MixPlaylistPage />} />
+            <Route path="discover" element={<DiscoverPlaylistPage />} />
+            <Route path="library" element={<LibraryPage />} />
+            <Route path="stats" element={<StatsPage />} />
+          </Route>
         </Route>
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
+  )
+}
+
+function RouteLoading() {
+  const t = useT()
+  return (
+    <div
+      className="bg-atmosphere flex min-h-svh items-center justify-center"
+      role="status"
+      aria-label={t('common.loading')}
+    >
+      <Spinner size="lg" />
+    </div>
   )
 }

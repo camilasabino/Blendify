@@ -19,6 +19,12 @@ describe('curated genres', () => {
     expect(hits.some((g) => g.name.toLowerCase().includes('jazz'))).toBe(true);
   });
 
+  it('does not invent freeform genres outside the catalog', () => {
+    const hits = searchCuratedGenres('fassafsa', 8);
+    expect(hits.every((g) => !g.id.startsWith('custom:'))).toBe(true);
+    expect(hits).toHaveLength(0);
+  });
+
   it('explores related genres without returning the seed', () => {
     const seed = findCuratedGenre('jazz');
     expect(seed).toBeDefined();

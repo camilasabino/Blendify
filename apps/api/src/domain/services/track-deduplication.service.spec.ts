@@ -46,7 +46,7 @@ describe('TrackDeduplicationService', () => {
     expect(result[0].name).toBe('Levitating');
   });
 
-  it('keeps distinct songs for the same artist', () => {
+  it('keeps distinct tracks for the same artist', () => {
     const result = service.deduplicate([
       track({ id: '1', name: 'Song A' }),
       track({ id: '2', name: 'Song B' }),

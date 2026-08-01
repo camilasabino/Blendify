@@ -17,7 +17,7 @@ export function SelectableChip({
     <button
       type="button"
       className={cn(
-        'rounded-full border px-3 py-1.5 text-sm transition-colors duration-150',
+        'rounded-full border px-3 py-1.5 text-sm transition-colors duration-150 cursor-pointer',
         focusRing,
         selected
           ? 'border-amber-500/40 bg-amber-500/20 text-cream-50'

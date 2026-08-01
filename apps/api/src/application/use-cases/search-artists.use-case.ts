@@ -1,99 +1,149 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
-  MUSIC_PROVIDER,
-  MusicProviderPort,
-} from '../../domain/repositories/music-provider.port';
-import { Artist } from '../../domain/artist/artist.entity';
+  MUSIC_PROVIDER_FACTORY,
+  type MusicProviderFactoryPort,
+} from '../../domain/repositories/music-provider.factory.port';
 import {
-  SearchArtistsDto,
-  SearchArtistsSchema,
-} from '../dto/generate-playlist.dto';
+  DISCOVERY_CATALOG,
+  type DiscoveryCatalogPort,
+} from '../../domain/repositories/discovery-catalog.port';
 import {
-  ArtistResponseDto,
-  toArtistResponse,
-} from '../dto/playlist-response.dto';
-import { SpotifyMusicProvider } from '../../infrastructure/spotify/spotify-music.provider';
+  normalizeArtistName,
+  pickBestArtistMatch,
+} from '../../domain/artist/artist-name-match';
+import { artistNameVariants } from '../../domain/discovery/similar-track-query';
+import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import type { ArtistDto } from '@blendify/contracts';
+import { z } from 'zod';
+
+const LASTFM_NAME_LIMIT = 40;
+const SearchArtistsSchema = z.object({
+  query: z.string().trim().min(1).max(100),
+  limit: z.number().int().min(1).max(50).default(10),
+});
+type SearchArtistsDto = z.input<typeof SearchArtistsSchema>;
+
+export type SimilarArtistSuggestionDto = {
+  name: string;
+  imageUrl?: string;
+  mbid?: string;
+  match?: number;
+};
 
 @Injectable()
 export class SearchArtistsUseCase {
+  private readonly logger = new Logger(SearchArtistsUseCase.name);
+
   constructor(
-    @Inject(MUSIC_PROVIDER) private readonly music: MusicProviderPort,
+    @Inject(MUSIC_PROVIDER_FACTORY)
+    private readonly providers: MusicProviderFactoryPort,
+    @Inject(DISCOVERY_CATALOG)
+    private readonly discoveryCatalog: DiscoveryCatalogPort,
   ) {}
 
-  async execute(
-    userId: string,
-    raw: SearchArtistsDto,
-  ): Promise<ArtistResponseDto[]> {
+  async execute(userId: string, raw: SearchArtistsDto): Promise<ArtistDto[]> {
     const input = SearchArtistsSchema.parse(raw);
-    const provider = this.bind(userId);
+    const provider = this.providers.forUser(userId);
     const artists = await provider.searchArtists(input.query, input.limit);
-    return artists.map(toArtistResponse);
+    return artists.map(toArtistDto);
   }
 
-  async resolveNames(
-    userId: string,
-    names: string[],
-  ): Promise<ArtistResponseDto[]> {
-    const provider = this.bind(userId);
-    const resolved: Artist[] = [];
+  async resolveNames(userId: string, names: string[]): Promise<ArtistDto[]> {
+    const provider = this.providers.forUser(userId);
+    const resolved = [];
     const seen = new Set<string>();
 
     for (const name of names.map((n) => n.trim()).filter(Boolean)) {
-      const matches = await provider.searchArtists(name, 1);
-      const best = matches[0];
+      const matches = await provider.searchArtists(name, 3);
+      const best = pickBestArtistMatch(name, matches);
       if (best && !seen.has(best.id.getValue())) {
         seen.add(best.id.getValue());
         resolved.push(best);
       }
     }
 
-    return resolved.map(toArtistResponse);
+    return resolved.map(toArtistDto);
   }
 
-  async exploreSimilar(
-    userId: string,
-    artistIds: string[],
-    options: {
-      excludeIds?: string[];
-      limit?: number;
-      offset?: number;
-    } = {},
-  ): Promise<{ artists: ArtistResponseDto[]; hasMore: boolean }> {
-    const provider = this.bind(userId);
-    const seeds = artistIds.filter(Boolean);
-    const seed = seeds[seeds.length - 1];
-    if (!seed) {
-      return { artists: [], hasMore: false };
+  async exploreSimilar(options: {
+    seedName: string;
+    excludeNames?: string[];
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    artists: SimilarArtistSuggestionDto[];
+    hasMore: boolean;
+    source: 'lastfm';
+  }> {
+    if (!this.discoveryCatalog.isConfigured()) {
+      throw new BusinessRuleError(
+        'Last.fm API key is not configured.',
+        'LASTFM_NOT_CONFIGURED',
+      );
+    }
+
+    const seedName = options.seedName.trim();
+    if (!seedName) {
+      return { artists: [], hasMore: false, source: 'lastfm' };
     }
 
     const limit = Math.min(Math.max(options.limit ?? 8, 1), 16);
     const offset = Math.max(options.offset ?? 0, 0);
-    const excluded = new Set([...(options.excludeIds ?? []), ...seeds, seed]);
-
-    const poolSize = Math.min(
-      50,
-      Math.max(offset + limit + excluded.size + 12, 24),
+    // Exclude seed aliases too (e.g. "Yusuf" / "Cat Stevens" for the Spotify
+    // combined name) so "More like" does not suggest the same artist back.
+    const excluded = new Set(
+      [
+        seedName,
+        ...artistNameVariants(seedName),
+        ...(options.excludeNames ?? []),
+      ]
+        .map((name) => normalizeArtistName(name))
+        .filter(Boolean),
     );
-    const result = await provider.getSimilarArtists(seed, {
-      limit: poolSize,
-      offset: 0,
-    });
 
-    const filtered = result.artists.filter(
-      (artist) => !excluded.has(artist.id.getValue()),
-    );
-    const page = filtered.slice(offset, offset + limit);
+    try {
+      const suggestions = await this.discoveryCatalog.getSimilarArtists(
+        seedName,
+        LASTFM_NAME_LIMIT,
+      );
+      const filtered = suggestions.filter(
+        (artist) => !excluded.has(normalizeArtistName(artist.name)),
+      );
+      const page = filtered.slice(offset, offset + limit);
 
-    return {
-      artists: page.map(toArtistResponse),
-      hasMore: filtered.length > offset + limit || result.hasMore,
-    };
-  }
-
-  private bind(userId: string): MusicProviderPort {
-    if (this.music instanceof SpotifyMusicProvider) {
-      return this.music.forUser(userId);
+      return {
+        artists: page.map((artist) => ({
+          name: artist.name,
+          imageUrl: artist.imageUrl,
+          mbid: artist.mbid,
+          match: artist.match,
+        })),
+        hasMore: filtered.length > offset + limit,
+        source: 'lastfm',
+      };
+    } catch (error) {
+      if (error instanceof BusinessRuleError) throw error;
+      this.logger.warn(
+        `Last.fm similar failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      throw new BusinessRuleError(
+        'Could not load similar artists from Last.fm.',
+        'LASTFM_SIMILAR_FAILED',
+      );
     }
-    return this.music;
   }
+}
+
+function toArtistDto(artist: {
+  id: { getValue(): string };
+  name: string;
+  imageUrl?: string;
+}): ArtistDto {
+  return {
+    id: artist.id.getValue(),
+    name: artist.name,
+    imageUrl: artist.imageUrl ?? null,
+  };
 }

@@ -1,29 +1,14 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import {
+  StartPlaybackRequestSchema,
+  type StartPlaybackRequest,
+} from '@blendify/contracts';
+import { ControlPlaybackUseCase } from '../../application/use-cases/control-playback.use-case';
+import { User } from '../../domain/user/user.entity';
 import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
-import { User } from '../../domain/user/user.entity';
-import { ControlPlaybackUseCase } from '../../application/use-cases/control-playback.use-case';
-
-class StartPlaybackBody {
-  @IsOptional()
-  @IsString()
-  contextUri?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  uris?: string[];
-
-  @IsOptional()
-  @IsString()
-  offsetUri?: string;
-
-  @IsOptional()
-  @IsString()
-  deviceId?: string;
-}
+import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
 
 @ApiTags('player')
 @ApiCookieAuth()
@@ -33,24 +18,19 @@ export class PlayerController {
   constructor(private readonly playback: ControlPlaybackUseCase) {}
 
   @Get('devices')
-  @ApiOperation({ summary: 'List Spotify Connect devices for the user' })
+  @ApiOperation({ summary: 'List Spotify Connect devices' })
   async devices(@CurrentUser() user: User) {
-    const devices = await this.playback.listDevices(user.id);
-    return { devices };
+    return { devices: await this.playback.listDevices(user.id) };
   }
 
   @Post('play')
-  @ApiOperation({
-    summary:
-      'Start playback on the user’s active Spotify device (Premium + Connect)',
-  })
-  async play(@CurrentUser() user: User, @Body() body: StartPlaybackBody) {
-    await this.playback.play(user.id, {
-      contextUri: body.contextUri,
-      uris: body.uris,
-      offsetUri: body.offsetUri,
-      deviceId: body.deviceId,
-    });
-    return { ok: true };
+  @ApiOperation({ summary: 'Start playback on a Spotify Connect device' })
+  async play(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(StartPlaybackRequestSchema))
+    body: StartPlaybackRequest,
+  ) {
+    await this.playback.play(user.id, body);
+    return { ok: true as const };
   }
 }

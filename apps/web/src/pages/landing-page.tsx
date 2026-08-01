@@ -1,9 +1,17 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Disc3 } from 'lucide-react'
+import {
+  ArrowRight,
+  Compass,
+  Gem,
+  Scale,
+  Shuffle,
+  TrendingUp,
+} from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
+import { SpotifyMark } from '@/components/brand/spotify-mark'
 import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +43,7 @@ export function LandingPage() {
           <LanguageSwitcher />
           {!isAuthenticated ? (
             <Button size="sm" variant="ghost" onClick={login} disabled={isLoading}>
+              <SpotifyMark className="size-4" />
               {t('nav.logIn')}
             </Button>
           ) : null}
@@ -63,13 +72,24 @@ export function LandingPage() {
             style={{ animationDelay: '200ms' }}
           >
             {isAuthenticated ? (
-              <Link
-                to="/app"
-                className={cn(buttonVariants({ size: 'lg' }))}
-              >
-                {t('landing.ctaStart')}
-                <ArrowRight className="size-4" />
-              </Link>
+              <>
+                <Link
+                  to="/app/mix"
+                  className={cn(buttonVariants({ size: 'lg' }))}
+                >
+                  <Shuffle className="size-4" />
+                  {t('nav.create')}
+                </Link>
+                <Link
+                  to="/app/discover"
+                  className={cn(
+                    buttonVariants({ size: 'lg', variant: 'outline' }),
+                  )}
+                >
+                  <Compass className="size-4" />
+                  {t('nav.discover')}
+                </Link>
+              </>
             ) : (
               <Button
                 size="lg"
@@ -77,6 +97,7 @@ export function LandingPage() {
                 onClick={login}
                 disabled={isLoading}
               >
+                <SpotifyMark variant="mono" className="size-5 text-charcoal-950" />
                 {t('landing.ctaLogin')}
                 <ArrowRight className="size-4" />
               </Button>
@@ -89,14 +110,62 @@ export function LandingPage() {
           style={{ animationDelay: '120ms' }}
           aria-hidden
         >
-          <div className="relative aspect-square w-full max-w-md">
-            <div className="absolute inset-[12%] rounded-full border border-amber-500/20" />
-            <div className="absolute inset-[22%] rounded-full border border-amber-500/30" />
-            <div className="absolute inset-[32%] flex items-center justify-center rounded-full bg-gradient-to-br from-charcoal-700 via-charcoal-800 to-charcoal-950 shadow-[0_0_80px_-20px_rgb(232_168_56_/_0.55)] ring-1 ring-amber-500/30 animate-pulse-glow">
-              <Disc3 className="size-20 text-amber-400/90 sm:size-24" />
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.12] via-charcoal-800/90 to-charcoal-950 p-5 shadow-[0_0_80px_-20px_rgb(232_168_56_/_0.55)] sm:p-6">
+            <div className="pointer-events-none absolute -right-10 -top-14 size-44 rounded-full bg-amber-500/25 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-16 -left-8 size-36 rounded-full bg-amber-700/15 blur-3xl" />
+
+            <div className="relative mb-4 flex items-start gap-3 border-b border-cream-200/10 pb-3">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 font-display text-xs font-bold text-amber-400 ring-1 ring-amber-500/35">
+                2
+              </span>
+              <div className="min-w-0">
+                <p className="font-display text-sm font-semibold tracking-tight text-cream-50">
+                  {t('create.reach')}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-cream-400">
+                  {t('create.mixHint')}
+                </p>
+              </div>
             </div>
-            <div className="absolute left-[8%] top-[18%] h-24 w-24 rounded-full bg-amber-500/10 blur-2xl" />
-            <div className="absolute bottom-[12%] right-[10%] h-32 w-32 rounded-full bg-amber-600/15 blur-2xl" />
+
+            <div className="relative grid gap-1.5 sm:grid-cols-3">
+              {(
+                [
+                  { icon: TrendingUp, key: 'create.mix.popular' as const },
+                  { icon: Scale, key: 'create.mix.balanced' as const },
+                  { icon: Gem, key: 'create.mix.rarities' as const },
+                ] as const
+              ).map(({ icon: Icon, key }, index) => {
+                const selected = index === 1
+                return (
+                  <div
+                    key={key}
+                    className={cn(
+                      'flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs transition-all sm:flex-col sm:items-start sm:gap-1.5',
+                      selected
+                        ? 'border-amber-500/55 bg-amber-500/18 text-cream-50 shadow-[0_0_24px_-12px_rgb(232_168_56_/_0.55)]'
+                        : 'border-cream-200/10 bg-charcoal-900/40 text-cream-400',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'flex size-6 shrink-0 items-center justify-center rounded-md',
+                        selected
+                          ? 'bg-amber-500/30 text-amber-300'
+                          : 'bg-charcoal-700/80 text-cream-500',
+                      )}
+                    >
+                      <Icon className="size-3.5" />
+                    </span>
+                    {t(key)}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="relative mt-3 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 to-amber-500/5 px-3 py-2.5 text-center text-xs font-medium text-amber-200">
+              {t('landing.previewName')}
+            </div>
           </div>
         </div>
       </section>

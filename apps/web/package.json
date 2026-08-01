@@ -9,9 +9,11 @@
     "lint": "oxlint .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:cov": "vitest run --coverage --coverage.reporter=text --coverage.reporter=lcov",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@blendify/contracts": "^0.0.0",
     "@hookform/resolvers": "^5.5.7",
     "@tanstack/react-query": "^5.101.4",
     "class-variance-authority": "^0.7.1",
@@ -20,9 +22,9 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.83.0",
-    "react-router-dom": "^7.18.1",
+    "react-router-dom": "^7.18.2",
     "tailwind-merge": "^3.6.0",
-    "zod": "^3.25.76",
+    "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
@@ -34,6 +36,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
     "jsdom": "^30.0.0",
     "oxlint": "^1.71.0",
     "tailwindcss": "^4.3.3",

@@ -7,132 +7,45 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
   UseGuards,
-  BadRequestException,
 } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
-  IsArray,
-  IsBoolean,
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-  MinLength,
-  ValidateIf,
-  ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+  BulkLibraryRequestSchema,
+  CreateDiscoverRequestSchema,
+  CreateMixRequestSchema,
+  DeletePlaylistQuerySchema,
+  PlaylistLibraryQuerySchema,
+  RenamePlaylistRequestSchema,
+  type DeletePlaylistQuery,
+  type PlaylistLibraryQuery,
+} from '@blendify/contracts';
+import type { z } from 'zod';
+import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
-import { User } from '../../domain/user/user.entity';
 import { GeneratePlaylistUseCase } from '../../application/use-cases/generate-playlist.use-case';
 import { GenerateGenrePlaylistUseCase } from '../../application/use-cases/generate-genre-playlist.use-case';
-import { GetPlaylistHistoryUseCase } from '../../application/use-cases/get-playlist-history.use-case';
+import { DiscoverPlaylistUseCase } from '../../application/use-cases/discover-playlist.use-case';
+import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
+import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
 import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
-import { DeletePlaylistHistoryUseCase } from '../../application/use-cases/delete-playlist-history.use-case';
-import { BulkPlaylistHistoryUseCase } from '../../application/use-cases/bulk-playlist-history.use-case';
-import { RegeneratePlaylistUseCase } from '../../application/use-cases/regenerate-playlist.use-case';
+import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
+import { BulkLibraryUseCase } from '../../application/use-cases/bulk-library.use-case';
+import { CurrentUser } from '../decorators/current-user.decorator';
+import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
+import { User } from '../../domain/user/user.entity';
 import {
-  MAX_ARTISTS,
-  MAX_GENRES,
-  MAX_SONGS_PER_ARTIST,
-  MAX_SONGS_PER_GENRE,
-} from '../../domain/constants';
-import { MIX_MODES } from '../../domain/genre/mix-mode';
+  acceptsNdjson,
+  writeNdjsonGeneration,
+} from '../http/ndjson-generation';
+import type { ProgressReporter } from '../../application/services/generation-progress.tracker';
 
-class ArtistSnapshotBody {
-  @IsString()
-  @MinLength(1)
-  id!: string;
-
-  @IsString()
-  @MinLength(1)
-  @MaxLength(200)
-  name!: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  imageUrl?: string | null;
-}
-
-class CreatePlaylistBody {
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(300)
-  description?: string;
-
-  @IsOptional()
-  @IsIn(['artists', 'genres'])
-  source?: 'artists' | 'genres';
-
-  @ValidateIf((o: CreatePlaylistBody) => (o.source ?? 'artists') === 'artists')
-  @IsArray()
-  @IsString({ each: true })
-  artistIds?: string[];
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ArtistSnapshotBody)
-  artists?: ArtistSnapshotBody[];
-
-  @ValidateIf((o: CreatePlaylistBody) => (o.source ?? 'artists') === 'artists')
-  @IsInt()
-  @Min(1)
-  @Max(MAX_SONGS_PER_ARTIST)
-  songsPerArtist?: number;
-
-  @ValidateIf((o: CreatePlaylistBody) => o.source === 'genres')
-  @IsArray()
-  @IsString({ each: true })
-  genreIds?: string[];
-
-  @IsOptional()
-  @IsIn([...MIX_MODES])
-  mixMode?: string;
-
-  @ValidateIf((o: CreatePlaylistBody) => o.source === 'genres')
-  @IsInt()
-  @Min(1)
-  @Max(MAX_SONGS_PER_GENRE)
-  songsPerGenre?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  shuffle?: boolean;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(400_000)
-  coverImageBase64?: string;
-}
-
-class RenameBody {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
-  name!: string;
-}
-
-class BulkHistoryBody {
-  @IsIn(['purge_active', 'clear_deleted'])
-  action!: 'purge_active' | 'clear_deleted';
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  q?: string;
-}
+type MixRequest = z.output<typeof CreateMixRequestSchema>;
+type DiscoverRequest = z.output<typeof CreateDiscoverRequestSchema>;
+type RenameRequest = z.output<typeof RenamePlaylistRequestSchema>;
+type BulkRequest = z.output<typeof BulkLibraryRequestSchema>;
 
 @ApiTags('playlists')
 @ApiCookieAuth()
@@ -140,128 +53,117 @@ class BulkHistoryBody {
 @Controller('api/playlists')
 export class PlaylistsController {
   constructor(
-    private readonly generate: GeneratePlaylistUseCase,
-    private readonly generateGenre: GenerateGenrePlaylistUseCase,
-    private readonly history: GetPlaylistHistoryUseCase,
+    private readonly generateArtists: GeneratePlaylistUseCase,
+    private readonly generateGenres: GenerateGenrePlaylistUseCase,
+    private readonly discover: DiscoverPlaylistUseCase,
+    private readonly library: ListLibraryPlaylistsUseCase,
+    private readonly detail: GetPlaylistDetailUseCase,
     private readonly rename: RenamePlaylistUseCase,
-    private readonly remove: DeletePlaylistHistoryUseCase,
-    private readonly bulk: BulkPlaylistHistoryUseCase,
-    private readonly regenerate: RegeneratePlaylistUseCase,
+    private readonly remove: RemovePlaylistFromLibraryUseCase,
+    private readonly bulk: BulkLibraryUseCase,
   ) {}
 
-  @Post()
-  @ApiOperation({
-    summary: 'Generate a Spotify playlist from artists or genres',
-  })
-  create(@CurrentUser() user: User, @Body() body: CreatePlaylistBody) {
-    const source = body.source ?? 'artists';
+  @Post('mix')
+  @ApiOperation({ summary: 'Generate a Spotify playlist mix' })
+  async createMix(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(CreateMixRequestSchema)) body: MixRequest,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!acceptsNdjson(req)) {
+      return this.runMix(user.id, body);
+    }
+    await writeNdjsonGeneration(res, (onProgress) =>
+      this.runMix(user.id, body, onProgress),
+    );
+  }
 
-    if (source === 'genres') {
-      const genreIds = body.genreIds ?? [];
-      if (genreIds.length === 0) {
-        throw new BadRequestException('genreIds is required');
-      }
-      if (genreIds.length > MAX_GENRES) {
-        throw new BadRequestException(`Maximum ${MAX_GENRES} genres allowed`);
-      }
-      if (!body.mixMode) {
-        throw new BadRequestException('mixMode is required');
-      }
-      return this.generateGenre.execute({
-        userId: user.id,
-        name: body.name ?? '',
-        description: body.description ?? '',
-        genreIds,
-        mixMode: body.mixMode as (typeof MIX_MODES)[number],
-        songsPerGenre: body.songsPerGenre ?? 10,
-        shuffle: body.shuffle ?? true,
-        isPublic: false,
-        coverImageBase64: body.coverImageBase64,
-      });
+  @Post('discover')
+  @ApiOperation({ summary: 'Generate a Spotify discovery playlist' })
+  async createDiscover(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(CreateDiscoverRequestSchema))
+    body: DiscoverRequest,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!acceptsNdjson(req)) {
+      return this.discover.execute({ ...body, userId: user.id });
     }
-
-    const artistIds = body.artistIds ?? [];
-    if (artistIds.length === 0) {
-      throw new BadRequestException('artistIds is required');
-    }
-    if (artistIds.length > MAX_ARTISTS) {
-      throw new BadRequestException(`Maximum ${MAX_ARTISTS} artists allowed`);
-    }
-    return this.generate.execute({
-      userId: user.id,
-      name: body.name ?? '',
-      description: body.description ?? '',
-      artistIds,
-      artists: body.artists,
-      songsPerArtist: body.songsPerArtist ?? 10,
-      mixMode: (body.mixMode as (typeof MIX_MODES)[number]) ?? 'balanced',
-      shuffle: body.shuffle ?? true,
-      isPublic: false,
-      coverImageBase64: body.coverImageBase64,
-    });
+    await writeNdjsonGeneration(res, (onProgress) =>
+      this.discover.execute({ ...body, userId: user.id }, { onProgress }),
+    );
   }
 
   @Get()
-  @ApiOperation({
-    summary:
-      'List playlist history (paginated, newest first; optional Spotify sync + name search)',
-  })
-  async list(
+  @ApiOperation({ summary: 'List saved Blendify playlists' })
+  list(
     @CurrentUser() user: User,
-    @Query('sync') sync?: string,
-    @Query('limit') limitRaw?: string,
-    @Query('offset') offsetRaw?: string,
-    @Query('q') q?: string,
+    @Query(new ZodValidationPipe(PlaylistLibraryQuerySchema))
+    query: PlaylistLibraryQuery,
   ) {
-    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
-    const offset = offsetRaw ? Number.parseInt(offsetRaw, 10) : undefined;
-    return this.history.execute(user.id, {
-      sync: sync === '1' || sync === 'true',
-      limit: Number.isFinite(limit) ? limit : undefined,
-      offset: Number.isFinite(offset) ? offset : undefined,
-      q,
+    return this.library.execute(user.id, {
+      sync: query.sync,
+      limit: query.limit,
+      offset: query.offset,
+      q: query.q,
     });
   }
 
   @Post('bulk')
-  @ApiOperation({
-    summary:
-      'Bulk history actions: purge all active on Spotify, or clear deleted from history',
-  })
-  bulkHistory(@CurrentUser() user: User, @Body() body: BulkHistoryBody) {
-    return this.bulk.execute(user.id, body.action, { q: body.q });
+  @ApiOperation({ summary: 'Run a bulk action on saved playlists' })
+  bulkLibrary(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(BulkLibraryRequestSchema)) body: BulkRequest,
+  ) {
+    return this.bulk.execute(user.id, body.action, {
+      q: body.q,
+      playlistIds: body.playlistIds,
+    });
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a saved playlist with its tracks' })
+  getDetail(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.detail.execute(user.id, id);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Rename playlist (local + Spotify when linked)' })
+  @ApiOperation({ summary: 'Rename a playlist in Blendify and Spotify' })
   renamePlaylist(
     @CurrentUser() user: User,
     @Param('id') id: string,
-    @Body() body: RenameBody,
+    @Body(new ZodValidationPipe(RenamePlaylistRequestSchema))
+    body: RenameRequest,
   ) {
     return this.rename.execute(user.id, id, body.name);
   }
 
   @Delete(':id')
   @ApiOperation({
-    summary: 'Delete from history; optionally unfollow/delete on Spotify too',
+    summary: 'Remove a playlist from Blendify and optionally Spotify',
   })
-  async delete(
+  async deletePlaylist(
     @CurrentUser() user: User,
     @Param('id') id: string,
-    @Query('fromSpotify') fromSpotify?: string,
+    @Query(new ZodValidationPipe(DeletePlaylistQuerySchema))
+    query: DeletePlaylistQuery,
   ) {
     await this.remove.execute(user.id, id, {
-      fromSpotify: fromSpotify === '1' || fromSpotify === 'true',
+      fromSpotify: query.fromSpotify,
     });
-    return { ok: true };
+    return { ok: true as const };
   }
 
-  @Post(':id/regenerate')
-  @ApiOperation({
-    summary: 'Regenerate / recreate playlist with same parameters',
-  })
-  regeneratePlaylist(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.regenerate.execute(user.id, id);
+  private runMix(
+    userId: string,
+    body: MixRequest,
+    onProgress?: ProgressReporter,
+  ) {
+    const options = onProgress ? { onProgress } : undefined;
+    return body.kind === 'genre_mix'
+      ? this.generateGenres.execute({ ...body, userId }, options)
+      : this.generateArtists.execute({ ...body, userId }, options);
   }
 }

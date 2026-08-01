@@ -23,11 +23,22 @@ export function formatDuration(ms: number): string {
 export function formatDate(iso: string, locale?: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat(locale ?? undefined, {
+  const localeTag = locale === 'pt' ? 'pt-BR' : locale
+  return new Intl.DateTimeFormat(localeTag ?? undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   }).format(date)
+}
+
+export function normalizeArtistName(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }
 
 export async function copyToClipboard(text: string): Promise<boolean> {
@@ -39,38 +50,23 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export const PLAYLIST_SONG_CAP = 200
-export const MAX_SONGS_PER_ARTIST = 25
+export const PLAYLIST_TRACK_CAP = 50
 
-export function maxSongsPerArtist(artistCount: number): number {
-  if (artistCount <= 0) return MAX_SONGS_PER_ARTIST
-  return Math.min(
-    MAX_SONGS_PER_ARTIST,
-    Math.floor(PLAYLIST_SONG_CAP / artistCount),
-  )
+export function maxTracksPerArtist(artistCount: number): number {
+  if (artistCount <= 0) return PLAYLIST_TRACK_CAP
+  return Math.floor(PLAYLIST_TRACK_CAP / artistCount)
 }
 
-export function maxSongsPerGenre(genreCount: number): number {
-  if (genreCount <= 0) return PLAYLIST_SONG_CAP
-  return Math.floor(PLAYLIST_SONG_CAP / genreCount)
+export function maxTracksPerGenre(genreCount: number): number {
+  if (genreCount <= 0) return PLAYLIST_TRACK_CAP
+  return Math.floor(PLAYLIST_TRACK_CAP / genreCount)
 }
 
-export function songCountOptions(max: number): number[] {
-  if (max < 1) return [1]
-  const preferred = [
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100, 125,
-    150, 175, 200,
-  ]
-  const opts = preferred.filter((n) => n <= max)
-  if (opts[opts.length - 1] !== max) opts.push(max)
-  return opts
-}
-
-export function estimateSongCount(
-  artistCount: number,
-  songsPerArtist: number,
-  cap = PLAYLIST_SONG_CAP,
+export function estimateTrackCount(
+  seedCount: number,
+  tracksPerSeed: number,
+  cap = PLAYLIST_TRACK_CAP,
 ): { total: number; capped: boolean } {
-  const raw = Math.max(0, artistCount) * Math.max(0, songsPerArtist)
+  const raw = Math.max(0, seedCount) * Math.max(0, tracksPerSeed)
   return { total: Math.min(raw, cap), capped: raw > cap }
 }

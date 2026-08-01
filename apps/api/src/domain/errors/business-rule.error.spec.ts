@@ -11,6 +11,9 @@ describe('BusinessRuleError', () => {
     expect(BusinessRuleError.emptyGenreSelection().code).toBe(
       'EMPTY_GENRE_SELECTION',
     );
-    expect(BusinessRuleError.playlistNotFound('abc').message).toContain('abc');
+    expect(BusinessRuleError.noTracksFound().code).toBe('NO_TRACKS_FOUND');
+    expect(BusinessRuleError.genreLookupUnavailable().code).toBe(
+      'GENRE_LOOKUP_UNAVAILABLE',
+    );
   });
 });

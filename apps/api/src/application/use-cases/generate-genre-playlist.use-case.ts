@@ -1,80 +1,73 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import {
-  MUSIC_PROVIDER,
-  MusicProviderPort,
-} from '../../domain/repositories/music-provider.port';
+  GenreMixRequestSchema,
+  type PlaylistDetail,
+} from '@blendify/contracts';
 import {
-  PLAYLIST_REPOSITORY,
-  PlaylistRepositoryPort,
-} from '../../domain/repositories/playlist.repository.port';
+  MUSIC_PROVIDER_FACTORY,
+  type MusicProviderFactoryPort,
+} from '../../domain/repositories/music-provider.factory.port';
 import {
   USER_REPOSITORY,
   UserRepositoryPort,
 } from '../../domain/repositories/user.repository.port';
+import {
+  USAGE_STATS_REPOSITORY,
+  UsageStatsRepositoryPort,
+} from '../../domain/repositories/usage-stats.repository.port';
 import { Playlist } from '../../domain/playlist/playlist.entity';
-import { Artist } from '../../domain/artist/artist.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { Track } from '../../domain/track/track.entity';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import {
   MAX_GENRES,
-  MAX_SONGS_PER_GENRE,
   MAX_TRACKS,
-  maxSongsPerGenreForCount,
+  maxTracksPerSeedForCount,
 } from '../../domain/constants';
 import {
-  CURATED_GENRES,
   findCuratedGenre,
-  genreToArtistId,
-  getExploreSuggestions,
-  listMainGenres,
-  searchCuratedGenres,
+  genreTrackGroupKey,
   type CuratedGenre,
 } from '../../domain/genre/curated-genres';
-import { MixMode } from '../../domain/genre/mix-mode';
+import { GenrePlaylistGenerationService } from '../../domain/genre/genre-playlist-generation.service';
 import {
-  GenrePlaylistGenerationService,
-  buildGenreQueries,
-} from '../../domain/genre/genre-playlist-generation.service';
-import { rankTracksForMix } from '../../domain/genre/artist-mix-queries';
-import { buildDefaultPlaylistName } from '../../domain/playlist/default-playlist-name';
-import {
-  PlaylistResponseDto,
-  toPlaylistResponse,
-} from '../dto/playlist-response.dto';
-import { SpotifyMusicProvider } from '../../infrastructure/spotify/spotify-music.provider';
+  buildDefaultPlaylistDescription,
+  buildDefaultPlaylistName,
+} from '../../domain/playlist/default-playlist-name';
 import { z } from 'zod';
+import { GenreTrackCatalogService } from '../services/genre-track-catalog.service';
+import { PublishPlaylistService } from '../services/publish-playlist.service';
+import {
+  GenerationProgressTracker,
+  type ProgressReporter,
+} from '../services/generation-progress.tracker';
 
-export const GenerateGenrePlaylistSchema = z.object({
+const GenerateGenrePlaylistSchema = GenreMixRequestSchema.extend({
   userId: z.string().min(1),
-  name: z.string().max(100).optional().default(''),
-  description: z.string().max(300).optional().default(''),
-  genreIds: z.array(z.string().min(1)).min(1).max(MAX_GENRES),
-  mixMode: z.nativeEnum(MixMode),
-  songsPerGenre: z.number().int().min(1).max(MAX_SONGS_PER_GENRE).default(10),
-  shuffle: z.boolean().default(true),
-  isPublic: z.boolean().optional().default(false),
-  coverImageBase64: z.string().min(1).max(400_000).optional(),
 });
 
-export type GenerateGenrePlaylistDto = z.infer<
-  typeof GenerateGenrePlaylistSchema
->;
+type GenerateGenrePlaylistDto = z.input<typeof GenerateGenrePlaylistSchema>;
 
 @Injectable()
 export class GenerateGenrePlaylistUseCase {
   private readonly generation = new GenrePlaylistGenerationService();
+  private readonly logger = new Logger(GenerateGenrePlaylistUseCase.name);
 
   constructor(
-    @Inject(MUSIC_PROVIDER) private readonly music: MusicProviderPort,
-    @Inject(PLAYLIST_REPOSITORY)
-    private readonly playlists: PlaylistRepositoryPort,
+    @Inject(MUSIC_PROVIDER_FACTORY)
+    private readonly providers: MusicProviderFactoryPort,
     @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
+    @Inject(USAGE_STATS_REPOSITORY)
+    private readonly usageStats: UsageStatsRepositoryPort,
+    private readonly genreTrackCatalog: GenreTrackCatalogService,
+    private readonly publisher: PublishPlaylistService,
   ) {}
 
-  async execute(raw: GenerateGenrePlaylistDto): Promise<PlaylistResponseDto> {
+  async execute(
+    raw: GenerateGenrePlaylistDto,
+    options?: { onProgress?: ProgressReporter },
+  ): Promise<PlaylistDetail> {
     const input = GenerateGenrePlaylistSchema.parse(raw);
+    const tracker = new GenerationProgressTracker(options?.onProgress);
     const user = await this.users.findById(input.userId);
     if (!user) {
       throw new BusinessRuleError('User not found', 'USER_NOT_FOUND');
@@ -84,107 +77,115 @@ export class GenerateGenrePlaylistUseCase {
     if (genres.length === 0) {
       throw BusinessRuleError.emptyGenreSelection();
     }
+    tracker.report('resolving_seeds', genres.length, genres.length);
 
-    const maxPerGenre = maxSongsPerGenreForCount(genres.length);
-    if (input.songsPerGenre > maxPerGenre) {
+    const maxPerGenre = maxTracksPerSeedForCount(genres.length);
+    if (input.tracksPerSeed > maxPerGenre) {
       throw new BusinessRuleError(
-        `At most ${maxPerGenre} songs per genre for ${genres.length} genre(s) (cap ${MAX_TRACKS}).`,
+        `At most ${maxPerGenre} tracks per genre for ${genres.length} genre(s) (cap ${MAX_TRACKS}).`,
         'TRACK_BUDGET_EXCEEDED',
       );
     }
 
+    const seedNames = genres.map((g) => g.name);
     const playlistName =
       input.name.trim() ||
       buildDefaultPlaylistName({
-        names: genres.map((g) => g.name),
-        mixMode: input.mixMode,
+        names: seedNames,
+      });
+    const playlistDescription =
+      input.description.trim() ||
+      buildDefaultPlaylistDescription({
+        names: seedNames,
       });
 
-    const provider = this.bindProvider(input.userId);
-    const tracksByGenre = await this.fetchTracksByGenre(
-      provider,
-      genres,
-      input.mixMode,
-      input.songsPerGenre,
-    );
+    const provider = this.providers.forUser(input.userId);
+    const totalNeeded = genres.length * input.tracksPerSeed;
+    tracker.report('matching_tracks', 0, Math.max(1, totalNeeded));
+    const { tracksByGenre, coverCandidates } =
+      await this.genreTrackCatalog.resolve(
+        provider,
+        genres,
+        input.popularity,
+        input.tracksPerSeed,
+        {
+          onMatched: (matched) => {
+            tracker.report(
+              'matching_tracks',
+              Math.min(matched, totalNeeded),
+              Math.max(1, totalNeeded),
+            );
+          },
+        },
+      );
 
     const { tracks } = this.generation.generate({
       tracksByGenre,
-      songsPerGenre: input.songsPerGenre,
-      shuffle: input.shuffle,
+      tracksPerSeed: input.tracksPerSeed,
+      orderMode: input.orderMode,
     });
 
-    const genreArtists = genres.map((g) =>
-      Artist.create({
-        id: ArtistId.create(genreToArtistId(g.id)),
-        name: g.name,
-      }),
-    );
+    if (tracks.length === 0) {
+      throw BusinessRuleError.noTracksFound({
+        names: genres.map((g) => g.name),
+        popularity: input.popularity,
+        source: 'genres',
+      });
+    }
 
+    const seeds = genres.map((genre) => ({
+      type: 'genre' as const,
+      id: genre.id,
+      name: genre.name,
+      imageUrl: coverCandidates.get(genreTrackGroupKey(genre.id)) ?? null,
+    }));
     const playlist = Playlist.create({
       id: randomUUID(),
       userId: user.id,
       name: playlistName,
-      description: input.description,
-      artists: genreArtists,
+      description: playlistDescription,
+      seeds,
       tracks,
-      songsPerArtist: input.songsPerGenre,
-      shuffle: input.shuffle,
-      source: 'genres',
-      mixMode: input.mixMode,
+      generation: {
+        version: 1,
+        kind: 'genre_mix',
+        tracksPerSeed: input.tracksPerSeed,
+        seeds: genres.map(({ id, name }) => ({ id, name })),
+        popularity: input.popularity,
+        orderMode: input.orderMode,
+      },
+    });
+    const response = await this.publisher.execute({
+      playlist,
+      provider,
+      spotifyUserId: user.spotifyId,
+      coverImageBase64: input.coverImageBase64,
+      fallbackImageUrl: tracks.find((track) => track.albumImageUrl)
+        ?.albumImageUrl,
+      persistToLibrary: input.persistToLibrary,
+      onProgress: options?.onProgress,
     });
 
-    const remote = await provider.createPlaylist({
-      userId: user.spotifyId,
-      name: playlistName,
-      description: input.description || 'Created with Blendify',
-      isPublic: input.isPublic,
-    });
-
-    await provider.addTracksToPlaylist(
-      remote.id,
-      tracks.map((t) => t.uri),
-    );
-
-    if (input.coverImageBase64) {
-      try {
-        await provider.uploadPlaylistCover(remote.id, input.coverImageBase64);
-      } catch (coverError) {
-        console.warn('Playlist cover upload failed', coverError);
-      }
+    try {
+      await this.usageStats.recordMix({
+        userId: user.id,
+        kind: 'genre',
+        seeds: genres.map((genre) => ({
+          kind: 'genre' as const,
+          seedKey: genre.id,
+          name: genre.name,
+          imageUrl: coverCandidates.get(genreTrackGroupKey(genre.id)) ?? null,
+        })),
+      });
+    } catch (statsError) {
+      this.logger.warn(
+        `Usage stats recording failed: ${
+          statsError instanceof Error ? statsError.message : String(statsError)
+        }`,
+      );
     }
 
-    playlist.linkToSpotify(remote.id, remote.url);
-    playlist.markCompleted();
-
-    const saved = await this.playlists.save(playlist);
-    return toPlaylistResponse(saved);
-  }
-
-  listCurated(): CuratedGenre[] {
-    return CURATED_GENRES;
-  }
-
-  listMain(): CuratedGenre[] {
-    return listMainGenres();
-  }
-
-  search(query: string): CuratedGenre[] {
-    return searchCuratedGenres(query, 18);
-  }
-
-  explore(
-    selectedIds: string[],
-    options: { limit?: number; offset?: number } = {},
-  ): { genres: CuratedGenre[]; hasMore: boolean } {
-    return getExploreSuggestions(selectedIds, options);
-  }
-
-  related(
-    genreId: string,
-    options: { limit?: number; offset?: number } = {},
-  ): { genres: CuratedGenre[]; hasMore: boolean } {
-    return getExploreSuggestions([genreId], options);
+    return response;
   }
 
   private resolveGenres(genreIds: string[]): CuratedGenre[] {
@@ -206,71 +207,5 @@ export class GenerateGenrePlaylistUseCase {
     }
 
     return resolved;
-  }
-
-  private async fetchTracksByGenre(
-    provider: MusicProviderPort,
-    genres: CuratedGenre[],
-    mixMode: MixMode,
-    songsPerGenre: number,
-  ): Promise<Map<string, Track[]>> {
-    const fetchTarget = Math.min(
-      Math.max(songsPerGenre + 6, songsPerGenre),
-      30,
-    );
-    const map = new Map<string, Track[]>();
-
-    for (const genre of genres) {
-      const plan = buildGenreQueries(genre, mixMode);
-      const collected: Track[] = [];
-      const seen = new Set<string>();
-      let searches = 0;
-
-      outer: for (const query of plan.queries) {
-        for (const offset of plan.offsets) {
-          if (collected.length >= fetchTarget) break outer;
-          if (searches >= plan.maxSearches) break outer;
-          searches += 1;
-          const page = await provider.searchTracks(query, {
-            limit: 10,
-            offset,
-          });
-          for (const track of page) {
-            const id = track.id.getValue();
-            if (seen.has(id)) continue;
-            seen.add(id);
-            collected.push(track);
-            if (collected.length >= fetchTarget) break;
-          }
-        }
-      }
-
-      let ranked = rankTracksForMix(collected, plan.rank);
-
-      if (plan.minPopularity != null && plan.minPopularity > 0) {
-        const filtered = ranked.filter(
-          (t) => t.popularity >= (plan.minPopularity ?? 0),
-        );
-        if (filtered.length >= songsPerGenre) {
-          ranked = filtered;
-        } else {
-          const soft = ranked.filter(
-            (t) => t.popularity >= Math.floor((plan.minPopularity ?? 0) / 2),
-          );
-          ranked = soft.length >= songsPerGenre ? soft : ranked;
-        }
-      }
-
-      map.set(genreToArtistId(genre.id), ranked);
-    }
-
-    return map;
-  }
-
-  private bindProvider(userId: string): MusicProviderPort {
-    if (this.music instanceof SpotifyMusicProvider) {
-      return this.music.forUser(userId);
-    }
-    return this.music;
   }
 }

@@ -1,36 +1,56 @@
 import { describe, expect, it } from 'vitest'
-import { buildDefaultPlaylistName } from './playlist-name'
+import {
+  buildDefaultPlaylistDescription,
+  buildDefaultPlaylistName,
+} from './playlist-name'
 
 describe('buildDefaultPlaylistName', () => {
-  it('names a single artist with Blendify brand + mix', () => {
+  it('names a single artist with Blendify · Mix', () => {
     expect(
       buildDefaultPlaylistName({
-        mode: 'artists',
         names: ['Radiohead'],
-        mixMode: 'balanced',
       }),
-    ).toBe('Blendify · Radiohead · Balanced')
+    ).toBe('Blendify · Mix · Radiohead')
   })
 
-  it('summarizes many artists', () => {
+  it('summarizes many artists after Mix', () => {
     expect(
       buildDefaultPlaylistName({
-        mode: 'artists',
         names: ['A', 'B', 'C', 'D'],
-        mixMode: 'mood_chill',
-        mixLabel: 'Chill',
       }),
-    ).toBe('Blendify · A + 3 · Chill')
+    ).toBe('Blendify · Mix · A + 3')
   })
 
   it('names genres the same way', () => {
     expect(
       buildDefaultPlaylistName({
-        mode: 'genres',
         names: ['Jazz', 'Acid Jazz'],
-        mixMode: 'popular',
-        mixLabel: 'Popular',
       }),
-    ).toBe('Blendify · Jazz + Acid Jazz · Popular')
+    ).toBe('Blendify · Mix · Jazz + Acid Jazz')
+  })
+})
+
+describe('buildDefaultPlaylistDescription', () => {
+  it('uses localized templates when provided', () => {
+    const translate = (
+      key:
+        | 'playlist.description.empty'
+        | 'playlist.description.one'
+        | 'playlist.description.two'
+        | 'playlist.description.many',
+      vars?: Record<string, string | number>,
+    ) => `${key}:${JSON.stringify(vars ?? {})}`
+
+    expect(
+      buildDefaultPlaylistDescription(['Sade', 'Prince', 'Björk'], translate),
+    ).toBe(
+      'playlist.description.many:{"first":"Sade","count":2}',
+    )
+  })
+
+  it('keeps the English fallback for non-UI callers', () => {
+    expect(buildDefaultPlaylistDescription(['Sade'])).toBe(
+      'Made with Blendify from Sade.',
+    )
   })
 })
