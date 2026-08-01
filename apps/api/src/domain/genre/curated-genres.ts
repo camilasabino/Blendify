@@ -144,16 +144,22 @@ function tokensOf(value: string): string[] {
   const lower = value.toLowerCase().trim();
   const tokens = new Set<string>();
 
-  // Collapse "r & b" → "r&b" without nested \s* quantifiers, then tokenize.
+  // Collapse "r & b" → "r&b" without nested quantifiers, then find compounds.
   const ampCollapsed = lower
     .split('&')
     .map((part) => part.trim())
+    .filter(Boolean)
     .join('&');
-  for (const compound of ampCollapsed.match(/[a-z0-9]+(?:&[a-z0-9]+)+/g) ??
-    []) {
-    tokens.add(compound);
-    tokens.add(compound.replaceAll('&', 'and'));
-    tokens.add(compound.replaceAll('&', ''));
+  if (ampCollapsed.includes('&')) {
+    for (const compound of ampCollapsed.split(/\s+/)) {
+      if (!compound.includes('&')) continue;
+      const pieces = compound.split('&').filter(Boolean);
+      if (pieces.length < 2) continue;
+      if (!pieces.every((p) => /^[a-z0-9]+$/i.test(p))) continue;
+      tokens.add(compound);
+      tokens.add(pieces.join('and'));
+      tokens.add(pieces.join(''));
+    }
   }
 
   for (const part of lower.replaceAll('&', ' ').split(/[\s/_+-]+/)) {

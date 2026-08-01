@@ -65,10 +65,10 @@ export function ErrorState({
 export function FieldError({
   children,
   className,
-}: {
+}: Readonly<{
   children: ReactNode
   className?: string
-}) {
+}>) {
   if (!children) return null
   return <p className={cn('text-sm text-red-300', className)}>{children}</p>
 }

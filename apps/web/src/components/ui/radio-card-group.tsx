@@ -15,13 +15,13 @@ export function RadioCardGroup<T extends string | number>({
   options,
   onChange,
   columns = 3,
-}: {
+}: Readonly<{
   label: string
   value: T
   options: readonly RadioCardOption<T>[]
   onChange: (value: T) => void
   columns?: 2 | 3
-}) {
+}>) {
   const name = useId()
 
   return (

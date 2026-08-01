@@ -22,50 +22,51 @@ function Dialog({
 }: DialogProps) {
   const t = useT()
   const titleId = useId()
-  const panelRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
-    if (!open) return
-    const previous = document.activeElement as HTMLElement | null
-    const frame = window.requestAnimationFrame(() => {
-      panelRef.current?.querySelector<HTMLElement>('button, [href], input')?.focus()
-    })
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    const { overflow } = document.body.style
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.cancelAnimationFrame(frame)
-      document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = overflow
-      previous?.focus?.()
-    }
-  }, [open, onClose])
+    const dialog = dialogRef.current
+    if (!dialog) return
 
-  if (!open) return null
+    if (open) {
+      if (!dialog.open) dialog.showModal()
+      const frame = window.requestAnimationFrame(() => {
+        dialog
+          .querySelector<HTMLElement>('button, [href], input')
+          ?.focus()
+      })
+      return () => window.cancelAnimationFrame(frame)
+    }
+
+    if (dialog.open) dialog.close()
+  }, [open])
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
-        aria-label={t('common.close')}
-        className="absolute inset-0 bg-charcoal-950/75 backdrop-blur-[2px] animate-fade-in"
-        onClick={onClose}
-      />
-      <div
-        ref={panelRef}
-        // S6819: keep role="dialog" — switching to <dialog> would require
-        // showModal()/close() and break the existing portal + overlay + focus restore flow.
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className={cn(
-          'relative z-10 w-full max-w-md rounded-2xl border border-cream-200/15 bg-charcoal-900 p-5 shadow-[0_24px_80px_-24px_rgb(0_0_0_/_0.9)] animate-fade-up',
-          className,
-        )}
-      >
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      className={cn(
+        'blendify-dialog w-full max-w-md rounded-2xl border border-cream-200/15 bg-charcoal-900 p-5 text-cream-50 shadow-[0_24px_80px_-24px_rgb(0_0_0_/_0.9)] open:animate-fade-up',
+        className,
+      )}
+      onClose={() => {
+        if (open) onClose()
+      }}
+      onCancel={(event) => {
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(event) => {
+        if (event.target === dialogRef.current) onClose()
+      }}
+    >
+      <div className="relative">
+        <button
+          type="button"
+          aria-label={t('common.close')}
+          className="sr-only"
+          onClick={onClose}
+        />
         <h2
           id={titleId}
           className="font-display text-lg tracking-tight text-cream-50"
@@ -74,7 +75,7 @@ function Dialog({
         </h2>
         <div className="mt-3">{children}</div>
       </div>
-    </div>,
+    </dialog>,
     document.body,
   )
 }

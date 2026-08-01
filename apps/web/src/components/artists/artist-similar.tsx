@@ -46,11 +46,11 @@ function ExploreSeedPicker({
   selected,
   seedId,
   onSetSeedId,
-}: {
+}: Readonly<{
   selected: Artist[]
   seedId: string
   onSetSeedId: (id: string) => void
-}) {
+}>) {
   const t = useT()
   if (selected.length <= 1) return null
   return (
@@ -76,12 +76,12 @@ function SimilarSuggestionsList({
   resolvingName,
   resolvePending,
   onResolve,
-}: {
+}: Readonly<{
   suggestions: SimilarArtistSuggestion[]
   resolvingName: string | null
   resolvePending: boolean
   onResolve: (name: string) => void
-}) {
+}>) {
   if (suggestions.length === 0) return null
   return (
     <ul className="flex flex-wrap gap-2">
@@ -120,11 +120,11 @@ function SuggestMoreButton({
   hasMore,
   fetching,
   onLoadMore,
-}: {
+}: Readonly<{
   hasMore: boolean
   fetching: boolean
   onLoadMore: () => void
-}) {
+}>) {
   const t = useT()
   return (
     <button

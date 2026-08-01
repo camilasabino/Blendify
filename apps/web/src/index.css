@@ -176,6 +176,19 @@
     width: 40%;
     animation: progress-indeterminate 1.35s ease-in-out infinite;
   }
+
+  .blendify-dialog {
+    margin: auto;
+    padding: 1.25rem;
+    border: 1px solid rgb(245 240 232 / 0.15);
+    background: rgb(28 25 23);
+    color: rgb(245 240 232);
+  }
+
+  .blendify-dialog::backdrop {
+    background: rgb(12 10 9 / 0.75);
+    backdrop-filter: blur(2px);
+  }
 }
 
 @layer utilities {

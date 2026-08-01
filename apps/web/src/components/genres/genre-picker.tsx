@@ -27,12 +27,12 @@ function SelectedGenres({
   seedId,
   onRemove,
   onClear,
-}: {
+}: Readonly<{
   selected: CuratedGenre[]
   seedId: string | undefined
   onRemove: (id: string) => void
   onClear?: () => void
-}) {
+}>) {
   const t = useT()
   if (selected.length === 0) return null
 
@@ -76,7 +76,7 @@ function GenreCatalogResults({
   searchFetching,
   searchEmpty,
   onSelect,
-}: {
+}: Readonly<{
   searching: boolean
   visible: CuratedGenre[]
   selectedIds: Set<string>
@@ -84,7 +84,7 @@ function GenreCatalogResults({
   searchFetching: boolean
   searchEmpty: boolean
   onSelect: (genre: CuratedGenre) => void
-}) {
+}>) {
   const t = useT()
   return (
     <div className="space-y-2">
@@ -125,7 +125,7 @@ function GenreExploreSection({
   onSetSeedId,
   onSelect,
   onLoadMore,
-}: {
+}: Readonly<{
   seed: CuratedGenre
   selected: CuratedGenre[]
   explore: CuratedGenre[]
@@ -137,7 +137,7 @@ function GenreExploreSection({
   onSetSeedId: (id: string) => void
   onSelect: (genre: CuratedGenre) => void
   onLoadMore: () => void
-}) {
+}>) {
   const t = useT()
   const showLoadMore = exploreHasMore || explore.length > 0
   const emptyLabel =

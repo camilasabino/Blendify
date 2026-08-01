@@ -23,7 +23,7 @@ function LibraryToolbar({
   refreshing,
   busy,
   onRefresh,
-}: {
+}: Readonly<{
   search: string
   onSearchChange: (value: string) => void
   showSelectionToggle: boolean
@@ -32,7 +32,7 @@ function LibraryToolbar({
   refreshing: boolean
   busy: boolean
   onRefresh: () => void
-}) {
+}>) {
   const t = useT()
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
@@ -77,13 +77,13 @@ function LibrarySelectionBar({
   allVisibleSelected,
   onToggleAllVisible,
   onAskConfirm,
-}: {
+}: Readonly<{
   selectedPlaylists: PlaylistSummary[]
   selectedActive: PlaylistSummary[]
   allVisibleSelected: boolean
   onToggleAllVisible: (selectAll: boolean) => void
   onAskConfirm: (confirm: PendingLibraryConfirm) => void
-}) {
+}>) {
   const t = useT()
   const hasSelection = selectedPlaylists.length > 0
 
@@ -161,13 +161,13 @@ function LibraryConfirmDialog({
   busy,
   onCancel,
   onConfirm,
-}: {
+}: Readonly<{
   pending: PendingLibraryConfirm | null
   confirmCopy: ConfirmCopy
   busy: boolean
   onCancel: () => void
   onConfirm: () => void
-}) {
+}>) {
   const t = useT()
   const isAlert = pending?.kind === 'alert'
   return (
@@ -198,7 +198,7 @@ function LibraryPlaylistList({
   hasNextPage,
   fetchingNextPage,
   onLoadMore,
-}: {
+}: Readonly<{
   playlists: PlaylistSummary[]
   total: number
   selecting: boolean
@@ -208,7 +208,7 @@ function LibraryPlaylistList({
   hasNextPage: boolean
   fetchingNextPage: boolean
   onLoadMore: () => void
-}) {
+}>) {
   const t = useT()
   return (
     <>
