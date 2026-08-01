@@ -176,12 +176,7 @@ export function SearchCombobox<T extends { id: string }>({
             const selected = selectedIds.has(item.id)
             const active = index === activeIndex
             return (
-              <li
-                id={`${listId}-option-${index}`}
-                key={item.id}
-                role="option"
-                aria-selected={active}
-              >
+              <li id={`${listId}-option-${index}`} key={item.id}>
                 <button
                   type="button"
                   tabIndex={-1}

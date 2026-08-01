@@ -56,9 +56,6 @@ function Dialog({
         event.preventDefault()
         onClose()
       }}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) onClose()
-      }}
     >
       <div className="relative">
         <button

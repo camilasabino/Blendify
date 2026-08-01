@@ -32,7 +32,7 @@ describe('SearchCombobox', () => {
 
     const input = screen.getByRole('combobox')
     await user.type(input, 'ab')
-    expect(await screen.findByRole('option', { name: 'First' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'First' })).toBeVisible()
 
     await user.keyboard('{ArrowDown}{Enter}')
 

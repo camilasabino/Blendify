@@ -140,39 +140,44 @@ export function listMainGenres(): CuratedGenre[] {
   return featuredMains.length > 0 ? featuredMains : CURATED_GENRES.slice(0, 24);
 }
 
-function tokensOf(value: string): string[] {
-  const lower = value.toLowerCase().trim();
-  const tokens = new Set<string>();
-
-  // Collapse "r & b" → "r&b" without nested quantifiers, then find compounds.
-  const ampCollapsed = lower
+function addAmpersandCompounds(source: string, tokens: Set<string>): void {
+  const ampCollapsed = source
     .split('&')
     .map((part) => part.trim())
     .filter(Boolean)
     .join('&');
-  if (ampCollapsed.includes('&')) {
-    for (const compound of ampCollapsed.split(/\s+/)) {
-      if (!compound.includes('&')) continue;
-      const pieces = compound.split('&').filter(Boolean);
-      if (pieces.length < 2) continue;
-      if (!pieces.every((p) => /^[a-z0-9]+$/i.test(p))) continue;
-      tokens.add(compound);
-      tokens.add(pieces.join('and'));
-      tokens.add(pieces.join(''));
-    }
+  if (!ampCollapsed.includes('&')) return;
+
+  for (const compound of ampCollapsed.split(' ')) {
+    if (!compound.includes('&')) continue;
+    const pieces = compound.split('&').filter(Boolean);
+    if (pieces.length < 2) continue;
+    if (!pieces.every((p) => /^[a-z0-9]+$/i.test(p))) continue;
+    tokens.add(compound);
+    tokens.add(pieces.join('and'));
+    tokens.add(pieces.join(''));
   }
+}
+
+function addRnBAliases(lower: string, tokens: Set<string>): void {
+  if (!(lower.includes('r&b') || lower === 'rnb' || tokens.has('rb'))) return;
+  tokens.add('r&b');
+  tokens.add('rnb');
+  tokens.add('soul');
+}
+
+function tokensOf(value: string): string[] {
+  const lower = value.toLowerCase().trim();
+  const tokens = new Set<string>();
+
+  addAmpersandCompounds(lower, tokens);
 
   for (const part of lower.replaceAll('&', ' ').split(/[\s/_+-]+/)) {
     const t = part.trim();
     if (t.length >= 2) tokens.add(t);
   }
 
-  if (lower.includes('r&b') || lower === 'rnb' || tokens.has('rb')) {
-    tokens.add('r&b');
-    tokens.add('rnb');
-    tokens.add('soul');
-  }
-
+  addRnBAliases(lower, tokens);
   return [...tokens];
 }
 

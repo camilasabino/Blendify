@@ -72,6 +72,24 @@ function stripTrailingDashSuffix(title: string): string {
   return title;
 }
 
+function keywordCutRange(
+  result: string,
+  idx: number,
+  keyLength: number,
+): { start: number; end: number } | null {
+  const before = idx === 0 ? ' ' : result[idx - 1];
+  const after =
+    idx + keyLength >= result.length ? ' ' : result[idx + keyLength];
+  if (!' ([)-–—'.includes(before)) return null;
+  if (!(isWordBoundary(after) || after === ')' || after === ']')) return null;
+
+  let start = idx;
+  if (' ([)-–—'.includes(before) && before !== '') start = idx - 1;
+  let end = idx + keyLength;
+  if (after === ')' || after === ']') end += 1;
+  return { start: Math.max(0, start), end };
+}
+
 function stripKeywordMentions(title: string): string {
   let result = title;
   for (const keyword of ALTERNATE_KEYWORDS) {
@@ -79,26 +97,30 @@ function stripKeywordMentions(title: string): string {
     const key = keyword.toLowerCase();
     let idx = lower.indexOf(key);
     while (idx >= 0) {
-      const before = idx === 0 ? ' ' : result[idx - 1];
-      const after =
-        idx + key.length >= result.length ? ' ' : result[idx + key.length];
-      const delimBefore = ' ([)-–—'.includes(before);
-      if (
-        delimBefore &&
-        (isWordBoundary(after) || after === ')' || after === ']')
-      ) {
-        let cutStart = idx;
-        if (before !== ' ' && '([ -–—'.includes(before)) cutStart = idx - 1;
-        else if (before === ' ') cutStart = idx - 1;
-        let end = idx + key.length;
-        if (after === ')' || after === ']') end += 1;
-        result = `${result.slice(0, Math.max(0, cutStart))}${result.slice(end)}`;
+      const range = keywordCutRange(result, idx, key.length);
+      if (range) {
+        result = `${result.slice(0, range.start)}${result.slice(range.end)}`;
         break;
       }
       idx = lower.indexOf(key, idx + 1);
     }
   }
   return result;
+}
+
+function collapseWhitespace(value: string): string {
+  let out = '';
+  let pendingSpace = false;
+  for (const ch of value.trim()) {
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+      pendingSpace = true;
+      continue;
+    }
+    if (pendingSpace && out.length > 0) out += ' ';
+    pendingSpace = false;
+    out += ch;
+  }
+  return out;
 }
 
 function keepLettersNumbersSpaces(title: string): string {
@@ -109,7 +131,6 @@ function keepLettersNumbersSpaces(title: string): string {
     const isDigit = code >= 48 && code <= 57;
     const isAsciiLetter =
       (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
-    // Rough unicode letter check: keep non-ascii letters via toLowerCase identity heuristic
     const isUnicodeLetter =
       !isAsciiLetter &&
       !isDigit &&
@@ -118,7 +139,7 @@ function keepLettersNumbersSpaces(title: string): string {
     cleaned +=
       isSpace || isDigit || isAsciiLetter || isUnicodeLetter ? ch : ' ';
   }
-  return cleaned.split(/\s+/).join(' ').trim();
+  return collapseWhitespace(cleaned);
 }
 
 export class TrackNormalizer {

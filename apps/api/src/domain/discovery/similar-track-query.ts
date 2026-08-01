@@ -54,8 +54,23 @@ function hasFeatCredit(inner: string): boolean {
   );
 }
 
+function collapseWhitespace(value: string): string {
+  let out = '';
+  let pendingSpace = false;
+  for (const ch of value.trim()) {
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+      pendingSpace = true;
+      continue;
+    }
+    if (pendingSpace && out.length > 0) out += ' ';
+    pendingSpace = false;
+    out += ch;
+  }
+  return out;
+}
+
 function hasVersionMarker(inner: string): boolean {
-  const n = inner.toLowerCase().split(/\s+/).join(' ').trim();
+  const n = collapseWhitespace(inner.toLowerCase());
   if (VERSION_MARKERS.some((marker) => includesWord(n, marker))) return true;
   if (n.includes('remaster')) {
     for (const token of n.split(/[\s._/-]+/)) {
@@ -179,7 +194,7 @@ export function cleanDiscoveryTrackTitle(trackName: string): string {
   title = stripBracketedGroups(title, hasVersionMarker);
   title = stripDashVersionSuffix(title);
 
-  return title.split(/\s+/).join(' ').trim();
+  return collapseWhitespace(title);
 }
 
 export function buildSimilarTrackQueryVariants(
