@@ -36,7 +36,7 @@ export function LandingPage() {
           to="/"
           className="inline-flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-cream-100/80 transition-colors hover:text-cream-50"
         >
-          <BlendifyMark className="size-7" />
+          <BlendifyMark decorative />
           Blendify
         </Link>
         <div className="flex items-center gap-2 sm:gap-3">

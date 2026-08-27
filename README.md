@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/brand/blendify-mark.svg" alt="Blendify logo" width="104" height="104" />
+  <img src="docs/brand/blendify-logo.svg" alt="Blendify logo" width="160" />
 </p>
 
 <h1 align="center">Blendify</h1>

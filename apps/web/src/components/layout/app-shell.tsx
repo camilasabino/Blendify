@@ -60,7 +60,7 @@ export function AppShell() {
                 focusRing,
               )}
             >
-              <BlendifyMark className="size-7" />
+              <BlendifyMark decorative />
               Blendify
             </NavLink>
             <nav className="hidden items-center gap-1 md:flex">
