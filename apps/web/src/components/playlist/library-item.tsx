@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
@@ -196,7 +197,11 @@ function LibraryItemMeta({
   )
 }
 
+const menuItemClass =
+  'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-charcoal-700/80 focus-visible:bg-charcoal-700/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/60'
+
 function LibraryItemMenu({
+  id,
   playlist,
   deleted,
   copied,
@@ -204,6 +209,7 @@ function LibraryItemMenu({
   onStartRename,
   onAskConfirm,
 }: Readonly<{
+  id: string
   playlist: PlaylistSummary
   deleted: boolean
   copied: boolean
@@ -216,67 +222,73 @@ function LibraryItemMenu({
   const showPurge = !deleted && Boolean(playlist.spotifyId)
 
   return (
-    <div
-      role="menu"
-      className="absolute right-0 top-full z-10 mt-1 w-56 rounded-lg border border-cream-200/10 bg-charcoal-800 py-1 shadow-xl"
+    <ul
+      id={id}
+      aria-label={t('library.more')}
+      className="absolute right-0 top-full z-10 mt-1 w-56 overflow-hidden rounded-lg border border-cream-200/10 bg-charcoal-800 py-1 shadow-xl"
     >
       {showSpotifyActions ? (
         <>
-          <a
-            href={playlist.spotifyUrl!}
-            target="_blank"
-            rel="noreferrer"
-            role="menuitem"
-            className="flex items-center gap-2 px-3 py-2 text-sm text-cream-100"
-          >
-            <ExternalLink className="size-3.5" />
-            {t('library.openSpotify')}
-          </a>
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-cream-100"
-            onClick={onCopyLink}
-          >
-            {copied ? (
-              <Check className="size-3.5" />
-            ) : (
-              <Copy className="size-3.5" />
-            )}
-            {copied ? t('library.copied') : t('library.copy')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-cream-100"
-            onClick={onStartRename}
-          >
-            <Pencil className="size-3.5" />
-            {t('library.rename')}
-          </button>
+          <li>
+            <a
+              href={playlist.spotifyUrl!}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(menuItemClass, 'text-cream-100')}
+            >
+              <ExternalLink aria-hidden className="size-3.5" />
+              {t('library.openSpotify')}
+            </a>
+          </li>
+          <li>
+            <button
+              type="button"
+              className={cn(menuItemClass, 'text-cream-100')}
+              onClick={onCopyLink}
+            >
+              {copied ? (
+                <Check aria-hidden className="size-3.5" />
+              ) : (
+                <Copy aria-hidden className="size-3.5" />
+              )}
+              {copied ? t('library.copied') : t('library.copy')}
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              className={cn(menuItemClass, 'text-cream-100')}
+              onClick={onStartRename}
+            >
+              <Pencil aria-hidden className="size-3.5" />
+              {t('library.rename')}
+            </button>
+          </li>
         </>
       ) : null}
-      <button
-        type="button"
-        role="menuitem"
-        className="flex w-full items-center gap-2 px-3 py-2 text-sm text-cream-200"
-        onClick={() => onAskConfirm({ kind: 'delete', playlist })}
-      >
-        <Trash2 className="size-3.5" />
-        {t('library.removeFromLibrary')}
-      </button>
-      {showPurge ? (
+      <li>
         <button
           type="button"
-          role="menuitem"
-          className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-300"
-          onClick={() => onAskConfirm({ kind: 'purge', playlist })}
+          className={cn(menuItemClass, 'text-cream-200')}
+          onClick={() => onAskConfirm({ kind: 'delete', playlist })}
         >
-          <Trash2 className="size-3.5" />
-          {t('library.purgeSpotify')}
+          <Trash2 aria-hidden className="size-3.5" />
+          {t('library.removeFromLibrary')}
         </button>
+      </li>
+      {showPurge ? (
+        <li>
+          <button
+            type="button"
+            className={cn(menuItemClass, 'text-red-300')}
+            onClick={() => onAskConfirm({ kind: 'purge', playlist })}
+          >
+            <Trash2 aria-hidden className="size-3.5" />
+            {t('library.purgeSpotify')}
+          </button>
+        </li>
       ) : null}
-    </div>
+    </ul>
   )
 }
 
@@ -285,16 +297,20 @@ function LibraryItemActions({
   previewOpen,
   onTogglePreview,
   menuOpen,
+  menuId,
   onToggleMenu,
   menuRef,
+  menuTriggerRef,
   menu,
 }: Readonly<{
   canPreview: boolean
   previewOpen: boolean
   onTogglePreview: () => void
   menuOpen: boolean
+  menuId: string
   onToggleMenu: () => void
   menuRef: RefObject<HTMLDivElement | null>
+  menuTriggerRef: RefObject<HTMLButtonElement | null>
   menu: ReactNode
 }>) {
   const t = useT()
@@ -306,12 +322,16 @@ function LibraryItemActions({
         </Button>
       ) : null}
       <Button
+        ref={menuTriggerRef}
         size="sm"
         variant="ghost"
         aria-label={t('library.more')}
+        aria-expanded={menuOpen}
+        aria-controls={menuOpen ? menuId : undefined}
         onClick={onToggleMenu}
+        className={cn(menuOpen && 'bg-charcoal-700 text-cream-50')}
       >
-        <MoreHorizontal className="size-4" />
+        <MoreHorizontal aria-hidden className="size-4" />
       </Button>
       {menuOpen ? menu : null}
     </div>
@@ -380,6 +400,8 @@ export function LibraryItem({
   const [copied, setCopied] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
+  const menuId = useId()
   const deleted = playlist.missingOnSpotify
   const canPreview = !deleted && Boolean(playlist.spotifyId)
 
@@ -398,15 +420,27 @@ export function LibraryItem({
       if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
     }
     function closeWithEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setMenuOpen(false)
+      if (event.key !== 'Escape') return
+      setMenuOpen(false)
+      menuTriggerRef.current?.focus()
+    }
+    function closeOnFocusOut(event: FocusEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
     }
     document.addEventListener('pointerdown', close)
     document.addEventListener('keydown', closeWithEscape)
+    document.addEventListener('focusin', closeOnFocusOut)
     return () => {
       document.removeEventListener('pointerdown', close)
       document.removeEventListener('keydown', closeWithEscape)
+      document.removeEventListener('focusin', closeOnFocusOut)
     }
   }, [menuOpen])
+
+  function closeMenu() {
+    setMenuOpen(false)
+    menuTriggerRef.current?.focus()
+  }
 
   const detailQuery = useQuery({
     queryKey: ['playlists', 'detail', playlist.id],
@@ -416,15 +450,20 @@ export function LibraryItem({
   const rename = useMutation({
     mutationFn: (name: string) => api.renamePlaylist(playlist.id, name),
     onSuccess: () => {
-      setRenaming(false)
+      finishRename()
       void queryClient.invalidateQueries({ queryKey: ['playlists'] })
     },
   })
 
+  function finishRename() {
+    setRenaming(false)
+    menuTriggerRef.current?.focus()
+  }
+
   function submitRename() {
     const next = nameDraft.trim()
     if (!next || next === playlist.name) {
-      setRenaming(false)
+      finishRename()
       setNameDraft(playlist.name)
       return
     }
@@ -450,7 +489,7 @@ export function LibraryItem({
       nameDraft={nameDraft}
       onDraftChange={setNameDraft}
       onSubmitRename={submitRename}
-      onCancelRename={() => setRenaming(false)}
+      onCancelRename={finishRename}
       renamePending={rename.isPending}
     />
   )
@@ -498,10 +537,13 @@ export function LibraryItem({
             previewOpen={previewOpen}
             onTogglePreview={() => setPreviewOpen((open) => !open)}
             menuOpen={menuOpen}
+            menuId={menuId}
             onToggleMenu={() => setMenuOpen((open) => !open)}
             menuRef={menuRef}
+            menuTriggerRef={menuTriggerRef}
             menu={
               <LibraryItemMenu
+                id={menuId}
                 playlist={playlist}
                 deleted={deleted}
                 copied={copied}
@@ -510,7 +552,10 @@ export function LibraryItem({
                   setMenuOpen(false)
                   setRenaming(true)
                 }}
-                onAskConfirm={onAskConfirm}
+                onAskConfirm={(confirm) => {
+                  closeMenu()
+                  onAskConfirm(confirm)
+                }}
               />
             }
           />

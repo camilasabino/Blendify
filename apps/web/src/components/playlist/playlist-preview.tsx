@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ExternalLink, Play, Speaker } from 'lucide-react'
 import type { StartPlaybackRequest, TrackDto } from '@blendify/contracts'
@@ -11,6 +11,8 @@ import { cn, focusRing, formatDuration } from '@/lib/utils'
 import { InPagePlaylistPlayer } from '@/components/playlist/in-page-playlist-player'
 
 type ListenMode = 'here' | 'device'
+
+const LISTEN_MODES: readonly ListenMode[] = ['here', 'device']
 
 const DEVICE_WAKE_MS = 3200
 const DEVICE_RETRY_MS = 2200
@@ -64,6 +66,82 @@ function openSpotifyPlaylist(playlistId: string, spotifyUrl?: string | null) {
   webLink.remove()
 }
 
+function ListenModeTabs({
+  value,
+  onChange,
+  tabId,
+  panelId,
+}: Readonly<{
+  value: ListenMode
+  onChange: (mode: ListenMode) => void
+  tabId: (mode: ListenMode) => string
+  panelId: string
+}>) {
+  const t = useT()
+  const tabRefs = useRef<Partial<Record<ListenMode, HTMLButtonElement | null>>>(
+    {},
+  )
+  const labels: Record<ListenMode, string> = {
+    here: t('preview.modeHere'),
+    device: t('preview.modeDevice'),
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const index = LISTEN_MODES.indexOf(value)
+    let next: ListenMode | undefined
+    if (event.key === 'ArrowRight') {
+      next = LISTEN_MODES[(index + 1) % LISTEN_MODES.length]
+    } else if (event.key === 'ArrowLeft') {
+      next = LISTEN_MODES.at(index - 1)
+    } else if (event.key === 'Home') {
+      next = LISTEN_MODES[0]
+    } else if (event.key === 'End') {
+      next = LISTEN_MODES.at(-1)
+    }
+    if (!next) return
+    event.preventDefault()
+    onChange(next)
+    tabRefs.current[next]?.focus()
+  }
+
+  return (
+    <div
+      className="inline-flex items-center rounded-lg border border-cream-200/15 bg-charcoal-800/60 p-0.5"
+      role="tablist"
+      aria-label={t('preview.modeLabel')}
+    >
+      {LISTEN_MODES.map((mode) => {
+        const selected = value === mode
+        return (
+          <button
+            key={mode}
+            ref={(element) => {
+              tabRefs.current[mode] = element
+            }}
+            id={tabId(mode)}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-controls={panelId}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(mode)}
+            onKeyDown={handleKeyDown}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition-colors duration-200',
+              focusRing,
+              selected
+                ? 'bg-amber-500/20 text-amber-400'
+                : 'text-cream-400 hover:text-cream-100',
+            )}
+          >
+            {labels[mode]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function PlaylistPreview({
   tracks = [],
   spotifyId,
@@ -72,6 +150,9 @@ export function PlaylistPreview({
   mode = 'full',
 }: PlaylistPreviewProps) {
   const t = useT()
+  const tabsId = useId()
+  const panelId = `${tabsId}-panel`
+  const tabId = (listenMode: ListenMode) => `${tabsId}-tab-${listenMode}`
   const list = useMemo(
     () => tracks.filter((track) => track.id && track.name),
     [tracks],
@@ -215,35 +296,12 @@ export function PlaylistPreview({
             {t('preview.modeLabel')}
           </p>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div
-              className="inline-flex items-center rounded-lg border border-cream-200/15 bg-charcoal-800/60 p-0.5"
-              role="tablist"
-              aria-label={t('preview.modeLabel')}
-            >
-              {(
-                [
-                  { id: 'here' as const, label: t('preview.modeHere') },
-                  { id: 'device' as const, label: t('preview.modeDevice') },
-                ] as const
-              ).map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={listenMode === option.id}
-                  onClick={() => switchMode(option.id)}
-                  className={cn(
-                    'rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition-colors duration-200',
-                    focusRing,
-                    listenMode === option.id
-                      ? 'bg-amber-500/20 text-amber-400'
-                      : 'text-cream-400 hover:text-cream-100',
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            <ListenModeTabs
+              value={listenMode}
+              onChange={switchMode}
+              tabId={tabId}
+              panelId={panelId}
+            />
             {listenMode === 'device' && contextUri && (
               <Button
                 type="button"
@@ -268,114 +326,121 @@ export function PlaylistPreview({
         </div>
       )}
 
-      {showEmbed && embedId && (
-        <InPagePlaylistPlayer tracks={list} spotifyId={embedId} />
-      )}
+      <div
+        id={showSwitcher ? panelId : undefined}
+        role={showSwitcher ? 'tabpanel' : undefined}
+        aria-labelledby={showSwitcher ? tabId(listenMode) : undefined}
+        className="space-y-4"
+      >
+        {showEmbed && embedId && (
+          <InPagePlaylistPlayer tracks={list} spotifyId={embedId} />
+        )}
 
-      {showConnect && (
-        <section className="space-y-3">
-          {!showSwitcher && (
-            <div className="space-y-1">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-cream-500">
-                  {t('preview.connectList')}
-                </p>
-                <p className="text-xs tabular-nums text-cream-500">
-                  {t('preview.trackCount', { count: list.length })}
+        {showConnect && (
+          <section className="space-y-3">
+            {!showSwitcher && (
+              <div className="space-y-1">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-cream-500">
+                    {t('preview.connectList')}
+                  </p>
+                  <p className="text-xs tabular-nums text-cream-500">
+                    {t('preview.trackCount', { count: list.length })}
+                  </p>
+                </div>
+                <p className="max-w-lg text-xs text-cream-400">
+                  {t('preview.connectHint')}
                 </p>
               </div>
-              <p className="max-w-lg text-xs text-cream-400">
-                {t('preview.connectHint')}
+            )}
+            {showSwitcher && (
+              <p className="text-right text-xs tabular-nums text-cream-500">
+                {t('preview.trackCount', { count: list.length })}
               </p>
-            </div>
-          )}
-          {showSwitcher && (
-            <p className="text-right text-xs tabular-nums text-cream-500">
-              {t('preview.trackCount', { count: list.length })}
-            </p>
-          )}
+            )}
 
-          <ol className="max-h-[18rem] overflow-y-auto rounded-xl border border-cream-200/10 bg-charcoal-800/30">
-            {list.map((track, trackIndex) => {
-              const isActive = activeUri === track.uri && playMutation.isPending
-              const isPlaying =
-                activeUri === track.uri &&
-                playMutation.isSuccess &&
-                !playError
-              return (
-                <li key={`${track.id}-${trackIndex}`}>
-                  <button
-                    type="button"
-                    onClick={() => playTrack(track)}
-                    disabled={playMutation.isPending}
-                    className={cn(
-                      'flex w-full items-center gap-3 border-b border-cream-200/5 px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-amber-500/10 disabled:opacity-60',
-                      focusRing,
-                      isPlaying && 'bg-amber-500/10',
-                    )}
-                  >
-                    <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-500">
-                      {trackIndex + 1}
-                    </span>
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-charcoal-700 text-amber-400">
-                      {isActive ? (
-                        <Spinner size="sm" className="text-current" />
-                      ) : (
-                        <Play className="size-3.5 fill-current" />
+            <ol className="max-h-[18rem] overflow-y-auto rounded-xl border border-cream-200/10 bg-charcoal-800/30">
+              {list.map((track, trackIndex) => {
+                const isActive = activeUri === track.uri && playMutation.isPending
+                const isPlaying =
+                  activeUri === track.uri &&
+                  playMutation.isSuccess &&
+                  !playError
+                return (
+                  <li key={`${track.id}-${trackIndex}`}>
+                    <button
+                      type="button"
+                      onClick={() => playTrack(track)}
+                      disabled={playMutation.isPending}
+                      className={cn(
+                        'flex w-full items-center gap-3 border-b border-cream-200/5 px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-amber-500/10 disabled:opacity-60',
+                        focusRing,
+                        isPlaying && 'bg-amber-500/10',
                       )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-cream-50">
-                        {track.name}
-                      </p>
-                      <p className="truncate text-xs text-cream-400">
-                        {track.artistName}
-                        {track.albumName ? ` · ${track.albumName}` : ''}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-xs tabular-nums text-cream-500">
-                      {formatDuration(track.durationMs)}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ol>
-        </section>
-      )}
+                    >
+                      <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-500">
+                        {trackIndex + 1}
+                      </span>
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-charcoal-700 text-amber-400">
+                        {isActive ? (
+                          <Spinner size="sm" className="text-current" />
+                        ) : (
+                          <Play className="size-3.5 fill-current" />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-cream-50">
+                          {track.name}
+                        </p>
+                        <p className="truncate text-xs text-cream-400">
+                          {track.artistName}
+                          {track.albumName ? ` · ${track.albumName}` : ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs tabular-nums text-cream-500">
+                        {formatDuration(track.durationMs)}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
+          </section>
+        )}
 
-      {mode === 'full' && listenMode === 'device' && status && !playError && (
-        <output className="block text-sm text-cream-300">{status}</output>
-      )}
-      {mode === 'full' && listenMode === 'device' && playError && (
-        <output className="block space-y-2">
-          <p className="text-sm text-amber-200/90">{playError}</p>
-          <div className="flex flex-wrap gap-2">
-            {embedId && (
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={openSpotify}
-              >
-                <ExternalLink className="size-3.5" />
-                {t('create.openSpotify')}
-              </Button>
-            )}
-            {lastPlay && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                loading={playMutation.isPending}
-                onClick={retryPlay}
-              >
-                {t('preview.retryPlay')}
-              </Button>
-            )}
-          </div>
-        </output>
-      )}
+        {mode === 'full' && listenMode === 'device' && status && !playError && (
+          <output className="block text-sm text-cream-300">{status}</output>
+        )}
+        {mode === 'full' && listenMode === 'device' && playError && (
+          <output className="block space-y-2">
+            <p className="text-sm text-amber-200/90">{playError}</p>
+            <div className="flex flex-wrap gap-2">
+              {embedId && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={openSpotify}
+                >
+                  <ExternalLink className="size-3.5" />
+                  {t('create.openSpotify')}
+                </Button>
+              )}
+              {lastPlay && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  loading={playMutation.isPending}
+                  onClick={retryPlay}
+                >
+                  {t('preview.retryPlay')}
+                </Button>
+              )}
+            </div>
+          </output>
+        )}
+      </div>
     </div>
   )
 }

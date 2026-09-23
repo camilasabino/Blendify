@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -16,7 +16,6 @@ import { ArtistSearch } from '@/components/artists/artist-search'
 import { TrackSearch } from '@/components/tracks/track-search'
 import { GenerationResultPanel } from '@/components/playlist/generation-result-panel'
 import {
-  CoverErrorNotice,
   GENERATION_ORDER_MODES,
   GenerationSettingsCollapse,
   GenerationSubmitBar,
@@ -49,6 +48,12 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
+const DEFAULT_VALUES: FormValues = {
+  popularity: 'balanced',
+  targetTrackCount: 30,
+  orderMode: 'random',
+}
+
 export function DiscoverPlaylistForm() {
   const t = useT()
   const queryClient = useQueryClient()
@@ -59,15 +64,14 @@ export function DiscoverPlaylistForm() {
   const [progress, setProgress] = useState<GenerationProgress | null>(null)
   const [requestedTrackCount, setRequestedTrackCount] = useState(0)
   const [coverError, setCoverError] = useState<string | null>(null)
+  const [isPreparing, setIsPreparing] = useState(false)
   const copiedLink = useCopiedLink()
+  const formRef = useRef<HTMLFormElement>(null)
+  const seedSearchId = useId()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      popularity: 'balanced',
-      targetTrackCount: 30,
-      orderMode: 'random',
-    },
+    defaultValues: DEFAULT_VALUES,
   })
 
   const selectedArtistIds = useMemo(
@@ -98,38 +102,23 @@ export function DiscoverPlaylistForm() {
 
   function changeSeedMode(next: SeedMode) {
     setSeedMode(next)
-    setArtist(null)
-    setTrack(null)
-    setResult(null)
-    setProgress(null)
-    setCoverError(null)
-    form.clearErrors()
-    discoverMutation.reset()
+    form.clearErrors('root')
   }
 
   function selectArtist(next: Artist) {
     setArtist(next)
-    setResult(null)
+    form.clearErrors('root')
     discoverMutation.reset()
-  }
-
-  function clearArtist() {
-    setArtist(null)
-    setResult(null)
   }
 
   function selectTrack(next: TrackDto) {
     setTrack(next)
-    setResult(null)
+    form.clearErrors('root')
     discoverMutation.reset()
   }
 
-  function clearTrack() {
-    setTrack(null)
-    setResult(null)
-  }
-
   async function onSubmit(values: FormValues) {
+    if (isPreparing || discoverMutation.isPending) return
     if (seedMode === 'artist' && !artist) {
       form.setError('root', { message: t('discover.addArtist') })
       return
@@ -139,10 +128,20 @@ export function DiscoverPlaylistForm() {
       return
     }
 
+    setIsPreparing(true)
     setCoverError(null)
     setResult(null)
     setRequestedTrackCount(values.targetTrackCount)
+    discoverMutation.reset()
 
+    try {
+      await startDiscover(values)
+    } finally {
+      setIsPreparing(false)
+    }
+  }
+
+  async function startDiscover(values: FormValues) {
     const sharedBase = {
       targetTrackCount: values.targetTrackCount,
       popularity: values.popularity,
@@ -218,7 +217,38 @@ export function DiscoverPlaylistForm() {
     })
   }
 
-  const isGenerating = discoverMutation.isPending
+  const submit = form.handleSubmit(onSubmit)
+
+  function focusSeedSearch() {
+    window.requestAnimationFrame(() =>
+      document.getElementById(seedSearchId)?.focus(),
+    )
+  }
+
+  function focusSettings() {
+    window.requestAnimationFrame(() => formRef.current?.focus())
+  }
+
+  function adjustAndRecreate() {
+    settingsCollapse.expandSettings()
+    focusSettings()
+  }
+
+  function createAnother() {
+    setSeedMode('artist')
+    setArtist(null)
+    setTrack(null)
+    setResult(null)
+    setProgress(null)
+    setRequestedTrackCount(0)
+    setCoverError(null)
+    copiedLink.reset()
+    form.reset(DEFAULT_VALUES)
+    discoverMutation.reset()
+    focusSettings()
+  }
+
+  const isGenerating = isPreparing || discoverMutation.isPending
   const settingsCollapse = useGenerationSettingsCollapse(
     isGenerating,
     result !== null,
@@ -234,6 +264,16 @@ export function DiscoverPlaylistForm() {
     t,
   )
 
+  let disabledReason: string | null = null
+  if (seedMode === 'artist' && !artist) {
+    disabledReason = t('discover.needArtist')
+  } else if (seedMode === 'track' && !track) {
+    disabledReason = t('discover.needTrack')
+  }
+  const generationError = discoverMutation.isError
+    ? getApiErrorMessage(discoverMutation.error, t, 'discover.failed')
+    : null
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-10 animate-fade-up">
       <PageHeader
@@ -244,17 +284,23 @@ export function DiscoverPlaylistForm() {
 
       <div
         ref={settingsCollapse.resultPanelRef}
-        className="scroll-mt-24 empty:hidden"
+        tabIndex={-1}
+        className="scroll-mt-24 outline-none empty:hidden"
       >
         <GenerationResultPanel
           isGenerating={isGenerating}
           result={result}
           progress={progress}
+          error={generationError}
+          coverError={coverError}
           requestedTrackCount={requestedTrackCount}
           workingTitleKey="discover.working"
           workingHintKey="discover.workingHint"
           copied={copiedLink.copied}
           onCopy={(url) => void copiedLink.copy(url)}
+          onRetry={() => void submit()}
+          onAdjust={adjustAndRecreate}
+          onCreateAnother={createAnother}
         />
       </div>
 
@@ -264,117 +310,129 @@ export function DiscoverPlaylistForm() {
         onToggle={settingsCollapse.toggleSettings}
         summary={settingsSummary}
       >
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <FormSection
-            step={1}
-            accent="amber"
-            title={t('discover.stepSeed')}
-            description={t('discover.stepSeedHint')}
+        <form
+          ref={formRef}
+          tabIndex={-1}
+          onSubmit={(event) => void submit(event)}
+          className="space-y-8 outline-none"
+        >
+          <fieldset
+            disabled={isGenerating}
+            className="min-w-0 space-y-8"
           >
-            <SegmentedControl
-              layout="grid"
-              className="w-full"
-              ariaLabel={t('discover.stepSeed')}
-              value={seedMode}
-              options={[
-                { value: 'artist', label: t('discover.modeArtist') },
-                { value: 'track', label: t('discover.modeTrack') },
-              ]}
-              onChange={changeSeedMode}
-            />
+            <FormSection
+              step={1}
+              accent="amber"
+              title={t('discover.stepSeed')}
+              description={t('discover.stepSeedHint')}
+            >
+              <SegmentedControl
+                layout="grid"
+                className="w-full"
+                label={t('discover.stepSeed')}
+                value={seedMode}
+                options={[
+                  { value: 'artist', label: t('discover.modeArtist') },
+                  { value: 'track', label: t('discover.modeTrack') },
+                ]}
+                onChange={changeSeedMode}
+              />
 
-            {seedMode === 'artist' ? (
-              <div className="space-y-3">
-                <Label>{t('discover.artist')}</Label>
-                {artist ? (
-                  <SelectedSeed
-                    imageUrl={artist.imageUrl}
-                    title={artist.name}
-                    imageRounded
-                    removeLabel={t('create.removeArtist', { name: artist.name })}
-                    onRemove={clearArtist}
-                  />
-                ) : (
-                  <>
-                    <ArtistSearch
-                      selectedIds={selectedArtistIds}
-                      onSelect={selectArtist}
+              {seedMode === 'artist' ? (
+                <div className="space-y-3">
+                  <Label htmlFor={artist ? undefined : seedSearchId}>
+                    {t('discover.artist')}
+                  </Label>
+                  {artist ? (
+                    <SelectedSeed
+                      imageUrl={artist.imageUrl}
+                      title={artist.name}
+                      imageRounded
+                      removeLabel={t('create.removeArtist', { name: artist.name })}
+                      onRemove={() => {
+                        setArtist(null)
+                        focusSeedSearch()
+                      }}
                     />
-                    <p className="text-sm text-cream-400">
-                      {t('discover.noArtistYet')}
-                    </p>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <Label>{t('discover.track')}</Label>
-                {track ? (
-                  <SelectedSeed
-                    imageUrl={track.albumImageUrl}
-                    title={track.name}
-                    subtitle={track.artistName}
-                    removeLabel={t('discover.removeTrack', {
-                      name: track.name,
-                    })}
-                    onRemove={clearTrack}
-                  />
-                ) : (
-                  <>
-                    <TrackSearch
-                      selectedIds={selectedTrackIds}
-                      onSelect={selectTrack}
+                  ) : (
+                    <>
+                      <ArtistSearch
+                        inputId={seedSearchId}
+                        selectedIds={selectedArtistIds}
+                        onSelect={selectArtist}
+                      />
+                      <p className="text-sm text-cream-400">
+                        {t('discover.noArtistYet')}
+                      </p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Label htmlFor={track ? undefined : seedSearchId}>
+                    {t('discover.track')}
+                  </Label>
+                  {track ? (
+                    <SelectedSeed
+                      imageUrl={track.albumImageUrl}
+                      title={track.name}
+                      subtitle={track.artistName}
+                      removeLabel={t('discover.removeTrack', {
+                        name: track.name,
+                      })}
+                      onRemove={() => {
+                        setTrack(null)
+                        focusSeedSearch()
+                      }}
                     />
-                    <p className="text-sm text-cream-400">
-                      {t('discover.noTrackYet')}
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-          </FormSection>
-
-          <PopularityModeSection control={form.control} step={2} />
-
-          <FormSection
-            step={3}
-            title={t('discover.stepDetails')}
-            description={t('discover.stepDetailsHint')}
-          >
-            <Controller
-              control={form.control}
-              name="targetTrackCount"
-              render={({ field }) => (
-                <RadioCardGroup
-                  label={t('discover.stepDetails')}
-                  value={field.value}
-                  onChange={field.onChange}
-                  options={TRACK_TARGETS.map((count) => ({
-                    value: count,
-                    label: count,
-                    hint: t('discover.songsLabel'),
-                  }))}
-                />
+                  ) : (
+                    <>
+                      <TrackSearch
+                        inputId={seedSearchId}
+                        selectedIds={selectedTrackIds}
+                        onSelect={selectTrack}
+                      />
+                      <p className="text-sm text-cream-400">
+                        {t('discover.noTrackYet')}
+                      </p>
+                    </>
+                  )}
+                </div>
               )}
-            />
-            <CoverErrorNotice message={coverError} />
-          </FormSection>
+            </FormSection>
 
-          <OrderModeSection control={form.control} step={4} />
+            <PopularityModeSection control={form.control} step={2} />
+
+            <FormSection
+              step={3}
+              title={t('discover.stepDetails')}
+              description={t('discover.stepDetailsHint')}
+            >
+              <Controller
+                control={form.control}
+                name="targetTrackCount"
+                render={({ field }) => (
+                  <RadioCardGroup
+                    label={t('discover.stepDetails')}
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={TRACK_TARGETS.map((count) => ({
+                      value: count,
+                      label: count,
+                      hint: t('discover.songsLabel'),
+                    }))}
+                  />
+                )}
+              />
+            </FormSection>
+
+            <OrderModeSection control={form.control} step={4} />
+          </fieldset>
 
           <GenerationSubmitBar
             isGenerating={isGenerating}
-            disabled={seedMode === 'artist' ? !artist : !track}
-            error={
-              form.formState.errors.root?.message ??
-              (discoverMutation.isError
-                ? getApiErrorMessage(
-                    discoverMutation.error,
-                    t,
-                    'discover.failed',
-                  )
-                : null)
-            }
+            disabledReason={disabledReason}
+            error={form.formState.errors.root?.message ?? null}
             idleLabel={t('discover.generate')}
             busyLabel={t('discover.generating')}
             icon={Compass}

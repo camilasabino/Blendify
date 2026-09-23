@@ -253,9 +253,9 @@ function RankBars({
 
   return (
     <div className="space-y-5 rounded-2xl border border-cream-200/10 bg-gradient-to-b from-charcoal-800/55 to-charcoal-900/40 p-5">
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-amber-400/90">
+      <h2 className="font-sans text-xs font-medium uppercase tracking-[0.16em] text-amber-400/90">
         {title}
-      </p>
+      </h2>
       {items.length === 0 ? (
         <p className="text-sm text-cream-500">{empty}</p>
       ) : (

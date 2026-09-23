@@ -13,7 +13,7 @@ import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
 import { SpotifyMark } from '@/components/brand/spotify-mark'
 import { useT } from '@/i18n/use-t'
-import { cn } from '@/lib/utils'
+import { cn, focusRing } from '@/lib/utils'
 
 export function LandingPage() {
   const { isAuthenticated, isLoading, login } = useAuth()
@@ -34,7 +34,10 @@ export function LandingPage() {
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-6">
         <Link
           to="/"
-          className="inline-flex items-center rounded-md transition-opacity hover:opacity-80"
+          className={cn(
+            'inline-flex items-center rounded-md transition-opacity hover:opacity-80',
+            focusRing,
+          )}
         >
           <BlendifyMark />
         </Link>
@@ -49,7 +52,7 @@ export function LandingPage() {
         </div>
       </header>
 
-      <section className="relative z-10 mx-auto flex min-h-[calc(100svh-5rem)] max-w-6xl flex-col justify-center px-6 pb-16 pt-4 lg:flex-row lg:items-center lg:gap-16">
+      <main className="relative z-10 mx-auto flex min-h-[calc(100svh-5rem)] max-w-6xl flex-col justify-center px-6 pb-16 pt-4 lg:flex-row lg:items-center lg:gap-16">
         <div className="max-w-xl flex-1 space-y-6">
           <h1 className="animate-fade-up font-display text-6xl font-extrabold leading-[0.95] tracking-tight text-cream-50 sm:text-7xl lg:text-8xl">
             Blendify
@@ -167,7 +170,7 @@ export function LandingPage() {
             </div>
           </div>
         </div>
-      </section>
+      </main>
     </div>
   )
 }

@@ -1,8 +1,17 @@
-import { Check, Copy, ExternalLink } from 'lucide-react'
+import { useId } from 'react'
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Plus,
+  RotateCcw,
+  SlidersHorizontal,
+} from 'lucide-react'
 import type {
   GenerationProgress,
   PlaylistDetail,
 } from '@blendify/contracts'
+import { CoverErrorNotice } from '@/components/playlist/generation-form-shared'
 import { PlaylistPreview } from '@/components/playlist/playlist-preview'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { useGenerationFill } from '@/hooks/use-generation-feedback'
@@ -32,6 +41,19 @@ function etaMessage(
   return minutes === 1
     ? t('create.etaOneMinute')
     : t('create.etaMinutes', { minutes })
+}
+
+function progressAnnouncement(
+  progress: GenerationProgress | null,
+  workingHintKey: MessageKey,
+  t: ReturnType<typeof useT>,
+): string {
+  if (!progress) return t(workingHintKey)
+  const count = t('create.progressCount', {
+    current: progress.current,
+    total: progress.total,
+  })
+  return `${t(phaseMessageKey(progress.phase))}, ${count}`
 }
 
 function GenerationProgressBar({
@@ -164,16 +186,63 @@ function ResultActions({
   )
 }
 
+function GenerationErrorState({
+  message,
+  onRetry,
+}: Readonly<{
+  message: string
+  onRetry: () => void
+}>) {
+  const t = useT()
+  return (
+    <div className="relative space-y-4">
+      <p role="alert" className="text-sm leading-relaxed text-red-200">
+        {message}
+      </p>
+      <Button type="button" variant="secondary" onClick={onRetry}>
+        <RotateCcw className="size-4" />
+        {t('common.retry')}
+      </Button>
+    </div>
+  )
+}
+
+function NextStepActions({
+  onAdjust,
+  onCreateAnother,
+}: Readonly<{
+  onAdjust: () => void
+  onCreateAnother: () => void
+}>) {
+  const t = useT()
+  return (
+    <div className="flex flex-wrap gap-2 border-t border-cream-200/10 pt-4">
+      <Button type="button" variant="secondary" size="sm" onClick={onCreateAnother}>
+        <Plus className="size-3.5" />
+        {t('create.createAnother')}
+      </Button>
+      <Button type="button" variant="ghost" size="sm" onClick={onAdjust}>
+        <SlidersHorizontal className="size-3.5" />
+        {t('create.adjustAndRecreate')}
+      </Button>
+    </div>
+  )
+}
+
 function ReadyResult({
   result,
   requestedTrackCount,
   copied,
   onCopy,
+  onAdjust,
+  onCreateAnother,
 }: Readonly<{
   result: PlaylistDetail
   requestedTrackCount: number
   copied: boolean
   onCopy: (url: string) => void
+  onAdjust: () => void
+  onCreateAnother: () => void
 }>) {
   const t = useT()
   const { isNearCompleteFill, isShortFill } = useGenerationFill(
@@ -203,6 +272,10 @@ function ReadyResult({
             onCopy={onCopy}
           />
         </div>
+        <NextStepActions
+          onAdjust={onAdjust}
+          onCreateAnother={onCreateAnother}
+        />
       </div>
       <PlaylistPreview
         mode="full"
@@ -218,50 +291,91 @@ export function GenerationResultPanel({
   isGenerating,
   result,
   progress,
+  error,
+  coverError,
   requestedTrackCount,
   workingTitleKey,
   workingHintKey,
   copied,
   onCopy,
+  onRetry,
+  onAdjust,
+  onCreateAnother,
 }: Readonly<{
   isGenerating: boolean
   result: PlaylistDetail | null
   progress: GenerationProgress | null
+  error: string | null
+  coverError: string | null
   requestedTrackCount: number
   workingTitleKey: MessageKey
   workingHintKey: MessageKey
   copied: boolean
   onCopy: (url: string) => void
+  onRetry: () => void
+  onAdjust: () => void
+  onCreateAnother: () => void
 }>) {
   const t = useT()
+  const titleId = useId()
 
-  if (!isGenerating && !result) return null
+  if (!isGenerating && !result && !error) return null
+
+  const showError = !isGenerating && error != null
+  const showResult = !isGenerating && !showError && result != null
+  let title = t('create.ready')
+  if (isGenerating) title = t(workingTitleKey)
+  else if (showError) title = t('create.failedTitle')
+
+  let announcement = ''
+  if (isGenerating) {
+    announcement = progressAnnouncement(progress, workingHintKey, t)
+  } else if (showResult) {
+    announcement = `${t('create.ready')}. ${t('create.tracksReady', { count: result.trackCount })}`
+  }
 
   return (
     <section
-      className="animate-fade-up relative overflow-hidden space-y-4 rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/10 via-charcoal-800/80 to-charcoal-950 p-5 shadow-[0_24px_60px_-36px_rgb(0_0_0_/_0.95)] sm:p-6"
-      aria-live="polite"
-      aria-busy={isGenerating}
+      aria-labelledby={titleId}
+      className={cn(
+        'animate-fade-up relative overflow-hidden space-y-4 rounded-2xl border bg-gradient-to-br via-charcoal-800/80 to-charcoal-950 p-5 shadow-[0_24px_60px_-36px_rgb(0_0_0_/_0.95)] sm:p-6',
+        showError
+          ? 'border-red-900/50 from-red-950/30'
+          : 'border-amber-500/25 from-amber-500/10',
+      )}
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-amber-500/20 blur-3xl"
+        className={cn(
+          'pointer-events-none absolute -right-10 -top-12 size-40 rounded-full blur-3xl',
+          showError ? 'bg-red-900/20' : 'bg-amber-500/20',
+        )}
       />
-      <h2 className="relative font-display text-lg font-semibold text-cream-50">
-        {isGenerating ? t(workingTitleKey) : t('create.ready')}
+      <h2
+        id={titleId}
+        className="relative font-display text-lg font-semibold text-cream-50"
+      >
+        {title}
       </h2>
+      <output className="sr-only">{announcement}</output>
       {isGenerating ? (
         <GeneratingState
           progress={progress}
           workingHintKey={workingHintKey}
         />
       ) : null}
-      {result && !isGenerating ? (
+      {showError ? (
+        <GenerationErrorState message={error} onRetry={onRetry} />
+      ) : null}
+      <CoverErrorNotice message={coverError} />
+      {showResult ? (
         <ReadyResult
           result={result}
           requestedTrackCount={requestedTrackCount}
           copied={copied}
           onCopy={onCopy}
+          onAdjust={onAdjust}
+          onCreateAnother={onCreateAnother}
         />
       ) : null}
     </section>

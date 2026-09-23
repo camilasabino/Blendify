@@ -240,10 +240,10 @@ export function ArtistSimilarSuggestions({
       )}
     >
       <div className="space-y-1">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-amber-400/90">
-          <Sparkles className="size-3.5" />
+        <h3 className="flex items-center gap-2 font-sans text-xs font-medium uppercase tracking-[0.16em] text-amber-400/90">
+          <Sparkles aria-hidden className="size-3.5" />
           {t('artist.exploreFor', { name: seed.name })}
-        </div>
+        </h3>
         <p className="text-sm leading-relaxed text-cream-400">
           {t('artist.exploreHint')}
         </p>

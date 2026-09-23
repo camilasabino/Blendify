@@ -32,7 +32,9 @@ export function useGenerationSettingsCollapse(
   }
 
   useEffect(() => {
-    if (isGenerating) scrollIntoViewRespectingMotion(resultPanelRef.current)
+    if (!isGenerating) return
+    scrollIntoViewRespectingMotion(resultPanelRef.current)
+    resultPanelRef.current?.focus({ preventScroll: true })
   }, [isGenerating])
 
   return {
@@ -40,5 +42,6 @@ export function useGenerationSettingsCollapse(
     isActive,
     collapsed: isActive && !settingsExpanded,
     toggleSettings: () => setSettingsExpanded((expanded) => !expanded),
+    expandSettings: () => setSettingsExpanded(true),
   }
 }

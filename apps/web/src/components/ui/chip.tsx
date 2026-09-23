@@ -79,12 +79,12 @@ export function RemovableChip({
         type="button"
         onClick={onRemove}
         className={cn(
-          'rounded-full p-0.5 text-cream-400 transition-colors hover:bg-charcoal-700 hover:text-cream-50',
+          '-my-0.5 -mr-1 flex size-6 shrink-0 items-center justify-center rounded-full text-cream-400 transition-colors hover:bg-charcoal-700 hover:text-cream-50 disabled:pointer-events-none disabled:opacity-50',
           focusRing,
         )}
         aria-label={removeLabel}
       >
-        <X className="size-3.5" />
+        <X aria-hidden className="size-3.5" />
       </button>
     </li>
   )
@@ -105,7 +105,7 @@ export function SeedChip({
     <button
       type="button"
       className={cn(
-        'rounded-full px-2.5 py-1 text-[11px] transition',
+        'inline-flex min-h-6 items-center rounded-full px-2.5 py-1 text-[11px] transition disabled:cursor-not-allowed disabled:opacity-50',
         focusRing,
         active
           ? 'bg-amber-500/20 text-amber-200'
@@ -113,6 +113,27 @@ export function SeedChip({
         className,
       )}
       {...props}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function ClearAllButton({
+  onClick,
+  children,
+}: Readonly<{
+  onClick: () => void
+  children: ReactNode
+}>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex min-h-6 items-center rounded-md px-1.5 text-xs text-cream-400 transition-colors hover:text-cream-200 disabled:pointer-events-none disabled:opacity-50',
+        focusRing,
+      )}
     >
       {children}
     </button>

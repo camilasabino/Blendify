@@ -60,6 +60,7 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/app" element={<AppShell />}>
+            <Route index element={<Navigate to="mix" replace />} />
             <Route path="mix" element={<MixPlaylistPage />} />
             <Route path="discover" element={<DiscoverPlaylistPage />} />
             <Route path="library" element={<LibraryPage />} />

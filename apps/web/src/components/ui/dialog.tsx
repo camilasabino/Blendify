@@ -1,8 +1,13 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import {
+  useEffect,
+  useId,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 
 type DialogProps = Readonly<{
@@ -11,7 +16,12 @@ type DialogProps = Readonly<{
   title: string
   children: ReactNode
   className?: string
+  initialFocusRef?: RefObject<HTMLElement | null>
+  dismissible?: boolean
 }>
+
+const FOCUSABLE_SELECTOR =
+  'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
 function Dialog({
   open,
@@ -19,27 +29,34 @@ function Dialog({
   title,
   children,
   className,
+  initialFocusRef,
+  dismissible = true,
 }: DialogProps) {
-  const t = useT()
   const titleId = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
     const dialog = dialogRef.current
-    if (!dialog) return
+    if (!dialog || !open) return
 
-    if (open) {
-      if (!dialog.open) dialog.showModal()
-      const frame = window.requestAnimationFrame(() => {
-        dialog
-          .querySelector<HTMLElement>('button, [href], input')
-          ?.focus()
-      })
-      return () => window.cancelAnimationFrame(frame)
+    const trigger =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    if (!dialog.open) dialog.showModal()
+    const frame = window.requestAnimationFrame(() => {
+      const target =
+        initialFocusRef?.current ??
+        dialog.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+      target?.focus()
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      if (dialog.open) dialog.close()
+      if (trigger?.isConnected) trigger.focus()
     }
-
-    if (dialog.open) dialog.close()
-  }, [open])
+  }, [open, initialFocusRef])
 
   return createPortal(
     <dialog
@@ -49,21 +66,22 @@ function Dialog({
         'blendify-dialog w-full max-w-md rounded-2xl border border-cream-200/15 bg-charcoal-900 p-5 text-cream-50 shadow-[0_24px_80px_-24px_rgb(0_0_0_/_0.9)] open:animate-fade-up',
         className,
       )}
-      onClose={() => {
-        if (open) onClose()
-      }}
+      closedby={dismissible ? 'closerequest' : 'none'}
       onCancel={(event) => {
         event.preventDefault()
-        onClose()
+        if (dismissible) onClose()
+      }}
+      onClose={(event) => {
+        if (!open) return
+        if (dismissible) {
+          onClose()
+          return
+        }
+        const dialog = event.currentTarget
+        if (!dialog.open) dialog.showModal()
       }}
     >
       <div className="relative">
-        <button
-          type="button"
-          aria-label={t('common.close')}
-          className="sr-only"
-          onClick={onClose}
-        />
         <h2
           id={titleId}
           className="font-display text-lg tracking-tight text-cream-50"
@@ -102,9 +120,14 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const confirmRef = useRef<HTMLButtonElement>(null)
+
   return (
     <Dialog
       open={open}
+      dismissible={!busy}
+      initialFocusRef={danger && cancelLabel ? cancelRef : confirmRef}
       onClose={() => {
         if (busy) return
         onCancel()
@@ -124,6 +147,7 @@ export function ConfirmDialog({
       <div className="mt-5 flex flex-wrap justify-end gap-2">
         {cancelLabel ? (
           <Button
+            ref={cancelRef}
             type="button"
             size="sm"
             variant="ghost"
@@ -134,6 +158,7 @@ export function ConfirmDialog({
           </Button>
         ) : null}
         <Button
+          ref={confirmRef}
           type="button"
           size="sm"
           variant={danger ? 'danger' : 'default'}

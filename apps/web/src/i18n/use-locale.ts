@@ -9,7 +9,7 @@ const META_DESCRIPTION: Record<Locale, string> = {
   pt: 'Blendify — Crie e descubra playlists no Spotify.',
 }
 
-const DOCUMENT_TITLE: Record<Locale, string> = {
+export const DOCUMENT_TITLE: Record<Locale, string> = {
   en: 'Blendify — Mix & Discover',
   es: 'Blendify — Mezcla y descubre',
   pt: 'Blendify — Misture e descubra',

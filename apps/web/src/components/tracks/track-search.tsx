@@ -6,6 +6,7 @@ import { formatDuration } from '@/lib/utils'
 
 type TrackSearchProps = Readonly<{
   selectedIds: Set<string>
+  inputId?: string
   onSelect: (track: TrackDto) => void
   disabled?: boolean
   className?: string
@@ -20,7 +21,9 @@ export function TrackSearch(props: TrackSearchProps) {
       search={async (query) => (await api.searchTracks(query)).tracks}
       selectedIds={props.selectedIds}
       onSelect={props.onSelect}
+      inputId={props.inputId}
       placeholder={t('search.trackPlaceholder')}
+      resultsLabel={t('search.trackResults')}
       clearLabel={t('search.clear')}
       emptyLabel={t('search.trackEmpty')}
       errorLabel={(error) =>

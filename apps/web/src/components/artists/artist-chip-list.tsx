@@ -1,5 +1,5 @@
 import type { Artist } from '@/lib/api'
-import { RemovableChip } from '@/components/ui/chip'
+import { ClearAllButton, RemovableChip } from '@/components/ui/chip'
 import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 
@@ -30,13 +30,9 @@ export function ArtistChipList({
     <div className={cn('space-y-2', className)}>
       <div className="flex items-center justify-end">
         {onClear && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="text-xs text-cream-400 transition-colors hover:text-cream-200"
-          >
+          <ClearAllButton onClick={onClear}>
             {t('create.clearAll')}
-          </button>
+          </ClearAllButton>
         )}
       </div>
       <ul className="flex flex-wrap gap-2">

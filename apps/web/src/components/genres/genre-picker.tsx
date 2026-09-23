@@ -3,7 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus, RefreshCw, Sparkles } from 'lucide-react'
 import { api, type CuratedGenre } from '@/lib/api'
 import { GenreIcon } from '@/components/genres/genre-icon'
-import { RemovableChip, SeedChip, SelectableChip } from '@/components/ui/chip'
+import {
+  ClearAllButton,
+  RemovableChip,
+  SeedChip,
+  SelectableChip,
+} from '@/components/ui/chip'
 import { FieldError } from '@/components/ui/feedback'
 import { SearchField } from '@/components/ui/search-field'
 import { Spinner } from '@/components/ui/spinner'
@@ -40,16 +45,9 @@ function SelectedGenres({
     <div className="space-y-2">
       <div className="flex items-center justify-end">
         {onClear ? (
-          <button
-            type="button"
-            onClick={onClear}
-            className={cn(
-              'text-xs text-cream-400 transition-colors hover:text-cream-200',
-              focusRing,
-            )}
-          >
+          <ClearAllButton onClick={onClear}>
             {t('create.clearAll')}
-          </button>
+          </ClearAllButton>
         ) : null}
       </div>
       <ul className="flex flex-wrap gap-2">
@@ -88,9 +86,9 @@ function GenreCatalogResults({
   const t = useT()
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium text-cream-300">
+      <h3 className="font-sans text-sm font-medium text-cream-300">
         {searching ? t('genre.results') : t('genre.mains')}
-      </p>
+      </h3>
       <div className="flex flex-wrap gap-2">
         {visible.map((genre) => {
           const isSelected = selectedIds.has(genre.id)
@@ -146,10 +144,10 @@ function GenreExploreSection({
   return (
     <div className="space-y-3 rounded-2xl border border-amber-500/15 bg-gradient-to-b from-amber-500/[0.07] to-transparent p-4">
       <div className="space-y-1">
-        <div className="flex items-center gap-2 text-sm font-medium text-amber-300/90">
-          <Sparkles className="size-3.5" />
+        <h3 className="flex items-center gap-2 font-sans text-sm font-medium text-amber-300/90">
+          <Sparkles aria-hidden className="size-3.5" />
           {t('genre.exploreFor', { query: seed.name })}
-        </div>
+        </h3>
         <p className="text-sm leading-relaxed text-cream-400">
           {t('genre.exploreHint')}
         </p>

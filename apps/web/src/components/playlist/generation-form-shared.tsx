@@ -106,21 +106,24 @@ export function CoverErrorNotice({ message }: Readonly<{ message: string | null 
 
 export function GenerationSubmitBar({
   isGenerating,
-  disabled,
+  disabledReason,
   error,
   idleLabel,
   busyLabel,
   icon: Icon,
 }: Readonly<{
   isGenerating: boolean
-  disabled: boolean
+  disabledReason: string | null
   error: string | null
   idleLabel: string
   busyLabel: string
   icon: LucideIcon
 }>) {
+  const reasonId = useId()
+  const showReason = Boolean(disabledReason) && !isGenerating
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {error ? <FieldError>{error}</FieldError> : null}
       <Button
         type="submit"
@@ -130,11 +133,17 @@ export function GenerationSubmitBar({
           isGenerating ? 'animate-pulse-glow' : '',
         )}
         loading={isGenerating}
-        disabled={disabled}
+        disabled={Boolean(disabledReason)}
+        aria-describedby={showReason ? reasonId : undefined}
       >
         {!isGenerating ? <Icon className="size-4" /> : null}
         {isGenerating ? busyLabel : idleLabel}
       </Button>
+      {showReason ? (
+        <p id={reasonId} className="text-sm text-cream-400">
+          {disabledReason}
+        </p>
+      ) : null}
     </div>
   )
 }

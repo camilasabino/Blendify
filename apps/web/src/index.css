@@ -191,6 +191,17 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer utilities {
   .bg-atmosphere {
     background-color: var(--color-charcoal-950);

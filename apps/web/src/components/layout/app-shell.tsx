@@ -40,6 +40,15 @@ export function AppShell() {
 
   return (
     <div className="bg-atmosphere bg-grain relative min-h-svh overflow-x-hidden">
+      <a
+        href="#main-content"
+        className={cn(
+          'sr-only rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-charcoal-950 focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50',
+          focusRing,
+        )}
+      >
+        {t('nav.skipToContent')}
+      </a>
       <div
         aria-hidden
         className="pointer-events-none absolute -left-28 top-24 z-0 size-[26rem] rounded-full bg-amber-500/15 blur-3xl animate-drift"
@@ -62,7 +71,10 @@ export function AppShell() {
             >
               <BlendifyMark />
             </NavLink>
-            <nav className="hidden items-center gap-1 md:flex">
+            <nav
+              className="hidden items-center gap-1 md:flex"
+              aria-label={t('nav.main')}
+            >
               <NavLink to="/app/mix" className={navLinkClass}>
                 <Shuffle className="size-4" />
                 {t('nav.create')}
@@ -147,7 +159,11 @@ export function AppShell() {
         </nav>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="relative z-10 outline-none mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10"
+      >
         <Outlet />
       </main>
     </div>

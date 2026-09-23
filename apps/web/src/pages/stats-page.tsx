@@ -7,11 +7,13 @@ import { ErrorState, LoadingState } from '@/components/ui/feedback'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/dialog'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useT } from '@/i18n/use-t'
 import { isUsageStatsEmpty } from '@/lib/usage-stats'
 
 export function StatsPage() {
   const t = useT()
+  useDocumentTitle(t('nav.stats'))
   const queryClient = useQueryClient()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { data, isLoading, isError, refetch } = useQuery({

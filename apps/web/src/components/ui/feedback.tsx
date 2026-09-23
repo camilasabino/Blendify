@@ -18,7 +18,7 @@ export function EmptyState({ title, body, action, className }: EmptyStateProps) 
         className,
       )}
     >
-      <p className="font-display text-lg text-cream-100">{title}</p>
+      <h2 className="font-display text-lg text-cream-100">{title}</h2>
       <p className="mt-2 text-sm text-cream-400">{body}</p>
       {action ? (
         <Link to={action.to} className={cn(buttonVariants({ className: 'mt-5' }))}>
