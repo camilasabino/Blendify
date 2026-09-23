@@ -120,6 +120,33 @@ describe('EquitableAllocationStrategy', () => {
     expect(sum(allocation)).toBe(10);
   });
 
+  it('treats an artist missing from the availability map as having zero tracks (no prorate)', () => {
+    const allocation = strategy.allocate({
+      artistIds: ['a', 'ghost'],
+      tracksPerSeed: 10,
+      availableByArtist: new Map([['a', 20]]),
+    });
+
+    expect(allocation.get('ghost')).toBe(0);
+    // Redistribution tops 'a' up with the quota 'ghost' cannot use.
+    expect(allocation.get('a')).toBe(20);
+  });
+
+  it('treats an artist missing from the availability map as having zero tracks (prorated)', () => {
+    const artistIds = Array.from({ length: 25 }, (_, i) => `artist-${i}`);
+    const availableByArtist = new Map(
+      artistIds.slice(1).map((id) => [id, 50] as const),
+    );
+
+    const allocation = strategy.allocate({
+      artistIds,
+      tracksPerSeed: 30,
+      availableByArtist,
+    });
+
+    expect(allocation.get('artist-0')).toBe(0);
+  });
+
   it('returns an empty map for no artists', () => {
     const allocation = strategy.allocate({
       artistIds: [],

@@ -79,6 +79,12 @@ describe('preferPopularTracks', () => {
       'a',
     ]);
   });
+
+  it('returns the input unchanged for an empty pool or a non-positive need', () => {
+    expect(preferPopularTracks([], 5)).toEqual([]);
+    expect(preferPopularTracks(tracks, 0)).toBe(tracks);
+    expect(preferPopularTracks(tracks, -1)).toBe(tracks);
+  });
 });
 
 describe('preferRareTracks', () => {
@@ -103,5 +109,11 @@ describe('preferRareTracks', () => {
       'mid',
       'hit',
     ]);
+  });
+
+  it('returns the input unchanged for an empty pool or a non-positive need', () => {
+    expect(preferRareTracks([], 5)).toEqual([]);
+    expect(preferRareTracks(tracks, 0)).toBe(tracks);
+    expect(preferRareTracks(tracks, -1)).toBe(tracks);
   });
 });

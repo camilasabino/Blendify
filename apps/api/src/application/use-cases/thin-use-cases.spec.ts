@@ -75,6 +75,19 @@ describe('thin application use cases', () => {
     expect(resetStats).toHaveBeenCalledWith('user-1');
   });
 
+  it('ResetUserStatsUseCase rejects unknown users', async () => {
+    const users = {
+      findById: jest.fn().mockResolvedValue(null),
+    } as unknown as UserRepositoryPort;
+    const usage = {
+      resetStats: jest.fn(),
+    } as unknown as UsageStatsRepositoryPort;
+
+    await expect(
+      new ResetUserStatsUseCase(usage, users).execute('missing'),
+    ).rejects.toMatchObject({ code: 'USER_NOT_FOUND' });
+  });
+
   it('SearchTracksUseCase returns mapped tracks and ignores short queries', async () => {
     const track = Track.create({
       id: TrackId.create('t1'),
@@ -121,6 +134,100 @@ describe('thin application use cases', () => {
     expect(updatePlaylistDetails).toHaveBeenCalledWith('sp1', {
       name: 'Renamed',
     });
+    expect(save).toHaveBeenCalled();
+  });
+
+  it('RenamePlaylistUseCase rejects playlists the user does not own', async () => {
+    const playlists = {
+      findById: jest.fn().mockResolvedValue(null),
+    } as unknown as PlaylistRepositoryPort;
+    const providers = {
+      forUser: jest.fn(),
+    } as unknown as MusicProviderFactoryPort;
+
+    await expect(
+      new RenamePlaylistUseCase(playlists, providers).execute(
+        'user-1',
+        'missing',
+        'Renamed',
+      ),
+    ).rejects.toMatchObject({ code: 'PLAYLIST_NOT_FOUND' });
+  });
+
+  it('RenamePlaylistUseCase skips the Spotify sync when the playlist is not linked', async () => {
+    const playlist = makePlaylist();
+    const save = jest
+      .fn()
+      .mockImplementation((p: Playlist) => Promise.resolve(p));
+    const playlists = {
+      findById: jest.fn().mockResolvedValue(playlist),
+      save,
+    } as unknown as PlaylistRepositoryPort;
+    const updatePlaylistDetails = jest.fn();
+    const providers = {
+      forUser: () => ({ updatePlaylistDetails }),
+    } as unknown as MusicProviderFactoryPort;
+
+    const detail = await new RenamePlaylistUseCase(
+      playlists,
+      providers,
+    ).execute('user-1', 'playlist-1', 'Renamed');
+
+    expect(detail.name).toBe('Renamed');
+    expect(updatePlaylistDetails).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalled();
+  });
+
+  it('RenamePlaylistUseCase skips the Spotify sync for a playlist marked missing on Spotify', async () => {
+    const playlist = makePlaylist();
+    playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
+    playlist.markMissingOnSpotify();
+    const save = jest
+      .fn()
+      .mockImplementation((p: Playlist) => Promise.resolve(p));
+    const playlists = {
+      findById: jest.fn().mockResolvedValue(playlist),
+      save,
+    } as unknown as PlaylistRepositoryPort;
+    const updatePlaylistDetails = jest.fn();
+    const providers = {
+      forUser: () => ({ updatePlaylistDetails }),
+    } as unknown as MusicProviderFactoryPort;
+
+    const detail = await new RenamePlaylistUseCase(
+      playlists,
+      providers,
+    ).execute('user-1', 'playlist-1', 'Renamed');
+
+    expect(detail.name).toBe('Renamed');
+    expect(updatePlaylistDetails).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalled();
+  });
+
+  it('RenamePlaylistUseCase saves locally even when the Spotify sync fails', async () => {
+    const playlist = makePlaylist();
+    playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
+    const save = jest
+      .fn()
+      .mockImplementation((p: Playlist) => Promise.resolve(p));
+    const playlists = {
+      findById: jest.fn().mockResolvedValue(playlist),
+      save,
+    } as unknown as PlaylistRepositoryPort;
+    const providers = {
+      forUser: () => ({
+        updatePlaylistDetails: jest
+          .fn()
+          .mockRejectedValue(new Error('spotify down')),
+      }),
+    } as unknown as MusicProviderFactoryPort;
+
+    const detail = await new RenamePlaylistUseCase(
+      playlists,
+      providers,
+    ).execute('user-1', 'playlist-1', 'Renamed');
+
+    expect(detail.name).toBe('Renamed');
     expect(save).toHaveBeenCalled();
   });
 
@@ -191,6 +298,28 @@ describe('thin application use cases', () => {
         { fromSpotify: true },
       ),
     ).rejects.toThrow('spotify down');
+  });
+
+  it('RemovePlaylistFromLibraryUseCase stringifies a non-Error Spotify purge failure', async () => {
+    const playlist = makePlaylist();
+    playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
+    const playlists = {
+      findById: jest.fn().mockResolvedValue(playlist),
+      save: jest.fn(),
+    } as unknown as PlaylistRepositoryPort;
+    const providers = {
+      forUser: () => ({
+        deletePlaylist: jest.fn().mockRejectedValue('spotify down'),
+      }),
+    } as unknown as MusicProviderFactoryPort;
+
+    await expect(
+      new RemovePlaylistFromLibraryUseCase(playlists, providers).execute(
+        'user-1',
+        'playlist-1',
+        { fromSpotify: true },
+      ),
+    ).rejects.toBe('spotify down');
   });
 
   it('RemovePlaylistFromLibraryUseCase rejects foreign playlists', async () => {

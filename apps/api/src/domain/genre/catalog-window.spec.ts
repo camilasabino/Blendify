@@ -44,6 +44,32 @@ describe('catalogPoolBounds', () => {
     });
     expect(RARITIES_POOL_START).toBe(0.6);
   });
+
+  it('returns an empty window for an empty or negative-length chart', () => {
+    expect(catalogPoolBounds(0, PopularityMode.POPULAR)).toEqual({
+      start: 0,
+      end: 0,
+    });
+    expect(catalogPoolBounds(-1, PopularityMode.BALANCED)).toEqual({
+      start: 0,
+      end: 0,
+    });
+  });
+});
+
+describe('catalogCandidateBudget', () => {
+  it('returns zero for a non-positive need', () => {
+    expect(catalogCandidateBudget(0)).toBe(0);
+    expect(catalogCandidateBudget(-5)).toBe(0);
+  });
+});
+
+describe('catalogEntryKey', () => {
+  it('treats a missing artist name as empty rather than "undefined"', () => {
+    expect(catalogEntryKey({ trackName: 'Song' })).toBe(
+      catalogEntryKey({ artistName: '', trackName: 'Song' }),
+    );
+  });
 });
 
 describe('expandCatalogPoolBounds', () => {
@@ -83,6 +109,12 @@ describe('expandCatalogPoolBounds', () => {
         start: 0,
         end: 50,
       }),
+    ).toBeNull();
+  });
+
+  it('returns null for an empty or negative-length chart', () => {
+    expect(
+      expandCatalogPoolBounds(0, PopularityMode.POPULAR, { start: 0, end: 0 }),
     ).toBeNull();
   });
 });
@@ -132,6 +164,48 @@ describe('nextCatalogBatch', () => {
     for (const item of batch) {
       expect(entries.indexOf(item)).toBeLessThan(30);
     }
+  });
+
+  it('reports exhausted with an empty batch for empty entries or a non-positive need', () => {
+    expect(
+      nextCatalogBatch(
+        [],
+        PopularityMode.POPULAR,
+        10,
+        new Set(),
+        { start: 0, end: 0 },
+        pickLast,
+      ),
+    ).toEqual({ batch: [], bounds: { start: 0, end: 0 }, exhausted: true });
+
+    expect(
+      nextCatalogBatch(
+        entries,
+        PopularityMode.POPULAR,
+        0,
+        new Set(),
+        { start: 0, end: 20 },
+        pickLast,
+      ),
+    ).toEqual({
+      batch: [],
+      bounds: { start: 0, end: 20 },
+      exhausted: true,
+    });
+  });
+
+  it('reports exhausted once the pool cannot expand further (balanced mode)', () => {
+    const attempted = new Set(entries.map((entry) => catalogEntryKey(entry)));
+    const { batch, exhausted } = nextCatalogBatch(
+      entries,
+      PopularityMode.BALANCED,
+      10,
+      attempted,
+      { start: 0, end: 50 },
+      pickLast,
+    );
+    expect(exhausted).toBe(true);
+    expect(batch).toEqual([]);
   });
 });
 

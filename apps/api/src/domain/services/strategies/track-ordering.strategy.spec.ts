@@ -50,6 +50,15 @@ describe('TrackOrderingStrategy', () => {
       const ordered = new SortByTitleStrategy().order(tracksByArtist);
       expect(ordered.map((t) => t.name)).toEqual(['Dawn', 'Moon']);
     });
+
+    it('breaks a title tie by artist name', () => {
+      const tracksByArtist = new Map<string, Track[]>([
+        ['z', [track('1', 'z', 'Same Title', 'Zebra')]],
+        ['a', [track('2', 'a', 'Same Title', 'Alpha')]],
+      ]);
+      const ordered = new SortByTitleStrategy().order(tracksByArtist);
+      expect(ordered.map((t) => t.id.getValue())).toEqual(['2', '1']);
+    });
   });
 
   describe('RandomFlatStrategy', () => {

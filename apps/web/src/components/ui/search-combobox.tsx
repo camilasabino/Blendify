@@ -76,10 +76,7 @@ function SearchComboboxOptions<T extends { id: string }>({
   renderOption: (item: T, selected: boolean) => ReactNode
 }>) {
   return (
-    <div
-      className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-card border border-divider bg-raised py-1 shadow-xl shadow-charcoal-950/60 animate-fade-in"
-      onMouseDown={(event) => event.preventDefault()}
-    >
+    <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-card border border-divider bg-raised py-1 shadow-xl shadow-charcoal-950/60 animate-fade-in">
       {isError ? (
         <div className="px-3 py-2">
           <FieldError>{errorLabel(error)}</FieldError>
@@ -100,7 +97,13 @@ function SearchComboboxOptions<T extends { id: string }>({
               aria-selected={active}
               aria-disabled={selected || disabled || undefined}
               onMouseEnter={() => !selected && onHover(index)}
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => onSelect(item)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                onSelect(item)
+              }}
               className={cn(
                 'flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150',
                 selected ? 'cursor-default opacity-40' : 'cursor-pointer',

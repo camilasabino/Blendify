@@ -25,6 +25,7 @@ describe('curated genres', () => {
     });
     expect(findCuratedGenre('custom:')).toBeUndefined();
     expect(findCuratedGenre('   ')).toBeUndefined();
+    expect(findCuratedGenre('custom:%')).toBeUndefined();
   });
 
   it('lists featured mains and maps DTOs', () => {

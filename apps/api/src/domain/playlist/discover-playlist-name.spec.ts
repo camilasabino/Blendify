@@ -31,6 +31,12 @@ describe('discover playlist naming helpers', () => {
         seedType: 'artist',
       }),
     ).toContain('orbit');
+
+    expect(
+      buildDiscoverPlaylistDescription({ seedName: '   ', seedType: 'track' }),
+    ).toContain('this pick');
+
+    expect(buildDiscoverPlaylistName('a'.repeat(200)).length).toBeLessThan(200);
   });
 
   it('sizes similar-artist and per-seed targets', () => {

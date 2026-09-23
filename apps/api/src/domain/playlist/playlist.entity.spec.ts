@@ -210,4 +210,35 @@ describe('Playlist entity', () => {
     });
     expect(playlist.name.getValue()).toBe('Evening mix');
   });
+
+  it('prefers the reported duration over the summed tracks when both are present', () => {
+    const playlist = makePlaylist();
+    playlist.syncFromSpotify({
+      name: 'With duration',
+      url: 'https://open.spotify.com/playlist/sp1',
+      trackCount: 2,
+      totalDurationMs: 999_000,
+      tracks: [makeTrack('r1', 100_000), makeTrack('r2', 50_000)],
+    });
+    expect(playlist.totalDurationMs).toBe(999_000);
+  });
+
+  it('keeps the known duration when a later sync omits tracks and reports zero for a non-empty playlist', () => {
+    const playlist = makePlaylist();
+    playlist.syncFromSpotify({
+      name: 'Known duration',
+      url: 'https://open.spotify.com/playlist/sp1',
+      trackCount: 1,
+      totalDurationMs: 180_000,
+    });
+    expect(playlist.totalDurationMs).toBe(180_000);
+
+    playlist.syncFromSpotify({
+      name: 'Known duration',
+      url: 'https://open.spotify.com/playlist/sp1',
+      trackCount: 1,
+      totalDurationMs: 0,
+    });
+    expect(playlist.totalDurationMs).toBe(180_000);
+  });
 });

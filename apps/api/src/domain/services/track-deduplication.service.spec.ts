@@ -74,6 +74,16 @@ describe('TrackDeduplicationService', () => {
     expect(result[0].id.getValue()).toBe('2');
   });
 
+  it('breaks a popularity tie between two alternates by keeping the first', () => {
+    const result = service.deduplicate([
+      track({ id: '1', name: 'Hello - Live', popularity: 60 }),
+      track({ id: '2', name: 'Hello (Acoustic)', popularity: 60 }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id.getValue()).toBe('1');
+  });
+
   it('deduplicates within artist buckets independently', () => {
     const byArtist = new Map([
       [

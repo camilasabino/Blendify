@@ -30,6 +30,20 @@ describe('genre display / tags', () => {
     expect(toLastFmTag('Rock en Español')).toBe('rock en espanol');
   });
 
+  it('lowercases a small word that ends a longer phrase (not just mid-phrase)', () => {
+    expect(formatGenreDisplayName('musica de la')).toBe('Musica de la');
+  });
+
+  it('uppercases a standalone acronym token that is not part of an override', () => {
+    expect(formatGenreDisplayName('nyc house')).toBe('NYC House');
+  });
+
+  it('returns the trimmed input unchanged for a blank tag', () => {
+    expect(canonicalizeGenreTag('   ')).toBe('');
+    expect(formatGenreDisplayName('  Freeform  ')).toBe('Freeform');
+    expect(formatGenreDisplayName('   ')).toBe('');
+  });
+
   it('exposes the expected display overrides', () => {
     expect(DISPLAY_OVERRIDES.electronic).toBe('Electronic');
     expect(DISPLAY_OVERRIDES.edm).toBe('EDM');

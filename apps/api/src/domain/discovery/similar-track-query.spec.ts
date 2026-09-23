@@ -21,6 +21,21 @@ describe('similar-track-query', () => {
     ).toBe('Get Lucky');
   });
 
+  it('strips a remaster year token embedded in a compound word', () => {
+    // "postremaster" is not a whole "remaster" word, so this only strips via
+    // the digit-token scan inside hasVersionMarker's fallback check.
+    expect(cleanDiscoveryTrackTitle('Song (PostRemaster 97)')).toBe('Song');
+  });
+
+  it('strips a "from" movie/soundtrack credit in double or single quotes', () => {
+    expect(
+      cleanDiscoveryTrackTitle('My Heart Will Go On (From "Titanic")'),
+    ).toBe('My Heart Will Go On');
+    expect(cleanDiscoveryTrackTitle("Let It Go (From 'Frozen')")).toBe(
+      'Let It Go',
+    );
+  });
+
   it('extracts explicit aliases without splitting real artist punctuation', () => {
     expect(primaryArtistName('Artist feat. Guest')).toBe('Artist');
     expect(primaryArtistName('Yusuf / Cat Stevens')).toBe('Yusuf');

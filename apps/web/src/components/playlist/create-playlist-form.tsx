@@ -128,6 +128,158 @@ function mixDisabledReason(
   return null
 }
 
+function MixArtistSource({
+  artists,
+  artistSearchId,
+  selectedIds,
+  onAddArtist,
+  onRemoveArtist,
+  onClearArtists,
+  pasteOpen,
+  onTogglePaste,
+  pasteId,
+  pasteRegionId,
+  pasteHintId,
+  pasteList,
+  onPasteChange,
+  onResolve,
+  resolvePending,
+  resolveError,
+  t,
+}: Readonly<{
+  artists: Artist[]
+  artistSearchId: string
+  selectedIds: Set<string>
+  onAddArtist: (artist: Artist) => void
+  onRemoveArtist: (id: string) => void
+  onClearArtists: () => void
+  pasteOpen: boolean
+  onTogglePaste: () => void
+  pasteId: string
+  pasteRegionId: string
+  pasteHintId: string
+  pasteList: string
+  onPasteChange: (value: string) => void
+  onResolve: () => void
+  resolvePending: boolean
+  resolveError: string | null
+  t: ReturnType<typeof useT>
+}>) {
+  return (
+    <div className="space-y-3">
+      <SelectionHeader
+        labelFor={artistSearchId}
+        label={t('create.artists')}
+        count={artists.length}
+        max={MAX_ARTISTS}
+        clearLabel={t('create.clearAll')}
+        onClear={onClearArtists}
+      />
+      <ArtistSearch
+        inputId={artistSearchId}
+        selectedIds={selectedIds}
+        onSelect={onAddArtist}
+        disabled={artists.length >= MAX_ARTISTS}
+      />
+      {artists.length === 0 ? (
+        <p className="text-sm text-cream-400">
+          {t('create.artistsEmpty', { max: MAX_ARTISTS })}
+        </p>
+      ) : (
+        <ArtistChipList artists={artists} onRemove={onRemoveArtist} />
+      )}
+      <ArtistSimilarSuggestions
+        selected={artists}
+        max={MAX_ARTISTS}
+        onSelect={onAddArtist}
+      />
+
+      <div className="border-t border-divider pt-3">
+        <button
+          type="button"
+          aria-expanded={pasteOpen}
+          aria-controls={pasteRegionId}
+          onClick={onTogglePaste}
+          className={cn(
+            'inline-flex min-h-9 items-center gap-2 rounded-control text-sm font-medium text-cream-200 transition-colors hover:text-cream-50',
+            focusRing,
+          )}
+        >
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              'size-4 text-cream-400 transition-transform motion-reduce:transition-none',
+              pasteOpen && 'rotate-180',
+            )}
+          />
+          {t('create.paste')}
+        </button>
+        <div id={pasteRegionId} hidden={!pasteOpen} className="space-y-2 pt-2">
+          <Label htmlFor={pasteId} className="sr-only">
+            {t('create.paste')}
+          </Label>
+          <Textarea
+            id={pasteId}
+            placeholder={t('create.pastePlaceholder')}
+            value={pasteList}
+            onChange={(e) => onPasteChange(e.target.value)}
+            aria-describedby={pasteHintId}
+            rows={4}
+          />
+          <p id={pasteHintId} className="text-xs text-cream-400">
+            {t('create.pasteHint')}
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onResolve}
+              loading={resolvePending}
+              disabled={!pasteList.trim()}
+            >
+              {!resolvePending ? <Music2 aria-hidden className="size-4" /> : null}
+              {t('create.resolve')}
+            </Button>
+            <FieldError>{resolveError}</FieldError>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MixGenreSource({
+  genres,
+  onToggleGenre,
+  onRemoveGenre,
+  onClearGenres,
+  t,
+}: Readonly<{
+  genres: CuratedGenre[]
+  onToggleGenre: (genre: CuratedGenre) => void
+  onRemoveGenre: (id: string) => void
+  onClearGenres: () => void
+  t: ReturnType<typeof useT>
+}>) {
+  return (
+    <div className="space-y-3">
+      <SelectionHeader
+        label={t('create.genres')}
+        count={genres.length}
+        max={MAX_GENRES}
+        clearLabel={t('create.clearAll')}
+        onClear={onClearGenres}
+      />
+      <GenrePicker
+        selected={genres}
+        max={MAX_GENRES}
+        onToggle={onToggleGenre}
+        onRemove={onRemoveGenre}
+      />
+    </div>
+  )
+}
+
 export function MixPlaylistForm() {
   const t = useT()
   const queryClient = useQueryClient()
@@ -529,107 +681,33 @@ export function MixPlaylistForm() {
               />
 
               {mode === 'artists' ? (
-                <div className="space-y-3">
-                  <SelectionHeader
-                    labelFor={artistSearchId}
-                    label={t('create.artists')}
-                    count={artists.length}
-                    max={MAX_ARTISTS}
-                    clearLabel={t('create.clearAll')}
-                    onClear={() => setArtists([])}
-                  />
-                  <ArtistSearch
-                    inputId={artistSearchId}
-                    selectedIds={selectedIds}
-                    onSelect={addArtist}
-                    disabled={artists.length >= MAX_ARTISTS}
-                  />
-                  {artists.length === 0 ? (
-                    <p className="text-sm text-cream-400">
-                      {t('create.artistsEmpty', { max: MAX_ARTISTS })}
-                    </p>
-                  ) : (
-                    <ArtistChipList artists={artists} onRemove={removeArtist} />
-                  )}
-                  <ArtistSimilarSuggestions
-                    selected={artists}
-                    max={MAX_ARTISTS}
-                    onSelect={addArtist}
-                  />
-
-                  <div className="border-t border-divider pt-3">
-                    <button
-                      type="button"
-                      aria-expanded={pasteOpen}
-                      aria-controls={pasteRegionId}
-                      onClick={() => setPasteOpen((open) => !open)}
-                      className={cn(
-                        'inline-flex min-h-9 items-center gap-2 rounded-control text-sm font-medium text-cream-200 transition-colors hover:text-cream-50',
-                        focusRing,
-                      )}
-                    >
-                      <ChevronDown
-                        aria-hidden
-                        className={cn(
-                          'size-4 text-cream-400 transition-transform motion-reduce:transition-none',
-                          pasteOpen && 'rotate-180',
-                        )}
-                      />
-                      {t('create.paste')}
-                    </button>
-                    <div
-                      id={pasteRegionId}
-                      hidden={!pasteOpen}
-                      className="space-y-2 pt-2"
-                    >
-                      <Label htmlFor={pasteId} className="sr-only">
-                        {t('create.paste')}
-                      </Label>
-                      <Textarea
-                        id={pasteId}
-                        placeholder={t('create.pastePlaceholder')}
-                        value={pasteList}
-                        onChange={(e) => setPasteList(e.target.value)}
-                        aria-describedby={pasteHintId}
-                        rows={4}
-                      />
-                      <p id={pasteHintId} className="text-xs text-cream-400">
-                        {t('create.pasteHint')}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={handleResolve}
-                          loading={resolveMutation.isPending}
-                          disabled={!pasteList.trim()}
-                        >
-                          {!resolveMutation.isPending ? (
-                            <Music2 aria-hidden className="size-4" />
-                          ) : null}
-                          {t('create.resolve')}
-                        </Button>
-                        <FieldError>{resolveError}</FieldError>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <MixArtistSource
+                  artists={artists}
+                  artistSearchId={artistSearchId}
+                  selectedIds={selectedIds}
+                  onAddArtist={addArtist}
+                  onRemoveArtist={removeArtist}
+                  onClearArtists={() => setArtists([])}
+                  pasteOpen={pasteOpen}
+                  onTogglePaste={() => setPasteOpen((open) => !open)}
+                  pasteId={pasteId}
+                  pasteRegionId={pasteRegionId}
+                  pasteHintId={pasteHintId}
+                  pasteList={pasteList}
+                  onPasteChange={setPasteList}
+                  onResolve={handleResolve}
+                  resolvePending={resolveMutation.isPending}
+                  resolveError={resolveError}
+                  t={t}
+                />
               ) : (
-                <div className="space-y-3">
-                  <SelectionHeader
-                    label={t('create.genres')}
-                    count={genres.length}
-                    max={MAX_GENRES}
-                    clearLabel={t('create.clearAll')}
-                    onClear={() => setGenres([])}
-                  />
-                  <GenrePicker
-                    selected={genres}
-                    max={MAX_GENRES}
-                    onToggle={toggleGenre}
-                    onRemove={removeGenre}
-                  />
-                </div>
+                <MixGenreSource
+                  genres={genres}
+                  onToggleGenre={toggleGenre}
+                  onRemoveGenre={removeGenre}
+                  onClearGenres={() => setGenres([])}
+                  t={t}
+                />
               )}
             </FormSection>
 

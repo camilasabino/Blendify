@@ -112,6 +112,57 @@ describe('resolveCatalogTracks', () => {
     expect(calls).toBe(2);
   });
 
+  it('swallows a non-quota resolve failure and keeps going', async () => {
+    let calls = 0;
+    const provider = {
+      resolveTrack: () => {
+        calls += 1;
+        if (calls === 1) return Promise.reject(new Error('not found'));
+        return Promise.resolve(makeTrack(`t${calls}`));
+      },
+    } as unknown as MusicProviderPort;
+
+    const refs = Array.from({ length: 3 }, (_, i) => ({
+      artistName: 'A',
+      trackName: `Song ${i}`,
+    }));
+
+    const tracks = await resolveCatalogTracks(provider, refs, {
+      needed: 2,
+      concurrency: 1,
+    });
+
+    expect(tracks).toHaveLength(2);
+    expect(calls).toBe(3);
+  });
+
+  it('filters out a resolved track whose artist does not match the requested id', async () => {
+    let calls = 0;
+    const provider = {
+      resolveTrack: () => {
+        calls += 1;
+        // First hit is a homonym on a different artist; second is correct.
+        return Promise.resolve(
+          calls === 1
+            ? makeTrack('wrong', 'other-artist-id')
+            : makeTrack('right', 'duffy-id'),
+        );
+      },
+    } as unknown as MusicProviderPort;
+
+    const refs = [
+      { artistName: 'Duffy', trackName: 'Mercy' },
+      { artistName: 'Duffy', trackName: 'Warwick Avenue' },
+    ];
+
+    const tracks = await resolveCatalogTracks(provider, refs, {
+      needed: 1,
+      artistId: 'duffy-id',
+    });
+
+    expect(tracks.map((t) => t.id.getValue())).toEqual(['right']);
+  });
+
   it('passes artistId into resolveTrack so homonyms can be rejected', async () => {
     const seen: Array<{ artistId?: string }> = [];
     const provider = {

@@ -52,10 +52,41 @@ describe('GenerationProgressTracker', () => {
     expect(last?.etaSeconds).toBeGreaterThan(0);
   });
 
+  it('reports zero eta once the phase reaches its total', () => {
+    const updates: GenerationProgress[] = [];
+    const tracker = new GenerationProgressTracker((progress) => {
+      updates.push(progress);
+    });
+
+    tracker.report('matching_tracks', 0, 5);
+    tracker.report('matching_tracks', 2, 5);
+    tracker.report('matching_tracks', 5, 5);
+
+    expect(updates[updates.length - 1]?.etaSeconds).toBe(0);
+  });
+
+  it('caps the ETA sample window so it keeps tracking long-running phases', () => {
+    const updates: GenerationProgress[] = [];
+    const tracker = new GenerationProgressTracker((progress) => {
+      updates.push(progress);
+    });
+
+    for (let i = 0; i < 25; i += 1) {
+      tracker.report('matching_tracks', i, 100);
+    }
+
+    const last = updates[updates.length - 1];
+    expect(last?.etaSeconds).toEqual(expect.any(Number));
+  });
+
   it('is a no-op without a reporter', () => {
     expect(() =>
       new GenerationProgressTracker().report('publishing', 1, 2),
     ).not.toThrow();
+  });
+
+  it('returns undefined when no reporter is given to wrap', () => {
+    expect(monotonicProgressReporter(undefined)).toBeUndefined();
   });
 
   it('suppresses backward updates across nested trackers', () => {

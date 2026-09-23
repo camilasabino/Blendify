@@ -25,4 +25,16 @@ describe('TrackNormalizer', () => {
   it('collapses leftover symbols into spaces', () => {
     expect(normalizer.normalize('A***B!!!C')).toBe('a b c');
   });
+
+  it('skips a keyword match that is embedded inside another word and strips the real one', () => {
+    expect(normalizer.normalize('XLive Song Live')).toBe('xlive song');
+  });
+
+  it('does not strip a keyword that runs straight into the next word (bad boundary)', () => {
+    expect(normalizer.normalize('Livewire')).toBe('livewire');
+  });
+
+  it('strips a trailing dash suffix that is not a recognized keyword', () => {
+    expect(normalizer.normalize('Song - Radio Mix')).toBe('song');
+  });
 });

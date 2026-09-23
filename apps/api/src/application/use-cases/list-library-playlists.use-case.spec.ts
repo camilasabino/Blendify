@@ -62,6 +62,66 @@ describe('ListLibraryPlaylistsUseCase sync quota', () => {
     ).rejects.toMatchObject({ code: 'SPOTIFY_QUOTA_EXCEEDED' });
   });
 
+  it('uses default paging when no options are given', async () => {
+    const playlist = makePlaylist();
+    const listLibraryPage = jest.fn().mockResolvedValue({
+      items: [playlist],
+      total: 1,
+    });
+    const playlists = {
+      deleteFailedByUserId: jest.fn().mockResolvedValue(undefined),
+      listLibraryPage,
+      countLibraryPresence: jest
+        .fn()
+        .mockResolvedValue({ active: 1, deleted: 0 }),
+    } as unknown as PlaylistRepositoryPort;
+
+    const page = await new ListLibraryPlaylistsUseCase(playlists, {
+      forUser: jest.fn(),
+    }).execute('user-1');
+
+    expect(page.limit).toBe(5);
+    expect(page.offset).toBe(0);
+    expect(listLibraryPage).toHaveBeenCalledWith('user-1', {
+      limit: 5,
+      offset: 0,
+      q: undefined,
+    });
+  });
+
+  it('stringifies non-Error purge and sync failures instead of throwing', async () => {
+    const playlist = makePlaylist();
+    playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
+    playlist.markCompleted();
+
+    const playlists = {
+      deleteFailedByUserId: jest.fn().mockRejectedValue('purge exploded'),
+      listLibraryPage: jest.fn().mockResolvedValue({
+        items: [playlist],
+        total: 1,
+      }),
+      countLibraryPresence: jest
+        .fn()
+        .mockResolvedValue({ active: 1, deleted: 0 }),
+      save: jest.fn(),
+    } as unknown as PlaylistRepositoryPort;
+
+    const provider = {
+      listLibraryPlaylistIds: jest.fn().mockRejectedValue('list exploded'),
+      getPlaylistSnapshot: jest.fn().mockRejectedValue('snapshot exploded'),
+    };
+    const factories: MusicProviderFactoryPort = {
+      forUser: () => provider as never,
+    };
+
+    const page = await new ListLibraryPlaylistsUseCase(
+      playlists,
+      factories,
+    ).execute('user-1', { sync: true });
+
+    expect(page.playlists[0]?.name).toBe('Evening mix');
+  });
+
   it('returns summaries without syncing when sync is false', async () => {
     const playlist = makePlaylist();
     const playlists = {
@@ -243,6 +303,41 @@ describe('ListLibraryPlaylistsUseCase sync quota', () => {
       { sync: true },
     );
     expect(getPlaylistSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('rethrows Spotify quota errors while listing library playlist ids', async () => {
+    const playlist = makePlaylist();
+    playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
+    playlist.markCompleted();
+
+    const playlists = {
+      deleteFailedByUserId: jest.fn().mockResolvedValue(undefined),
+      listLibraryPage: jest.fn().mockResolvedValue({
+        items: [playlist],
+        total: 1,
+      }),
+      countLibraryPresence: jest
+        .fn()
+        .mockResolvedValue({ active: 1, deleted: 0 }),
+    } as unknown as PlaylistRepositoryPort;
+
+    const provider = {
+      listLibraryPlaylistIds: jest
+        .fn()
+        .mockRejectedValue(
+          new BusinessRuleError('quota', 'SPOTIFY_QUOTA_EXCEEDED'),
+        ),
+      getPlaylistSnapshot: jest.fn(),
+    };
+    const factories: MusicProviderFactoryPort = {
+      forUser: () => provider as never,
+    };
+
+    await expect(
+      new ListLibraryPlaylistsUseCase(playlists, factories).execute('user-1', {
+        sync: true,
+      }),
+    ).rejects.toMatchObject({ code: 'SPOTIFY_QUOTA_EXCEEDED' });
   });
 
   it('continues when listing library ids fails non-quota', async () => {
