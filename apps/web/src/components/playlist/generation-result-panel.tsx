@@ -103,7 +103,7 @@ function GeneratingState({
       <div className="flex items-baseline justify-between gap-4">
         <p className="text-sm font-medium text-cream-200">{progressLabel}</p>
         {progress ? (
-          <span className="shrink-0 text-xs tabular-nums text-amber-300">
+          <span className="shrink-0 text-xs font-medium tabular-nums text-accent-fg">
             {percent}%
           </span>
         ) : null}
@@ -113,7 +113,7 @@ function GeneratingState({
         progressLabel={progressLabel}
       />
       {metaLine ? (
-        <p className="text-xs text-cream-500">{metaLine}</p>
+        <p className="text-xs text-cream-400">{metaLine}</p>
       ) : null}
     </div>
   )
@@ -143,7 +143,7 @@ function FillStatusMessages({
   }
   if (isShortFill) {
     return (
-      <p className="mt-2 text-sm text-amber-200/90">
+      <p className="mt-2 text-sm text-warning">
         {t('create.partialTracks', {
           count: trackCount,
           requested: requestedTrackCount,
@@ -175,11 +175,15 @@ function ResultActions({
         rel="noreferrer"
         className={cn(buttonVariants())}
       >
-        <ExternalLink className="size-4" />
+        <ExternalLink aria-hidden className="size-4" />
         {t('create.openSpotify')}
       </a>
       <Button type="button" variant="secondary" onClick={() => onCopy(spotifyUrl)}>
-        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+        {copied ? (
+          <Check aria-hidden className="size-4" />
+        ) : (
+          <Copy aria-hidden className="size-4" />
+        )}
         {copied ? t('create.copied') : t('create.copyLink')}
       </Button>
     </>
@@ -195,12 +199,12 @@ function GenerationErrorState({
 }>) {
   const t = useT()
   return (
-    <div className="relative space-y-4">
-      <p role="alert" className="text-sm leading-relaxed text-red-200">
+    <div className="space-y-4">
+      <p role="alert" className="text-sm leading-relaxed text-danger">
         {message}
       </p>
       <Button type="button" variant="secondary" onClick={onRetry}>
-        <RotateCcw className="size-4" />
+        <RotateCcw aria-hidden className="size-4" />
         {t('common.retry')}
       </Button>
     </div>
@@ -216,13 +220,13 @@ function NextStepActions({
 }>) {
   const t = useT()
   return (
-    <div className="flex flex-wrap gap-2 border-t border-cream-200/10 pt-4">
+    <div className="flex flex-wrap gap-2 border-t border-divider pt-4">
       <Button type="button" variant="secondary" size="sm" onClick={onCreateAnother}>
-        <Plus className="size-3.5" />
+        <Plus aria-hidden className="size-3.5" />
         {t('create.createAnother')}
       </Button>
       <Button type="button" variant="ghost" size="sm" onClick={onAdjust}>
-        <SlidersHorizontal className="size-3.5" />
+        <SlidersHorizontal aria-hidden className="size-3.5" />
         {t('create.adjustAndRecreate')}
       </Button>
     </div>
@@ -254,7 +258,7 @@ function ReadyResult({
     <div className="space-y-6">
       <div className="space-y-4">
         <div>
-          <p className="font-medium text-cream-50">{result.name}</p>
+          <p className="text-base font-semibold text-cream-50">{result.name}</p>
           <p className="mt-1 text-sm text-cream-400">
             {t('create.tracksReady', { count: result.trackCount })}
           </p>
@@ -338,22 +342,15 @@ export function GenerationResultPanel({
     <section
       aria-labelledby={titleId}
       className={cn(
-        'animate-fade-up relative overflow-hidden space-y-4 rounded-2xl border bg-gradient-to-br via-charcoal-800/80 to-charcoal-950 p-5 shadow-[0_24px_60px_-36px_rgb(0_0_0_/_0.95)] sm:p-6',
+        'animate-fade-up space-y-4 rounded-panel border bg-panel bg-linear-to-br to-transparent to-60% p-5 shadow-[0_24px_60px_-36px_rgb(0_0_0_/_0.95)] sm:p-6',
         showError
-          ? 'border-red-900/50 from-red-950/30'
-          : 'border-amber-500/25 from-amber-500/10',
+          ? 'border-danger-line from-danger-soft'
+          : 'border-accent-line/50 from-amber-500/[0.12]',
       )}
     >
-      <div
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute -right-10 -top-12 size-40 rounded-full blur-3xl',
-          showError ? 'bg-red-900/20' : 'bg-amber-500/20',
-        )}
-      />
       <h2
         id={titleId}
-        className="relative font-display text-lg font-semibold text-cream-50"
+        className="font-display text-lg font-semibold text-cream-50"
       >
         {title}
       </h2>

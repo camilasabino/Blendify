@@ -63,7 +63,7 @@ function Dialog({
       ref={dialogRef}
       aria-labelledby={titleId}
       className={cn(
-        'blendify-dialog w-full max-w-md rounded-2xl border border-cream-200/15 bg-charcoal-900 p-5 text-cream-50 shadow-[0_24px_80px_-24px_rgb(0_0_0_/_0.9)] open:animate-fade-up',
+        'blendify-dialog w-full max-w-md rounded-panel border border-divider bg-raised p-5 text-cream-50 shadow-[0_24px_80px_-24px_rgb(0_0_0_/_0.9)] open:animate-fade-up',
         className,
       )}
       closedby={dismissible ? 'closerequest' : 'none'}
@@ -84,7 +84,7 @@ function Dialog({
       <div className="relative">
         <h2
           id={titleId}
-          className="font-display text-lg tracking-tight text-cream-50"
+          className="font-display text-lg font-semibold tracking-tight text-cream-50"
         >
           {title}
         </h2>
@@ -137,10 +137,10 @@ export function ConfirmDialog({
       <p className="text-sm leading-relaxed text-cream-300">{description}</p>
       {busy && workingLabel ? (
         <output
-          className="mt-3 flex items-center gap-2 text-sm text-amber-400/90"
+          className="mt-3 flex items-center gap-2 text-sm text-accent-fg"
           aria-live="polite"
         >
-          <Spinner size="sm" className="text-amber-400" />
+          <Spinner size="sm" />
           {workingLabel}
         </output>
       ) : null}

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @theme {
+  --color-*: initial;
+
   --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
 
@@ -11,6 +13,7 @@
   --color-charcoal-600: #3a322b;
   --color-charcoal-500: #5c5147;
 
+  --color-amber-300: #f5c870;
   --color-amber-400: #f0b84a;
   --color-amber-500: #e8a838;
   --color-amber-600: #c4892a;
@@ -22,6 +25,39 @@
   --color-cream-300: #b9ae9e;
   --color-cream-400: #a89f91;
   --color-cream-500: #8f867a;
+
+  --color-panel: rgb(24 21 18 / 0.72);
+  --color-card: rgb(36 31 26 / 0.45);
+  --color-raised: #1a1714;
+  --color-field: rgb(10 9 8 / 0.55);
+  --color-hover: rgb(247 242 234 / 0.06);
+
+  --color-divider: rgb(207 196 180 / 0.1);
+  --color-control: #716659;
+  --color-control-hover: #8f867a;
+
+  --color-accent: #e8a838;
+  --color-accent-hover: #f0b84a;
+  --color-accent-fg: #f0b84a;
+  --color-accent-soft: rgb(232 168 56 / 0.12);
+  --color-accent-line: rgb(232 168 56 / 0.6);
+  --color-on-accent: #0a0908;
+  --color-focus: #f0b84a;
+
+  --color-success: #8fd6ae;
+  --color-success-soft: rgb(62 168 112 / 0.12);
+  --color-success-line: rgb(62 168 112 / 0.4);
+  --color-warning: #f5c870;
+  --color-warning-soft: rgb(232 168 56 / 0.1);
+  --color-warning-line: rgb(232 168 56 / 0.4);
+  --color-danger: #f4a49a;
+  --color-danger-soft: rgb(190 60 48 / 0.16);
+  --color-danger-line: rgb(226 96 82 / 0.45);
+
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-panel: 1rem;
+  --radius-feature: 1.5rem;
 
   --animate-fade-up: fade-up 0.55s ease-out;
   --animate-fade-in: fade-in 0.4s ease-out;
@@ -120,6 +156,16 @@
     font-family: var(--font-display);
   }
 
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  ::placeholder {
+    color: var(--color-cream-500);
+    opacity: 1;
+  }
+
   ::selection {
     background: rgb(232 168 56 / 0.35);
     color: var(--color-cream-50);
@@ -143,23 +189,23 @@
     appearance: none;
     display: block;
     border: none;
-    background-color: var(--color-charcoal-700);
-    color: var(--color-amber-500);
+    background-color: var(--color-charcoal-600);
+    color: var(--color-accent);
   }
 
   progress.generation-progress::-webkit-progress-bar {
-    background-color: var(--color-charcoal-700);
+    background-color: var(--color-charcoal-600);
     border-radius: 9999px;
   }
 
   progress.generation-progress::-webkit-progress-value {
-    background-color: var(--color-amber-500);
+    background-color: var(--color-accent);
     border-radius: 9999px;
     transition: width 300ms ease-out;
   }
 
   progress.generation-progress::-moz-progress-bar {
-    background-color: var(--color-amber-500);
+    background-color: var(--color-accent);
     border-radius: 9999px;
   }
 
@@ -180,13 +226,13 @@
   .blendify-dialog {
     margin: auto;
     padding: 1.25rem;
-    border: 1px solid rgb(245 240 232 / 0.15);
-    background: rgb(28 25 23);
-    color: rgb(245 240 232);
+    border: 1px solid var(--color-divider);
+    background: var(--color-raised);
+    color: var(--color-cream-50);
   }
 
   .blendify-dialog::backdrop {
-    background: rgb(12 10 9 / 0.75);
+    background: rgb(10 9 8 / 0.75);
     backdrop-filter: blur(2px);
   }
 }
@@ -200,6 +246,14 @@
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
+}
+
+@utility text-eyebrow {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 @layer utilities {

@@ -106,7 +106,7 @@ function ListenModeTabs({
 
   return (
     <div
-      className="inline-flex items-center rounded-lg border border-cream-200/15 bg-charcoal-800/60 p-0.5"
+      className="inline-flex items-center gap-0.5 rounded-card border border-control bg-field p-1"
       role="tablist"
       aria-label={t('preview.modeLabel')}
     >
@@ -127,11 +127,11 @@ function ListenModeTabs({
             onClick={() => onChange(mode)}
             onKeyDown={handleKeyDown}
             className={cn(
-              'rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition-colors duration-200',
+              'rounded-control border px-3 py-1.5 text-xs font-semibold tracking-wide transition-colors duration-200',
               focusRing,
               selected
-                ? 'bg-amber-500/20 text-amber-400'
-                : 'text-cream-400 hover:text-cream-100',
+                ? 'border-accent-line bg-accent-soft text-accent-fg'
+                : 'border-transparent text-cream-300 hover:bg-hover hover:text-cream-50',
             )}
           >
             {labels[mode]}
@@ -292,7 +292,7 @@ export function PlaylistPreview({
     <div className={cn('space-y-4', className)}>
       {showSwitcher && (
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-cream-500">
+          <p className="text-eyebrow text-cream-400">
             {t('preview.modeLabel')}
           </p>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -341,10 +341,10 @@ export function PlaylistPreview({
             {!showSwitcher && (
               <div className="space-y-1">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-cream-500">
+                  <p className="text-eyebrow text-cream-400">
                     {t('preview.connectList')}
                   </p>
-                  <p className="text-xs tabular-nums text-cream-500">
+                  <p className="text-xs tabular-nums text-cream-400">
                     {t('preview.trackCount', { count: list.length })}
                   </p>
                 </div>
@@ -354,12 +354,12 @@ export function PlaylistPreview({
               </div>
             )}
             {showSwitcher && (
-              <p className="text-right text-xs tabular-nums text-cream-500">
+              <p className="text-right text-xs tabular-nums text-cream-400">
                 {t('preview.trackCount', { count: list.length })}
               </p>
             )}
 
-            <ol className="max-h-[18rem] overflow-y-auto rounded-xl border border-cream-200/10 bg-charcoal-800/30">
+            <ol className="max-h-72 overflow-y-auto rounded-card border border-divider bg-card">
               {list.map((track, trackIndex) => {
                 const isActive = activeUri === track.uri && playMutation.isPending
                 const isPlaying =
@@ -373,15 +373,15 @@ export function PlaylistPreview({
                       onClick={() => playTrack(track)}
                       disabled={playMutation.isPending}
                       className={cn(
-                        'flex w-full items-center gap-3 border-b border-cream-200/5 px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-amber-500/10 disabled:opacity-60',
+                        'flex w-full items-center gap-3 border-b border-divider px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-hover disabled:opacity-50',
                         focusRing,
-                        isPlaying && 'bg-amber-500/10',
+                        isPlaying && 'bg-accent-soft',
                       )}
                     >
-                      <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-500">
+                      <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-400">
                         {trackIndex + 1}
                       </span>
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-charcoal-700 text-amber-400">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-control bg-charcoal-700 text-accent-fg">
                         {isActive ? (
                           <Spinner size="sm" className="text-current" />
                         ) : (
@@ -397,7 +397,7 @@ export function PlaylistPreview({
                           {track.albumName ? ` · ${track.albumName}` : ''}
                         </p>
                       </div>
-                      <span className="shrink-0 text-xs tabular-nums text-cream-500">
+                      <span className="shrink-0 text-xs tabular-nums text-cream-400">
                         {formatDuration(track.durationMs)}
                       </span>
                     </button>
@@ -413,7 +413,7 @@ export function PlaylistPreview({
         )}
         {mode === 'full' && listenMode === 'device' && playError && (
           <output className="block space-y-2">
-            <p className="text-sm text-amber-200/90">{playError}</p>
+            <p className="text-sm text-warning">{playError}</p>
             <div className="flex flex-wrap gap-2">
               {embedId && (
                 <Button

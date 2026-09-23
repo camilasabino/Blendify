@@ -3,10 +3,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
-import {
-  Music2,
-  Sparkles,
-} from 'lucide-react'
+import { Blend, Music2 } from 'lucide-react'
 import {
   api,
   getApiErrorMessage,
@@ -36,6 +33,7 @@ import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/feedback'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
 import { FormSection } from '@/components/ui/form-section'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -418,7 +416,7 @@ export function MixPlaylistForm() {
     : null
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-10 animate-fade-up">
+    <PageContainer width="form">
       <PageHeader
         eyebrow={t('create.eyebrow')}
         title={t('create.title')}
@@ -491,7 +489,7 @@ export function MixPlaylistForm() {
                       <Label htmlFor={artistSearchId}>
                         {t('create.artists')}
                       </Label>
-                      <span className="rounded-md bg-charcoal-950/50 px-2 py-0.5 text-xs tabular-nums text-cream-400">
+                      <span className="rounded-control bg-charcoal-700 px-2 py-0.5 text-xs tabular-nums text-cream-300">
                         {artists.length}/{MAX_ARTISTS}
                       </span>
                     </div>
@@ -513,7 +511,7 @@ export function MixPlaylistForm() {
                     />
                   </div>
 
-                  <div className="space-y-2 border-t border-cream-200/10 pt-4">
+                  <div className="space-y-2 border-t border-divider pt-4">
                     <Label htmlFor="paste">{t('create.paste')}</Label>
                     <Textarea
                       id="paste"
@@ -531,7 +529,7 @@ export function MixPlaylistForm() {
                         disabled={!pasteList.trim()}
                       >
                         {!resolveMutation.isPending ? (
-                          <Music2 className="size-4" />
+                          <Music2 aria-hidden className="size-4" />
                         ) : null}
                         {t('create.resolve')}
                       </Button>
@@ -543,7 +541,7 @@ export function MixPlaylistForm() {
                 <div className="space-y-3">
                   <div className="flex items-end justify-between gap-3">
                     <Label>{t('create.genres')}</Label>
-                    <span className="rounded-md bg-charcoal-950/50 px-2 py-0.5 text-xs tabular-nums text-cream-400">
+                    <span className="rounded-control bg-charcoal-700 px-2 py-0.5 text-xs tabular-nums text-cream-300">
                       {genres.length}/{MAX_GENRES}
                     </span>
                   </div>
@@ -596,7 +594,7 @@ export function MixPlaylistForm() {
                         />
                       )}
                     />
-                    <p className="text-xs text-cream-500">
+                    <p className="text-xs text-cream-400">
                       {t('create.tracksMaxHint', { max: artistTrackMax })}
                     </p>
                   </div>
@@ -630,13 +628,13 @@ export function MixPlaylistForm() {
                         />
                       )}
                     />
-                    <p className="text-xs text-cream-500">
+                    <p className="text-xs text-cream-400">
                       {t('create.tracksMaxHint', { max: genreTrackMax })}
                     </p>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-4 py-3">
+                <div className="flex items-center justify-between gap-4 rounded-card border border-divider bg-card p-4">
                   <div>
                     <Label htmlFor="generateCover">
                       {t('create.generateCover')}
@@ -664,10 +662,10 @@ export function MixPlaylistForm() {
           </fieldset>
 
           <div className="space-y-4">
-            <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 to-amber-500/5 px-4 py-3">
+            <div className="rounded-card border border-divider bg-card px-4 py-3">
               <p className="text-sm text-cream-100">
                 {t('create.estimated')}{' '}
-                <span className="font-semibold tabular-nums text-amber-400">
+                <span className="font-semibold tabular-nums text-accent-fg">
                   {estimate.total}
                 </span>
                 {sourceCount > 0 && (
@@ -693,11 +691,11 @@ export function MixPlaylistForm() {
               error={form.formState.errors.root?.message ?? null}
               idleLabel={t('create.generate')}
               busyLabel={t('create.generating')}
-              icon={Sparkles}
+              icon={Blend}
             />
           </div>
         </form>
       </GenerationSettingsCollapse>
-    </div>
+    </PageContainer>
   )
 }

@@ -1,4 +1,5 @@
 import { LibraryList } from '@/components/playlist/library-list'
+import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
 import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useT } from '@/i18n/use-t'
@@ -8,13 +9,13 @@ export function LibraryPage() {
   useDocumentTitle(t('nav.library'))
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8 animate-fade-up">
+    <PageContainer>
       <PageHeader
         eyebrow={t('library.eyebrow')}
         title={t('library.title')}
         description={t('library.subtitle')}
       />
       <LibraryList />
-    </div>
+    </PageContainer>
   )
 }

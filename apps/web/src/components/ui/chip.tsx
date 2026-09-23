@@ -17,12 +17,12 @@ export function SelectableChip({
     <button
       type="button"
       className={cn(
-        'rounded-full border px-3 py-1.5 text-sm transition-colors duration-150 cursor-pointer',
+        'min-h-8 cursor-pointer rounded-full border px-3 py-1.5 text-sm transition-colors duration-150',
         focusRing,
         selected
-          ? 'border-amber-500/40 bg-amber-500/20 text-cream-50'
-          : 'border-cream-200/15 bg-charcoal-800/60 text-cream-200 hover:border-amber-500/30 hover:bg-amber-500/10 hover:text-cream-50',
-        props.disabled && 'cursor-not-allowed opacity-40',
+          ? 'border-accent-line bg-accent-soft text-cream-50'
+          : 'border-divider bg-card text-cream-200 hover:border-control-hover hover:bg-hover hover:text-cream-50',
+        props.disabled && 'cursor-not-allowed opacity-50',
         className,
       )}
       {...props}
@@ -54,10 +54,10 @@ export function RemovableChip({
   return (
     <li
       className={cn(
-        'animate-chip-in inline-flex items-center gap-2 rounded-full border py-1 pl-1 pr-2 text-sm',
+        'animate-chip-in inline-flex items-center gap-2 rounded-full border py-1 pl-1 pr-2 text-sm text-cream-50',
         highlighted
-          ? 'border-amber-500/40 bg-amber-500/20 text-cream-50'
-          : 'border-amber-500/25 bg-amber-500/10 text-cream-50',
+          ? 'border-accent-line bg-accent-soft'
+          : 'border-divider bg-card',
         className,
       )}
     >
@@ -70,16 +70,16 @@ export function RemovableChip({
         />
       ) : null}
       {!imageUrl && !leading ? (
-        <span className="flex size-6 items-center justify-center rounded-full bg-charcoal-600 text-[10px]">
+        <span className="flex size-6 items-center justify-center rounded-full bg-charcoal-600 text-xs">
           {label.slice(0, 1)}
         </span>
       ) : null}
-      <span className="max-w-[10rem] truncate">{label}</span>
+      <span className="max-w-40 truncate">{label}</span>
       <button
         type="button"
         onClick={onRemove}
         className={cn(
-          '-my-0.5 -mr-1 flex size-6 shrink-0 items-center justify-center rounded-full text-cream-400 transition-colors hover:bg-charcoal-700 hover:text-cream-50 disabled:pointer-events-none disabled:opacity-50',
+          '-my-0.5 -mr-1 flex size-6 shrink-0 items-center justify-center rounded-full text-cream-400 transition-colors hover:bg-hover hover:text-cream-50 disabled:pointer-events-none disabled:opacity-50',
           focusRing,
         )}
         aria-label={removeLabel}
@@ -105,11 +105,11 @@ export function SeedChip({
     <button
       type="button"
       className={cn(
-        'inline-flex min-h-6 items-center rounded-full px-2.5 py-1 text-[11px] transition disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex min-h-6 items-center rounded-full border px-2.5 py-0.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
         focusRing,
         active
-          ? 'bg-amber-500/20 text-amber-200'
-          : 'bg-charcoal-800/80 text-cream-400 hover:text-cream-200',
+          ? 'border-accent-line bg-accent-soft text-accent-fg'
+          : 'border-divider bg-card text-cream-300 hover:border-control-hover hover:text-cream-50',
         className,
       )}
       {...props}
@@ -131,7 +131,7 @@ export function ClearAllButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex min-h-6 items-center rounded-md px-1.5 text-xs text-cream-400 transition-colors hover:text-cream-200 disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex min-h-6 items-center rounded-control px-1.5 text-xs text-cream-400 transition-colors hover:text-cream-50 disabled:pointer-events-none disabled:opacity-50',
         focusRing,
       )}
     >

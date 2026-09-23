@@ -37,7 +37,7 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
         aria-label={t('lang.label')}
         onChange={(event) => setLocale(event.target.value as Locale)}
         className={cn(
-          'h-8 appearance-none rounded-full border border-cream-200/10 bg-charcoal-800/70 py-0 pl-2.5 pr-7 text-xs font-medium text-cream-100 sm:h-9 sm:pl-3 sm:pr-8 sm:text-sm',
+          'h-8 appearance-none rounded-full border border-control bg-field py-0 pl-2.5 pr-7 text-xs font-medium text-cream-100 transition-colors hover:border-control-hover sm:h-9 sm:pl-3 sm:pr-8 sm:text-sm',
           focusRing,
         )}
       >
@@ -49,7 +49,7 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
       </select>
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-cream-500"
+        className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-cream-400"
       >
         ▾
       </span>

@@ -177,7 +177,7 @@ export function SearchCombobox<T extends { id: string }>({
             type="button"
             onClick={clear}
             className={cn(
-              'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-cream-400 transition-colors hover:bg-charcoal-700 hover:text-cream-100',
+              'absolute right-2 top-1/2 -translate-y-1/2 rounded-control p-1 text-cream-400 transition-colors hover:bg-hover hover:text-cream-50',
               focusRing,
             )}
             aria-label={clearLabel}
@@ -196,7 +196,7 @@ export function SearchCombobox<T extends { id: string }>({
       </p>
       {showPopup ? (
         <div
-          className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-cream-200/10 bg-charcoal-800 py-1 shadow-xl animate-fade-in"
+          className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-card border border-divider bg-raised py-1 shadow-xl shadow-charcoal-950/60 animate-fade-in"
           onMouseDown={(event) => event.preventDefault()}
         >
           {result.isError ? (
@@ -228,7 +228,7 @@ export function SearchCombobox<T extends { id: string }>({
                   className={cn(
                     'flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150',
                     selected ? 'cursor-default opacity-40' : 'cursor-pointer',
-                    active && !selected && 'bg-amber-500/10',
+                    active && !selected && 'bg-accent-soft',
                   )}
                 >
                   {renderOption(item, selected)}

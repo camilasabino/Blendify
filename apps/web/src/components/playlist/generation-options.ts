@@ -1,6 +1,7 @@
 import {
   ArrowDownAZ,
   Gem,
+  MicVocal,
   Scale,
   Shuffle,
   TrendingUp,
@@ -43,7 +44,7 @@ export const ORDER_OPTIONS: readonly GenerationOption<TrackOrderMode>[] = [
     value: 'artist',
     labelKey: 'create.order.artist',
     hintKey: 'create.order.artist.hint',
-    icon: ArrowDownAZ,
+    icon: MicVocal,
   },
   {
     value: 'title',

@@ -55,7 +55,7 @@ function ExploreSeedPicker({
   if (selected.length <= 1) return null
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-[11px] text-cream-500">
+      <span className="text-xs text-cream-400">
         {t('artist.exploreSeedHint')}
       </span>
       {selected.map((artist) => (
@@ -94,8 +94,8 @@ function SimilarSuggestionsList({
               disabled={resolvePending}
               onClick={() => onResolve(artist.name)}
               className={cn(
-                'group inline-flex max-w-full items-center gap-2 rounded-full border border-cream-200/10 bg-charcoal-950/35 px-3.5 py-2 text-left text-sm text-cream-100 transition',
-                'hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-cream-50',
+                'group inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-divider bg-field px-3.5 py-1.5 text-left text-sm text-cream-100 transition-colors',
+                'hover:border-control-hover hover:bg-hover hover:text-cream-50',
                 'disabled:cursor-wait disabled:opacity-60',
                 focusRing,
               )}
@@ -106,7 +106,7 @@ function SimilarSuggestionsList({
               {busy ? (
                 <Spinner size="sm" className="shrink-0" />
               ) : (
-                <Plus className="size-3.5 shrink-0 text-amber-400/70 transition group-hover:text-amber-300" />
+<Plus aria-hidden className="size-3.5 shrink-0 text-accent-fg" />
               )}
             </button>
           </li>
@@ -132,11 +132,15 @@ function SuggestMoreButton({
       disabled={fetching || !hasMore}
       onClick={onLoadMore}
       className={cn(
-        'inline-flex items-center gap-2 text-sm text-amber-300/90 transition hover:text-amber-200 disabled:opacity-40',
+'inline-flex min-h-8 items-center gap-2 rounded-control text-sm font-medium text-accent-fg transition-colors hover:text-amber-300 disabled:opacity-50',
         focusRing,
       )}
     >
-      {fetching ? <Spinner size="sm" /> : <RefreshCw className="size-3.5" />}
+      {fetching ? (
+        <Spinner size="sm" />
+      ) : (
+        <RefreshCw aria-hidden className="size-3.5" />
+      )}
       {hasMore ? t('artist.suggestMore') : t('artist.exploreExhausted')}
     </button>
   )
@@ -235,13 +239,13 @@ export function ArtistSimilarSuggestions({
   return (
     <div
       className={cn(
-        'space-y-3 rounded-2xl border border-amber-500/15 bg-gradient-to-b from-amber-500/[0.07] to-transparent p-4',
+        'space-y-3 rounded-card border border-divider bg-card p-4',
         className,
       )}
     >
       <div className="space-y-1">
-        <h3 className="flex items-center gap-2 font-sans text-xs font-medium uppercase tracking-[0.16em] text-amber-400/90">
-          <Sparkles aria-hidden className="size-3.5" />
+        <h3 className="flex items-center gap-2 font-sans text-sm font-semibold text-cream-100">
+          <Sparkles aria-hidden className="size-4 shrink-0 text-accent-fg" />
           {t('artist.exploreFor', { name: seed.name })}
         </h3>
         <p className="text-sm leading-relaxed text-cream-400">

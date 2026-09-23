@@ -22,7 +22,7 @@ export function InPagePlaylistPlayer({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-cream-200/10 bg-charcoal-900/80 shadow-[0_20px_60px_-28px_rgb(0_0_0_/_0.85)]">
+    <div className="overflow-hidden rounded-panel border border-divider bg-charcoal-900 shadow-[0_20px_60px_-28px_rgb(0_0_0_/_0.85)]">
       {current ? (
         <>
           <div className="relative bg-[#121212]">
@@ -36,11 +36,11 @@ export function InPagePlaylistPlayer({
               className="block border-0"
             />
           </div>
-          <p className="border-t border-cream-200/10 bg-charcoal-950/60 px-3 py-2 text-xs text-cream-400">
-            <span className="text-cream-500">{t('preview.albumLabel')}: </span>
+          <p className="border-t border-divider bg-charcoal-950/60 px-3 py-2 text-xs text-cream-300">
+            <span className="text-cream-400">{t('preview.albumLabel')}: </span>
             {current.albumName?.trim() || t('preview.unknownAlbum')}
           </p>
-          <ol className="max-h-[16rem] overflow-y-auto border-t border-cream-200/10">
+          <ol className="max-h-64 overflow-y-auto border-t border-divider">
             {list.map((track, trackIndex) => {
               const selected = trackIndex === index
               return (
@@ -51,17 +51,17 @@ export function InPagePlaylistPlayer({
                     className={cn(
                       'flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
                       focusRing,
-                      selected ? 'bg-amber-500/15' : 'hover:bg-cream-50/5',
+                      selected ? 'bg-accent-soft' : 'hover:bg-hover',
                     )}
                   >
-                    <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-500">
+                    <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-400">
                       {trackIndex + 1}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span
                         className={cn(
                           'block truncate text-sm',
-                          selected ? 'text-amber-300' : 'text-cream-50',
+                          selected ? 'text-accent-fg' : 'text-cream-50',
                         )}
                       >
                         {track.name}
@@ -71,7 +71,7 @@ export function InPagePlaylistPlayer({
                         {track.albumName ? ` · ${track.albumName}` : ''}
                       </span>
                     </span>
-                    <span className="shrink-0 text-xs tabular-nums text-cream-500">
+                    <span className="shrink-0 text-xs tabular-nums text-cream-400">
                       {formatDuration(track.durationMs)}
                     </span>
                   </button>

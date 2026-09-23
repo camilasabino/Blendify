@@ -15,7 +15,7 @@ type SpinnerProps = Readonly<{
 export function Spinner({ className, size = 'md' }: SpinnerProps) {
   return (
     <Loader2
-      className={cn('animate-spin text-amber-500', sizes[size], className)}
+      className={cn('animate-spin text-accent-fg', sizes[size], className)}
       aria-hidden
     />
   )

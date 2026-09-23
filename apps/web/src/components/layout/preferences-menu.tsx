@@ -54,10 +54,10 @@ export function PreferencesMenu() {
         onClick={() => setOpen((value) => !value)}
         className={cn(
           'size-8 sm:size-9',
-          open && 'bg-charcoal-700/80 text-cream-50',
+          open && 'bg-hover text-cream-50',
         )}
       >
-        <Settings className="size-4" />
+        <Settings aria-hidden className="size-4" />
       </Button>
 
       {open && (
@@ -65,18 +65,18 @@ export function PreferencesMenu() {
           id={panelId}
           aria-label={t('preferences.title')}
           className={cn(
-            'absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-cream-200/10 bg-charcoal-900/95 p-4 shadow-xl shadow-black/40 backdrop-blur-md',
+            'absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-panel border border-divider bg-raised p-4 shadow-xl shadow-charcoal-950/60',
             focusRing,
           )}
         >
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-amber-400/90">
+          <p className="text-eyebrow text-accent-fg">
             {t('preferences.title')}
           </p>
-          <p className="mt-1 text-xs text-cream-500">
+          <p className="mt-1 text-xs text-cream-400">
             {t('preferences.subtitle')}
           </p>
 
-          <div className="mt-4 flex items-start justify-between gap-4 rounded-xl border border-cream-200/10 bg-charcoal-800/50 px-3 py-3">
+          <div className="mt-4 flex items-start justify-between gap-4 rounded-card border border-divider bg-card p-3">
             <div className="min-w-0">
               <Label htmlFor="pref-persistToLibrary">
                 {t('preferences.persistToLibrary')}

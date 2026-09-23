@@ -24,6 +24,7 @@ import {
 } from '@/components/playlist/generation-form-shared'
 import { buildGenerationSummary } from '@/components/playlist/generation-options'
 import { Label } from '@/components/ui/label'
+import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
 import { FormSection } from '@/components/ui/form-section'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -275,7 +276,7 @@ export function DiscoverPlaylistForm() {
     : null
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-10 animate-fade-up">
+    <PageContainer width="form">
       <PageHeader
         eyebrow={t('discover.eyebrow')}
         title={t('discover.title')}
@@ -416,6 +417,7 @@ export function DiscoverPlaylistForm() {
                     label={t('discover.stepDetails')}
                     value={field.value}
                     onChange={field.onChange}
+                    mobileLayout="inline"
                     options={TRACK_TARGETS.map((count) => ({
                       value: count,
                       label: count,
@@ -439,7 +441,7 @@ export function DiscoverPlaylistForm() {
           />
         </form>
       </GenerationSettingsCollapse>
-    </div>
+    </PageContainer>
   )
 }
 
@@ -459,21 +461,21 @@ function SelectedSeed({
   onRemove: () => void
 }>) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2.5">
+    <div className="flex items-center gap-3 rounded-card border border-accent-line bg-accent-soft px-3 py-2.5">
       {imageUrl ? (
         <img
           src={imageUrl}
           alt=""
           className={cn(
             'size-11 shrink-0 object-cover',
-            imageRounded ? 'rounded-full' : 'rounded-lg',
+            imageRounded ? 'rounded-full' : 'rounded-control',
           )}
         />
       ) : (
         <span
           className={cn(
             'flex size-11 shrink-0 items-center justify-center bg-charcoal-700 text-sm text-cream-200',
-            imageRounded ? 'rounded-full' : 'rounded-lg',
+            imageRounded ? 'rounded-full' : 'rounded-control',
           )}
         >
           {title.slice(0, 1)}
@@ -489,12 +491,12 @@ function SelectedSeed({
         type="button"
         onClick={onRemove}
         className={cn(
-          'rounded-lg p-1.5 text-cream-400 transition-colors hover:bg-charcoal-700 hover:text-cream-50',
+          'rounded-control p-1.5 text-cream-300 transition-colors hover:bg-hover hover:text-cream-50',
           focusRing,
         )}
         aria-label={removeLabel}
       >
-        <X className="size-4" />
+        <X aria-hidden className="size-4" />
       </button>
     </div>
   )

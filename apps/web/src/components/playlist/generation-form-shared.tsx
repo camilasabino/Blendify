@@ -99,7 +99,7 @@ export function CoverErrorNotice({ message }: Readonly<{ message: string | null 
   return (
     <div className="space-y-1">
       <FieldError>{message}</FieldError>
-      <p className="text-xs text-cream-500">{t('create.coverScopeHint')}</p>
+      <p className="text-xs text-cream-400">{t('create.coverScopeHint')}</p>
     </div>
   )
 }
@@ -123,7 +123,7 @@ export function GenerationSubmitBar({
   const showReason = Boolean(disabledReason) && !isGenerating
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 pt-2">
       {error ? <FieldError>{error}</FieldError> : null}
       <Button
         type="submit"
@@ -136,7 +136,7 @@ export function GenerationSubmitBar({
         disabled={Boolean(disabledReason)}
         aria-describedby={showReason ? reasonId : undefined}
       >
-        {!isGenerating ? <Icon className="size-4" /> : null}
+        {!isGenerating ? <Icon aria-hidden className="size-4" /> : null}
         {isGenerating ? busyLabel : idleLabel}
       </Button>
       {showReason ? (
@@ -173,11 +173,11 @@ export function GenerationSettingsCollapse({
           aria-controls={regionId}
           onClick={onToggle}
           className={cn(
-            'flex w-full items-center gap-3 rounded-2xl border border-cream-200/12 bg-charcoal-900/80 px-4 py-3 text-left transition-colors hover:border-amber-500/30 hover:bg-charcoal-800/80 motion-reduce:transition-none',
+            'flex w-full items-center gap-3 rounded-panel border border-divider bg-panel px-4 py-3 text-left transition-colors hover:border-control-hover hover:bg-hover motion-reduce:transition-none',
             focusRing,
           )}
         >
-          <SlidersHorizontal className="size-4 shrink-0 text-amber-400" />
+          <SlidersHorizontal aria-hidden className="size-4 shrink-0 text-accent-fg" />
           <span className="min-w-0 flex-1">
             <span className="block font-display text-sm font-semibold text-cream-50">
               {t('create.settings')}
@@ -188,7 +188,7 @@ export function GenerationSettingsCollapse({
               </span>
             ) : null}
           </span>
-          <span className="shrink-0 text-xs font-medium text-amber-300">
+          <span className="shrink-0 text-xs font-medium text-accent-fg">
             {collapsed ? t('create.showSettings') : t('create.hideSettings')}
           </span>
           <ChevronDown

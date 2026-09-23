@@ -4,6 +4,7 @@ import { RotateCcw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { UsageStatsView } from '@/components/playlist/usage-stats'
 import { ErrorState, LoadingState } from '@/components/ui/feedback'
+import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/dialog'
@@ -32,7 +33,7 @@ export function StatsPage() {
   const canReset = data != null && !isUsageStatsEmpty(data)
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8 animate-fade-up">
+    <PageContainer>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
           eyebrow={t('stats.eyebrow')}
@@ -48,7 +49,7 @@ export function StatsPage() {
             disabled={resetMutation.isPending}
             onClick={() => setConfirmOpen(true)}
           >
-            <RotateCcw className="size-3.5" />
+            <RotateCcw aria-hidden className="size-3.5" />
             {t('stats.reset')}
           </Button>
         ) : null}
@@ -85,6 +86,6 @@ export function StatsPage() {
         }}
         onConfirm={() => resetMutation.mutate()}
       />
-    </div>
+    </PageContainer>
   )
 }

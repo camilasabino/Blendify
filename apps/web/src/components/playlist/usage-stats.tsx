@@ -8,45 +8,23 @@ import { cn } from '@/lib/utils'
 import { isUsageStatsEmpty } from '@/lib/usage-stats'
 
 const PODIUM_BAR_TONES = [
-  'from-amber-400 via-amber-500 to-amber-600',
-  'from-cream-200/90 via-amber-300/80 to-amber-500/70',
-  'from-amber-600/80 to-amber-700/70',
-  'from-amber-700/55 to-amber-800/40',
+  'bg-amber-400',
+  'bg-amber-500',
+  'bg-amber-600',
+  'bg-amber-700',
 ] as const
-
-const STAT_ACCENT_CLASS = {
-  amber: 'text-amber-400',
-  emerald: 'text-emerald-300',
-  rose: 'text-red-300',
-  cream: 'text-cream-50',
-} as const
 
 function StatCard({
   label,
   value,
-  accent,
 }: Readonly<{
   label: string
   value: number | string
-  accent?: keyof typeof STAT_ACCENT_CLASS
 }>) {
-  const valueClass = STAT_ACCENT_CLASS[accent ?? 'cream']
-
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-cream-200/10 bg-charcoal-800/50 p-5">
-      <div
-        className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-amber-500/10 blur-2xl"
-        aria-hidden
-      />
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-cream-500">
-        {label}
-      </p>
-      <p
-        className={cn(
-          'mt-2 font-display text-3xl font-bold tabular-nums tracking-tight sm:text-4xl',
-          valueClass,
-        )}
-      >
+    <div className="rounded-card border border-divider bg-card p-4">
+      <p className="text-eyebrow text-cream-400">{label}</p>
+      <p className="mt-2 font-display text-3xl font-bold tabular-nums tracking-tight text-cream-50">
         {value}
       </p>
     </div>
@@ -69,7 +47,7 @@ function ArtistAvatar({
         src={imageUrl}
         alt=""
         className={cn(
-          'shrink-0 rounded-full object-cover ring-1 ring-amber-500/25',
+          'shrink-0 rounded-full object-cover ring-1 ring-divider',
           box,
         )}
       />
@@ -79,7 +57,7 @@ function ArtistAvatar({
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-charcoal-700 text-amber-300/90 ring-1 ring-cream-200/10',
+        'flex shrink-0 items-center justify-center rounded-full bg-charcoal-700 text-accent-fg ring-1 ring-divider',
         box,
       )}
       aria-hidden
@@ -130,7 +108,7 @@ function genreRankLeading(item: RankedSeedUsage, index: number) {
       name={item.name}
       id={item.seedKey}
       className={cn(
-        'bg-charcoal-700/90 ring-1 ring-amber-500/15',
+        'bg-charcoal-700 ring-1 ring-divider',
         index === 0 ? 'size-11' : 'size-8',
       )}
       iconClassName={index === 0 ? 'size-5' : 'size-4'}
@@ -138,17 +116,15 @@ function genreRankLeading(item: RankedSeedUsage, index: number) {
   )
 }
 
-function rankRowSurfaceClass(isTop: boolean, isPodium: boolean): string {
-  if (isTop) return 'bg-amber-500/[0.07] ring-1 ring-amber-500/20'
-  if (isPodium) return 'bg-cream-50/[0.03]'
-  return 'hover:bg-charcoal-800/50'
+function rankRowSurfaceClass(isTop: boolean): string {
+  return isTop ? 'bg-accent-soft ring-1 ring-inset ring-accent-line/40' : ''
 }
 
 function rankIndexClass(index: number, isTop: boolean, isPodium: boolean): string {
-  if (isTop) return 'text-lg font-bold text-amber-400'
+  if (isTop) return 'text-lg font-bold text-accent-fg'
   if (index === 1) return 'text-base font-semibold text-cream-200'
-  if (index === 2) return 'text-base font-semibold text-amber-600/90'
-  if (!isPodium) return 'text-sm text-cream-600'
+  if (index === 2) return 'text-base font-semibold text-amber-600'
+  if (!isPodium) return 'text-sm text-cream-500'
   return ''
 }
 
@@ -177,8 +153,8 @@ function RankBarRow({
   return (
     <li
       className={cn(
-        'group rounded-xl px-2 py-2.5 transition-colors',
-        rankRowSurfaceClass(isTop, isPodium),
+        'rounded-card px-2 py-2.5',
+        rankRowSurfaceClass(isTop),
       )}
       style={{ animationDelay: `${index * 40}ms` }}
     >
@@ -202,28 +178,27 @@ function RankBarRow({
                 className={cn(
                   'tabular-nums',
                   isTop
-                    ? 'font-display text-base font-bold text-amber-400'
-                    : 'text-sm text-cream-300',
+                    ? 'font-display text-base font-bold text-accent-fg'
+                    : 'text-sm text-cream-200',
                 )}
               >
                 {item.useCount}
               </span>
-              <span className="ml-1.5 text-[10px] tabular-nums text-cream-600">
+              <span className="ml-1.5 text-xs tabular-nums text-cream-400">
                 {share}%
               </span>
             </span>
           </div>
           <div
             className={cn(
-              'mt-1.5 overflow-hidden rounded-full bg-charcoal-950/80',
+              'mt-1.5 overflow-hidden rounded-full bg-charcoal-700',
               rankBarHeightClass(isTop, isPodium),
             )}
           >
             <div
               className={cn(
-                'h-full rounded-full bg-gradient-to-r transition-[width] duration-700 ease-out',
+                'h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none',
                 barTone,
-                isTop && 'shadow-[0_0_16px_-4px_rgb(232_168_56_/_0.7)]',
               )}
               style={{ width: `${width}%` }}
             />
@@ -252,12 +227,12 @@ function RankBars({
   )
 
   return (
-    <div className="space-y-5 rounded-2xl border border-cream-200/10 bg-gradient-to-b from-charcoal-800/55 to-charcoal-900/40 p-5">
-      <h2 className="font-sans text-xs font-medium uppercase tracking-[0.16em] text-amber-400/90">
+    <div className="space-y-4 rounded-panel border border-divider bg-panel p-5 sm:p-6">
+      <h2 className="font-sans text-eyebrow text-accent-fg">
         {title}
       </h2>
       {items.length === 0 ? (
-        <p className="text-sm text-cream-500">{empty}</p>
+        <p className="text-sm text-cream-400">{empty}</p>
       ) : (
         <ul className="space-y-1">
           {items.map((item, index) => (
@@ -308,21 +283,18 @@ export function UsageStatsView({ stats }: Readonly<{ stats: UserUsageStats }>) {
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label={t('stats.uniqueArtists')}
           value={stats.uniqueArtists}
-          accent="amber"
         />
         <StatCard
           label={t('stats.uniqueGenres')}
           value={stats.uniqueGenres}
-          accent="emerald"
         />
         <StatCard
           label={t('stats.artistMixes')}
           value={stats.artistMixCount}
-          accent="cream"
         />
         <StatCard
           label={t('stats.genreMixes')}

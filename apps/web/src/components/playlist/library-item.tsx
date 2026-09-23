@@ -26,12 +26,12 @@ const PlaylistDetail = lazy(
 
 function statusStyles(status: PlaylistStatus) {
   if (status === 'COMPLETED') {
-    return 'text-emerald-300 bg-emerald-950/50 border-emerald-800/50'
+    return 'border-success-line bg-success-soft text-success'
   }
   if (status === 'PENDING') {
-    return 'text-amber-300 bg-amber-950/40 border-amber-800/40'
+    return 'border-warning-line bg-warning-soft text-warning'
   }
-  return 'text-red-300 bg-red-950/50 border-red-800/50'
+  return 'border-danger-line bg-danger-soft text-danger'
 }
 
 function statusLabelFor(
@@ -45,11 +45,11 @@ function statusLabelFor(
 
 function itemBorderClass(selecting: boolean, selected: boolean, deleted: boolean) {
   if (selecting && selected) {
-    return 'border-amber-500/55 bg-amber-500/[0.12] ring-1 ring-amber-500/25'
+    return 'border-accent-line bg-accent-soft'
   }
-  if (selecting) return 'border-cream-200/15 hover:border-amber-500/35'
-  if (deleted) return 'border-red-900/35 opacity-90'
-  return 'border-cream-200/12 hover:border-amber-500/30'
+  if (selecting) return 'border-control hover:border-control-hover hover:bg-hover'
+  if (deleted) return 'border-danger-line/60'
+  return 'border-divider hover:border-control'
 }
 
 function LibraryStatusBadge({
@@ -67,9 +67,9 @@ function LibraryStatusBadge({
   return (
     <span
       className={cn(
-        'rounded-md border px-2 py-0.5 text-[11px] font-medium uppercase',
+        'rounded-control border px-2 py-0.5 text-xs font-medium',
         deleted
-          ? 'border-red-800/50 bg-red-950/50 text-red-300'
+          ? 'border-danger-line bg-danger-soft text-danger'
           : statusStyles(status),
       )}
     >
@@ -88,7 +88,7 @@ function LibraryItemCover({
   return (
     <div
       className={cn(
-        'flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-charcoal-700',
+        'flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-control bg-charcoal-700',
         deleted && 'grayscale',
       )}
     >
@@ -100,7 +100,7 @@ function LibraryItemCover({
           loading="lazy"
         />
       ) : (
-        <Music2 className="size-6 text-cream-500" />
+        <Music2 aria-hidden className="size-6 text-cream-500" />
       )}
     </div>
   )
@@ -183,7 +183,7 @@ function LibraryItemMeta({
           saving={renamePending}
         />
       ) : (
-        <h3 className="truncate font-display text-lg text-cream-50">
+        <h3 className="truncate font-sans text-base font-semibold text-cream-50">
           {playlist.name}
         </h3>
       )}
@@ -198,7 +198,7 @@ function LibraryItemMeta({
 }
 
 const menuItemClass =
-  'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-charcoal-700/80 focus-visible:bg-charcoal-700/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/60'
+  'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-hover focus-visible:bg-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus'
 
 function LibraryItemMenu({
   id,
@@ -225,7 +225,7 @@ function LibraryItemMenu({
     <ul
       id={id}
       aria-label={t('library.more')}
-      className="absolute right-0 top-full z-10 mt-1 w-56 overflow-hidden rounded-lg border border-cream-200/10 bg-charcoal-800 py-1 shadow-xl"
+      className="absolute right-0 top-full z-10 mt-1 w-56 overflow-hidden rounded-card border border-divider bg-raised py-1 shadow-xl shadow-charcoal-950/60"
     >
       {showSpotifyActions ? (
         <>
@@ -280,7 +280,7 @@ function LibraryItemMenu({
         <li>
           <button
             type="button"
-            className={cn(menuItemClass, 'text-red-300')}
+            className={cn(menuItemClass, 'text-danger')}
             onClick={() => onAskConfirm({ kind: 'purge', playlist })}
           >
             <Trash2 aria-hidden className="size-3.5" />
@@ -329,7 +329,7 @@ function LibraryItemActions({
         aria-expanded={menuOpen}
         aria-controls={menuOpen ? menuId : undefined}
         onClick={onToggleMenu}
-        className={cn(menuOpen && 'bg-charcoal-700 text-cream-50')}
+        className={cn(menuOpen && 'bg-hover text-cream-50')}
       >
         <MoreHorizontal aria-hidden className="size-4" />
       </Button>
@@ -347,7 +347,7 @@ function LibraryItemPreviewPanel({
 }>) {
   if (loading) {
     return (
-      <div className="mt-4 border-t border-cream-200/10 pt-4">
+      <div className="mt-4 border-t border-divider pt-4">
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
@@ -356,7 +356,7 @@ function LibraryItemPreviewPanel({
   }
   if (!detail) return null
   return (
-    <div className="mt-4 border-t border-cream-200/10 pt-4">
+    <div className="mt-4 border-t border-divider pt-4">
       <Suspense
         fallback={
           <div className="flex justify-center py-8">
@@ -497,7 +497,7 @@ export function LibraryItem({
   return (
     <li
       className={cn(
-        'group animate-fade-up rounded-xl border bg-gradient-to-br from-charcoal-800/75 to-charcoal-900/50 p-4 transition-all',
+        'animate-fade-up rounded-card border bg-card p-4 transition-colors',
         itemBorderClass(selecting, selected, deleted),
       )}
     >
@@ -507,7 +507,7 @@ export function LibraryItem({
             type="button"
             onClick={() => onToggleSelect(playlist.id)}
             className={cn(
-              'flex min-w-0 flex-1 gap-3 rounded-lg text-left',
+              'flex min-w-0 flex-1 gap-3 rounded-control text-left',
               focusRing,
             )}
             aria-pressed={selected}

@@ -18,7 +18,7 @@ export function GenreIcon({
   return (
     <span
       className={cn(
-        'inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-charcoal-700/90 text-amber-300/90',
+        'inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-charcoal-700 text-accent-fg',
         className,
       )}
       aria-hidden

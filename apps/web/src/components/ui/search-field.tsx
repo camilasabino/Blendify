@@ -26,7 +26,10 @@ export function SearchField({
 }: SearchFieldProps) {
   return (
     <div className={cn('relative min-w-0', className)}>
-      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-cream-500" />
+      <Search
+        aria-hidden
+        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-cream-400"
+      />
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -48,12 +51,12 @@ export function SearchField({
           type="button"
           onClick={() => onChange('')}
           className={cn(
-            'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-cream-400 transition-colors hover:bg-charcoal-700 hover:text-cream-100',
+            'absolute right-2 top-1/2 -translate-y-1/2 rounded-control p-1 text-cream-400 transition-colors hover:bg-hover hover:text-cream-50',
             focusRing,
           )}
           aria-label={clearLabel}
         >
-          <X className="size-4" />
+          <X aria-hidden className="size-4" />
         </button>
       ) : null}
     </div>

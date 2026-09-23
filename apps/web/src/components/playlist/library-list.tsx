@@ -1,4 +1,4 @@
-import { RefreshCw, Trash2, X } from 'lucide-react'
+import { ListChecks, RefreshCw, Trash2, X } from 'lucide-react'
 import type { PlaylistSummary } from '@blendify/contracts'
 import { LibraryItem } from '@/components/playlist/library-item'
 import {
@@ -47,9 +47,9 @@ function LibraryToolbar({
         {showSelectionToggle ? (
           <Button size="sm" variant="ghost" onClick={onToggleSelecting}>
             {selecting ? (
-              <X className="size-3.5" />
+              <X aria-hidden className="size-3.5" />
             ) : (
-              <Trash2 className="size-3.5" />
+              <ListChecks aria-hidden className="size-3.5" />
             )}
             {selecting
               ? t('library.doneSelecting')
@@ -63,7 +63,7 @@ function LibraryToolbar({
           disabled={busy || selecting}
           onClick={onRefresh}
         >
-          {!refreshing ? <RefreshCw className="size-3.5" /> : null}
+          {!refreshing ? <RefreshCw aria-hidden className="size-3.5" /> : null}
           {t('library.refresh')}
         </Button>
       </div>
@@ -88,7 +88,7 @@ function LibrarySelectionBar({
   const hasSelection = selectedPlaylists.length > 0
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-card border border-divider bg-card p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div className="space-y-2">
         {hasSelection ? (
           <p className="text-sm font-medium text-cream-100">
@@ -104,7 +104,7 @@ function LibrarySelectionBar({
             type="checkbox"
             checked={allVisibleSelected}
             onChange={() => onToggleAllVisible(!allVisibleSelected)}
-            className="accent-amber-500"
+            className="size-4 accent-amber-500"
           />
           {allVisibleSelected
             ? t('library.deselectAll')
@@ -125,7 +125,7 @@ function LibrarySelectionBar({
               )
             }
           >
-            <Trash2 className="size-3.5" />
+            <Trash2 aria-hidden className="size-3.5" />
             {t('library.bulkRemoveSelected', {
               count: selectedPlaylists.length,
             })}
@@ -143,7 +143,7 @@ function LibrarySelectionBar({
                 )
               }
             >
-              <Trash2 className="size-3.5" />
+              <Trash2 aria-hidden className="size-3.5" />
               {t('library.bulkPurgeSelected', {
                 count: selectedActive.length,
               })}
@@ -212,7 +212,7 @@ function LibraryPlaylistList({
   const t = useT()
   return (
     <>
-      <p className="text-xs text-cream-500">
+      <p className="text-xs text-cream-400">
         {t('library.showingCount', { shown: playlists.length, total })}
       </p>
       <ul className="space-y-3">

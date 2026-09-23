@@ -6,7 +6,12 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const focusRing =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal-950'
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+
+export const pageGutter = 'mx-auto w-full max-w-4xl px-4 sm:px-6'
+
+export const focusWithinRing =
+  'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus'
 
 export function formatDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return '0:00'

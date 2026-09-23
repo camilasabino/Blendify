@@ -14,12 +14,12 @@ export function EmptyState({ title, body, action, className }: EmptyStateProps) 
   return (
     <div
       className={cn(
-        'rounded-2xl border border-dashed border-cream-200/15 px-6 py-12 text-center',
+        'rounded-panel border border-dashed border-control px-6 py-12 text-center',
         className,
       )}
     >
-      <h2 className="font-display text-lg text-cream-100">{title}</h2>
-      <p className="mt-2 text-sm text-cream-400">{body}</p>
+      <h2 className="font-display text-lg font-semibold text-cream-50">{title}</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm text-cream-400">{body}</p>
       {action ? (
         <Link to={action.to} className={cn(buttonVariants({ className: 'mt-5' }))}>
           {action.label}
@@ -47,11 +47,11 @@ export function ErrorState({
   return (
     <div
       className={cn(
-        'space-y-3 rounded-xl border border-red-900/40 bg-red-950/20 p-4',
+        'space-y-3 rounded-card border border-danger-line bg-danger-soft p-4',
         className,
       )}
     >
-      <p className="text-sm text-red-200">{message}</p>
+      <p className="text-sm text-danger">{message}</p>
       {children}
       {onRetry && retryLabel ? (
         <Button size="sm" variant="secondary" onClick={onRetry}>
@@ -70,7 +70,7 @@ export function FieldError({
   className?: string
 }>) {
   if (!children) return null
-  return <p className={cn('text-sm text-red-300', className)}>{children}</p>
+  return <p className={cn('text-sm text-danger', className)}>{children}</p>
 }
 
 export { LoadingState } from '@/components/ui/spinner'

@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Check, type LucideIcon } from 'lucide-react'
+import { cn, focusWithinRing } from '@/lib/utils'
 
 export type RadioCardOption<T extends string | number> = Readonly<{
   value: T
@@ -14,15 +14,16 @@ export function RadioCardGroup<T extends string | number>({
   value,
   options,
   onChange,
-  columns = 3,
+  mobileLayout = 'stack',
 }: Readonly<{
   label: string
   value: T
   options: readonly RadioCardOption<T>[]
   onChange: (value: T) => void
-  columns?: 2 | 3
+  mobileLayout?: 'stack' | 'inline'
 }>) {
   const name = useId()
+  const stacked = mobileLayout === 'stack'
 
   return (
     <fieldset>
@@ -30,7 +31,7 @@ export function RadioCardGroup<T extends string | number>({
       <div
         className={cn(
           'grid gap-2',
-          columns === 2 ? 'sm:grid-cols-2' : 'grid-cols-3',
+          stacked ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-3',
         )}
       >
         {options.map((option) => {
@@ -40,10 +41,15 @@ export function RadioCardGroup<T extends string | number>({
             <label
               key={option.value}
               className={cn(
-                'relative flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-all duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-amber-500/60 has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-charcoal-950 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 sm:flex-col sm:gap-2',
+                'relative flex min-h-11 cursor-pointer rounded-card border px-3 py-3 text-left transition-colors duration-150',
+                stacked
+                  ? 'items-center gap-3 pr-9 sm:flex-col sm:items-start sm:gap-2 sm:pr-3'
+                  : 'flex-col gap-0.5',
+                focusWithinRing,
+                'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50',
                 selected
-                  ? 'border-amber-500/55 bg-amber-500/18 text-cream-50 shadow-[0_0_24px_-12px_rgb(232_168_56_/_0.55)]'
-                  : 'border-cream-200/10 bg-charcoal-950/40 text-cream-300 hover:border-amber-500/30 hover:bg-amber-500/8',
+                  ? 'border-accent-line bg-accent-soft text-cream-50'
+                  : 'border-control bg-field text-cream-200 hover:border-control-hover hover:bg-hover hover:text-cream-50',
               )}
             >
               <input
@@ -57,10 +63,10 @@ export function RadioCardGroup<T extends string | number>({
               {Icon ? (
                 <span
                   className={cn(
-                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                    'flex size-8 shrink-0 items-center justify-center rounded-control',
                     selected
-                      ? 'bg-amber-500/30 text-amber-300'
-                      : 'bg-charcoal-700/80 text-cream-400',
+                      ? 'bg-accent-soft text-accent-fg'
+                      : 'bg-charcoal-700 text-cream-400',
                   )}
                 >
                   <Icon className="size-4" aria-hidden />
@@ -69,18 +75,36 @@ export function RadioCardGroup<T extends string | number>({
               <span className="min-w-0">
                 <span
                   className={cn(
-                    'block font-medium',
-                    Icon ? 'text-sm' : 'font-display text-xl font-semibold tabular-nums',
+                    'block',
+                    Icon
+                      ? 'text-sm font-medium'
+                      : 'font-display text-xl font-semibold tabular-nums',
                   )}
                 >
                   {option.label}
                 </span>
                 {option.hint ? (
-                  <span className="mt-0.5 block text-[11px] leading-snug text-cream-500">
+                  <span
+                    className={cn(
+                      'mt-0.5 block text-xs leading-snug',
+                      selected ? 'text-cream-300' : 'text-cream-400',
+                    )}
+                  >
                     {option.hint}
                   </span>
                 ) : null}
               </span>
+              {selected ? (
+                <Check
+                  aria-hidden
+                  className={cn(
+                    'absolute right-3 size-4 text-accent-fg',
+                    stacked
+                      ? 'top-1/2 -translate-y-1/2 sm:top-3 sm:translate-y-0'
+                      : 'top-3',
+                  )}
+                />
+              ) : null}
             </label>
           )
         })}
