@@ -56,12 +56,11 @@ export function AppShell() {
             <NavLink
               to="/"
               className={cn(
-                'inline-flex shrink-0 items-center gap-2 rounded-md font-display text-lg font-bold tracking-tight text-cream-50 transition-colors hover:text-amber-400 sm:text-xl',
+                'inline-flex shrink-0 items-center rounded-md transition-opacity hover:opacity-80',
                 focusRing,
               )}
             >
-              <BlendifyMark decorative />
-              Blendify
+              <BlendifyMark />
             </NavLink>
             <nav className="hidden items-center gap-1 md:flex">
               <NavLink to="/app/mix" className={navLinkClass}>

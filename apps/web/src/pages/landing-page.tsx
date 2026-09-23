@@ -34,10 +34,9 @@ export function LandingPage() {
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-6">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-cream-100/80 transition-colors hover:text-cream-50"
+          className="inline-flex items-center rounded-md transition-opacity hover:opacity-80"
         >
-          <BlendifyMark decorative />
-          Blendify
+          <BlendifyMark />
         </Link>
         <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSwitcher />
