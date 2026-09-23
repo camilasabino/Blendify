@@ -4,35 +4,38 @@ import {
   Blend,
   Compass,
   Library,
-  LogOut,
-  Music2,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
-import { Button } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { PreferencesMenu } from '@/components/layout/preferences-menu'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
-import { SpotifyMark } from '@/components/brand/spotify-mark'
+import { AccountMenu } from '@/components/layout/account-menu'
 import { useT } from '@/i18n/use-t'
-import { cn, focusRing, pageGutter } from '@/lib/utils'
+import { cn, focusRing, pageGutter, shellGutter } from '@/lib/utils'
 
-const navStateClass = (isActive: boolean) =>
-  isActive
-    ? 'border-accent-line bg-accent-soft text-accent-fg'
-    : 'border-transparent text-cream-300 hover:bg-hover hover:text-cream-50'
+const NAV_ITEMS = [
+  { to: '/app/mix', labelKey: 'nav.create', icon: Blend },
+  { to: '/app/discover', labelKey: 'nav.discover', icon: Compass },
+  { to: '/app/library', labelKey: 'nav.library', icon: Library },
+  { to: '/app/stats', labelKey: 'nav.stats', icon: BarChart3 },
+] as const
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-control border px-3 py-2 text-sm font-medium transition-colors duration-200',
+    'inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-sm font-medium transition-colors duration-200',
     focusRing,
-    navStateClass(isActive),
+    isActive
+      ? 'border-accent-line bg-accent-soft text-accent-fg'
+      : 'border-transparent text-cream-300 hover:bg-hover hover:text-cream-50',
   )
 
-const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
+const tabLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'inline-flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-control border px-1 py-1 text-xs font-medium leading-none transition-colors duration-200',
-    focusRing,
-    navStateClass(isActive),
+    'relative inline-flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 whitespace-nowrap rounded-control px-1 text-xs font-medium leading-none transition-colors duration-200 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus md:flex-none md:flex-row md:gap-2 md:px-4 md:text-sm',
+    "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
+    isActive
+      ? 'text-accent-fg after:bg-accent'
+      : 'text-cream-300 after:bg-transparent hover:bg-hover hover:text-cream-50',
   )
 
 export function AppShell() {
@@ -53,105 +56,53 @@ export function AppShell() {
       <header className="sticky top-0 z-30 border-b border-divider bg-charcoal-950/80 backdrop-blur-md">
         <div
           className={cn(
-            pageGutter,
-            'flex h-14 items-center justify-between gap-3 sm:h-16 sm:gap-4',
+            shellGutter,
+            'grid h-12 grid-cols-[auto_1fr] items-center gap-3 sm:h-14 lg:h-16 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-6',
           )}
         >
-          <div className="flex min-w-0 items-center gap-4 lg:gap-6">
-            <NavLink
-              to="/app/mix"
-              className={cn(
-                'inline-flex shrink-0 items-center rounded-control transition-opacity hover:opacity-80',
-                focusRing,
-              )}
-            >
-              <BlendifyMark />
-            </NavLink>
-            <nav
-              className="hidden items-center gap-1 md:flex"
-              aria-label={t('nav.main')}
-            >
-              <NavLink to="/app/mix" className={navLinkClass}>
-                <Blend aria-hidden className="hidden size-4 lg:block" />
-                {t('nav.create')}
-              </NavLink>
-              <NavLink to="/app/discover" className={navLinkClass}>
-                <Compass aria-hidden className="hidden size-4 lg:block" />
-                {t('nav.discover')}
-              </NavLink>
-              <NavLink to="/app/library" className={navLinkClass}>
-                <Library aria-hidden className="hidden size-4 lg:block" />
-                {t('nav.library')}
-              </NavLink>
-              <NavLink to="/app/stats" className={navLinkClass}>
-                <BarChart3 aria-hidden className="hidden size-4 lg:block" />
-                {t('nav.stats')}
-              </NavLink>
-            </nav>
-          </div>
+          <NavLink
+            to="/app/mix"
+            className={cn(
+              'inline-flex shrink-0 items-center justify-self-start rounded-control transition-opacity hover:opacity-80',
+              focusRing,
+            )}
+          >
+            <BlendifyMark />
+          </NavLink>
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+          <nav
+            className="hidden items-center gap-1 justify-self-center lg:flex"
+            aria-label={t('nav.main')}
+          >
+            {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
+              <NavLink key={to} to={to} className={navLinkClass}>
+                <Icon aria-hidden className="size-4" />
+                {t(labelKey)}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="flex min-w-0 items-center justify-self-end gap-0.5 sm:gap-1">
             <LanguageSwitcher />
             <PreferencesMenu />
-            {user && (
-              <div
-                className="flex items-center gap-2 px-1"
-                title={`Spotify · ${user.displayName}`}
-              >
-                <span className="relative shrink-0">
-                  {user.imageUrl ? (
-                    <img
-                      src={user.imageUrl}
-                      alt=""
-                      className="size-8 rounded-full object-cover ring-1 ring-divider"
-                    />
-                  ) : (
-                    <span className="flex size-8 items-center justify-center rounded-full bg-charcoal-700 ring-1 ring-divider">
-                      <Music2 aria-hidden className="size-4 text-accent-fg" />
-                    </span>
-                  )}
-                  <span className="absolute -bottom-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-charcoal-950 ring-1 ring-charcoal-950">
-                    <SpotifyMark className="size-3" />
-                  </span>
-                </span>
-                <span className="sr-only xl:not-sr-only xl:max-w-40 xl:truncate xl:text-sm xl:text-cream-300">
-                  {user.displayName}
-                </span>
-              </div>
-            )}
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => void logout()}
-              aria-label={t('nav.logOut')}
-              title={t('nav.logOut')}
-              className="size-8 sm:size-9"
-            >
-              <LogOut aria-hidden className="size-4" />
-            </Button>
+            <span aria-hidden className="w-0.5 shrink-0 sm:mx-1 sm:h-5 sm:w-px sm:bg-divider" />
+            <AccountMenu
+              displayName={user?.displayName}
+              imageUrl={user?.imageUrl}
+              onLogOut={() => void logout()}
+            />
           </div>
         </div>
 
-        <nav
-          className="grid grid-cols-4 gap-1 border-t border-divider px-2 py-1 md:hidden"
-          aria-label={t('nav.main')}
-        >
-          <NavLink to="/app/mix" className={mobileNavLinkClass}>
-            <Blend aria-hidden className="size-4" />
-            <span className="truncate">{t('nav.create')}</span>
-          </NavLink>
-          <NavLink to="/app/discover" className={mobileNavLinkClass}>
-            <Compass aria-hidden className="size-4" />
-            <span className="truncate">{t('nav.discover')}</span>
-          </NavLink>
-          <NavLink to="/app/library" className={mobileNavLinkClass}>
-            <Library aria-hidden className="size-4" />
-            <span className="truncate">{t('nav.library')}</span>
-          </NavLink>
-          <NavLink to="/app/stats" className={mobileNavLinkClass}>
-            <BarChart3 aria-hidden className="size-4" />
-            <span className="truncate">{t('nav.stats')}</span>
-          </NavLink>
+        <nav className="lg:hidden" aria-label={t('nav.main')}>
+          <div className="mx-auto flex w-full max-w-6xl gap-1 px-2 pt-1 sm:px-6 md:justify-center md:gap-2">
+            {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
+              <NavLink key={to} to={to} className={tabLinkClass}>
+                <Icon aria-hidden className="size-4 shrink-0" />
+                {t(labelKey)}
+              </NavLink>
+            ))}
+          </div>
         </nav>
       </header>
 

@@ -4,6 +4,7 @@ export const en = {
     'Mix artists or genres, or start from a single artist or song. Blendify builds the playlist and saves it to your Spotify.',
   'nav.logIn': 'Log in',
   'nav.logOut': 'Log out',
+  'nav.account': 'Account menu',
   'nav.create': 'Mix',
   'nav.discover': 'Discover',
   'nav.library': 'Library',

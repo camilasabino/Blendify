@@ -8,7 +8,7 @@ import { SpotifyMark } from '@/components/brand/spotify-mark'
 import { useT } from '@/i18n/use-t'
 import { buildDefaultPlaylistName } from '@/lib/playlist-name'
 import { formatSongCount } from '@/lib/song-count'
-import { cn, focusRing } from '@/lib/utils'
+import { cn, focusRing, shellGutter } from '@/lib/utils'
 
 const DEMO_ARTISTS = ['Nina Simone', 'Bill Withers', 'Aretha Franklin']
 const DEMO_TRACK_WIDTHS = ['w-3/4', 'w-1/2', 'w-2/3']
@@ -25,7 +25,12 @@ export function LandingPage() {
         className="pointer-events-none absolute -left-24 top-10 z-0 size-112 rounded-full bg-amber-500/15 blur-3xl animate-drift"
       />
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-6 sm:px-6">
+      <header
+        className={cn(
+          shellGutter,
+          'relative z-20 flex items-center justify-between gap-4 py-6',
+        )}
+      >
         <Link
           to="/"
           className={cn(

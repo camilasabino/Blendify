@@ -6,6 +6,7 @@ export const es: Record<MessageKey, string> = {
     'Mezcla artistas o géneros, o empieza desde un artista o una canción. Blendify arma la playlist y la guarda en tu Spotify.',
   'nav.logIn': 'Iniciar sesión',
   'nav.logOut': 'Cerrar sesión',
+  'nav.account': 'Menú de cuenta',
   'nav.create': 'Mezclar',
   'nav.discover': 'Descubrir',
   'nav.library': 'Biblioteca',

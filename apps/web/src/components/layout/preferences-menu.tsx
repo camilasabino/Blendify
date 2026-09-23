@@ -1,75 +1,59 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { usePopover, popoverSurfaceClass } from '@/hooks/use-popover'
 import { useT } from '@/i18n/use-t'
 import {
   readPersistToLibraryPreference,
   writePersistToLibraryPreference,
 } from '@/lib/persist-to-library-preference'
-import { cn, focusRing } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 export function PreferencesMenu() {
   const t = useT()
   const panelId = useId()
-  const rootRef = useRef<HTMLDivElement>(null)
-  const [open, setOpen] = useState(false)
+  const titleId = useId()
+  const popover = usePopover({ align: 'end' })
+  const { open } = popover
   const [persistToLibrary, setPersistToLibrary] = useState(() =>
     readPersistToLibraryPreference(),
   )
 
   useEffect(() => {
-    if (!open) return
-    setPersistToLibrary(readPersistToLibraryPreference())
-
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Node
-      if (!rootRef.current?.contains(target)) {
-        setOpen(false)
-      }
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-
-    document.addEventListener('mousedown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
+    if (open) setPersistToLibrary(readPersistToLibraryPreference())
   }, [open])
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={popover.rootRef} className="relative">
       <Button
+        ref={popover.triggerRef}
         type="button"
         size="icon"
         variant="ghost"
         aria-label={t('preferences.open')}
         aria-expanded={open}
-        aria-controls={panelId}
+        aria-controls={open ? panelId : undefined}
         title={t('preferences.open')}
-        onClick={() => setOpen((value) => !value)}
-        className={cn(
-          'size-8 sm:size-9',
-          open && 'bg-hover text-cream-50',
-        )}
+        onClick={popover.toggle}
+        className={cn(open && 'bg-hover text-cream-50')}
       >
         <Settings aria-hidden className="size-4" />
       </Button>
 
       {open && (
         <div
+          ref={popover.panelRef}
           id={panelId}
-          aria-label={t('preferences.title')}
-          className={cn(
-            'absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-panel border border-divider bg-raised p-4 shadow-xl shadow-charcoal-950/60',
-            focusRing,
-          )}
+          role="group"
+          aria-labelledby={titleId}
+          data-popover-panel
+          data-placement={popover.placement}
+          style={popover.panelStyle}
+          className={cn(popoverSurfaceClass, 'w-88 rounded-panel p-4')}
         >
-          <p className="text-eyebrow text-accent-fg">
+          <p id={titleId} className="text-eyebrow text-accent-fg">
             {t('preferences.title')}
           </p>
           <p className="mt-1 text-xs text-cream-400">

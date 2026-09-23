@@ -3,8 +3,9 @@ import {
   Suspense,
   useEffect,
   useId,
-  useRef,
   useState,
+  type CSSProperties,
+  type KeyboardEvent,
   type ReactNode,
   type RefObject,
 } from 'react'
@@ -29,6 +30,7 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { popoverSurfaceClass, usePopover } from '@/hooks/use-popover'
 import { useLocaleStore } from '@/i18n/use-locale'
 import { useT } from '@/i18n/use-t'
 import { formatSongCount } from '@/lib/song-count'
@@ -220,6 +222,10 @@ const menuItemClass =
 
 function LibraryItemMenu({
   id,
+  panelRef,
+  panelStyle,
+  placement,
+  onKeyDown,
   playlist,
   deleted,
   copied,
@@ -228,6 +234,10 @@ function LibraryItemMenu({
   onAskConfirm,
 }: Readonly<{
   id: string
+  panelRef: RefObject<HTMLUListElement | null>
+  panelStyle: CSSProperties
+  placement: string | undefined
+  onKeyDown: (event: KeyboardEvent) => void
   playlist: PlaylistSummary
   deleted: boolean
   copied: boolean
@@ -241,15 +251,21 @@ function LibraryItemMenu({
 
   return (
     <ul
+      ref={panelRef}
       id={id}
       aria-label={t('library.more')}
-      className="absolute right-0 top-full z-10 mt-1 w-56 overflow-hidden rounded-card border border-divider bg-raised py-1 shadow-xl shadow-charcoal-950/60"
+      data-popover-panel
+      data-placement={placement}
+      style={panelStyle}
+      onKeyDown={onKeyDown}
+      className={cn(popoverSurfaceClass, 'w-56 rounded-card py-1')}
     >
       {showSpotifyActions ? (
         <>
           <li>
             <button
               type="button"
+              data-popover-item
               className={cn(menuItemClass, 'text-cream-100')}
               onClick={onCopyLink}
             >
@@ -264,6 +280,7 @@ function LibraryItemMenu({
           <li>
             <button
               type="button"
+              data-popover-item
               className={cn(menuItemClass, 'text-cream-100')}
               onClick={onStartRename}
             >
@@ -276,6 +293,7 @@ function LibraryItemMenu({
       <li>
         <button
           type="button"
+          data-popover-item
           className={cn(menuItemClass, 'text-cream-200')}
           onClick={() => onAskConfirm({ kind: 'delete', playlist })}
         >
@@ -287,6 +305,7 @@ function LibraryItemMenu({
         <li>
           <button
             type="button"
+            data-popover-item
             className={cn(menuItemClass, 'text-danger')}
             onClick={() => onAskConfirm({ kind: 'purge', playlist })}
           >
@@ -431,13 +450,12 @@ export function LibraryItem({
 }>) {
   const t = useT()
   const queryClient = useQueryClient()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState(playlist.name)
   const [copied, setCopied] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const menuTriggerRef = useRef<HTMLButtonElement>(null)
+  const menu = usePopover<HTMLUListElement>({ align: 'end' })
+  const { open: menuOpen, setOpen: setMenuOpen } = menu
   const menuId = useId()
   const previewId = useId()
   const deleted = playlist.missingOnSpotify
@@ -450,35 +468,8 @@ export function LibraryItem({
     setMenuOpen(false)
     setPreviewOpen(false)
     setRenaming(false)
-  }, [selecting])
+  }, [selecting, setMenuOpen])
 
-  useEffect(() => {
-    if (!menuOpen) return
-    function close(event: PointerEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
-    }
-    function closeWithEscape(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return
-      setMenuOpen(false)
-      menuTriggerRef.current?.focus()
-    }
-    function closeOnFocusOut(event: FocusEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('pointerdown', close)
-    document.addEventListener('keydown', closeWithEscape)
-    document.addEventListener('focusin', closeOnFocusOut)
-    return () => {
-      document.removeEventListener('pointerdown', close)
-      document.removeEventListener('keydown', closeWithEscape)
-      document.removeEventListener('focusin', closeOnFocusOut)
-    }
-  }, [menuOpen])
-
-  function closeMenu() {
-    setMenuOpen(false)
-    menuTriggerRef.current?.focus()
-  }
 
   const detailQuery = useQuery({
     queryKey: ['playlists', 'detail', playlist.id],
@@ -495,7 +486,7 @@ export function LibraryItem({
 
   function finishRename() {
     setRenaming(false)
-    menuTriggerRef.current?.focus()
+    menu.triggerRef.current?.focus()
   }
 
   function submitRename() {
@@ -580,12 +571,16 @@ export function LibraryItem({
             onTogglePreview={() => setPreviewOpen((open) => !open)}
             menuOpen={menuOpen}
             menuId={menuId}
-            onToggleMenu={() => setMenuOpen((open) => !open)}
-            menuRef={menuRef}
-            menuTriggerRef={menuTriggerRef}
+            onToggleMenu={menu.toggle}
+            menuRef={menu.rootRef}
+            menuTriggerRef={menu.triggerRef}
             menu={
               <LibraryItemMenu
                 id={menuId}
+                panelRef={menu.panelRef}
+                panelStyle={menu.panelStyle}
+                placement={menu.placement}
+                onKeyDown={menu.onPanelKeyDown}
                 playlist={playlist}
                 deleted={deleted}
                 copied={copied}
@@ -595,7 +590,7 @@ export function LibraryItem({
                   setRenaming(true)
                 }}
                 onAskConfirm={(confirm) => {
-                  closeMenu()
+                  menu.close()
                   onAskConfirm(confirm)
                 }}
               />

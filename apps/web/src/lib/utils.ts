@@ -10,6 +10,8 @@ export const focusRing =
 
 export const pageGutter = 'mx-auto w-full max-w-4xl px-4 sm:px-6'
 
+export const shellGutter = 'mx-auto w-full max-w-6xl px-4 sm:px-6'
+
 export const focusWithinRing =
   'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus'
 
