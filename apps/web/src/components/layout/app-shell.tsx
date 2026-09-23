@@ -30,7 +30,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'inline-flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-control border px-1 py-1.5 text-xs font-medium leading-none transition-colors duration-200',
+    'inline-flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-control border px-1 py-1 text-xs font-medium leading-none transition-colors duration-200',
     focusRing,
     navStateClass(isActive),
   )
@@ -59,7 +59,7 @@ export function AppShell() {
         >
           <div className="flex min-w-0 items-center gap-4 lg:gap-6">
             <NavLink
-              to="/"
+              to="/app/mix"
               className={cn(
                 'inline-flex shrink-0 items-center rounded-control transition-opacity hover:opacity-80',
                 focusRing,
@@ -95,14 +95,14 @@ export function AppShell() {
             <PreferencesMenu />
             {user && (
               <div
-                className="flex items-center gap-2 rounded-full border border-divider bg-card py-1 pl-1 pr-1.5 xl:pr-2.5"
+                className="flex items-center gap-2 px-1"
                 title={`Spotify · ${user.displayName}`}
               >
                 <span className="relative shrink-0">
                   {user.imageUrl ? (
                     <img
                       src={user.imageUrl}
-                      alt={user.displayName}
+                      alt=""
                       className="size-8 rounded-full object-cover ring-1 ring-divider"
                     />
                   ) : (
@@ -114,7 +114,7 @@ export function AppShell() {
                     <SpotifyMark className="size-3" />
                   </span>
                 </span>
-                <span className="hidden max-w-40 truncate text-sm text-cream-200 xl:inline">
+                <span className="sr-only xl:not-sr-only xl:max-w-40 xl:truncate xl:text-sm xl:text-cream-300">
                   {user.displayName}
                 </span>
               </div>
@@ -133,7 +133,7 @@ export function AppShell() {
         </div>
 
         <nav
-          className="grid grid-cols-4 gap-1 border-t border-divider px-2 py-1.5 md:hidden"
+          className="grid grid-cols-4 gap-1 border-t border-divider px-2 py-1 md:hidden"
           aria-label={t('nav.main')}
         >
           <NavLink to="/app/mix" className={mobileNavLinkClass}>

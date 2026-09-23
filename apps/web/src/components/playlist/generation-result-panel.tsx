@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import {
   Check,
+  CircleCheck,
   Copy,
   ExternalLink,
   Plus,
@@ -17,7 +18,9 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { useGenerationFill } from '@/hooks/use-generation-feedback'
 import { useT } from '@/i18n/use-t'
 import type { MessageKey } from '@/i18n/messages'
-import { cn } from '@/lib/utils'
+import { readPersistToLibraryPreference } from '@/lib/persist-to-library-preference'
+import { formatSongCount } from '@/lib/song-count'
+import { cn, formatListeningTime } from '@/lib/utils'
 
 function phaseMessageKey(phase: GenerationProgress['phase']): MessageKey {
   switch (phase) {
@@ -80,9 +83,11 @@ function GenerationProgressBar({
 function GeneratingState({
   progress,
   workingHintKey,
+  requestStarted,
 }: Readonly<{
   progress: GenerationProgress | null
   workingHintKey: MessageKey
+  requestStarted: boolean
 }>) {
   const t = useT()
   const percent = progress?.percent ?? 0
@@ -114,6 +119,13 @@ function GeneratingState({
       />
       {metaLine ? (
         <p className="text-xs text-cream-400">{metaLine}</p>
+      ) : null}
+      {requestStarted ? (
+        <p className="text-xs leading-relaxed text-cream-400">
+          {readPersistToLibraryPreference()
+            ? t('create.leaveNoteLibrary')
+            : t('create.leaveNoteSpotify')}
+        </p>
       ) : null}
     </div>
   )
@@ -233,6 +245,20 @@ function NextStepActions({
   )
 }
 
+function resultMeta(
+  result: PlaylistDetail,
+  t: ReturnType<typeof useT>,
+): string {
+  return [
+    formatSongCount(result.trackCount, t),
+    result.totalDurationMs > 0
+      ? formatListeningTime(result.totalDurationMs)
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
 function ReadyResult({
   result,
   requestedTrackCount,
@@ -258,10 +284,7 @@ function ReadyResult({
     <div className="space-y-6">
       <div className="space-y-4">
         <div>
-          <p className="text-base font-semibold text-cream-50">{result.name}</p>
-          <p className="mt-1 text-sm text-cream-400">
-            {t('create.tracksReady', { count: result.trackCount })}
-          </p>
+          <p className="text-sm text-cream-300">{resultMeta(result, t)}</p>
           <FillStatusMessages
             trackCount={result.trackCount}
             requestedTrackCount={requestedTrackCount}
@@ -300,6 +323,7 @@ export function GenerationResultPanel({
   requestedTrackCount,
   workingTitleKey,
   workingHintKey,
+  requestStarted = false,
   copied,
   onCopy,
   onRetry,
@@ -314,6 +338,7 @@ export function GenerationResultPanel({
   requestedTrackCount: number
   workingTitleKey: MessageKey
   workingHintKey: MessageKey
+  requestStarted?: boolean
   copied: boolean
   onCopy: (url: string) => void
   onRetry: () => void
@@ -327,7 +352,7 @@ export function GenerationResultPanel({
 
   const showError = !isGenerating && error != null
   const showResult = !isGenerating && !showError && result != null
-  let title = t('create.ready')
+  let title = result?.name ?? t('create.ready')
   if (isGenerating) title = t(workingTitleKey)
   else if (showError) title = t('create.failedTitle')
 
@@ -335,7 +360,7 @@ export function GenerationResultPanel({
   if (isGenerating) {
     announcement = progressAnnouncement(progress, workingHintKey, t)
   } else if (showResult) {
-    announcement = `${t('create.ready')}. ${t('create.tracksReady', { count: result.trackCount })}`
+    announcement = `${t('create.ready')}: ${result.name}. ${resultMeta(result, t)}`
   }
 
   return (
@@ -348,17 +373,29 @@ export function GenerationResultPanel({
           : 'border-accent-line/50 from-amber-500/[0.12]',
       )}
     >
-      <h2
-        id={titleId}
-        className="font-display text-lg font-semibold text-cream-50"
-      >
-        {title}
-      </h2>
+      <div className="space-y-1">
+        {showResult ? (
+          <p className="flex items-center gap-1.5 text-eyebrow text-accent-fg">
+            <CircleCheck aria-hidden className="size-3.5" />
+            {t('create.ready')}
+          </p>
+        ) : null}
+        <h2
+          id={titleId}
+          className={cn(
+            'font-display font-semibold text-cream-50',
+            showResult ? 'break-words text-xl sm:text-2xl' : 'text-lg',
+          )}
+        >
+          {title}
+        </h2>
+      </div>
       <output className="sr-only">{announcement}</output>
       {isGenerating ? (
         <GeneratingState
           progress={progress}
           workingHintKey={workingHintKey}
+          requestStarted={requestStarted}
         />
       ) : null}
       {showError ? (

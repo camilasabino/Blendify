@@ -10,7 +10,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/feedback'
 import { FormSection } from '@/components/ui/form-section'
+import { Label } from '@/components/ui/label'
 import { RadioCardGroup } from '@/components/ui/radio-card-group'
+import { Switch } from '@/components/ui/switch'
 import { useT } from '@/i18n/use-t'
 import { cn, focusRing } from '@/lib/utils'
 
@@ -104,12 +106,44 @@ export function CoverErrorNotice({ message }: Readonly<{ message: string | null 
   )
 }
 
+export function CoverToggle({
+  id,
+  checked,
+  onCheckedChange,
+  hint,
+}: Readonly<{
+  id: string
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+  hint: string
+}>) {
+  const t = useT()
+  const hintId = `${id}-hint`
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <Label htmlFor={id}>{t('create.generateCover')}</Label>
+        <p id={hintId} className="mt-1 text-xs leading-relaxed text-cream-400">
+          {hint}
+        </p>
+      </div>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        aria-describedby={hintId}
+      />
+    </div>
+  )
+}
+
 export function GenerationSubmitBar({
   isGenerating,
   disabledReason,
   error,
   idleLabel,
   busyLabel,
+  summary,
   icon: Icon,
 }: Readonly<{
   isGenerating: boolean
@@ -117,28 +151,44 @@ export function GenerationSubmitBar({
   error: string | null
   idleLabel: string
   busyLabel: string
+  summary?: string | null
   icon: LucideIcon
 }>) {
   const reasonId = useId()
+  const summaryId = useId()
   const showReason = Boolean(disabledReason) && !isGenerating
+  const showSummary = Boolean(summary) && !showReason
+  let describedBy: string | undefined
+  if (showReason) describedBy = reasonId
+  else if (showSummary) describedBy = summaryId
 
   return (
     <div className="space-y-3 pt-2">
       {error ? <FieldError>{error}</FieldError> : null}
-      <Button
-        type="submit"
-        size="lg"
-        className={cn(
-          'w-full sm:w-auto',
-          isGenerating ? 'animate-pulse-glow' : '',
-        )}
-        loading={isGenerating}
-        disabled={Boolean(disabledReason)}
-        aria-describedby={showReason ? reasonId : undefined}
-      >
-        {!isGenerating ? <Icon aria-hidden className="size-4" /> : null}
-        {isGenerating ? busyLabel : idleLabel}
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+        <Button
+          type="submit"
+          size="lg"
+          className={cn(
+            'w-full sm:w-auto',
+            isGenerating ? 'animate-pulse-glow' : '',
+          )}
+          loading={isGenerating}
+          disabled={Boolean(disabledReason)}
+          aria-describedby={describedBy}
+        >
+          {!isGenerating ? <Icon aria-hidden className="size-4" /> : null}
+          {isGenerating ? busyLabel : idleLabel}
+        </Button>
+        {showSummary ? (
+          <p
+            id={summaryId}
+            className="text-center text-sm tabular-nums text-cream-300 sm:text-left"
+          >
+            {summary}
+          </p>
+        ) : null}
+      </div>
       {showReason ? (
         <p id={reasonId} className="text-sm text-cream-400">
           {disabledReason}
@@ -153,12 +203,14 @@ export function GenerationSettingsCollapse({
   collapsed,
   onToggle,
   summary,
+  note,
   children,
 }: Readonly<{
   active: boolean
   collapsed: boolean
   onToggle: () => void
   summary: string[]
+  note?: string | null
   children: ReactNode
 }>) {
   const t = useT()
@@ -203,8 +255,13 @@ export function GenerationSettingsCollapse({
       <div
         id={regionId}
         hidden={collapsed}
-        className={cn(active && !collapsed && 'animate-fade-up')}
+        className={cn(active && !collapsed && 'animate-fade-up space-y-6')}
       >
+        {active && note ? (
+          <p className="rounded-card border border-divider bg-card px-4 py-3 text-sm text-cream-200">
+            {note}
+          </p>
+        ) : null}
         {children}
       </div>
     </div>

@@ -9,73 +9,76 @@ import {
   type RefObject,
 } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, ExternalLink, MoreHorizontal, Music2, Pencil, Trash2 } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  MoreHorizontal,
+  Music2,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import type { PlaylistStatus, PlaylistSummary } from '@blendify/contracts'
 import { api } from '@/lib/api'
 import type { PendingLibraryConfirm } from '@/components/playlist/library-types'
-import { Button } from '@/components/ui/button'
+import {
+  libraryDisplayTitle,
+  libraryKindKey,
+} from '@/components/playlist/library-list-helpers'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { useLocaleStore } from '@/i18n/use-locale'
 import { useT } from '@/i18n/use-t'
-import { cn, copyToClipboard, formatDate, formatDuration, focusRing } from '@/lib/utils'
+import { formatSongCount } from '@/lib/song-count'
+import {
+  cn,
+  copyToClipboard,
+  focusRing,
+  formatListeningTime,
+  formatShortDate,
+} from '@/lib/utils'
 
 const PlaylistDetail = lazy(
   () => import('@/components/playlist/playlist-detail'),
 )
 
-function statusStyles(status: PlaylistStatus) {
-  if (status === 'COMPLETED') {
-    return 'border-success-line bg-success-soft text-success'
+const badgeBase =
+  'inline-flex shrink-0 items-center rounded-control border px-1.5 py-0.5 text-[0.6875rem] font-medium leading-none'
+
+function exceptionalStatus(
+  status: PlaylistStatus,
+  deleted: boolean,
+  t: ReturnType<typeof useT>,
+): { label: string; className: string } | null {
+  if (deleted) {
+    return {
+      label: t('library.deleted'),
+      className: 'border-control text-cream-300',
+    }
   }
   if (status === 'PENDING') {
-    return 'border-warning-line bg-warning-soft text-warning'
+    return {
+      label: t('library.statusPending'),
+      className: 'border-warning-line bg-warning-soft text-warning',
+    }
   }
-  return 'border-danger-line bg-danger-soft text-danger'
+  if (status === 'FAILED') {
+    return {
+      label: t('library.statusFailed'),
+      className: 'border-danger-line bg-danger-soft text-danger',
+    }
+  }
+  return null
 }
 
-function statusLabelFor(
-  status: PlaylistStatus,
-  t: ReturnType<typeof useT>,
-): string {
-  if (status === 'COMPLETED') return t('library.statusActive')
-  if (status === 'PENDING') return t('library.statusPending')
-  return t('library.statusFailed')
-}
-
-function itemBorderClass(selecting: boolean, selected: boolean, deleted: boolean) {
+function itemBorderClass(selecting: boolean, selected: boolean) {
   if (selecting && selected) {
     return 'border-accent-line bg-accent-soft'
   }
   if (selecting) return 'border-control hover:border-control-hover hover:bg-hover'
-  if (deleted) return 'border-danger-line/60'
-  return 'border-divider hover:border-control'
-}
-
-function LibraryStatusBadge({
-  deleted,
-  status,
-}: Readonly<{
-  deleted: boolean
-  status: PlaylistStatus
-}>) {
-  const t = useT()
-  const label = deleted
-    ? t('library.deleted')
-    : statusLabelFor(status, t)
-
-  return (
-    <span
-      className={cn(
-        'rounded-control border px-2 py-0.5 text-xs font-medium',
-        deleted
-          ? 'border-danger-line bg-danger-soft text-danger'
-          : statusStyles(status),
-      )}
-    >
-      {label}
-    </span>
-  )
+  return 'border-divider'
 }
 
 function LibraryItemCover({
@@ -88,7 +91,7 @@ function LibraryItemCover({
   return (
     <div
       className={cn(
-        'flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-control bg-charcoal-700',
+        'flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-control bg-charcoal-700',
         deleted && 'grayscale',
       )}
     >
@@ -143,6 +146,7 @@ function LibraryItemRenameField({
 
 function LibraryItemMeta({
   playlist,
+  title,
   deleted,
   renaming,
   selecting,
@@ -153,6 +157,7 @@ function LibraryItemMeta({
   renamePending,
 }: Readonly<{
   playlist: PlaylistSummary
+  title: string
   deleted: boolean
   renaming: boolean
   selecting: boolean
@@ -165,15 +170,19 @@ function LibraryItemMeta({
   const t = useT()
   const locale = useLocaleStore((state) => state.locale)
   const showRename = renaming && !selecting
+  const status = exceptionalStatus(playlist.status, deleted, t)
+  const details = [
+    formatShortDate(playlist.createdAt, locale),
+    formatSongCount(playlist.trackCount, t),
+    playlist.totalDurationMs > 0
+      ? formatListeningTime(playlist.totalDurationMs)
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-cream-400">
-          {formatDate(playlist.createdAt, locale)}
-        </span>
-        <LibraryStatusBadge deleted={deleted} status={playlist.status} />
-      </div>
       {showRename ? (
         <LibraryItemRenameField
           nameDraft={nameDraft}
@@ -183,16 +192,25 @@ function LibraryItemMeta({
           saving={renamePending}
         />
       ) : (
-        <h3 className="truncate font-sans text-base font-semibold text-cream-50">
-          {playlist.name}
+        <h3
+          className={cn(
+            'truncate font-sans text-base font-semibold',
+            deleted ? 'text-cream-300' : 'text-cream-50',
+          )}
+          title={playlist.name}
+        >
+          {title}
         </h3>
       )}
-      <p className="text-sm text-cream-400">
-        {t('library.meta', {
-          tracks: playlist.trackCount,
-          duration: formatDuration(playlist.totalDurationMs),
-        })}
-      </p>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className={cn(badgeBase, 'border-divider bg-card text-cream-200')}>
+          {t(libraryKindKey(playlist.kind))}
+        </span>
+        {status ? (
+          <span className={cn(badgeBase, status.className)}>{status.label}</span>
+        ) : null}
+        <span className="text-xs tabular-nums text-cream-400">{details}</span>
+      </div>
     </>
   )
 }
@@ -229,17 +247,6 @@ function LibraryItemMenu({
     >
       {showSpotifyActions ? (
         <>
-          <li>
-            <a
-              href={playlist.spotifyUrl!}
-              target="_blank"
-              rel="noreferrer"
-              className={cn(menuItemClass, 'text-cream-100')}
-            >
-              <ExternalLink aria-hidden className="size-3.5" />
-              {t('library.openSpotify')}
-            </a>
-          </li>
           <li>
             <button
               type="button"
@@ -293,8 +300,10 @@ function LibraryItemMenu({
 }
 
 function LibraryItemActions({
+  spotifyUrl,
   canPreview,
   previewOpen,
+  previewId,
   onTogglePreview,
   menuOpen,
   menuId,
@@ -303,8 +312,10 @@ function LibraryItemActions({
   menuTriggerRef,
   menu,
 }: Readonly<{
+  spotifyUrl: string | null
   canPreview: boolean
   previewOpen: boolean
+  previewId: string
   onTogglePreview: () => void
   menuOpen: boolean
   menuId: string
@@ -315,11 +326,35 @@ function LibraryItemActions({
 }>) {
   const t = useT()
   return (
-    <div ref={menuRef} className="relative flex items-center gap-2">
+    <div ref={menuRef} className="relative flex items-center gap-1.5">
       {canPreview ? (
-        <Button size="sm" variant="secondary" onClick={onTogglePreview}>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-expanded={previewOpen}
+          aria-controls={previewOpen ? previewId : undefined}
+          onClick={onTogglePreview}
+        >
           {previewOpen ? t('preview.hide') : t('preview.show')}
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              'size-3.5 transition-transform motion-reduce:transition-none',
+              previewOpen && 'rotate-180',
+            )}
+          />
         </Button>
+      ) : null}
+      {spotifyUrl ? (
+        <a
+          href={spotifyUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={cn(buttonVariants({ size: 'sm', variant: 'secondary' }))}
+        >
+          <ExternalLink aria-hidden className="size-3.5" />
+          {t('library.openSpotify')}
+        </a>
       ) : null}
       <Button
         ref={menuTriggerRef}
@@ -329,7 +364,7 @@ function LibraryItemActions({
         aria-expanded={menuOpen}
         aria-controls={menuOpen ? menuId : undefined}
         onClick={onToggleMenu}
-        className={cn(menuOpen && 'bg-hover text-cream-50')}
+        className={cn('w-8 px-0', menuOpen && 'bg-hover text-cream-50')}
       >
         <MoreHorizontal aria-hidden className="size-4" />
       </Button>
@@ -339,15 +374,17 @@ function LibraryItemActions({
 }
 
 function LibraryItemPreviewPanel({
+  id,
   loading,
   detail,
 }: Readonly<{
+  id: string
   loading: boolean
   detail: Awaited<ReturnType<typeof api.getPlaylist>> | undefined
 }>) {
   if (loading) {
     return (
-      <div className="mt-4 border-t border-divider pt-4">
+      <div id={id} className="mt-4 border-t border-divider pt-4">
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
@@ -356,7 +393,7 @@ function LibraryItemPreviewPanel({
   }
   if (!detail) return null
   return (
-    <div className="mt-4 border-t border-divider pt-4">
+    <div id={id} className="mt-4 border-t border-divider pt-4">
       <Suspense
         fallback={
           <div className="flex justify-center py-8">
@@ -402,6 +439,7 @@ export function LibraryItem({
   const menuRef = useRef<HTMLDivElement>(null)
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const menuId = useId()
+  const previewId = useId()
   const deleted = playlist.missingOnSpotify
   const canPreview = !deleted && Boolean(playlist.spotifyId)
 
@@ -478,11 +516,13 @@ export function LibraryItem({
     }
   }
 
+  const title = libraryDisplayTitle(playlist, t)
   const imageUrl = resolveCoverImage(playlist)
   const cover = <LibraryItemCover imageUrl={imageUrl} deleted={deleted} />
   const meta = (
     <LibraryItemMeta
       playlist={playlist}
+      title={title}
       deleted={deleted}
       renaming={renaming}
       selecting={selecting}
@@ -498,43 +538,45 @@ export function LibraryItem({
     <li
       className={cn(
         'animate-fade-up rounded-card border bg-card p-4 transition-colors',
-        itemBorderClass(selecting, selected, deleted),
+        itemBorderClass(selecting, selected),
       )}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         {selecting ? (
           <button
             type="button"
             onClick={() => onToggleSelect(playlist.id)}
             className={cn(
-              'flex min-w-0 flex-1 gap-3 rounded-control text-left',
+              'flex min-w-0 flex-1 items-center gap-3 rounded-control text-left',
               focusRing,
             )}
             aria-pressed={selected}
-            aria-label={t('library.selectItem', { name: playlist.name })}
+            aria-label={t('library.selectItem', { name: title })}
           >
             <input
               type="checkbox"
               checked={selected}
               readOnly
               tabIndex={-1}
-              className="pointer-events-none mt-1 size-4 shrink-0 accent-amber-500"
+              className="pointer-events-none size-4 shrink-0 accent-amber-500"
               aria-hidden
             />
             {cover}
-            <div className="min-w-0 flex-1 space-y-2">{meta}</div>
+            <div className="min-w-0 flex-1 space-y-1.5">{meta}</div>
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             {cover}
-            <div className="min-w-0 flex-1 space-y-2">{meta}</div>
+            <div className="min-w-0 flex-1 space-y-1.5">{meta}</div>
           </div>
         )}
 
         {!selecting ? (
           <LibraryItemActions
+            spotifyUrl={deleted ? null : playlist.spotifyUrl}
             canPreview={canPreview}
             previewOpen={previewOpen}
+            previewId={previewId}
             onTogglePreview={() => setPreviewOpen((open) => !open)}
             menuOpen={menuOpen}
             menuId={menuId}
@@ -563,6 +605,7 @@ export function LibraryItem({
       </div>
       {!selecting && previewOpen && canPreview ? (
         <LibraryItemPreviewPanel
+          id={previewId}
           loading={detailQuery.isLoading}
           detail={detailQuery.data}
         />

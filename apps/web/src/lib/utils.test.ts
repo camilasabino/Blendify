@@ -3,8 +3,9 @@ import {
   cn,
   copyToClipboard,
   estimateTrackCount,
-  formatDate,
   formatDuration,
+  formatListeningTime,
+  formatShortDate,
   maxTracksPerArtist,
   maxTracksPerGenre,
   normalizeArtistName,
@@ -58,15 +59,6 @@ describe('formatDuration', () => {
   })
 })
 
-describe('formatDate', () => {
-  it('formats valid ISO dates and falls back for invalid ones', () => {
-    expect(formatDate('not-a-date')).toBe('—')
-    const formatted = formatDate('2024-06-15T12:00:00.000Z', 'en')
-    expect(formatted).toMatch(/2024/)
-    expect(formatDate('2024-06-15T12:00:00.000Z', 'pt')).toMatch(/2024/)
-  })
-})
-
 describe('normalizeArtistName', () => {
   it('normalizes accents, ampersands, and punctuation', () => {
     expect(normalizeArtistName('Björk & Friends!')).toBe('bjork and friends')
@@ -88,5 +80,36 @@ describe('copyToClipboard', () => {
       value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
     })
     await expect(copyToClipboard('hi')).resolves.toBe(false)
+  })
+})
+
+describe('formatListeningTime', () => {
+  it('rounds to whole minutes', () => {
+    expect(formatListeningTime(0)).toBe('0 min')
+    expect(formatListeningTime(20_000)).toBe('1 min')
+    expect(formatListeningTime(40 * 60_000 + 20_000)).toBe('40 min')
+  })
+
+  it('switches to hours past sixty minutes', () => {
+    expect(formatListeningTime(60 * 60_000)).toBe('1 h')
+    expect(formatListeningTime(125 * 60_000)).toBe('2 h 5 min')
+  })
+})
+
+describe('formatShortDate', () => {
+  const now = new Date('2026-09-23T12:00:00Z')
+
+  it('omits the year for dates in the current year', () => {
+    expect(formatShortDate('2026-09-20T12:00:00Z', 'en', now)).toBe('Sep 20')
+  })
+
+  it('keeps the year for older dates', () => {
+    expect(formatShortDate('2025-01-05T12:00:00Z', 'en', now)).toBe(
+      'Jan 5, 2025',
+    )
+  })
+
+  it('returns a dash for invalid dates', () => {
+    expect(formatShortDate('nope', 'en', now)).toBe('—')
   })
 })

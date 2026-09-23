@@ -9,6 +9,8 @@ import { useT } from '@/i18n/use-t'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { cn, focusRing, formatDuration } from '@/lib/utils'
 import { InPagePlaylistPlayer } from '@/components/playlist/in-page-playlist-player'
+import { TrackListToggle } from '@/components/playlist/track-list-disclosure'
+import { useTrackListDisclosure } from '@/hooks/use-track-list-disclosure'
 
 type ListenMode = 'here' | 'device'
 
@@ -152,6 +154,7 @@ export function PlaylistPreview({
   const t = useT()
   const tabsId = useId()
   const panelId = `${tabsId}-panel`
+  const deviceListId = `${tabsId}-tracks`
   const tabId = (listenMode: ListenMode) => `${tabsId}-tab-${listenMode}`
   const list = useMemo(
     () => tracks.filter((track) => track.id && track.name),
@@ -178,6 +181,7 @@ export function PlaylistPreview({
   })
 
   const hasKnownDevice = (devicesQuery.data?.devices.length ?? 0) > 0
+  const disclosure = useTrackListDisclosure(list)
 
   const playMutation = useMutation({
     mutationFn: async (input: {
@@ -292,9 +296,6 @@ export function PlaylistPreview({
     <div className={cn('space-y-4', className)}>
       {showSwitcher && (
         <div className="space-y-2">
-          <p className="text-eyebrow text-cream-400">
-            {t('preview.modeLabel')}
-          </p>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <ListenModeTabs
               value={listenMode}
@@ -318,11 +319,11 @@ export function PlaylistPreview({
               </Button>
             )}
           </div>
-          <p className="max-w-lg text-xs text-cream-400">
-            {listenMode === 'here'
-              ? t('preview.playerHint')
-              : t('preview.connectHint')}
-          </p>
+          {listenMode === 'device' ? (
+            <p className="max-w-lg text-xs text-cream-400">
+              {t('preview.connectHint')}
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -340,71 +341,70 @@ export function PlaylistPreview({
           <section className="space-y-3">
             {!showSwitcher && (
               <div className="space-y-1">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-eyebrow text-cream-400">
-                    {t('preview.connectList')}
-                  </p>
-                  <p className="text-xs tabular-nums text-cream-400">
-                    {t('preview.trackCount', { count: list.length })}
-                  </p>
-                </div>
+                <p className="text-eyebrow text-cream-400">
+                  {t('preview.connectList')}
+                </p>
                 <p className="max-w-lg text-xs text-cream-400">
                   {t('preview.connectHint')}
                 </p>
               </div>
             )}
-            {showSwitcher && (
-              <p className="text-right text-xs tabular-nums text-cream-400">
-                {t('preview.trackCount', { count: list.length })}
-              </p>
-            )}
-
-            <ol className="max-h-72 overflow-y-auto rounded-card border border-divider bg-card">
-              {list.map((track, trackIndex) => {
-                const isActive = activeUri === track.uri && playMutation.isPending
-                const isPlaying =
-                  activeUri === track.uri &&
-                  playMutation.isSuccess &&
-                  !playError
-                return (
-                  <li key={`${track.id}-${trackIndex}`}>
-                    <button
-                      type="button"
-                      onClick={() => playTrack(track)}
-                      disabled={playMutation.isPending}
-                      className={cn(
-                        'flex w-full items-center gap-3 border-b border-divider px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-hover disabled:opacity-50',
-                        focusRing,
-                        isPlaying && 'bg-accent-soft',
-                      )}
-                    >
-                      <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-400">
-                        {trackIndex + 1}
-                      </span>
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-control bg-charcoal-700 text-accent-fg">
-                        {isActive ? (
-                          <Spinner size="sm" className="text-current" />
-                        ) : (
-                          <Play className="size-3.5 fill-current" />
+            <div className="overflow-hidden rounded-card border border-divider bg-card">
+              <ol id={deviceListId}>
+                {disclosure.visible.map((track, trackIndex) => {
+                  const isActive = activeUri === track.uri && playMutation.isPending
+                  const isPlaying =
+                    activeUri === track.uri &&
+                    playMutation.isSuccess &&
+                    !playError
+                  return (
+                    <li key={`${track.id}-${trackIndex}`}>
+                      <button
+                        type="button"
+                        onClick={() => playTrack(track)}
+                        disabled={playMutation.isPending}
+                        className={cn(
+                          'flex w-full items-center gap-3 border-b border-divider px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-hover disabled:opacity-50',
+                          focusRing,
+                          isPlaying && 'bg-accent-soft',
                         )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm text-cream-50">
-                          {track.name}
-                        </p>
-                        <p className="truncate text-xs text-cream-400">
-                          {track.artistName}
-                          {track.albumName ? ` · ${track.albumName}` : ''}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-xs tabular-nums text-cream-400">
-                        {formatDuration(track.durationMs)}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ol>
+                      >
+                        <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-400">
+                          {trackIndex + 1}
+                        </span>
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-control bg-charcoal-700 text-accent-fg">
+                          {isActive ? (
+                            <Spinner size="sm" className="text-current" />
+                          ) : (
+                            <Play className="size-3.5 fill-current" />
+                          )}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm text-cream-50">
+                            {track.name}
+                          </p>
+                          <p className="truncate text-xs text-cream-400">
+                            {track.artistName}
+                            {track.albumName ? ` · ${track.albumName}` : ''}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs tabular-nums text-cream-400">
+                          {formatDuration(track.durationMs)}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
+              {disclosure.collapsible ? (
+                <TrackListToggle
+                  expanded={disclosure.expanded}
+                  total={list.length}
+                  controls={deviceListId}
+                  onToggle={disclosure.toggle}
+                />
+              ) : null}
+            </div>
           </section>
         )}
 

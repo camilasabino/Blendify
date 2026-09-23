@@ -1,8 +1,37 @@
 import type { BulkLibraryAction, PlaylistSummary } from '@blendify/contracts'
 import type { PendingLibraryConfirm } from '@/components/playlist/library-types'
 import type { MessageKey } from '@/i18n/messages'
+import { GENERATED_NAME_PREFIX } from '@/lib/playlist-name'
 
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string
+
+export function libraryDisplayTitle(
+  playlist: Pick<PlaylistSummary, 'name' | 'seeds' | 'seedCount'>,
+  t: Translate,
+): string {
+  if (!playlist.name.startsWith(GENERATED_NAME_PREFIX)) return playlist.name
+  const names = playlist.seeds
+    .map((seed) => seed.name.trim())
+    .filter(Boolean)
+  if (names.length === 0) return playlist.name
+  const total = Math.max(names.length, playlist.seedCount)
+  if (total === 1) return names[0]
+  if (names.length < 2) return playlist.name
+  if (total === 2) return `${names[0]} + ${names[1]}`
+  return t('library.titleMany', {
+    first: names[0],
+    second: names[1],
+    count: total - 2,
+  })
+}
+
+export function libraryKindKey(
+  kind: PlaylistSummary['kind'],
+): 'library.kindMix' | 'library.kindDiscover' {
+  return kind === 'artist_mix' || kind === 'genre_mix'
+    ? 'library.kindMix'
+    : 'library.kindDiscover'
+}
 
 export type ConfirmCopy = {
   title: string

@@ -7,7 +7,11 @@ import {
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
-import type { PopularityMode, TrackOrderMode } from '@blendify/contracts'
+import type {
+  PlaylistGeneration,
+  PopularityMode,
+  TrackOrderMode,
+} from '@blendify/contracts'
 import type { MessageKey } from '@/i18n/messages'
 import type { useT } from '@/i18n/use-t'
 
@@ -93,4 +97,27 @@ export function buildGenerationSummary(
     orderOption ? t(orderOption.labelKey) : null,
     trackCount > 0 ? t('create.summarySongs', { count: trackCount }) : null,
   ].filter((item): item is string => Boolean(item))
+}
+
+export function generationSeedNames(generation: PlaylistGeneration): string[] {
+  if (generation.kind === 'artist_mix' || generation.kind === 'genre_mix') {
+    return generation.seeds.map((seed) => seed.name)
+  }
+  return [generation.seed.name]
+}
+
+export function buildRecipeSummary(
+  generation: PlaylistGeneration,
+  trackCount: number,
+  t: ReturnType<typeof useT>,
+): string[] {
+  return buildGenerationSummary(
+    {
+      seedNames: generationSeedNames(generation),
+      popularity: generation.popularity,
+      orderMode: generation.orderMode,
+      trackCount,
+    },
+    t,
+  )
 }

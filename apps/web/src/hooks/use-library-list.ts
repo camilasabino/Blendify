@@ -16,7 +16,7 @@ import {
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useT } from '@/i18n/use-t'
 
-const PAGE_SIZE = 5
+const PAGE_SIZE = 10
 
 export function useLibraryList() {
   const t = useT()

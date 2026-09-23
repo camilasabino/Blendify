@@ -1,21 +1,18 @@
 import { Link } from 'react-router-dom'
-import {
-  ArrowRight,
-  Blend,
-  Check,
-  Compass,
-  Gem,
-  ListMusic,
-  Scale,
-  TrendingUp,
-} from 'lucide-react'
+import { ArrowDown, ArrowRight, Blend, Compass, Lock } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
 import { SpotifyMark } from '@/components/brand/spotify-mark'
 import { useT } from '@/i18n/use-t'
+import { buildDefaultPlaylistName } from '@/lib/playlist-name'
+import { formatSongCount } from '@/lib/song-count'
 import { cn, focusRing } from '@/lib/utils'
+
+const DEMO_ARTISTS = ['Nina Simone', 'Bill Withers', 'Aretha Franklin']
+const DEMO_TRACK_WIDTHS = ['w-3/4', 'w-1/2', 'w-2/3']
+const DEMO_TRACK_COUNT = 30
 
 export function LandingPage() {
   const { isAuthenticated, isLoading, login } = useAuth()
@@ -51,7 +48,7 @@ export function LandingPage() {
 
       <main className="relative z-10 mx-auto flex min-h-[calc(100svh-5rem)] max-w-6xl flex-col justify-center px-4 pb-16 pt-4 sm:px-6 lg:flex-row lg:items-center lg:gap-16">
         <div className="max-w-xl flex-1 space-y-6">
-          <h1 className="animate-fade-up font-display text-6xl font-extrabold leading-[0.95] tracking-tight text-cream-50 sm:text-7xl lg:text-8xl">
+          <h1 className="animate-fade-up font-display text-5xl font-extrabold leading-[0.95] tracking-tight text-cream-50 min-[400px]:text-6xl sm:text-7xl lg:text-8xl">
             Blendify
           </h1>
           <p
@@ -90,16 +87,22 @@ export function LandingPage() {
                 </Link>
               </>
             ) : (
-              <Button
-                size="lg"
-                className="animate-pulse-glow"
-                onClick={login}
-                disabled={isLoading}
-              >
-                <SpotifyMark variant="mono" className="size-5 text-charcoal-950" />
-                {t('landing.ctaLogin')}
-                <ArrowRight aria-hidden className="size-4" />
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  size="lg"
+                  className="animate-pulse-glow"
+                  onClick={login}
+                  disabled={isLoading}
+                >
+                  <SpotifyMark variant="mono" className="size-5 text-charcoal-950" />
+                  {t('landing.ctaLogin')}
+                  <ArrowRight aria-hidden className="size-4" />
+                </Button>
+                <p className="flex items-start gap-1.5 text-sm text-cream-400">
+                  <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+                  {t('landing.trust')}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -109,66 +112,70 @@ export function LandingPage() {
           style={{ animationDelay: '120ms' }}
           aria-hidden
         >
-          <div className="w-full max-w-md rounded-feature border border-accent-line/40 bg-panel bg-linear-to-br from-amber-500/[0.12] to-transparent to-60% p-5 shadow-[0_0_80px_-24px_rgb(232_168_56_/_0.45)] sm:p-6">
-            <div className="mb-4 flex items-start gap-3 border-b border-divider pb-3">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-control bg-charcoal-700 font-display text-xs font-bold text-accent-fg">
-                2
-              </span>
-              <div className="min-w-0">
-                <p className="font-display text-sm font-semibold tracking-tight text-cream-50">
-                  {t('create.reach')}
-                </p>
-                <p className="mt-0.5 text-xs leading-snug text-cream-400">
-                  {t('create.mixHint')}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-1.5 sm:grid-cols-3">
-              {(
-                [
-                  { icon: TrendingUp, key: 'create.mix.popular' as const },
-                  { icon: Scale, key: 'create.mix.balanced' as const },
-                  { icon: Gem, key: 'create.mix.rarities' as const },
-                ] as const
-              ).map(({ icon: Icon, key }, index) => {
-                const selected = index === 1
-                return (
-                  <div
-                    key={key}
-                    className={cn(
-                      'relative flex items-center gap-2 rounded-card border px-2.5 py-2 text-xs sm:flex-col sm:items-start sm:gap-1.5',
-                      selected
-                        ? 'border-accent-line bg-accent-soft text-cream-50'
-                        : 'border-control bg-field text-cream-300',
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'flex size-6 shrink-0 items-center justify-center rounded-control',
-                        selected
-                          ? 'bg-accent-soft text-accent-fg'
-                          : 'bg-charcoal-700 text-cream-400',
-                      )}
-                    >
-                      <Icon className="size-3.5" />
-                    </span>
-                    {t(key)}
-                    {selected ? (
-                      <Check className="absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-accent-fg sm:top-2 sm:translate-y-0" />
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="mt-3 flex items-center justify-center gap-2 rounded-card border border-divider bg-card px-3 py-2.5 text-xs font-medium text-cream-100">
-              <ListMusic className="size-3.5 shrink-0 text-accent-fg" />
-              {t('landing.previewName')}
-            </div>
-          </div>
+          <HeroDemo />
         </div>
       </main>
+    </div>
+  )
+}
+
+function HeroDemo() {
+  const t = useT()
+  const playlistName = buildDefaultPlaylistName({ names: DEMO_ARTISTS })
+
+  return (
+    <div className="w-full max-w-md rounded-feature border border-accent-line/40 bg-panel bg-linear-to-br from-amber-500/[0.12] to-transparent to-60% p-5 shadow-[0_0_80px_-24px_rgb(232_168_56_/_0.45)] sm:p-6">
+      <ul className="flex flex-wrap gap-2">
+        {DEMO_ARTISTS.map((name) => (
+          <li
+            key={name}
+            className="inline-flex items-center gap-2 rounded-full border border-divider bg-card py-1 pl-1 pr-3 text-sm text-cream-50"
+          >
+            <span className="flex size-6 items-center justify-center rounded-full bg-charcoal-600 text-xs text-cream-200">
+              {name.slice(0, 1)}
+            </span>
+            {name}
+          </li>
+        ))}
+      </ul>
+
+      <div className="my-4 flex items-center gap-3 text-accent-fg">
+        <span className="h-px flex-1 bg-divider" />
+        <span className="flex size-8 items-center justify-center rounded-full border border-accent-line bg-accent-soft">
+          <ArrowDown className="size-4" />
+        </span>
+        <span className="h-px flex-1 bg-divider" />
+      </div>
+
+      <div className="rounded-card border border-divider bg-card p-3">
+        <div className="flex items-center gap-3">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-control bg-linear-to-br from-amber-400 to-amber-700 text-on-accent">
+            <Blend className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-cream-50">
+              {playlistName}
+            </p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-cream-400">
+              <SpotifyMark className="size-3" />
+              {formatSongCount(DEMO_TRACK_COUNT, t)}
+            </p>
+          </div>
+        </div>
+        <ol className="mt-3 space-y-2 border-t border-divider pt-3">
+          {DEMO_TRACK_WIDTHS.map((width, index) => (
+            <li key={width} className="flex items-center gap-3">
+              <span className="w-3 text-right text-xs tabular-nums text-cream-500">
+                {index + 1}
+              </span>
+              <span className="flex-1 space-y-1">
+                <span className={cn('block h-2 rounded-full bg-cream-200/25', width)} />
+                <span className="block h-1.5 w-1/3 rounded-full bg-cream-200/10" />
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
     </div>
   )
 }

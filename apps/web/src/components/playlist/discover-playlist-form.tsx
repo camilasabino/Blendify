@@ -16,13 +16,17 @@ import { ArtistSearch } from '@/components/artists/artist-search'
 import { TrackSearch } from '@/components/tracks/track-search'
 import { GenerationResultPanel } from '@/components/playlist/generation-result-panel'
 import {
+  CoverToggle,
   GENERATION_ORDER_MODES,
   GenerationSettingsCollapse,
   GenerationSubmitBar,
   OrderModeSection,
   PopularityModeSection,
 } from '@/components/playlist/generation-form-shared'
-import { buildGenerationSummary } from '@/components/playlist/generation-options'
+import {
+  buildGenerationSummary,
+  buildRecipeSummary,
+} from '@/components/playlist/generation-options'
 import { Label } from '@/components/ui/label'
 import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
@@ -45,6 +49,7 @@ const formSchema = z.object({
   popularity: z.enum(['popular', 'balanced', 'rarities']),
   targetTrackCount: z.union([z.literal(15), z.literal(30), z.literal(50)]),
   orderMode: z.enum(GENERATION_ORDER_MODES),
+  generateCover: z.boolean(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -53,6 +58,7 @@ const DEFAULT_VALUES: FormValues = {
   popularity: 'balanced',
   targetTrackCount: 30,
   orderMode: 'random',
+  generateCover: true,
 }
 
 export function DiscoverPlaylistForm() {
@@ -142,6 +148,22 @@ export function DiscoverPlaylistForm() {
     }
   }
 
+  async function renderDiscoverCover(
+    title: string,
+    imageUrl: string | null | undefined,
+  ): Promise<string | undefined> {
+    try {
+      return await renderPlaylistCoverBase64({
+        title,
+        kind: 'discover',
+        imageUrls: imageUrl ? [imageUrl] : [],
+      })
+    } catch {
+      setCoverError(t('create.coverFailed'))
+      return undefined
+    }
+  }
+
   async function startDiscover(values: FormValues) {
     const sharedBase = {
       targetTrackCount: values.targetTrackCount,
@@ -158,16 +180,12 @@ export function DiscoverPlaylistForm() {
         seed: seedTrack.name,
         artist: seedTrack.artistName,
       })
-      let coverImageBase64: string | undefined
-      try {
-        coverImageBase64 = await renderPlaylistCoverBase64({
-          title: playlistName,
-          kind: 'discover',
-          imageUrls: seedTrack.albumImageUrl ? [seedTrack.albumImageUrl] : [],
-        })
-      } catch {
-        setCoverError(t('create.coverFailed'))
-      }
+      const coverImageBase64 = values.generateCover
+        ? await renderDiscoverCover(
+            playlistName,
+            seedTrack.albumImageUrl,
+          )
+        : undefined
       discoverMutation.mutate({
         kind: 'discover_track',
         trackId: seedTrack.id,
@@ -194,16 +212,9 @@ export function DiscoverPlaylistForm() {
     const description = t('playlist.discoverDescription.artist', {
       seed: seedArtist.name,
     })
-    let coverImageBase64: string | undefined
-    try {
-      coverImageBase64 = await renderPlaylistCoverBase64({
-        title: playlistName,
-        kind: 'discover',
-        imageUrls: seedArtist.imageUrl ? [seedArtist.imageUrl] : [],
-      })
-    } catch {
-      setCoverError(t('create.coverFailed'))
-    }
+    const coverImageBase64 = values.generateCover
+      ? await renderDiscoverCover(playlistName, seedArtist.imageUrl)
+      : undefined
     discoverMutation.mutate({
       kind: 'discover_artist',
       artistId: seedArtist.id,
@@ -255,15 +266,24 @@ export function DiscoverPlaylistForm() {
     result !== null,
   )
   const seedName = seedMode === 'artist' ? artist?.name : track?.name
-  const settingsSummary = buildGenerationSummary(
-    {
-      seedNames: seedName ? [seedName] : [],
-      popularity: form.watch('popularity'),
-      orderMode: form.watch('orderMode'),
-      trackCount: form.watch('targetTrackCount'),
-    },
-    t,
-  )
+  const targetTrackCount = form.watch('targetTrackCount')
+  const settingsSummary = result
+    ? buildRecipeSummary(result.generation, result.trackCount, t)
+    : buildGenerationSummary(
+        {
+          seedNames: seedName ? [seedName] : [],
+          popularity: form.watch('popularity'),
+          orderMode: form.watch('orderMode'),
+          trackCount: targetTrackCount,
+        },
+        t,
+      )
+  const estimateSummary = seedName
+    ? [
+        t('create.estimateSongs', { count: targetTrackCount }),
+        t('discover.summarySeed', { seed: seedName }),
+      ].join(' · ')
+    : null
 
   let disabledReason: string | null = null
   if (seedMode === 'artist' && !artist) {
@@ -297,6 +317,7 @@ export function DiscoverPlaylistForm() {
           requestedTrackCount={requestedTrackCount}
           workingTitleKey="discover.working"
           workingHintKey="discover.workingHint"
+          requestStarted={discoverMutation.isPending}
           copied={copiedLink.copied}
           onCopy={(url) => void copiedLink.copy(url)}
           onRetry={() => void submit()}
@@ -310,6 +331,7 @@ export function DiscoverPlaylistForm() {
         collapsed={settingsCollapse.collapsed}
         onToggle={settingsCollapse.toggleSettings}
         summary={settingsSummary}
+        note={result ? t('create.recreateNote') : null}
       >
         <form
           ref={formRef}
@@ -325,7 +347,6 @@ export function DiscoverPlaylistForm() {
               step={1}
               accent="amber"
               title={t('discover.stepSeed')}
-              description={t('discover.stepSeedHint')}
             >
               <SegmentedControl
                 layout="grid"
@@ -356,16 +377,11 @@ export function DiscoverPlaylistForm() {
                       }}
                     />
                   ) : (
-                    <>
-                      <ArtistSearch
-                        inputId={seedSearchId}
-                        selectedIds={selectedArtistIds}
-                        onSelect={selectArtist}
-                      />
-                      <p className="text-sm text-cream-400">
-                        {t('discover.noArtistYet')}
-                      </p>
-                    </>
+                    <ArtistSearch
+                      inputId={seedSearchId}
+                      selectedIds={selectedArtistIds}
+                      onSelect={selectArtist}
+                    />
                   )}
                 </div>
               ) : (
@@ -387,16 +403,11 @@ export function DiscoverPlaylistForm() {
                       }}
                     />
                   ) : (
-                    <>
-                      <TrackSearch
-                        inputId={seedSearchId}
-                        selectedIds={selectedTrackIds}
-                        onSelect={selectTrack}
-                      />
-                      <p className="text-sm text-cream-400">
-                        {t('discover.noTrackYet')}
-                      </p>
-                    </>
+                    <TrackSearch
+                      inputId={seedSearchId}
+                      selectedIds={selectedTrackIds}
+                      onSelect={selectTrack}
+                    />
                   )}
                 </div>
               )}
@@ -404,28 +415,49 @@ export function DiscoverPlaylistForm() {
 
             <PopularityModeSection control={form.control} step={2} />
 
-            <FormSection
-              step={3}
-              title={t('discover.stepDetails')}
-              description={t('discover.stepDetailsHint')}
-            >
-              <Controller
-                control={form.control}
-                name="targetTrackCount"
-                render={({ field }) => (
-                  <RadioCardGroup
-                    label={t('discover.stepDetails')}
-                    value={field.value}
-                    onChange={field.onChange}
-                    mobileLayout="inline"
-                    options={TRACK_TARGETS.map((count) => ({
-                      value: count,
-                      label: count,
-                      hint: t('discover.songsLabel'),
-                    }))}
+            <FormSection step={3} title={t('create.stepDetails')}>
+              <div className="divide-y divide-divider">
+                <div className="space-y-3 pb-4">
+                  <p className="text-sm font-medium leading-none text-cream-200">
+                    {t('discover.stepDetails')}
+                  </p>
+                  <Controller
+                    control={form.control}
+                    name="targetTrackCount"
+                    render={({ field }) => (
+                      <RadioCardGroup
+                        label={t('discover.stepDetails')}
+                        value={field.value}
+                        onChange={field.onChange}
+                        mobileLayout="inline"
+                        options={TRACK_TARGETS.map((count) => ({
+                          value: count,
+                          label: count,
+                          hint: t('discover.songsLabel'),
+                        }))}
+                      />
+                    )}
                   />
-                )}
-              />
+                </div>
+                <div className="pt-4">
+                  <Controller
+                    control={form.control}
+                    name="generateCover"
+                    render={({ field }) => (
+                      <CoverToggle
+                        id="discoverGenerateCover"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        hint={
+                          seedMode === 'artist'
+                            ? t('discover.coverHintArtist')
+                            : t('discover.coverHintTrack')
+                        }
+                      />
+                    )}
+                  />
+                </div>
+              </div>
             </FormSection>
 
             <OrderModeSection control={form.control} step={4} />
@@ -435,8 +467,9 @@ export function DiscoverPlaylistForm() {
             isGenerating={isGenerating}
             disabledReason={disabledReason}
             error={form.formState.errors.root?.message ?? null}
-            idleLabel={t('discover.generate')}
+            idleLabel={result ? t('create.generateNew') : t('discover.generate')}
             busyLabel={t('discover.generating')}
+            summary={estimateSummary}
             icon={Compass}
           />
         </form>

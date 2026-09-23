@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { TrackDto } from '@blendify/contracts'
+import { TrackListToggle } from '@/components/playlist/track-list-disclosure'
+import { useTrackListDisclosure } from '@/hooks/use-track-list-disclosure'
 import { useT } from '@/i18n/use-t'
 import { cn, focusRing, formatDuration } from '@/lib/utils'
 
@@ -15,6 +17,8 @@ export function InPagePlaylistPlayer({
   const [index, setIndex] = useState(0)
   const [autoplay, setAutoplay] = useState(false)
   const current = list[index] ?? null
+  const listId = useId()
+  const disclosure = useTrackListDisclosure(list)
 
   function selectTrack(trackIndex: number) {
     setIndex(trackIndex)
@@ -36,18 +40,15 @@ export function InPagePlaylistPlayer({
               className="block border-0"
             />
           </div>
-          <p className="border-t border-divider bg-charcoal-950/60 px-3 py-2 text-xs text-cream-300">
-            <span className="text-cream-400">{t('preview.albumLabel')}: </span>
-            {current.albumName?.trim() || t('preview.unknownAlbum')}
-          </p>
-          <ol className="max-h-64 overflow-y-auto border-t border-divider">
-            {list.map((track, trackIndex) => {
+          <ol id={listId} className="border-t border-divider">
+            {disclosure.visible.map((track, trackIndex) => {
               const selected = trackIndex === index
               return (
                 <li key={`${track.id}-${trackIndex}`}>
                   <button
                     type="button"
                     onClick={() => selectTrack(trackIndex)}
+                    aria-current={selected ? 'true' : undefined}
                     className={cn(
                       'flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
                       focusRing,
@@ -79,6 +80,14 @@ export function InPagePlaylistPlayer({
               )
             })}
           </ol>
+          {disclosure.collapsible ? (
+            <TrackListToggle
+              expanded={disclosure.expanded}
+              total={list.length}
+              controls={listId}
+              onToggle={disclosure.toggle}
+            />
+          ) : null}
         </>
       ) : (
         <iframe

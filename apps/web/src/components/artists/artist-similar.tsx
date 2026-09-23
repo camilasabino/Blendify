@@ -82,6 +82,7 @@ function SimilarSuggestionsList({
   resolvePending: boolean
   onResolve: (name: string) => void
 }>) {
+  const t = useT()
   if (suggestions.length === 0) return null
   return (
     <ul className="flex flex-wrap gap-2">
@@ -93,6 +94,7 @@ function SimilarSuggestionsList({
               type="button"
               disabled={resolvePending}
               onClick={() => onResolve(artist.name)}
+              aria-label={t('create.addSuggestion', { name: artist.name })}
               className={cn(
                 'group inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-divider bg-field px-3.5 py-1.5 text-left text-sm text-cream-100 transition-colors',
                 'hover:border-control-hover hover:bg-hover hover:text-cream-50',
@@ -106,7 +108,7 @@ function SimilarSuggestionsList({
               {busy ? (
                 <Spinner size="sm" className="shrink-0" />
               ) : (
-<Plus aria-hidden className="size-3.5 shrink-0 text-accent-fg" />
+                <Plus aria-hidden className="size-3.5 shrink-0 text-accent-fg" />
               )}
             </button>
           </li>
@@ -132,7 +134,7 @@ function SuggestMoreButton({
       disabled={fetching || !hasMore}
       onClick={onLoadMore}
       className={cn(
-'inline-flex min-h-8 items-center gap-2 rounded-control text-sm font-medium text-accent-fg transition-colors hover:text-amber-300 disabled:opacity-50',
+        'inline-flex min-h-8 items-center gap-2 rounded-control text-sm font-medium text-accent-fg transition-colors hover:text-amber-300 disabled:opacity-50',
         focusRing,
       )}
     >
@@ -246,10 +248,12 @@ export function ArtistSimilarSuggestions({
       <div className="space-y-1">
         <h3 className="flex items-center gap-2 font-sans text-sm font-semibold text-cream-100">
           <Sparkles aria-hidden className="size-4 shrink-0 text-accent-fg" />
-          {t('artist.exploreFor', { name: seed.name })}
+          {selected.length > 1
+            ? t('create.suggestions')
+            : t('create.suggestionsFor', { name: seed.name })}
         </h3>
         <p className="text-sm leading-relaxed text-cream-400">
-          {t('artist.exploreHint')}
+          {t('create.suggestionsHint')}
         </p>
       </div>
 

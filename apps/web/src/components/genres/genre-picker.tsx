@@ -4,7 +4,6 @@ import { Plus, RefreshCw, Sparkles } from 'lucide-react'
 import { api, type CuratedGenre } from '@/lib/api'
 import { GenreIcon } from '@/components/genres/genre-icon'
 import {
-  ClearAllButton,
   RemovableChip,
   SeedChip,
   SelectableChip,
@@ -23,7 +22,6 @@ type GenrePickerProps = Readonly<{
   max: number
   onToggle: (genre: CuratedGenre) => void
   onRemove: (id: string) => void
-  onClear?: () => void
   className?: string
 }>
 
@@ -31,25 +29,15 @@ function SelectedGenres({
   selected,
   seedId,
   onRemove,
-  onClear,
 }: Readonly<{
   selected: CuratedGenre[]
   seedId: string | undefined
   onRemove: (id: string) => void
-  onClear?: () => void
 }>) {
   const t = useT()
   if (selected.length === 0) return null
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-end">
-        {onClear ? (
-          <ClearAllButton onClick={onClear}>
-            {t('create.clearAll')}
-          </ClearAllButton>
-        ) : null}
-      </div>
       <ul className="flex flex-wrap gap-2">
         {selected.map((genre) => (
           <RemovableChip
@@ -62,7 +50,6 @@ function SelectedGenres({
           />
         ))}
       </ul>
-    </div>
   )
 }
 
@@ -146,10 +133,12 @@ function GenreExploreSection({
       <div className="space-y-1">
         <h3 className="flex items-center gap-2 font-sans text-sm font-semibold text-cream-100">
           <Sparkles aria-hidden className="size-4 shrink-0 text-accent-fg" />
-          {t('genre.exploreFor', { query: seed.name })}
+          {selected.length > 1
+            ? t('create.suggestions')
+            : t('create.suggestionsFor', { name: seed.name })}
         </h3>
         <p className="text-sm leading-relaxed text-cream-400">
-          {t('genre.exploreHint')}
+          {t('create.suggestionsHint')}
         </p>
       </div>
 
@@ -189,6 +178,7 @@ function GenreExploreSection({
                 type="button"
                 disabled={atLimit}
                 onClick={() => onSelect(genre)}
+                aria-label={t('create.addSuggestion', { name: genre.name })}
                 className={cn(
                   'group inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-divider bg-field px-3.5 py-1.5 text-left text-sm text-cream-100 transition-colors',
                   'hover:border-control-hover hover:bg-hover hover:text-cream-50',
@@ -247,7 +237,6 @@ export function GenrePicker({
   max,
   onToggle,
   onRemove,
-  onClear,
   className,
 }: GenrePickerProps) {
   const t = useT()
@@ -349,7 +338,6 @@ export function GenrePicker({
         selected={selected}
         seedId={seed?.id}
         onRemove={onRemove}
-        onClear={onClear}
       />
 
       {catalogQuery.isError ? (

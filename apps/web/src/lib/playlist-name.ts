@@ -9,11 +9,13 @@ type DescriptionTranslate = (
   vars?: Record<string, string | number>,
 ) => string
 
+export const GENERATED_NAME_PREFIX = 'Blendify · '
+
 export function buildDefaultPlaylistName(input: {
   names: string[]
 }): string {
   const names = input.names.map((n) => n.trim()).filter(Boolean)
-  if (names.length === 0) return 'Blendify · Mix'
+  if (names.length === 0) return `${GENERATED_NAME_PREFIX}Mix`
 
   let seeds: string
   if (names.length === 1) {
@@ -24,12 +26,12 @@ export function buildDefaultPlaylistName(input: {
     seeds = `${names[0]} + ${names.length - 1}`
   }
 
-  return truncate(`Blendify · Mix · ${seeds}`)
+  return truncate(`${GENERATED_NAME_PREFIX}Mix · ${seeds}`)
 }
 
 export function buildDiscoverPlaylistName(seedName: string): string {
   const seed = seedName.trim() || 'Discover'
-  return truncate(`Blendify · Discover · ${seed}`)
+  return truncate(`${GENERATED_NAME_PREFIX}Discover · ${seed}`)
 }
 
 export function buildDefaultPlaylistDescription(

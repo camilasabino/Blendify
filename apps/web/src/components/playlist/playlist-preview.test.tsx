@@ -17,14 +17,14 @@ const tracks: TrackDto[] = [
   },
 ]
 
-function renderPreview() {
+function renderPreview(items: TrackDto[] = tracks) {
   vi.spyOn(api, 'listPlaybackDevices').mockResolvedValue({ devices: [] })
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
   render(
     <QueryClientProvider client={queryClient}>
-      <PlaylistPreview tracks={tracks} spotifyId="playlist-1" />
+      <PlaylistPreview tracks={items} spotifyId="playlist-1" />
     </QueryClientProvider>,
   )
 }
@@ -35,9 +35,9 @@ describe('PlaylistPreview listen mode tabs', () => {
   it('links each tab to the panel it controls', () => {
     renderPreview()
 
-    const here = screen.getByRole('tab', { name: 'Here' })
-    const device = screen.getByRole('tab', { name: 'On your device' })
-    const panel = screen.getByRole('tabpanel', { name: 'Here' })
+    const here = screen.getByRole('tab', { name: 'Listen here' })
+    const device = screen.getByRole('tab', { name: 'Play on a device' })
+    const panel = screen.getByRole('tabpanel', { name: 'Listen here' })
 
     expect(here).toHaveAttribute('aria-selected', 'true')
     expect(here).toHaveAttribute('aria-controls', panel.id)
@@ -51,15 +51,15 @@ describe('PlaylistPreview listen mode tabs', () => {
     const user = userEvent.setup()
     renderPreview()
 
-    const here = screen.getByRole('tab', { name: 'Here' })
+    const here = screen.getByRole('tab', { name: 'Listen here' })
     here.focus()
     await user.keyboard('{ArrowRight}')
 
-    const device = screen.getByRole('tab', { name: 'On your device' })
+    const device = screen.getByRole('tab', { name: 'Play on a device' })
     expect(device).toHaveFocus()
     expect(device).toHaveAttribute('aria-selected', 'true')
     expect(
-      screen.getByRole('tabpanel', { name: 'On your device' }),
+      screen.getByRole('tabpanel', { name: 'Play on a device' }),
     ).toHaveTextContent('First song')
 
     await user.keyboard('{Home}')
@@ -71,5 +71,32 @@ describe('PlaylistPreview listen mode tabs', () => {
 
     await user.keyboard('{ArrowRight}')
     expect(here).toHaveFocus()
+  })
+})
+
+describe('PlaylistPreview track list', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('shows the first songs and reveals the rest on demand', async () => {
+    const user = userEvent.setup()
+    const many = Array.from({ length: 12 }, (_, index) => ({
+      ...tracks[0],
+      id: `track-${index + 1}`,
+      name: `Song ${index + 1}`,
+      uri: `spotify:track:track-${index + 1}`,
+    }))
+    renderPreview(many)
+
+    expect(screen.getByText('Song 10')).toBeInTheDocument()
+    expect(screen.queryByText('Song 11')).toBeNull()
+
+    const toggle = screen.getByRole('button', { name: 'Show all 12 songs' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(toggle)
+
+    expect(screen.getByText('Song 12')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Show fewer' }),
+    ).toHaveAttribute('aria-expanded', 'true')
   })
 })

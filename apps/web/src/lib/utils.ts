@@ -25,14 +25,28 @@ export function formatDuration(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
-export function formatDate(iso: string, locale?: string): string {
+export function formatListeningTime(ms: number): string {
+  const totalMinutes =
+    Number.isFinite(ms) && ms > 0 ? Math.max(1, Math.round(ms / 60_000)) : 0
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours === 0) return `${totalMinutes} min`
+  return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`
+}
+
+export function formatShortDate(
+  iso: string,
+  locale?: string,
+  now: Date = new Date(),
+): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
   const localeTag = locale === 'pt' ? 'pt-BR' : locale
+  const sameYear = date.getFullYear() === now.getFullYear()
   return new Intl.DateTimeFormat(localeTag ?? undefined, {
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
   }).format(date)
 }
 
