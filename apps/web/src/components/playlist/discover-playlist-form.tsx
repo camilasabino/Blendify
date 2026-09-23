@@ -11,7 +11,7 @@ import {
   type DiscoverTrackTarget,
   type GenerationProgress,
 } from '@/lib/api'
-import type { TrackDto } from '@blendify/contracts'
+import type { PlaylistDetail, TrackDto } from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
 import { TrackSearch } from '@/components/tracks/track-search'
 import { GenerationResultPanel } from '@/components/playlist/generation-result-panel'
@@ -61,13 +61,97 @@ const DEFAULT_VALUES: FormValues = {
   generateCover: true,
 }
 
+function discoverDisabledReason(
+  seedMode: SeedMode,
+  hasArtist: boolean,
+  hasTrack: boolean,
+  t: ReturnType<typeof useT>,
+): string | null {
+  if (seedMode === 'artist' && !hasArtist) return t('discover.needArtist')
+  if (seedMode === 'track' && !hasTrack) return t('discover.needTrack')
+  return null
+}
+
+function DiscoverSeedField({
+  seedMode,
+  artist,
+  track,
+  seedSearchId,
+  selectedArtistIds,
+  selectedTrackIds,
+  onSelectArtist,
+  onSelectTrack,
+  onRemoveArtist,
+  onRemoveTrack,
+  t,
+}: Readonly<{
+  seedMode: SeedMode
+  artist: Artist | null
+  track: TrackDto | null
+  seedSearchId: string
+  selectedArtistIds: Set<string>
+  selectedTrackIds: Set<string>
+  onSelectArtist: (artist: Artist) => void
+  onSelectTrack: (track: TrackDto) => void
+  onRemoveArtist: () => void
+  onRemoveTrack: () => void
+  t: ReturnType<typeof useT>
+}>) {
+  if (seedMode === 'artist') {
+    return (
+      <div className="space-y-3">
+        <Label htmlFor={artist ? undefined : seedSearchId}>
+          {t('discover.artist')}
+        </Label>
+        {artist ? (
+          <SelectedSeed
+            imageUrl={artist.imageUrl}
+            title={artist.name}
+            imageRounded
+            removeLabel={t('create.removeArtist', { name: artist.name })}
+            onRemove={onRemoveArtist}
+          />
+        ) : (
+          <ArtistSearch
+            inputId={seedSearchId}
+            selectedIds={selectedArtistIds}
+            onSelect={onSelectArtist}
+          />
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-3">
+      <Label htmlFor={track ? undefined : seedSearchId}>
+        {t('discover.track')}
+      </Label>
+      {track ? (
+        <SelectedSeed
+          imageUrl={track.albumImageUrl}
+          title={track.name}
+          subtitle={track.artistName}
+          removeLabel={t('discover.removeTrack', { name: track.name })}
+          onRemove={onRemoveTrack}
+        />
+      ) : (
+        <TrackSearch
+          inputId={seedSearchId}
+          selectedIds={selectedTrackIds}
+          onSelect={onSelectTrack}
+        />
+      )}
+    </div>
+  )
+}
+
 export function DiscoverPlaylistForm() {
   const t = useT()
   const queryClient = useQueryClient()
   const [seedMode, setSeedMode] = useState<SeedMode>('artist')
   const [artist, setArtist] = useState<Artist | null>(null)
   const [track, setTrack] = useState<TrackDto | null>(null)
-  const [result, setResult] = useState<import('@blendify/contracts').PlaylistDetail | null>(null)
+  const [result, setResult] = useState<PlaylistDetail | null>(null)
   const [progress, setProgress] = useState<GenerationProgress | null>(null)
   const [requestedTrackCount, setRequestedTrackCount] = useState(0)
   const [coverError, setCoverError] = useState<string | null>(null)
@@ -285,12 +369,12 @@ export function DiscoverPlaylistForm() {
       ].join(' · ')
     : null
 
-  let disabledReason: string | null = null
-  if (seedMode === 'artist' && !artist) {
-    disabledReason = t('discover.needArtist')
-  } else if (seedMode === 'track' && !track) {
-    disabledReason = t('discover.needTrack')
-  }
+  const disabledReason = discoverDisabledReason(
+    seedMode,
+    Boolean(artist),
+    Boolean(track),
+    t,
+  )
   const generationError = discoverMutation.isError
     ? getApiErrorMessage(discoverMutation.error, t, 'discover.failed')
     : null
@@ -360,57 +444,25 @@ export function DiscoverPlaylistForm() {
                 onChange={changeSeedMode}
               />
 
-              {seedMode === 'artist' ? (
-                <div className="space-y-3">
-                  <Label htmlFor={artist ? undefined : seedSearchId}>
-                    {t('discover.artist')}
-                  </Label>
-                  {artist ? (
-                    <SelectedSeed
-                      imageUrl={artist.imageUrl}
-                      title={artist.name}
-                      imageRounded
-                      removeLabel={t('create.removeArtist', { name: artist.name })}
-                      onRemove={() => {
-                        setArtist(null)
-                        focusSeedSearch()
-                      }}
-                    />
-                  ) : (
-                    <ArtistSearch
-                      inputId={seedSearchId}
-                      selectedIds={selectedArtistIds}
-                      onSelect={selectArtist}
-                    />
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <Label htmlFor={track ? undefined : seedSearchId}>
-                    {t('discover.track')}
-                  </Label>
-                  {track ? (
-                    <SelectedSeed
-                      imageUrl={track.albumImageUrl}
-                      title={track.name}
-                      subtitle={track.artistName}
-                      removeLabel={t('discover.removeTrack', {
-                        name: track.name,
-                      })}
-                      onRemove={() => {
-                        setTrack(null)
-                        focusSeedSearch()
-                      }}
-                    />
-                  ) : (
-                    <TrackSearch
-                      inputId={seedSearchId}
-                      selectedIds={selectedTrackIds}
-                      onSelect={selectTrack}
-                    />
-                  )}
-                </div>
-              )}
+              <DiscoverSeedField
+                seedMode={seedMode}
+                artist={artist}
+                track={track}
+                seedSearchId={seedSearchId}
+                selectedArtistIds={selectedArtistIds}
+                selectedTrackIds={selectedTrackIds}
+                onSelectArtist={selectArtist}
+                onSelectTrack={selectTrack}
+                onRemoveArtist={() => {
+                  setArtist(null)
+                  focusSeedSearch()
+                }}
+                onRemoveTrack={() => {
+                  setTrack(null)
+                  focusSeedSearch()
+                }}
+                t={t}
+              />
             </FormSection>
 
             <PopularityModeSection control={form.control} step={2} />

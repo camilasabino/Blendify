@@ -43,6 +43,7 @@ function Dialog({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null
+    dialog.setAttribute('closedby', dismissible ? 'closerequest' : 'none')
     if (!dialog.open) dialog.showModal()
     const frame = window.requestAnimationFrame(() => {
       const target =
@@ -56,7 +57,7 @@ function Dialog({
       if (dialog.open) dialog.close()
       if (trigger?.isConnected) trigger.focus()
     }
-  }, [open, initialFocusRef])
+  }, [open, initialFocusRef, dismissible])
 
   return createPortal(
     <dialog
@@ -66,7 +67,6 @@ function Dialog({
         'blendify-dialog w-full max-w-md rounded-panel border border-divider bg-raised p-5 text-cream-50 shadow-[0_24px_80px_-24px_rgb(0_0_0_/_0.9)] open:animate-fade-up',
         className,
       )}
-      closedby={dismissible ? 'closerequest' : 'none'}
       onCancel={(event) => {
         event.preventDefault()
         if (dismissible) onClose()

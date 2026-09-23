@@ -253,6 +253,8 @@ function LibraryItemMenu({
     <ul
       ref={panelRef}
       id={id}
+      role="menu"
+      tabIndex={-1}
       aria-label={t('library.more')}
       data-popover-panel
       data-placement={placement}
@@ -265,6 +267,8 @@ function LibraryItemMenu({
           <li>
             <button
               type="button"
+              role="menuitem"
+              tabIndex={-1}
               data-popover-item
               className={cn(menuItemClass, 'text-cream-100')}
               onClick={onCopyLink}
@@ -280,6 +284,8 @@ function LibraryItemMenu({
           <li>
             <button
               type="button"
+              role="menuitem"
+              tabIndex={-1}
               data-popover-item
               className={cn(menuItemClass, 'text-cream-100')}
               onClick={onStartRename}
@@ -293,6 +299,8 @@ function LibraryItemMenu({
       <li>
         <button
           type="button"
+          role="menuitem"
+          tabIndex={-1}
           data-popover-item
           className={cn(menuItemClass, 'text-cream-200')}
           onClick={() => onAskConfirm({ kind: 'delete', playlist })}
@@ -305,6 +313,8 @@ function LibraryItemMenu({
         <li>
           <button
             type="button"
+            role="menuitem"
+            tabIndex={-1}
             data-popover-item
             className={cn(menuItemClass, 'text-danger')}
             onClick={() => onAskConfirm({ kind: 'purge', playlist })}

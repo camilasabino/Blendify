@@ -15,7 +15,7 @@ export function PreferencesMenu() {
   const t = useT()
   const panelId = useId()
   const titleId = useId()
-  const popover = usePopover({ align: 'end' })
+  const popover = usePopover<HTMLFieldSetElement>({ align: 'end' })
   const { open } = popover
   const [persistToLibrary, setPersistToLibrary] = useState(() =>
     readPersistToLibraryPreference(),
@@ -43,19 +43,21 @@ export function PreferencesMenu() {
       </Button>
 
       {open && (
-        <div
+        <fieldset
           ref={popover.panelRef}
           id={panelId}
-          role="group"
           aria-labelledby={titleId}
           data-popover-panel
           data-placement={popover.placement}
           style={popover.panelStyle}
-          className={cn(popoverSurfaceClass, 'w-88 rounded-panel p-4')}
+          className={cn(
+            popoverSurfaceClass,
+            'w-88 rounded-panel border-0 p-4 m-0',
+          )}
         >
-          <p id={titleId} className="text-eyebrow text-accent-fg">
+          <legend id={titleId} className="text-eyebrow text-accent-fg">
             {t('preferences.title')}
-          </p>
+          </legend>
           <p className="mt-1 text-xs text-cream-400">
             {t('preferences.subtitle')}
           </p>
@@ -78,7 +80,7 @@ export function PreferencesMenu() {
               }}
             />
           </div>
-        </div>
+        </fieldset>
       )}
     </div>
   )

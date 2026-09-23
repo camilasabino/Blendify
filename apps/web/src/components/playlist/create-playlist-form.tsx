@@ -14,6 +14,7 @@ import {
 import {
   MAX_ARTISTS,
   MAX_GENRES,
+  type PlaylistDetail,
   type PopularityMode,
 } from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
@@ -85,6 +86,48 @@ type FormValues = {
   generateCover: boolean
 }
 
+function mixValidationError(
+  mode: MixSeedMode,
+  artistCount: number,
+  genreCount: number,
+  t: ReturnType<typeof useT>,
+): string | null {
+  if (mode === 'artists') {
+    if (artistCount === 0) return t('create.addArtist')
+    if (artistCount > MAX_ARTISTS) {
+      return t('create.maxArtists', { max: MAX_ARTISTS })
+    }
+    return null
+  }
+  if (genreCount === 0) return t('create.addGenre')
+  if (genreCount > MAX_GENRES) {
+    return t('create.maxGenres', { max: MAX_GENRES })
+  }
+  return null
+}
+
+function mixRequestedTrackCount(result: PlaylistDetail | null): number {
+  if (!result) return 0
+  if (
+    result.generation.kind === 'artist_mix' ||
+    result.generation.kind === 'genre_mix'
+  ) {
+    return result.generation.tracksPerSeed * result.generation.seeds.length
+  }
+  return result.trackCount
+}
+
+function mixDisabledReason(
+  mode: MixSeedMode,
+  artistCount: number,
+  genreCount: number,
+  t: ReturnType<typeof useT>,
+): string | null {
+  if (mode === 'artists' && artistCount === 0) return t('create.needArtist')
+  if (mode === 'genres' && genreCount === 0) return t('create.needGenre')
+  return null
+}
+
 export function MixPlaylistForm() {
   const t = useT()
   const queryClient = useQueryClient()
@@ -94,7 +137,7 @@ export function MixPlaylistForm() {
   const [pasteList, setPasteList] = useState('')
   const [pasteOpen, setPasteOpen] = useState(false)
   const [resolveError, setResolveError] = useState<string | null>(null)
-  const [result, setResult] = useState<import('@blendify/contracts').PlaylistDetail | null>(null)
+  const [result, setResult] = useState<PlaylistDetail | null>(null)
   const [progress, setProgress] = useState<GenerationProgress | null>(null)
   const [coverError, setCoverError] = useState<string | null>(null)
   const [isPreparing, setIsPreparing] = useState(false)
@@ -272,24 +315,14 @@ export function MixPlaylistForm() {
         ? artists.map((a) => a.name)
         : genres.map((g) => g.name)
 
-    if (mode === 'artists' && artists.length === 0) {
-      form.setError('root', { message: t('create.addArtist') })
-      return
-    }
-    if (mode === 'artists' && artists.length > MAX_ARTISTS) {
-      form.setError('root', {
-        message: t('create.maxArtists', { max: MAX_ARTISTS }),
-      })
-      return
-    }
-    if (mode === 'genres' && genres.length === 0) {
-      form.setError('root', { message: t('create.addGenre') })
-      return
-    }
-    if (mode === 'genres' && genres.length > MAX_GENRES) {
-      form.setError('root', {
-        message: t('create.maxGenres', { max: MAX_GENRES }),
-      })
+    const validationMessage = mixValidationError(
+      mode,
+      artists.length,
+      genres.length,
+      t,
+    )
+    if (validationMessage) {
+      form.setError('root', { message: validationMessage })
       return
     }
 
@@ -416,24 +449,13 @@ export function MixPlaylistForm() {
             : t('create.perGenre', { songs: tracksPerGenre }),
         ].join(' · ')
       : null
-  let requestedTrackCount = 0
-  if (result) {
-    if (
-      result.generation.kind === 'artist_mix' ||
-      result.generation.kind === 'genre_mix'
-    ) {
-      requestedTrackCount =
-        result.generation.tracksPerSeed * result.generation.seeds.length
-    } else {
-      requestedTrackCount = result.trackCount
-    }
-  }
-  let disabledReason: string | null = null
-  if (mode === 'artists' && artists.length === 0) {
-    disabledReason = t('create.needArtist')
-  } else if (mode === 'genres' && genres.length === 0) {
-    disabledReason = t('create.needGenre')
-  }
+  const requestedTrackCount = mixRequestedTrackCount(result)
+  const disabledReason = mixDisabledReason(
+    mode,
+    artists.length,
+    genres.length,
+    t,
+  )
   const generationError = createMutation.isError
     ? getApiErrorMessage(createMutation.error, t, 'create.failed')
     : null

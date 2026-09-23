@@ -13,6 +13,109 @@ import { Spinner } from '@/components/ui/spinner'
 import { useT } from '@/i18n/use-t'
 import { cn, focusRing } from '@/lib/utils'
 
+function comboboxStatus({
+  showPopup,
+  isError,
+  isFetching,
+  error,
+  itemCount,
+  emptyLabel,
+  errorLabel,
+  t,
+}: Readonly<{
+  showPopup: boolean
+  isError: boolean
+  isFetching: boolean
+  error: unknown
+  itemCount: number
+  emptyLabel: string
+  errorLabel: (error: unknown) => string
+  t: ReturnType<typeof useT>
+}>): string {
+  if (!showPopup) return ''
+  if (isError) return errorLabel(error)
+  if (isFetching) return ''
+  if (itemCount === 0) return emptyLabel
+  if (itemCount === 1) return t('search.resultsOne')
+  return t('search.resultsMany', { count: itemCount })
+}
+
+function SearchComboboxOptions<T extends { id: string }>({
+  isError,
+  isFetching,
+  items,
+  emptyLabel,
+  errorLabel,
+  error,
+  listId,
+  resultsLabel,
+  showOptions,
+  optionId,
+  selectedIds,
+  activeIndex,
+  disabled,
+  onHover,
+  onSelect,
+  renderOption,
+}: Readonly<{
+  isError: boolean
+  isFetching: boolean
+  items: T[]
+  emptyLabel: string
+  errorLabel: (error: unknown) => string
+  error: unknown
+  listId: string
+  resultsLabel: string
+  showOptions: boolean
+  optionId: (index: number) => string
+  selectedIds: Set<string>
+  activeIndex: number
+  disabled?: boolean
+  onHover: (index: number) => void
+  onSelect: (item: T) => void
+  renderOption: (item: T, selected: boolean) => ReactNode
+}>) {
+  return (
+    <div
+      className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-card border border-divider bg-raised py-1 shadow-xl shadow-charcoal-950/60 animate-fade-in"
+      onMouseDown={(event) => event.preventDefault()}
+    >
+      {isError ? (
+        <div className="px-3 py-2">
+          <FieldError>{errorLabel(error)}</FieldError>
+        </div>
+      ) : null}
+      {!isError && !isFetching && items.length === 0 ? (
+        <p className="px-3 py-2 text-sm text-cream-400">{emptyLabel}</p>
+      ) : null}
+      <ul id={listId} role="listbox" aria-label={resultsLabel} hidden={!showOptions}>
+        {items.map((item, index) => {
+          const selected = selectedIds.has(item.id)
+          const active = index === activeIndex
+          return (
+            <li
+              id={optionId(index)}
+              key={item.id}
+              role="option"
+              aria-selected={active}
+              aria-disabled={selected || disabled || undefined}
+              onMouseEnter={() => !selected && onHover(index)}
+              onClick={() => onSelect(item)}
+              className={cn(
+                'flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150',
+                selected ? 'cursor-default opacity-40' : 'cursor-pointer',
+                active && !selected && 'bg-accent-soft',
+              )}
+            >
+              {renderOption(item, selected)}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 export function SearchCombobox<T extends { id: string }>({
   queryKey,
   search,
@@ -108,16 +211,22 @@ export function SearchCombobox<T extends { id: string }>({
     })
   }
 
+  function handleEscape(event: KeyboardEvent<HTMLInputElement>) {
+    if (showPopup) {
+      event.preventDefault()
+      setOpen(false)
+      setActiveIndex(-1)
+      return
+    }
+    if (query) {
+      event.preventDefault()
+      clear()
+    }
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') {
-      if (showPopup) {
-        event.preventDefault()
-        setOpen(false)
-        setActiveIndex(-1)
-      } else if (query) {
-        event.preventDefault()
-        clear()
-      }
+      handleEscape(event)
       return
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -133,14 +242,16 @@ export function SearchCombobox<T extends { id: string }>({
     }
   }
 
-  let status = ''
-  if (showPopup && result.isError) {
-    status = errorLabel(result.error)
-  } else if (showPopup && !result.isFetching) {
-    if (items.length === 0) status = emptyLabel
-    else if (items.length === 1) status = t('search.resultsOne')
-    else status = t('search.resultsMany', { count: items.length })
-  }
+  const status = comboboxStatus({
+    showPopup,
+    isError: result.isError,
+    isFetching: result.isFetching,
+    error: result.error,
+    itemCount: items.length,
+    emptyLabel,
+    errorLabel,
+    t,
+  })
 
   return (
     <div className={cn('relative', className)}>
@@ -191,52 +302,26 @@ export function SearchCombobox<T extends { id: string }>({
           </span>
         ) : null}
       </div>
-      <p role="status" className="sr-only">
-        {status}
-      </p>
+      <output className="sr-only">{status}</output>
       {showPopup ? (
-        <div
-          className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-card border border-divider bg-raised py-1 shadow-xl shadow-charcoal-950/60 animate-fade-in"
-          onMouseDown={(event) => event.preventDefault()}
-        >
-          {result.isError ? (
-            <div className="px-3 py-2">
-              <FieldError>{errorLabel(result.error)}</FieldError>
-            </div>
-          ) : null}
-          {!result.isError && !result.isFetching && items.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-cream-400">{emptyLabel}</p>
-          ) : null}
-          <ul
-            id={listId}
-            role="listbox"
-            aria-label={resultsLabel}
-            hidden={!showOptions}
-          >
-            {items.map((item, index) => {
-              const selected = selectedIds.has(item.id)
-              const active = index === activeIndex
-              return (
-                <li
-                  id={optionId(index)}
-                  key={item.id}
-                  role="option"
-                  aria-selected={active}
-                  aria-disabled={selected || disabled || undefined}
-                  onMouseEnter={() => !selected && setActiveIndex(index)}
-                  onClick={() => select(item)}
-                  className={cn(
-                    'flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150',
-                    selected ? 'cursor-default opacity-40' : 'cursor-pointer',
-                    active && !selected && 'bg-accent-soft',
-                  )}
-                >
-                  {renderOption(item, selected)}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
+        <SearchComboboxOptions
+          isError={result.isError}
+          isFetching={result.isFetching}
+          items={items}
+          emptyLabel={emptyLabel}
+          errorLabel={errorLabel}
+          error={result.error}
+          listId={listId}
+          resultsLabel={resultsLabel}
+          showOptions={showOptions}
+          optionId={optionId}
+          selectedIds={selectedIds}
+          activeIndex={activeIndex}
+          disabled={disabled}
+          onHover={setActiveIndex}
+          onSelect={select}
+          renderOption={renderOption}
+        />
       ) : null}
     </div>
   )

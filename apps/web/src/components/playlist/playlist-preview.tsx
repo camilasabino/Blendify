@@ -144,6 +144,88 @@ function ListenModeTabs({
   )
 }
 
+function PlaybackTrackList({
+  deviceListId,
+  tracks,
+  activeUri,
+  isPending,
+  isSuccess,
+  playError,
+  onPlayTrack,
+  collapsible,
+  expanded,
+  total,
+  onToggle,
+}: Readonly<{
+  deviceListId: string
+  tracks: readonly TrackDto[]
+  activeUri: string | null
+  isPending: boolean
+  isSuccess: boolean
+  playError: string | null
+  onPlayTrack: (track: TrackDto) => void
+  collapsible: boolean
+  expanded: boolean
+  total: number
+  onToggle: () => void
+}>) {
+  return (
+    <div className="overflow-hidden rounded-card border border-divider bg-card">
+      <ol id={deviceListId}>
+        {tracks.map((track, trackIndex) => {
+          const isActive = activeUri === track.uri && isPending
+          const isPlaying = activeUri === track.uri && isSuccess && !playError
+          return (
+            <li key={`${track.id}-${trackIndex}`}>
+              <button
+                type="button"
+                onClick={() => onPlayTrack(track)}
+                disabled={isPending}
+                className={cn(
+                  'flex w-full items-center gap-3 border-b border-divider px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-hover disabled:opacity-50',
+                  focusRing,
+                  isPlaying && 'bg-accent-soft',
+                )}
+              >
+                <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-400">
+                  {trackIndex + 1}
+                </span>
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-control bg-charcoal-700 text-accent-fg">
+                  {isActive ? (
+                    <Spinner size="sm" className="text-current" />
+                  ) : (
+                    <Play className="size-3.5 fill-current" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-cream-50">
+                    {track.name}
+                  </p>
+                  <p className="truncate text-xs text-cream-400">
+                    {track.artistName}
+                    {track.albumName ? ` · ${track.albumName}` : ''}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs tabular-nums text-cream-400">
+                  {formatDuration(track.durationMs)}
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ol>
+      {collapsible ? (
+        <TrackListToggle
+          expanded={expanded}
+          total={total}
+          controls={deviceListId}
+          onToggle={onToggle}
+        />
+      ) : null}
+    </div>
+  )
+}
+
 export function PlaylistPreview({
   tracks = [],
   spotifyId,
@@ -349,62 +431,19 @@ export function PlaylistPreview({
                 </p>
               </div>
             )}
-            <div className="overflow-hidden rounded-card border border-divider bg-card">
-              <ol id={deviceListId}>
-                {disclosure.visible.map((track, trackIndex) => {
-                  const isActive = activeUri === track.uri && playMutation.isPending
-                  const isPlaying =
-                    activeUri === track.uri &&
-                    playMutation.isSuccess &&
-                    !playError
-                  return (
-                    <li key={`${track.id}-${trackIndex}`}>
-                      <button
-                        type="button"
-                        onClick={() => playTrack(track)}
-                        disabled={playMutation.isPending}
-                        className={cn(
-                          'flex w-full items-center gap-3 border-b border-divider px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-hover disabled:opacity-50',
-                          focusRing,
-                          isPlaying && 'bg-accent-soft',
-                        )}
-                      >
-                        <span className="w-6 shrink-0 text-right text-xs tabular-nums text-cream-400">
-                          {trackIndex + 1}
-                        </span>
-                        <span className="flex size-7 shrink-0 items-center justify-center rounded-control bg-charcoal-700 text-accent-fg">
-                          {isActive ? (
-                            <Spinner size="sm" className="text-current" />
-                          ) : (
-                            <Play className="size-3.5 fill-current" />
-                          )}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm text-cream-50">
-                            {track.name}
-                          </p>
-                          <p className="truncate text-xs text-cream-400">
-                            {track.artistName}
-                            {track.albumName ? ` · ${track.albumName}` : ''}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-xs tabular-nums text-cream-400">
-                          {formatDuration(track.durationMs)}
-                        </span>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ol>
-              {disclosure.collapsible ? (
-                <TrackListToggle
-                  expanded={disclosure.expanded}
-                  total={list.length}
-                  controls={deviceListId}
-                  onToggle={disclosure.toggle}
-                />
-              ) : null}
-            </div>
+            <PlaybackTrackList
+              deviceListId={deviceListId}
+              tracks={disclosure.visible}
+              activeUri={activeUri}
+              isPending={playMutation.isPending}
+              isSuccess={playMutation.isSuccess}
+              playError={playError}
+              onPlayTrack={playTrack}
+              collapsible={disclosure.collapsible}
+              expanded={disclosure.expanded}
+              total={list.length}
+              onToggle={disclosure.toggle}
+            />
           </section>
         )}
 

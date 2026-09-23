@@ -89,6 +89,7 @@ export function AccountMenu({
           ref={popover.panelRef}
           id={menuId}
           role="menu"
+          tabIndex={-1}
           aria-label={t('nav.account')}
           data-popover-panel
           data-placement={popover.placement}
@@ -97,10 +98,7 @@ export function AccountMenu({
           className={cn(popoverSurfaceClass, 'w-max min-w-44 max-w-64 rounded-card py-1')}
         >
           {displayName ? (
-            <p
-              role="presentation"
-              className="flex items-center gap-2 border-b border-divider px-3 pb-2 pt-1.5 text-xs text-cream-400"
-            >
+            <p className="flex items-center gap-2 border-b border-divider px-3 pb-2 pt-1.5 text-xs text-cream-400">
               <span aria-hidden className="inline-flex">
                 <SpotifyMark className="size-3.5" title="" />
               </span>
