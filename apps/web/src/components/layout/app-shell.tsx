@@ -10,6 +10,7 @@ import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { PreferencesMenu } from '@/components/layout/preferences-menu'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
 import { AccountMenu } from '@/components/layout/account-menu'
+import { Footer } from '@/components/layout/footer'
 import { useT } from '@/i18n/use-t'
 import { cn, focusRing, pageGutter, shellGutter } from '@/lib/utils'
 
@@ -43,7 +44,7 @@ export function AppShell() {
   const t = useT()
 
   return (
-    <div className="bg-atmosphere bg-grain relative min-h-svh overflow-x-hidden">
+    <div className="bg-atmosphere bg-grain relative flex min-h-svh flex-col overflow-x-hidden">
       <a
         href="#main-content"
         className={cn(
@@ -109,10 +110,12 @@ export function AppShell() {
       <main
         id="main-content"
         tabIndex={-1}
-        className={cn(pageGutter, 'relative z-10 py-8 outline-none sm:py-10')}
+        className={cn(pageGutter, 'relative z-10 flex-1 py-8 outline-none sm:py-10')}
       >
         <Outlet />
       </main>
+
+      <Footer />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
 import { SpotifyMark } from '@/components/brand/spotify-mark'
+import { Footer } from '@/components/layout/footer'
 import { useT } from '@/i18n/use-t'
 import { buildDefaultPlaylistName } from '@/lib/playlist-name'
 import { formatSongCount } from '@/lib/song-count'
@@ -19,7 +20,7 @@ export function LandingPage() {
   const t = useT()
 
   return (
-    <div className="bg-atmosphere bg-grain relative min-h-svh overflow-x-hidden">
+    <div className="bg-atmosphere bg-grain relative flex min-h-svh flex-col overflow-x-hidden">
       <div
         aria-hidden
         className="pointer-events-none absolute -left-24 top-10 z-0 size-112 rounded-full bg-amber-500/15 blur-3xl animate-drift"
@@ -51,7 +52,7 @@ export function LandingPage() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto flex min-h-[calc(100svh-5rem)] max-w-6xl flex-col justify-center px-4 pb-16 pt-4 sm:px-6 lg:flex-row lg:items-center lg:gap-16">
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 pb-16 pt-4 sm:px-6 lg:flex-row lg:items-center lg:gap-16">
         <div className="max-w-xl flex-1 space-y-6">
           <h1 className="animate-fade-up font-display text-5xl font-extrabold leading-[0.95] tracking-tight text-cream-50 min-[400px]:text-6xl sm:text-7xl lg:text-8xl">
             Blendify
@@ -120,6 +121,8 @@ export function LandingPage() {
           <HeroDemo />
         </div>
       </main>
+
+      <Footer />
     </div>
   )
 }
