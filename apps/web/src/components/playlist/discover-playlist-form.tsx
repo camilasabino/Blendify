@@ -18,10 +18,12 @@ import { GenerationResultPanel } from '@/components/playlist/generation-result-p
 import {
   CoverErrorNotice,
   GENERATION_ORDER_MODES,
+  GenerationSettingsCollapse,
   GenerationSubmitBar,
   OrderModeSection,
   PopularityModeSection,
 } from '@/components/playlist/generation-form-shared'
+import { buildGenerationSummary } from '@/components/playlist/generation-options'
 import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
 import { FormSection } from '@/components/ui/form-section'
@@ -33,6 +35,7 @@ import { cn, focusRing } from '@/lib/utils'
 import { buildDiscoverPlaylistName } from '@/lib/playlist-name'
 import { renderPlaylistCoverBase64 } from '@/lib/playlist-cover'
 import { useCopiedLink } from '@/hooks/use-generation-feedback'
+import { useGenerationSettingsCollapse } from '@/hooks/use-generation-settings-collapse'
 
 type SeedMode = 'artist' | 'track'
 
@@ -216,6 +219,20 @@ export function DiscoverPlaylistForm() {
   }
 
   const isGenerating = discoverMutation.isPending
+  const settingsCollapse = useGenerationSettingsCollapse(
+    isGenerating,
+    result !== null,
+  )
+  const seedName = seedMode === 'artist' ? artist?.name : track?.name
+  const settingsSummary = buildGenerationSummary(
+    {
+      seedNames: seedName ? [seedName] : [],
+      popularity: form.watch('popularity'),
+      orderMode: form.watch('orderMode'),
+      trackCount: form.watch('targetTrackCount'),
+    },
+    t,
+  )
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-10 animate-fade-up">
@@ -225,133 +242,145 @@ export function DiscoverPlaylistForm() {
         description={t('discover.subtitle')}
       />
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <FormSection
-          step={1}
-          accent="amber"
-          title={t('discover.stepSeed')}
-          description={t('discover.stepSeedHint')}
-        >
-          <SegmentedControl
-            layout="grid"
-            className="w-full"
-            ariaLabel={t('discover.stepSeed')}
-            value={seedMode}
-            options={[
-              { value: 'artist', label: t('discover.modeArtist') },
-              { value: 'track', label: t('discover.modeTrack') },
-            ]}
-            onChange={changeSeedMode}
-          />
-
-          {seedMode === 'artist' ? (
-            <div className="space-y-3">
-              <Label>{t('discover.artist')}</Label>
-              {artist ? (
-                <SelectedSeed
-                  imageUrl={artist.imageUrl}
-                  title={artist.name}
-                  imageRounded
-                  removeLabel={t('create.removeArtist', { name: artist.name })}
-                  onRemove={clearArtist}
-                />
-              ) : (
-                <>
-                  <ArtistSearch
-                    selectedIds={selectedArtistIds}
-                    onSelect={selectArtist}
-                  />
-                  <p className="text-sm text-cream-400">
-                    {t('discover.noArtistYet')}
-                  </p>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <Label>{t('discover.track')}</Label>
-              {track ? (
-                <SelectedSeed
-                  imageUrl={track.albumImageUrl}
-                  title={track.name}
-                  subtitle={track.artistName}
-                  removeLabel={t('discover.removeTrack', {
-                    name: track.name,
-                  })}
-                  onRemove={clearTrack}
-                />
-              ) : (
-                <>
-                  <TrackSearch
-                    selectedIds={selectedTrackIds}
-                    onSelect={selectTrack}
-                  />
-                  <p className="text-sm text-cream-400">
-                    {t('discover.noTrackYet')}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-        </FormSection>
-
-        <PopularityModeSection control={form.control} step={2} />
-
-        <FormSection
-          step={3}
-          title={t('discover.stepDetails')}
-          description={t('discover.stepDetailsHint')}
-        >
-          <Controller
-            control={form.control}
-            name="targetTrackCount"
-            render={({ field }) => (
-              <RadioCardGroup
-                label={t('discover.stepDetails')}
-                value={field.value}
-                onChange={field.onChange}
-                options={TRACK_TARGETS.map((count) => ({
-                  value: count,
-                  label: count,
-                  hint: t('discover.songsLabel'),
-                }))}
-              />
-            )}
-          />
-          <CoverErrorNotice message={coverError} />
-        </FormSection>
-
-        <OrderModeSection control={form.control} step={4} />
-
-        <GenerationSubmitBar
+      <div
+        ref={settingsCollapse.resultPanelRef}
+        className="scroll-mt-24 empty:hidden"
+      >
+        <GenerationResultPanel
           isGenerating={isGenerating}
-          disabled={seedMode === 'artist' ? !artist : !track}
-          error={
-            form.formState.errors.root?.message ??
-            (discoverMutation.isError
-              ? getApiErrorMessage(
-                  discoverMutation.error,
-                  t,
-                  'discover.failed',
-                )
-              : null)
-          }
-          idleLabel={t('discover.generate')}
-          busyLabel={t('discover.generating')}
-          icon={Compass}
+          result={result}
+          progress={progress}
+          requestedTrackCount={requestedTrackCount}
+          workingTitleKey="discover.working"
+          workingHintKey="discover.workingHint"
+          copied={copiedLink.copied}
+          onCopy={(url) => void copiedLink.copy(url)}
         />
-      </form>
+      </div>
 
-      <GenerationResultPanel
-        isGenerating={isGenerating}
-        result={result}
-        progress={progress}
-        requestedTrackCount={requestedTrackCount}
-        workingTitleKey="discover.working"
-        workingHintKey="discover.workingHint"
-        copied={copiedLink.copied}
-        onCopy={(url) => void copiedLink.copy(url)}
-      />
+      <GenerationSettingsCollapse
+        active={settingsCollapse.isActive}
+        collapsed={settingsCollapse.collapsed}
+        onToggle={settingsCollapse.toggleSettings}
+        summary={settingsSummary}
+      >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <FormSection
+            step={1}
+            accent="amber"
+            title={t('discover.stepSeed')}
+            description={t('discover.stepSeedHint')}
+          >
+            <SegmentedControl
+              layout="grid"
+              className="w-full"
+              ariaLabel={t('discover.stepSeed')}
+              value={seedMode}
+              options={[
+                { value: 'artist', label: t('discover.modeArtist') },
+                { value: 'track', label: t('discover.modeTrack') },
+              ]}
+              onChange={changeSeedMode}
+            />
+
+            {seedMode === 'artist' ? (
+              <div className="space-y-3">
+                <Label>{t('discover.artist')}</Label>
+                {artist ? (
+                  <SelectedSeed
+                    imageUrl={artist.imageUrl}
+                    title={artist.name}
+                    imageRounded
+                    removeLabel={t('create.removeArtist', { name: artist.name })}
+                    onRemove={clearArtist}
+                  />
+                ) : (
+                  <>
+                    <ArtistSearch
+                      selectedIds={selectedArtistIds}
+                      onSelect={selectArtist}
+                    />
+                    <p className="text-sm text-cream-400">
+                      {t('discover.noArtistYet')}
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Label>{t('discover.track')}</Label>
+                {track ? (
+                  <SelectedSeed
+                    imageUrl={track.albumImageUrl}
+                    title={track.name}
+                    subtitle={track.artistName}
+                    removeLabel={t('discover.removeTrack', {
+                      name: track.name,
+                    })}
+                    onRemove={clearTrack}
+                  />
+                ) : (
+                  <>
+                    <TrackSearch
+                      selectedIds={selectedTrackIds}
+                      onSelect={selectTrack}
+                    />
+                    <p className="text-sm text-cream-400">
+                      {t('discover.noTrackYet')}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </FormSection>
+
+          <PopularityModeSection control={form.control} step={2} />
+
+          <FormSection
+            step={3}
+            title={t('discover.stepDetails')}
+            description={t('discover.stepDetailsHint')}
+          >
+            <Controller
+              control={form.control}
+              name="targetTrackCount"
+              render={({ field }) => (
+                <RadioCardGroup
+                  label={t('discover.stepDetails')}
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={TRACK_TARGETS.map((count) => ({
+                    value: count,
+                    label: count,
+                    hint: t('discover.songsLabel'),
+                  }))}
+                />
+              )}
+            />
+            <CoverErrorNotice message={coverError} />
+          </FormSection>
+
+          <OrderModeSection control={form.control} step={4} />
+
+          <GenerationSubmitBar
+            isGenerating={isGenerating}
+            disabled={seedMode === 'artist' ? !artist : !track}
+            error={
+              form.formState.errors.root?.message ??
+              (discoverMutation.isError
+                ? getApiErrorMessage(
+                    discoverMutation.error,
+                    t,
+                    'discover.failed',
+                  )
+                : null)
+            }
+            idleLabel={t('discover.generate')}
+            busyLabel={t('discover.generating')}
+            icon={Compass}
+          />
+        </form>
+      </GenerationSettingsCollapse>
     </div>
   )
 }

@@ -121,6 +121,11 @@ export const en = {
   'create.generate': 'Create playlist',
   'create.working': 'Creating your playlist',
   'create.ready': 'Playlist ready',
+  'create.settings': 'Playlist settings',
+  'create.showSettings': 'Edit',
+  'create.hideSettings': 'Hide',
+  'create.summaryMore': '+{count} more',
+  'create.summarySongs': '{count} songs',
   'create.workingHint': 'Finding songs and adding them to Spotify…',
   'create.workingHintSlow':
     'Building the mix — this can take a little while…',

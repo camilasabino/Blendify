@@ -129,6 +129,11 @@ export const pt: Record<MessageKey, string> = {
   'create.generate': 'Criar playlist',
   'create.working': 'Criando sua playlist',
   'create.ready': 'Playlist pronta',
+  'create.settings': 'Configurações da playlist',
+  'create.showSettings': 'Editar',
+  'create.hideSettings': 'Ocultar',
+  'create.summaryMore': '+{count} mais',
+  'create.summarySongs': '{count} músicas',
   'create.workingHint': 'Buscando músicas e adicionando-as ao Spotify…',
   'create.workingHintSlow':
     'Montando a mistura: pode demorar um pouco…',

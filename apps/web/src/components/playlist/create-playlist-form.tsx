@@ -27,10 +27,12 @@ import { GenerationResultPanel } from '@/components/playlist/generation-result-p
 import {
   CoverErrorNotice,
   GENERATION_ORDER_MODES,
+  GenerationSettingsCollapse,
   GenerationSubmitBar,
   OrderModeSection,
   PopularityModeSection,
 } from '@/components/playlist/generation-form-shared'
+import { buildGenerationSummary } from '@/components/playlist/generation-options'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/feedback'
 import { Input } from '@/components/ui/input'
@@ -55,6 +57,7 @@ import {
 } from '@/lib/playlist-name'
 import { renderPlaylistCoverBase64 } from '@/lib/playlist-cover'
 import { useCopiedLink } from '@/hooks/use-generation-feedback'
+import { useGenerationSettingsCollapse } from '@/hooks/use-generation-settings-collapse'
 
 const DEFAULT_TRACKS_PER_ARTIST = 10
 const DEFAULT_TRACKS_PER_GENRE = 25
@@ -112,6 +115,8 @@ export function MixPlaylistForm() {
 
   const tracksPerArtist = form.watch('tracksPerArtist')
   const tracksPerGenre = form.watch('tracksPerGenre')
+  const popularity = form.watch('popularity')
+  const orderMode = form.watch('orderMode')
 
   const playlistName = useMemo(() => {
     if (mode === 'artists') {
@@ -334,6 +339,22 @@ export function MixPlaylistForm() {
   }
 
   const isGenerating = createMutation.isPending
+  const settingsCollapse = useGenerationSettingsCollapse(
+    isGenerating,
+    result !== null,
+  )
+  const settingsSummary = buildGenerationSummary(
+    {
+      seedNames:
+        mode === 'artists'
+          ? artists.map((a) => a.name)
+          : genres.map((g) => g.name),
+      popularity,
+      orderMode,
+      trackCount: estimate.total,
+    },
+    t,
+  )
   let requestedTrackCount = 0
   if (result) {
     if (
@@ -357,263 +378,275 @@ export function MixPlaylistForm() {
         description={t('create.subtitle')}
       />
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <FormSection
-          step={1}
-          accent="amber"
-          title={t('create.stepSource')}
-          description={t('create.stepSourceHint')}
-        >
-          <SegmentedControl
-            layout="grid"
-            className="w-full"
-            ariaLabel={t('create.title')}
-            value={mode}
-            options={[
-              { value: 'artists', label: t('create.modeArtists') },
-              { value: 'genres', label: t('create.modeGenres') },
-            ]}
-            onChange={(value) => {
-              setMode(value)
-              setArtists([])
-              setGenres([])
-              setPasteList('')
-              setResolveError(null)
-              setResult(null)
-              setCoverError(null)
-              copiedLink.reset()
-              form.clearErrors()
-              createMutation.reset()
-              resolveMutation.reset()
-            }}
-          />
+      <div
+        ref={settingsCollapse.resultPanelRef}
+        className="scroll-mt-24 empty:hidden"
+      >
+        <GenerationResultPanel
+          isGenerating={isGenerating}
+          result={result}
+          progress={progress}
+          requestedTrackCount={requestedTrackCount}
+          workingTitleKey="create.working"
+          workingHintKey="create.workingHint"
+          copied={copiedLink.copied}
+          onCopy={(url) => void copiedLink.copy(url)}
+        />
+      </div>
 
-          {mode === 'artists' ? (
-            <>
+      <GenerationSettingsCollapse
+        active={settingsCollapse.isActive}
+        collapsed={settingsCollapse.collapsed}
+        onToggle={settingsCollapse.toggleSettings}
+        summary={settingsSummary}
+      >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <FormSection
+            step={1}
+            accent="amber"
+            title={t('create.stepSource')}
+            description={t('create.stepSourceHint')}
+          >
+            <SegmentedControl
+              layout="grid"
+              className="w-full"
+              ariaLabel={t('create.title')}
+              value={mode}
+              options={[
+                { value: 'artists', label: t('create.modeArtists') },
+                { value: 'genres', label: t('create.modeGenres') },
+              ]}
+              onChange={(value) => {
+                setMode(value)
+                setArtists([])
+                setGenres([])
+                setPasteList('')
+                setResolveError(null)
+                setResult(null)
+                setCoverError(null)
+                copiedLink.reset()
+                form.clearErrors()
+                createMutation.reset()
+                resolveMutation.reset()
+              }}
+            />
+
+            {mode === 'artists' ? (
+              <>
+                <div className="space-y-3">
+                  <div className="flex items-end justify-between gap-3">
+                    <Label>{t('create.artists')}</Label>
+                    <span className="rounded-md bg-charcoal-950/50 px-2 py-0.5 text-xs tabular-nums text-cream-400">
+                      {artists.length}/{MAX_ARTISTS}
+                    </span>
+                  </div>
+                  <ArtistSearch
+                    selectedIds={selectedIds}
+                    onSelect={addArtist}
+                    disabled={artists.length >= MAX_ARTISTS}
+                  />
+                  <ArtistChipList
+                    artists={artists}
+                    onRemove={removeArtist}
+                    onClear={() => setArtists([])}
+                  />
+                  <ArtistSimilarSuggestions
+                    selected={artists}
+                    max={MAX_ARTISTS}
+                    onSelect={addArtist}
+                  />
+                </div>
+
+                <div className="space-y-2 border-t border-cream-200/10 pt-4">
+                  <Label htmlFor="paste">{t('create.paste')}</Label>
+                  <Textarea
+                    id="paste"
+                    placeholder={t('create.pastePlaceholder')}
+                    value={pasteList}
+                    onChange={(e) => setPasteList(e.target.value)}
+                    rows={4}
+                  />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleResolve}
+                      loading={resolveMutation.isPending}
+                      disabled={!pasteList.trim()}
+                    >
+                      {!resolveMutation.isPending ? (
+                        <Music2 className="size-4" />
+                      ) : null}
+                      {t('create.resolve')}
+                    </Button>
+                    <FieldError>{resolveError}</FieldError>
+                  </div>
+                </div>
+              </>
+            ) : (
               <div className="space-y-3">
                 <div className="flex items-end justify-between gap-3">
-                  <Label>{t('create.artists')}</Label>
+                  <Label>{t('create.genres')}</Label>
                   <span className="rounded-md bg-charcoal-950/50 px-2 py-0.5 text-xs tabular-nums text-cream-400">
-                    {artists.length}/{MAX_ARTISTS}
+                    {genres.length}/{MAX_GENRES}
                   </span>
                 </div>
-                <ArtistSearch
-                  selectedIds={selectedIds}
-                  onSelect={addArtist}
-                  disabled={artists.length >= MAX_ARTISTS}
+                <GenrePicker
+                  selected={genres}
+                  max={MAX_GENRES}
+                  onToggle={toggleGenre}
+                  onRemove={removeGenre}
+                  onClear={() => setGenres([])}
                 />
-                <ArtistChipList
-                  artists={artists}
-                  onRemove={removeArtist}
-                  onClear={() => setArtists([])}
-                />
-                <ArtistSimilarSuggestions
-                  selected={artists}
-                  max={MAX_ARTISTS}
-                  onSelect={addArtist}
-                />
-              </div>
-
-              <div className="space-y-2 border-t border-cream-200/10 pt-4">
-                <Label htmlFor="paste">{t('create.paste')}</Label>
-                <Textarea
-                  id="paste"
-                  placeholder={t('create.pastePlaceholder')}
-                  value={pasteList}
-                  onChange={(e) => setPasteList(e.target.value)}
-                  rows={4}
-                />
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleResolve}
-                    loading={resolveMutation.isPending}
-                    disabled={!pasteList.trim()}
-                  >
-                    {!resolveMutation.isPending ? (
-                      <Music2 className="size-4" />
-                    ) : null}
-                    {t('create.resolve')}
-                  </Button>
-                  <FieldError>{resolveError}</FieldError>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-end justify-between gap-3">
-                <Label>{t('create.genres')}</Label>
-                <span className="rounded-md bg-charcoal-950/50 px-2 py-0.5 text-xs tabular-nums text-cream-400">
-                  {genres.length}/{MAX_GENRES}
-                </span>
-              </div>
-              <GenrePicker
-                selected={genres}
-                max={MAX_GENRES}
-                onToggle={toggleGenre}
-                onRemove={removeGenre}
-                onClear={() => setGenres([])}
-              />
-            </div>
-          )}
-        </FormSection>
-
-        <PopularityModeSection control={form.control} step={2} />
-
-        <FormSection
-          step={3}
-          title={t('create.stepDetails')}
-          description={t('create.stepDetailsHint')}
-        >
-          <div className="grid gap-5 sm:grid-cols-2">
-            {mode === 'artists' ? (
-              <div className="space-y-2">
-                <Label htmlFor="tracksPerArtist">
-                  {t('create.tracksPerArtist')}
-                </Label>
-                <Controller
-                  control={form.control}
-                  name="tracksPerArtist"
-                  render={({ field }) => (
-                    <Input
-                      id="tracksPerArtist"
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={artistTrackMax}
-                      value={Number.isFinite(field.value) ? field.value : ''}
-                      onChange={(e) => {
-                        const raw = e.target.valueAsNumber
-                        field.onChange(Number.isFinite(raw) ? raw : Number.NaN)
-                      }}
-                      onBlur={() => {
-                        const raw = field.value
-                        const next = Number.isFinite(raw)
-                          ? Math.min(artistTrackMax, Math.max(1, Math.round(raw)))
-                          : Math.min(DEFAULT_TRACKS_PER_ARTIST, artistTrackMax)
-                        field.onChange(next)
-                      }}
-                    />
-                  )}
-                />
-                <p className="text-xs text-cream-500">
-                  {t('create.tracksMaxHint', { max: artistTrackMax })}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor="tracksPerGenre">
-                  {t('create.tracksPerGenre')}
-                </Label>
-                <Controller
-                  control={form.control}
-                  name="tracksPerGenre"
-                  render={({ field }) => (
-                    <Input
-                      id="tracksPerGenre"
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={genreTrackMax}
-                      value={Number.isFinite(field.value) ? field.value : ''}
-                      onChange={(e) => {
-                        const raw = e.target.valueAsNumber
-                        field.onChange(Number.isFinite(raw) ? raw : Number.NaN)
-                      }}
-                      onBlur={() => {
-                        const raw = field.value
-                        const next = Number.isFinite(raw)
-                          ? Math.min(genreTrackMax, Math.max(1, Math.round(raw)))
-                          : Math.min(DEFAULT_TRACKS_PER_GENRE, genreTrackMax)
-                        field.onChange(next)
-                      }}
-                    />
-                  )}
-                />
-                <p className="text-xs text-cream-500">
-                  {t('create.tracksMaxHint', { max: genreTrackMax })}
-                </p>
               </div>
             )}
+          </FormSection>
 
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-4 py-3">
-              <div>
-                <Label htmlFor="generateCover">
-                  {t('create.generateCover')}
-                </Label>
-                <p className="mt-1 text-xs text-cream-400">
-                  {t('create.generateCoverHint')}
-                </p>
-              </div>
-              <Controller
-                control={form.control}
-                name="generateCover"
-                render={({ field }) => (
-                  <Switch
-                    id="generateCover"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
+          <PopularityModeSection control={form.control} step={2} />
+
+          <FormSection
+            step={3}
+            title={t('create.stepDetails')}
+            description={t('create.stepDetailsHint')}
+          >
+            <div className="grid gap-5 sm:grid-cols-2">
+              {mode === 'artists' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="tracksPerArtist">
+                    {t('create.tracksPerArtist')}
+                  </Label>
+                  <Controller
+                    control={form.control}
+                    name="tracksPerArtist"
+                    render={({ field }) => (
+                      <Input
+                        id="tracksPerArtist"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={artistTrackMax}
+                        value={Number.isFinite(field.value) ? field.value : ''}
+                        onChange={(e) => {
+                          const raw = e.target.valueAsNumber
+                          field.onChange(Number.isFinite(raw) ? raw : Number.NaN)
+                        }}
+                        onBlur={() => {
+                          const raw = field.value
+                          const next = Number.isFinite(raw)
+                            ? Math.min(artistTrackMax, Math.max(1, Math.round(raw)))
+                            : Math.min(DEFAULT_TRACKS_PER_ARTIST, artistTrackMax)
+                          field.onChange(next)
+                        }}
+                      />
+                    )}
                   />
-                )}
-              />
+                  <p className="text-xs text-cream-500">
+                    {t('create.tracksMaxHint', { max: artistTrackMax })}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="tracksPerGenre">
+                    {t('create.tracksPerGenre')}
+                  </Label>
+                  <Controller
+                    control={form.control}
+                    name="tracksPerGenre"
+                    render={({ field }) => (
+                      <Input
+                        id="tracksPerGenre"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={genreTrackMax}
+                        value={Number.isFinite(field.value) ? field.value : ''}
+                        onChange={(e) => {
+                          const raw = e.target.valueAsNumber
+                          field.onChange(Number.isFinite(raw) ? raw : Number.NaN)
+                        }}
+                        onBlur={() => {
+                          const raw = field.value
+                          const next = Number.isFinite(raw)
+                            ? Math.min(genreTrackMax, Math.max(1, Math.round(raw)))
+                            : Math.min(DEFAULT_TRACKS_PER_GENRE, genreTrackMax)
+                          field.onChange(next)
+                        }}
+                      />
+                    )}
+                  />
+                  <p className="text-xs text-cream-500">
+                    {t('create.tracksMaxHint', { max: genreTrackMax })}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-4 py-3">
+                <div>
+                  <Label htmlFor="generateCover">
+                    {t('create.generateCover')}
+                  </Label>
+                  <p className="mt-1 text-xs text-cream-400">
+                    {t('create.generateCoverHint')}
+                  </p>
+                </div>
+                <Controller
+                  control={form.control}
+                  name="generateCover"
+                  render={({ field }) => (
+                    <Switch
+                      id="generateCover"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+              </div>
             </div>
-          </div>
-          <CoverErrorNotice message={coverError} />
-        </FormSection>
+            <CoverErrorNotice message={coverError} />
+          </FormSection>
 
-        <OrderModeSection control={form.control} step={4} />
+          <OrderModeSection control={form.control} step={4} />
 
-        <div className="space-y-4">
-          <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 to-amber-500/5 px-4 py-3">
-            <p className="text-sm text-cream-100">
-              {t('create.estimated')}{' '}
-              <span className="font-semibold tabular-nums text-amber-400">
-                {estimate.total}
-              </span>
-              {sourceCount > 0 && (
-                <span className="text-cream-400">
-                  {' '}
-                  ·{' '}
-                  {mode === 'artists'
-                    ? t('create.perArtist', { songs: tracksPerArtist })
-                    : t('create.perGenre', { songs: tracksPerGenre })}
+          <div className="space-y-4">
+            <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 to-amber-500/5 px-4 py-3">
+              <p className="text-sm text-cream-100">
+                {t('create.estimated')}{' '}
+                <span className="font-semibold tabular-nums text-amber-400">
+                  {estimate.total}
                 </span>
-              )}
-              {estimate.capped && (
-                <span className="ml-2 text-xs text-cream-400">
-                  {t('create.capped', { cap: PLAYLIST_TRACK_CAP })}
-                </span>
-              )}
-            </p>
+                {sourceCount > 0 && (
+                  <span className="text-cream-400">
+                    {' '}
+                    ·{' '}
+                    {mode === 'artists'
+                      ? t('create.perArtist', { songs: tracksPerArtist })
+                      : t('create.perGenre', { songs: tracksPerGenre })}
+                  </span>
+                )}
+                {estimate.capped && (
+                  <span className="ml-2 text-xs text-cream-400">
+                    {t('create.capped', { cap: PLAYLIST_TRACK_CAP })}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            <GenerationSubmitBar
+              isGenerating={isGenerating}
+              disabled={!canSubmit}
+              error={
+                form.formState.errors.root?.message ??
+                (createMutation.isError
+                  ? getApiErrorMessage(createMutation.error, t, 'create.failed')
+                  : null)
+              }
+              idleLabel={t('create.generate')}
+              busyLabel={t('create.generating')}
+              icon={Sparkles}
+            />
           </div>
-
-          <GenerationSubmitBar
-            isGenerating={isGenerating}
-            disabled={!canSubmit}
-            error={
-              form.formState.errors.root?.message ??
-              (createMutation.isError
-                ? getApiErrorMessage(createMutation.error, t, 'create.failed')
-                : null)
-            }
-            idleLabel={t('create.generate')}
-            busyLabel={t('create.generating')}
-            icon={Sparkles}
-          />
-        </div>
-      </form>
-
-      <GenerationResultPanel
-        isGenerating={isGenerating}
-        result={result}
-        progress={progress}
-        requestedTrackCount={requestedTrackCount}
-        workingTitleKey="create.working"
-        workingHintKey="create.workingHint"
-        copied={copiedLink.copied}
-        onCopy={(url) => void copiedLink.copy(url)}
-      />
+        </form>
+      </GenerationSettingsCollapse>
     </div>
   )
 }
