@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { CATALOG_PROVIDER_FACTORY } from '../domain/repositories/catalog-provider.port';
 import { MUSIC_PROVIDER_FACTORY } from '../domain/repositories/music-provider.factory.port';
 import { PLAYLIST_REPOSITORY } from '../domain/repositories/playlist.repository.port';
 import { PROVIDER_QUOTA } from '../domain/repositories/provider-quota.port';
@@ -33,6 +34,7 @@ const providers = [
 
 const bindings = [
   { provide: MUSIC_PROVIDER_FACTORY, useExisting: SpotifyMusicProvider },
+  { provide: CATALOG_PROVIDER_FACTORY, useExisting: SpotifyMusicProvider },
   { provide: PLAYLIST_REPOSITORY, useExisting: PrismaPlaylistRepository },
   { provide: USER_REPOSITORY, useExisting: PrismaUserRepository },
   {

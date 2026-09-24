@@ -1,4 +1,4 @@
-import type { MusicProviderPort } from '../repositories/music-provider.port';
+import type { CatalogProviderPort } from '../repositories/catalog-provider.port';
 import type { Track } from '../track/track.entity';
 import type { PopularityMode } from '@blendify/contracts';
 import {
@@ -8,6 +8,7 @@ import {
   type CatalogTrackRef,
 } from './catalog-window';
 import { BusinessRuleError } from '../errors/business-rule.error';
+import { CatalogUnavailableError } from '../errors/catalog-unavailable.error';
 
 /** Serial resolves — Dev Mode cannot sustain parallel search bursts. */
 const DEFAULT_CONCURRENCY = 1;
@@ -18,6 +19,10 @@ export function isSpotifyQuotaError(error: unknown): boolean {
     (error.code === 'SPOTIFY_QUOTA_EXCEEDED' ||
       error.code === 'SPOTIFY_RATE_LIMITED')
   );
+}
+
+export function isFatalCatalogError(error: unknown): boolean {
+  return error instanceof CatalogUnavailableError || isSpotifyQuotaError(error);
 }
 
 /**
@@ -31,7 +36,7 @@ export type CatalogResolveProgress = {
 };
 
 export async function resolveCatalogTracks(
-  provider: MusicProviderPort,
+  provider: CatalogProviderPort,
   refs: CatalogTrackRef[],
   options: {
     needed: number;
@@ -82,7 +87,7 @@ export async function resolveCatalogTracks(
 }
 
 async function resolveCatalogBatch(
-  provider: MusicProviderPort,
+  provider: CatalogProviderPort,
   batch: CatalogTrackRef[],
   artistId: string | undefined,
 ): Promise<Array<Track | null>> {
@@ -93,7 +98,7 @@ async function resolveCatalogBatch(
           artistId,
         });
       } catch (error) {
-        if (isSpotifyQuotaError(error)) throw error;
+        if (isFatalCatalogError(error)) throw error;
         return null;
       }
     }),
@@ -140,7 +145,7 @@ export function resolveAttemptBudget(needed: number): number {
  * is exhausted.
  */
 export async function resolveCatalogWithPoolExpand(
-  provider: MusicProviderPort,
+  provider: CatalogProviderPort,
   chart: CatalogTrackRef[],
   mode: PopularityMode,
   needed: number,

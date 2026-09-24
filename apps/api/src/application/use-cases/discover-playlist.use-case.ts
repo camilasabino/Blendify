@@ -2,7 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomInt, randomUUID } from 'node:crypto';
 import { PopularityMode, type PlaylistDetail } from '@blendify/contracts';
 import type { z } from 'zod';
-import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
+import {
+  CATALOG_PROVIDER_FACTORY,
+  type CatalogProviderFactoryPort,
+  type CatalogProviderPort,
+} from '../../domain/repositories/catalog-provider.port';
 import {
   MUSIC_PROVIDER_FACTORY,
   type MusicProviderFactoryPort,
@@ -74,6 +78,8 @@ export class DiscoverPlaylistUseCase {
     private readonly generate: GeneratePlaylistUseCase,
     @Inject(DISCOVERY_CATALOG)
     private readonly discoveryCatalog: DiscoveryCatalogPort,
+    @Inject(CATALOG_PROVIDER_FACTORY)
+    private readonly catalogs: CatalogProviderFactoryPort,
     @Inject(MUSIC_PROVIDER_FACTORY)
     private readonly providers: MusicProviderFactoryPort,
     @Inject(PROVIDER_QUOTA) private readonly quota: ProviderQuotaPort,
@@ -108,9 +114,9 @@ export class DiscoverPlaylistUseCase {
     onProgress?: ProgressReporter,
   ): Promise<PlaylistDetail> {
     const tracker = new GenerationProgressTracker(onProgress);
-    const provider = this.providers.forUser(input.userId);
+    const catalog = this.catalogs.forMarket(input.market);
     tracker.report('resolving_seeds', 0, 1);
-    const seed = await this.resolveSeedArtist(provider, input);
+    const seed = await this.resolveSeedArtist(catalog, input);
     tracker.report('resolving_seeds', 1, 1);
 
     let similarNames: string[];
@@ -147,7 +153,7 @@ export class DiscoverPlaylistUseCase {
       input.targetTrackCount,
     );
     const resolvedSimilar = await this.resolveSimilarArtists(
-      provider,
+      catalog,
       similarNames,
       seed.id.getValue(),
       similarTarget,
@@ -186,6 +192,7 @@ export class DiscoverPlaylistUseCase {
     const playlist = await this.generate.execute(
       {
         userId: input.userId,
+        market: input.market,
         kind: 'artist_mix',
         name,
         description,
@@ -243,9 +250,9 @@ export class DiscoverPlaylistUseCase {
 
     this.quota.assertAvailable();
 
-    const provider = this.providers.forUser(input.userId);
+    const catalog = this.catalogs.forMarket(input.market);
     tracker.report('resolving_seeds', 0, 1);
-    const seedTrack = await this.resolveSeedTrack(provider, input);
+    const seedTrack = await this.resolveSeedTrack(catalog, input);
     tracker.report('resolving_seeds', 1, 1);
 
     let similarRaw: Array<{ name: string; artistName: string }>;
@@ -278,7 +285,7 @@ export class DiscoverPlaylistUseCase {
     const resolveBudget = catalogCandidateBudget(neededSimilar);
     tracker.report('matching_tracks', 0, Math.max(1, neededSimilar));
     const resolvedSimilar = await this.resolveSimilarTracks(
-      provider,
+      catalog,
       similarRaw.slice(0, resolveBudget),
       seedTrack.id.getValue(),
       resolveBudget,
@@ -371,7 +378,7 @@ export class DiscoverPlaylistUseCase {
     });
     const response = await this.publisher.execute({
       playlist,
-      provider,
+      provider: this.providers.forUser(user.id),
       spotifyUserId: user.spotifyId,
       coverImageBase64: input.coverImageBase64,
       fallbackImageUrl:
@@ -406,20 +413,20 @@ export class DiscoverPlaylistUseCase {
   }
 
   private async resolveSeedArtist(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     input: ArtistDiscoverInput,
   ) {
     const artistId = input.artistId;
     const snapshot = input.artist;
     if (snapshot?.id === artistId) {
-      const byId = await provider.getArtistsByIds([artistId]);
+      const byId = await catalog.getArtistsByIds([artistId]);
       if (byId[0]) return byId[0];
-      const matches = await provider.searchArtists(snapshot.name, 3);
+      const matches = await catalog.searchArtists(snapshot.name, 3);
       const best = pickStrictArtistMatch(snapshot.name, matches);
       if (best) return best;
     }
 
-    const byId = await provider.getArtistsByIds([artistId]);
+    const byId = await catalog.getArtistsByIds([artistId]);
     if (byId[0]) return byId[0];
 
     throw new BusinessRuleError(
@@ -430,20 +437,20 @@ export class DiscoverPlaylistUseCase {
   }
 
   private async resolveSeedTrack(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     input: TrackDiscoverInput,
   ): Promise<Track> {
     const snapshot = input.track;
     const trackId = input.trackId;
 
-    const hits = await provider.searchTracks(
+    const hits = await catalog.searchTracks(
       `track:"${snapshot.name}" artist:"${snapshot.artistName}"`,
       { limit: 10, offset: 0 },
     );
     const byId = hits.find((t) => t.id.getValue() === trackId);
     if (byId) return byId;
 
-    const resolved = await provider.resolveTrack(
+    const resolved = await catalog.resolveTrack(
       snapshot.artistName,
       snapshot.name,
     );
@@ -473,7 +480,7 @@ export class DiscoverPlaylistUseCase {
   }
 
   private async resolveSimilarArtists(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     names: string[],
     seedId: string,
     limit: number,
@@ -489,7 +496,7 @@ export class DiscoverPlaylistUseCase {
 
     for (const name of names) {
       if (resolved.length >= limit) break;
-      const matches = await provider.searchArtists(name, 3);
+      const matches = await catalog.searchArtists(name, 3);
       const best = pickStrictArtistMatch(name, matches);
       if (!best) {
         tracker?.report('resolving_seeds', resolved.length, Math.max(1, limit));
@@ -588,7 +595,7 @@ export class DiscoverPlaylistUseCase {
   }
 
   private async resolveSimilarTracks(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     candidates: Array<{ name: string; artistName: string }>,
     seedTrackId: string,
     limit: number,
@@ -599,7 +606,7 @@ export class DiscoverPlaylistUseCase {
 
     for (const candidate of candidates) {
       if (resolved.length >= limit) break;
-      const track = await provider.resolveTrack(
+      const track = await catalog.resolveTrack(
         candidate.artistName,
         candidate.name,
       );

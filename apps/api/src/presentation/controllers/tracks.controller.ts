@@ -17,10 +17,10 @@ export class TracksController {
   @Get('search')
   @ApiOperation({ summary: 'Search tracks on Spotify' })
   async searchTracks(
-    @CurrentUser() user: User,
+    @CurrentUser() _user: User,
     @Query(new ZodValidationPipe(SearchQuerySchema)) query: SearchQuery,
   ): Promise<{ tracks: unknown[] }> {
-    const tracks = await this.search.execute(user.id, query.q, query.limit);
+    const tracks = await this.search.execute(query.q, query.limit);
     return { tracks };
   }
 }

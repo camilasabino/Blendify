@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
-  MUSIC_PROVIDER_FACTORY,
-  type MusicProviderFactoryPort,
-} from '../../domain/repositories/music-provider.factory.port';
+  CATALOG_PROVIDER_FACTORY,
+  type CatalogProviderFactoryPort,
+} from '../../domain/repositories/catalog-provider.port';
 import {
   DISCOVERY_CATALOG,
   type DiscoveryCatalogPort,
@@ -20,6 +20,7 @@ const LASTFM_NAME_LIMIT = 40;
 const SearchArtistsSchema = z.object({
   query: z.string().trim().min(1).max(100),
   limit: z.number().int().min(1).max(50).default(10),
+  market: z.string().optional(),
 });
 type SearchArtistsDto = z.input<typeof SearchArtistsSchema>;
 
@@ -35,26 +36,29 @@ export class SearchArtistsUseCase {
   private readonly logger = new Logger(SearchArtistsUseCase.name);
 
   constructor(
-    @Inject(MUSIC_PROVIDER_FACTORY)
-    private readonly providers: MusicProviderFactoryPort,
+    @Inject(CATALOG_PROVIDER_FACTORY)
+    private readonly catalogs: CatalogProviderFactoryPort,
     @Inject(DISCOVERY_CATALOG)
     private readonly discoveryCatalog: DiscoveryCatalogPort,
   ) {}
 
-  async execute(userId: string, raw: SearchArtistsDto): Promise<ArtistDto[]> {
+  async execute(raw: SearchArtistsDto): Promise<ArtistDto[]> {
     const input = SearchArtistsSchema.parse(raw);
-    const provider = this.providers.forUser(userId);
-    const artists = await provider.searchArtists(input.query, input.limit);
+    const catalog = this.catalogs.forMarket(input.market);
+    const artists = await catalog.searchArtists(input.query, input.limit);
     return artists.map(toArtistDto);
   }
 
-  async resolveNames(userId: string, names: string[]): Promise<ArtistDto[]> {
-    const provider = this.providers.forUser(userId);
+  async resolveNames(
+    names: string[],
+    market?: string | null,
+  ): Promise<ArtistDto[]> {
+    const catalog = this.catalogs.forMarket(market);
     const resolved = [];
     const seen = new Set<string>();
 
     for (const name of names.map((n) => n.trim()).filter(Boolean)) {
-      const matches = await provider.searchArtists(name, 3);
+      const matches = await catalog.searchArtists(name, 3);
       const best = pickBestArtistMatch(name, matches);
       if (best && !seen.has(best.id.getValue())) {
         seen.add(best.id.getValue());

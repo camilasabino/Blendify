@@ -41,6 +41,12 @@ export class SpotifyAppTokenProvider {
     return this.inFlight;
   }
 
+  invalidate(token: string): void {
+    if (this.cached?.value === token) {
+      this.cached = null;
+    }
+  }
+
   private async requestToken(): Promise<string> {
     const clientId = this.config.getOrThrow<string>('SPOTIFY_CLIENT_ID');
     const clientSecret = this.config.getOrThrow<string>(

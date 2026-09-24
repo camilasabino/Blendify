@@ -9,6 +9,7 @@ import { Track } from '../../domain/track/track.entity';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
 import type { PlaylistRepositoryPort } from '../../domain/repositories/playlist.repository.port';
+import type { CatalogProviderFactoryPort } from '../../domain/repositories/catalog-provider.port';
 import type { MusicProviderFactoryPort } from '../../domain/repositories/music-provider.factory.port';
 import type { UserRepositoryPort } from '../../domain/repositories/user.repository.port';
 import type { UsageStatsRepositoryPort } from '../../domain/repositories/usage-stats.repository.port';
@@ -99,15 +100,16 @@ describe('thin application use cases', () => {
       uri: 'spotify:track:t1',
     });
     const searchTracks = jest.fn().mockResolvedValue([track]);
-    const providers = {
-      forUser: () => ({ searchTracks }),
-    } as unknown as MusicProviderFactoryPort;
-    const useCase = new SearchTracksUseCase(providers);
+    const forMarket = jest.fn(() => ({ searchTracks }));
+    const useCase = new SearchTracksUseCase({
+      forMarket,
+    } as unknown as CatalogProviderFactoryPort);
 
-    await expect(useCase.execute('user-1', 'a')).resolves.toEqual([]);
-    await expect(useCase.execute('user-1', 'Sade')).resolves.toMatchObject([
+    await expect(useCase.execute('a')).resolves.toEqual([]);
+    await expect(useCase.execute('Sade', 10, 'AR')).resolves.toMatchObject([
       { id: 't1', name: 'Smooth Operator' },
     ]);
+    expect(forMarket).toHaveBeenCalledWith('AR');
   });
 
   it('RenamePlaylistUseCase renames locally and syncs Spotify when linked', async () => {

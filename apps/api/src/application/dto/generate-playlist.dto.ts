@@ -14,6 +14,7 @@ const UsageSeedSchema = z.object({
 
 export const GeneratePlaylistSchema = ArtistMixRequestSchema.extend({
   userId: z.string().min(1),
+  market: z.string().optional(),
   usageSeeds: z.array(UsageSeedSchema).optional(),
   maxTracks: z.number().int().min(1).max(MAX_TRACKS).optional(),
   displaySeeds: z.array(PlaylistSeedSchema).optional(),

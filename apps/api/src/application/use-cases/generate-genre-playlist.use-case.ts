@@ -5,6 +5,10 @@ import {
   type PlaylistDetail,
 } from '@blendify/contracts';
 import {
+  CATALOG_PROVIDER_FACTORY,
+  type CatalogProviderFactoryPort,
+} from '../../domain/repositories/catalog-provider.port';
+import {
   MUSIC_PROVIDER_FACTORY,
   type MusicProviderFactoryPort,
 } from '../../domain/repositories/music-provider.factory.port';
@@ -43,6 +47,7 @@ import {
 
 const GenerateGenrePlaylistSchema = GenreMixRequestSchema.extend({
   userId: z.string().min(1),
+  market: z.string().optional(),
 });
 
 type GenerateGenrePlaylistDto = z.input<typeof GenerateGenrePlaylistSchema>;
@@ -53,6 +58,8 @@ export class GenerateGenrePlaylistUseCase {
   private readonly logger = new Logger(GenerateGenrePlaylistUseCase.name);
 
   constructor(
+    @Inject(CATALOG_PROVIDER_FACTORY)
+    private readonly catalogs: CatalogProviderFactoryPort,
     @Inject(MUSIC_PROVIDER_FACTORY)
     private readonly providers: MusicProviderFactoryPort,
     @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
@@ -99,12 +106,12 @@ export class GenerateGenrePlaylistUseCase {
         names: seedNames,
       });
 
-    const provider = this.providers.forUser(input.userId);
+    const catalog = this.catalogs.forMarket(input.market);
     const totalNeeded = genres.length * input.tracksPerSeed;
     tracker.report('matching_tracks', 0, Math.max(1, totalNeeded));
     const { tracksByGenre, coverCandidates } =
       await this.genreTrackCatalog.resolve(
-        provider,
+        catalog,
         genres,
         input.popularity,
         input.tracksPerSeed,
@@ -157,7 +164,7 @@ export class GenerateGenrePlaylistUseCase {
     });
     const response = await this.publisher.execute({
       playlist,
-      provider,
+      provider: this.providers.forUser(user.id),
       spotifyUserId: user.spotifyId,
       coverImageBase64: input.coverImageBase64,
       fallbackImageUrl: tracks.find((track) => track.albumImageUrl)

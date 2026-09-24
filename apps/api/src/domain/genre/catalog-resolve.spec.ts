@@ -5,7 +5,8 @@ import {
   resolveCatalogWithPoolExpand,
 } from './catalog-resolve';
 import { BusinessRuleError } from '../errors/business-rule.error';
-import type { MusicProviderPort } from '../repositories/music-provider.port';
+import { CatalogUnavailableError } from '../errors/catalog-unavailable.error';
+import type { CatalogProviderPort } from '../repositories/catalog-provider.port';
 import { Track } from '../track/track.entity';
 import { TrackId } from '../value-objects/track-id.vo';
 import { ArtistId } from '../value-objects/artist-id.vo';
@@ -39,7 +40,7 @@ describe('resolveCatalogTracks', () => {
         calls += 1;
         return Promise.resolve(makeTrack(`t${calls}`));
       },
-    } as unknown as MusicProviderPort;
+    } as unknown as CatalogProviderPort;
 
     const refs = Array.from({ length: 40 }, (_, i) => ({
       artistName: 'A',
@@ -62,7 +63,7 @@ describe('resolveCatalogTracks', () => {
         calls += 1;
         return Promise.resolve(makeTrack(`t${calls}`));
       },
-    } as unknown as MusicProviderPort;
+    } as unknown as CatalogProviderPort;
 
     const progress: Array<{
       matched: number;
@@ -99,7 +100,7 @@ describe('resolveCatalogTracks', () => {
         }
         return Promise.resolve(makeTrack(`t${calls}`));
       },
-    } as unknown as MusicProviderPort;
+    } as unknown as CatalogProviderPort;
 
     const refs = Array.from({ length: 20 }, (_, i) => ({
       artistName: 'A',
@@ -112,6 +113,26 @@ describe('resolveCatalogTracks', () => {
     expect(calls).toBe(2);
   });
 
+  it('aborts immediately when the catalog is unavailable instead of treating it as a miss', async () => {
+    let calls = 0;
+    const provider = {
+      resolveTrack: () => {
+        calls += 1;
+        return Promise.reject(new CatalogUnavailableError());
+      },
+    } as unknown as CatalogProviderPort;
+
+    const refs = Array.from({ length: 5 }, (_, i) => ({
+      artistName: 'A',
+      trackName: `Song ${i}`,
+    }));
+
+    await expect(
+      resolveCatalogTracks(provider, refs, { needed: 3, concurrency: 1 }),
+    ).rejects.toBeInstanceOf(CatalogUnavailableError);
+    expect(calls).toBe(1);
+  });
+
   it('swallows a non-quota resolve failure and keeps going', async () => {
     let calls = 0;
     const provider = {
@@ -120,7 +141,7 @@ describe('resolveCatalogTracks', () => {
         if (calls === 1) return Promise.reject(new Error('not found'));
         return Promise.resolve(makeTrack(`t${calls}`));
       },
-    } as unknown as MusicProviderPort;
+    } as unknown as CatalogProviderPort;
 
     const refs = Array.from({ length: 3 }, (_, i) => ({
       artistName: 'A',
@@ -148,7 +169,7 @@ describe('resolveCatalogTracks', () => {
             : makeTrack('right', 'duffy-id'),
         );
       },
-    } as unknown as MusicProviderPort;
+    } as unknown as CatalogProviderPort;
 
     const refs = [
       { artistName: 'Duffy', trackName: 'Mercy' },
@@ -174,7 +195,7 @@ describe('resolveCatalogTracks', () => {
         seen.push({ artistId: options?.artistId });
         return Promise.resolve(makeTrack('ok', 'duffy-id'));
       },
-    } as unknown as MusicProviderPort;
+    } as unknown as CatalogProviderPort;
 
     await resolveCatalogTracks(
       provider,
@@ -202,7 +223,7 @@ describe('resolveCatalogWithPoolExpand', () => {
         if (index < 20) return Promise.resolve(null);
         return Promise.resolve(makeTrack(`t${index}`));
       },
-    } as unknown as MusicProviderPort;
+    } as unknown as CatalogProviderPort;
 
     const tracks = await resolveCatalogWithPoolExpand(
       provider,

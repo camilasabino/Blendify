@@ -3,12 +3,14 @@ import type { PopularityMode } from '@blendify/contracts';
 import { pickStrictArtistMatch } from '../../domain/artist/artist-name-match';
 import { Artist } from '../../domain/artist/artist.entity';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
 import {
   preferPopularTracks,
   preferRareTracks,
   rankTracksForMix,
 } from '../../domain/genre/artist-mix-queries';
 import {
+  isFatalCatalogError,
   isSpotifyQuotaError,
   resolveAttemptBudget,
   resolveCatalogWithPoolExpand,
@@ -26,7 +28,7 @@ import {
   DISCOVERY_CATALOG,
   type DiscoveryCatalogPort,
 } from '../../domain/repositories/discovery-catalog.port';
-import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
+import type { CatalogProviderPort } from '../../domain/repositories/catalog-provider.port';
 import {
   PROVIDER_QUOTA,
   type ProviderQuotaPort,
@@ -49,7 +51,7 @@ export class GenreTrackCatalogService {
   ) {}
 
   async resolve(
-    provider: MusicProviderPort,
+    provider: CatalogProviderPort,
     genres: CuratedGenre[],
     popularity: PopularityMode,
     tracksPerSeed: number,
@@ -100,7 +102,7 @@ export class GenreTrackCatalogService {
   }
 
   private async resolveGenre(
-    provider: MusicProviderPort,
+    provider: CatalogProviderPort,
     genre: CuratedGenre,
     popularity: PopularityMode,
     tracksPerSeed: number,
@@ -152,7 +154,7 @@ export class GenreTrackCatalogService {
   }
 
   private async resolveTagTracks(
-    provider: MusicProviderPort,
+    provider: CatalogProviderPort,
     genre: CuratedGenre,
     popularity: PopularityMode,
     tracksPerSeed: number,
@@ -180,13 +182,13 @@ export class GenreTrackCatalogService {
       );
       return resolved.filter((track) => !this.isJunkTrack(track));
     } catch (error) {
-      if (isSpotifyQuotaError(error)) throw error;
+      if (isFatalCatalogError(error)) throw error;
       return [];
     }
   }
 
   private async resolveSeedArtistTracks(
-    provider: MusicProviderPort,
+    provider: CatalogProviderPort,
     genre: CuratedGenre,
     plan: GenreTrackQuery,
     tracksPerSeed: number,
@@ -245,7 +247,7 @@ export class GenreTrackCatalogService {
 
   /** Returns tracks, `null` to skip artist, or `'stop'` to end the seed loop. */
   private async searchTracksForSeedArtist(
-    provider: MusicProviderPort,
+    provider: CatalogProviderPort,
     artist: Artist,
     collectedCount: number,
   ): Promise<Track[] | null | 'stop'> {
@@ -255,6 +257,7 @@ export class GenreTrackCatalogService {
         offset: 0,
       });
     } catch (error) {
+      if (error instanceof CatalogUnavailableError) throw error;
       if (isSpotifyQuotaError(error)) {
         if (collectedCount === 0) throw error;
         return 'stop';
@@ -302,7 +305,7 @@ export class GenreTrackCatalogService {
   }
 
   private async resolveSeedArtists(
-    provider: MusicProviderPort,
+    provider: CatalogProviderPort,
     genre: CuratedGenre,
     limit: number,
   ): Promise<Artist[]> {
@@ -335,14 +338,14 @@ export class GenreTrackCatalogService {
 
       return resolved;
     } catch (error) {
-      if (isSpotifyQuotaError(error)) throw error;
+      if (isFatalCatalogError(error)) throw error;
       return [];
     }
   }
 
   /** Returns a match, `null` to skip, or `'stop'` on quota with partial results. */
   private async resolveOneSeedArtist(
-    provider: MusicProviderPort,
+    provider: CatalogProviderPort,
     candidateName: string,
     seen: Set<string>,
     resolvedCount: number,
@@ -359,6 +362,7 @@ export class GenreTrackCatalogService {
       seen.add(id);
       return match;
     } catch (error) {
+      if (error instanceof CatalogUnavailableError) throw error;
       if (isSpotifyQuotaError(error)) {
         if (resolvedCount === 0) throw error;
         return 'stop';

@@ -26,10 +26,10 @@ export class ArtistsController {
   @Get('search')
   @ApiOperation({ summary: 'Search artists on Spotify' })
   async searchArtists(
-    @CurrentUser() user: User,
+    @CurrentUser() _user: User,
     @Query(new ZodValidationPipe(SearchQuerySchema)) query: SearchQuery,
   ): Promise<{ artists: unknown[] }> {
-    const artists = await this.search.execute(user.id, {
+    const artists = await this.search.execute({
       query: query.q,
       limit: query.limit,
     });
@@ -70,11 +70,11 @@ export class ArtistsController {
   @Post('resolve')
   @ApiOperation({ summary: 'Resolve artist names to Spotify artists' })
   async resolve(
-    @CurrentUser() user: User,
+    @CurrentUser() _user: User,
     @Body(new ZodValidationPipe(ResolveArtistsSchema))
     body: z.output<typeof ResolveArtistsSchema>,
   ): Promise<{ artists: unknown[] }> {
-    const artists = await this.search.resolveNames(user.id, body.names ?? []);
+    const artists = await this.search.resolveNames(body.names ?? []);
     return { artists };
   }
 }

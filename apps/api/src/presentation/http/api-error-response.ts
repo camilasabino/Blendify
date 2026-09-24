@@ -3,6 +3,7 @@ import type { ApiErrorResponse } from '@blendify/contracts';
 import { ZodError } from 'zod';
 import { DomainError } from '../../domain/errors/domain.error';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
 
 export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
   if (exception instanceof ZodError) {
@@ -11,6 +12,14 @@ export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
       code: 'VALIDATION_ERROR',
       message: exception.issues.map((i) => i.message).join('; '),
       details: { issues: exception.issues },
+    };
+  }
+
+  if (exception instanceof CatalogUnavailableError) {
+    return {
+      statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+      code: exception.code,
+      message: exception.message,
     };
   }
 

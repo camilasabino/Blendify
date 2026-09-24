@@ -1,5 +1,9 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { Artist } from '../../domain/artist/artist.entity';
+import { ConfigService } from '@nestjs/config';
+import type {
+  CatalogProviderFactoryPort,
+  CatalogProviderPort,
+} from '../../domain/repositories/catalog-provider.port';
 import type { MusicProviderFactoryPort } from '../../domain/repositories/music-provider.factory.port';
 import type {
   CreateProviderPlaylistInput,
@@ -7,71 +11,59 @@ import type {
   PlaybackDevice,
   PlaylistRemoteSnapshot,
   ProviderPlaylist,
-  ResolveTrackOptions,
-  SearchTracksOptions,
   StartPlaybackInput,
 } from '../../domain/repositories/music-provider.port';
-import { Track } from '../../domain/track/track.entity';
 import { User } from '../../domain/user/user.entity';
 import { SpotifyTokenService } from '../auth/spotify-token.service';
 import { RedisCacheService } from '../cache/redis-cache.service';
+import { parseConfiguredMarket, resolveCatalogMarket } from './catalog-market';
 import { SpotifyApiClient } from './spotify-api.client';
+import { SpotifyAppTokenProvider } from './spotify-app-token.provider';
 import { SpotifyCatalogClient } from './spotify-catalog.client';
 import { SpotifyPlaybackClient } from './spotify-playback.client';
 import { SpotifyPlaylistClient } from './spotify-playlist.client';
 
 @Injectable()
 export class SpotifyMusicProvider
-  implements MusicProviderPort, MusicProviderFactoryPort
+  implements MusicProviderFactoryPort, CatalogProviderFactoryPort
 {
-  private userId: string | null = null;
-  private api: SpotifyApiClient;
-  private catalog: SpotifyCatalogClient;
-  private playlists: SpotifyPlaylistClient;
-  private playback: SpotifyPlaybackClient;
+  private readonly api: SpotifyApiClient;
+  private readonly configuredMarket: string;
 
   constructor(
     tokenService: SpotifyTokenService,
-    @Optional() private cache?: RedisCacheService,
+    private readonly appTokens: SpotifyAppTokenProvider,
+    config: ConfigService,
+    @Optional() private readonly cache?: RedisCacheService,
   ) {
     this.api = new SpotifyApiClient(tokenService);
-    this.catalog = new SpotifyCatalogClient(this.userId, this.api, this.cache);
-    this.playlists = new SpotifyPlaylistClient(this.userId, this.api);
-    this.playback = new SpotifyPlaybackClient(this.userId, this.api);
+    this.configuredMarket = parseConfiguredMarket(
+      config.get<string>('SPOTIFY_CATALOG_MARKET'),
+    );
   }
 
   forUser(userId: string): MusicProviderPort {
-    const bound = Object.create(
-      SpotifyMusicProvider.prototype,
-    ) as SpotifyMusicProvider;
-    bound.userId = userId;
-    bound.api = this.api;
-    bound.cache = this.cache;
-    bound.catalog = new SpotifyCatalogClient(userId, this.api, this.cache);
-    bound.playlists = new SpotifyPlaylistClient(userId, this.api);
-    bound.playback = new SpotifyPlaybackClient(userId, this.api);
-    return bound;
+    return new SpotifyUserMusicProvider(
+      new SpotifyPlaylistClient(userId, this.api),
+      new SpotifyPlaybackClient(userId, this.api),
+    );
   }
 
-  searchArtists(query: string, limit?: number): Promise<Artist[]> {
-    return this.catalog.searchArtists(query, limit);
+  forMarket(market?: string | null): CatalogProviderPort {
+    return new SpotifyCatalogClient(
+      this.api,
+      this.appTokens,
+      resolveCatalogMarket(market, this.configuredMarket),
+      this.cache,
+    );
   }
+}
 
-  searchTracks(query: string, options?: SearchTracksOptions): Promise<Track[]> {
-    return this.catalog.searchTracks(query, options);
-  }
-
-  resolveTrack(
-    artistName: string,
-    trackName: string,
-    options?: ResolveTrackOptions,
-  ): Promise<Track | null> {
-    return this.catalog.resolveTrack(artistName, trackName, options);
-  }
-
-  getArtistsByIds(ids: string[]): Promise<Artist[]> {
-    return this.catalog.getArtistsByIds(ids);
-  }
+class SpotifyUserMusicProvider implements MusicProviderPort {
+  constructor(
+    private readonly playlists: SpotifyPlaylistClient,
+    private readonly playback: SpotifyPlaybackClient,
+  ) {}
 
   createPlaylist(
     input: CreateProviderPlaylistInput,

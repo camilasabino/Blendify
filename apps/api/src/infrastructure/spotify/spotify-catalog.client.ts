@@ -1,12 +1,26 @@
+import axios, { type AxiosRequestConfig } from 'axios';
 import { Artist } from '../../domain/artist/artist.entity';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import type { ResolveTrackOptions } from '../../domain/repositories/music-provider.port';
+import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
+import {
+  isFatalCatalogError,
+  isSpotifyQuotaError,
+} from '../../domain/genre/catalog-resolve';
+import type {
+  CatalogProviderPort,
+  ResolveTrackOptions,
+  SearchTracksOptions,
+} from '../../domain/repositories/catalog-provider.port';
 import { Track } from '../../domain/track/track.entity';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
 import { RedisCacheService } from '../cache/redis-cache.service';
 import { pickResolvedTrack } from './pick-resolved-track';
 import { SpotifyApiClient } from './spotify-api.client';
+
+export interface CatalogTokenSource {
+  getAccessToken(): Promise<string>;
+  invalidate(token: string): void;
+}
 
 interface SpotifyImage {
   url: string;
@@ -51,26 +65,31 @@ type CachedTrack = {
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const ARTIST_CACHE_TTL_MS = 30 * 60 * 1000;
 
-export class SpotifyCatalogClient {
+export class SpotifyCatalogClient implements CatalogProviderPort {
   constructor(
-    private readonly userId: string | null,
     private readonly api: SpotifyApiClient,
+    private readonly tokens: CatalogTokenSource,
+    private readonly market: string,
     private readonly cache?: RedisCacheService,
   ) {}
 
   async searchArtists(query: string, limit = 10): Promise<Artist[]> {
-    const token = await this.api.accessToken(this.userId);
     const safeLimit = Math.min(Math.max(limit, 1), 10);
     const key = this.cacheKey('search-artists', query, safeLimit);
     const cached = await this.cache?.getJson<CachedArtist[]>(key);
     if (cached) return cached.map(hydrateArtist);
 
-    const data = await this.api.request<{
+    const data = await this.request<{
       artists: { items: SpotifyArtist[] };
-    }>('searchArtists', token, {
+    }>('searchArtists', {
       method: 'GET',
       url: '/search',
-      params: { q: query, type: 'artist', limit: safeLimit },
+      params: {
+        q: query,
+        type: 'artist',
+        limit: safeLimit,
+        ...this.marketParam(),
+      },
     });
 
     const artists = (data.artists?.items ?? []).map(mapArtist);
@@ -87,18 +106,17 @@ export class SpotifyCatalogClient {
 
   async searchTracks(
     query: string,
-    options: { limit?: number; offset?: number } = {},
+    options: SearchTracksOptions = {},
   ): Promise<Track[]> {
-    const token = await this.api.accessToken(this.userId);
     const safeLimit = Math.min(Math.max(options.limit ?? 10, 1), 10);
     const offset = Math.max(options.offset ?? 0, 0);
     const key = this.cacheKey('search-tracks', query, safeLimit, offset);
     const cached = await this.cache?.getJson<CachedTrack[]>(key);
     if (cached) return cached.map(hydrateTrack);
 
-    const data = await this.api.request<{
+    const data = await this.request<{
       tracks: { items: SpotifyTrack[] };
-    }>('searchTracks', token, {
+    }>('searchTracks', {
       method: 'GET',
       url: '/search',
       params: {
@@ -106,6 +124,7 @@ export class SpotifyCatalogClient {
         type: 'track',
         limit: safeLimit,
         offset,
+        ...this.marketParam(),
       },
     });
 
@@ -131,10 +150,9 @@ export class SpotifyCatalogClient {
     const expectedArtistId = options.artistId?.trim() || undefined;
 
     try {
-      const token = await this.api.accessToken(this.userId);
-      const data = await this.api.request<{
+      const data = await this.request<{
         tracks: { items: SpotifyTrack[] };
-      }>('resolveTrack', token, {
+      }>('resolveTrack', {
         method: 'GET',
         url: '/search',
         params: {
@@ -142,6 +160,7 @@ export class SpotifyCatalogClient {
           type: 'track',
           limit: 10,
           offset: 0,
+          ...this.marketParam(),
         },
       });
 
@@ -172,20 +191,13 @@ export class SpotifyCatalogClient {
         requireArtistNameMatch: !expectedArtistId,
       });
     } catch (error) {
-      if (
-        error instanceof BusinessRuleError &&
-        (error.code === 'SPOTIFY_QUOTA_EXCEEDED' ||
-          error.code === 'SPOTIFY_RATE_LIMITED')
-      ) {
-        throw error;
-      }
+      if (isFatalCatalogError(error)) throw error;
       return null;
     }
   }
 
   async getArtistsByIds(ids: string[]): Promise<Artist[]> {
     if (ids.length === 0) return [];
-    const token = await this.api.accessToken(this.userId);
     const byId = new Map<string, Artist>();
     const missing: string[] = [];
 
@@ -196,14 +208,10 @@ export class SpotifyCatalogClient {
     }
 
     for (const id of missing) {
-      const data = await this.api.request<SpotifyArtist>(
-        `getArtist(${id})`,
-        token,
-        {
-          method: 'GET',
-          url: `/artists/${id}`,
-        },
-      );
+      const data = await this.request<SpotifyArtist>(`getArtist(${id})`, {
+        method: 'GET',
+        url: `/artists/${id}`,
+      });
       const artist = mapArtist(data);
       await this.cacheArtist(artist);
       byId.set(id, artist);
@@ -218,9 +226,58 @@ export class SpotifyCatalogClient {
     ...parts: number[]
   ): string {
     const normalized = query.trim().toLowerCase();
-    return `spotify:${namespace}:${encodeURIComponent(normalized)}:${parts.join(
-      ':',
-    )}`;
+    return `spotify:${namespace}:${this.market}:${encodeURIComponent(
+      normalized,
+    )}:${parts.join(':')}`;
+  }
+
+  private marketParam(): { market: string } {
+    return { market: this.market };
+  }
+
+  private async request<T>(
+    operation: string,
+    config: AxiosRequestConfig,
+  ): Promise<T> {
+    const token = await this.acquireToken();
+    try {
+      return (await this.api.raw<T>(token, config)).data;
+    } catch (error) {
+      if (!this.api.isStatus(error, 401)) {
+        throw this.toCatalogError(operation, error);
+      }
+      this.tokens.invalidate(token);
+    }
+
+    const retryToken = await this.acquireToken();
+    try {
+      return (await this.api.raw<T>(retryToken, config)).data;
+    } catch (error) {
+      if (this.api.isStatus(error, 401)) {
+        this.tokens.invalidate(retryToken);
+        throw new CatalogUnavailableError({
+          cause: this.api.toSpotifyError(operation, error),
+        });
+      }
+      throw this.toCatalogError(operation, error);
+    }
+  }
+
+  private async acquireToken(): Promise<string> {
+    try {
+      return await this.tokens.getAccessToken();
+    } catch (error) {
+      if (isSpotifyQuotaError(error)) throw error;
+      throw new CatalogUnavailableError({ cause: error });
+    }
+  }
+
+  private toCatalogError(operation: string, error: unknown): Error {
+    const converted = this.api.toSpotifyError(operation, error);
+    if (isSpotifyQuotaError(converted) || !isProviderUnavailable(error)) {
+      return converted;
+    }
+    return new CatalogUnavailableError({ cause: converted });
   }
 
   private getCachedArtist(id: string): Promise<Artist | null> {
@@ -314,4 +371,10 @@ function hydrateTrack(track: CachedTrack): Track {
     albumImageUrl: track.albumImageUrl,
     previewUrl: track.previewUrl,
   });
+}
+
+function isProviderUnavailable(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === undefined || status === 403 || status >= 500;
 }

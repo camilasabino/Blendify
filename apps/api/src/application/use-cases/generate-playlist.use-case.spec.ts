@@ -1,6 +1,7 @@
 import { PopularityMode, type PlaylistDetail } from '@blendify/contracts';
 import { Artist } from '../../domain/artist/artist.entity';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import type { CatalogProviderPort } from '../../domain/repositories/catalog-provider.port';
 import type { DiscoveryCatalogPort } from '../../domain/repositories/discovery-catalog.port';
 import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
 import type { UsageStatsRepositoryPort } from '../../domain/repositories/usage-stats.repository.port';
@@ -31,7 +32,9 @@ function setup() {
     imageUrl: 'https://images.example/sade.jpg',
   });
   const searchTracks = jest.fn().mockResolvedValue([makeTrack()]);
-  const provider = { searchTracks } as unknown as MusicProviderPort;
+  const catalog = { searchTracks } as unknown as CatalogProviderPort;
+  const forMarket = jest.fn().mockReturnValue(catalog);
+  const provider = {} as MusicProviderPort;
   const forUser = jest.fn().mockReturnValue(provider);
   const assertAvailable = jest.fn();
   const findById = jest.fn().mockResolvedValue(
@@ -52,6 +55,7 @@ function setup() {
   });
 
   const useCase = new GeneratePlaylistUseCase(
+    { forMarket },
     { forUser },
     { assertAvailable },
     {
@@ -66,7 +70,9 @@ function setup() {
     artist,
     assertAvailable,
     findById,
+    forMarket,
     forUser,
+    provider,
     publish,
     published,
     recordMix,
@@ -81,6 +87,7 @@ describe('GeneratePlaylistUseCase', () => {
 
     const result = await context.useCase.execute({
       userId: 'user-1',
+      market: 'AR',
       kind: 'artist_mix',
       artistIds: ['artist-1'],
       artists: [
@@ -97,12 +104,14 @@ describe('GeneratePlaylistUseCase', () => {
 
     expect(result).toEqual({ id: 'playlist-result' });
     expect(context.assertAvailable).toHaveBeenCalled();
+    expect(context.forMarket).toHaveBeenCalledWith('AR');
     expect(context.forUser).toHaveBeenCalledWith('user-1');
     expect(context.searchTracks).toHaveBeenCalledWith('artist:"Sade"', {
       limit: 10,
       offset: 0,
     });
     expect(context.publish).toHaveBeenCalledTimes(1);
+    expect(context.published[0].provider).toBe(context.provider);
     expect(context.published[0]).toMatchObject({
       spotifyUserId: 'spotify-user-1',
       persistToLibrary: true,
@@ -151,6 +160,7 @@ describe('GeneratePlaylistUseCase', () => {
       }),
     ).rejects.toMatchObject({ code: 'SPOTIFY_QUOTA_EXCEEDED' });
 
+    expect(context.forMarket).not.toHaveBeenCalled();
     expect(context.forUser).not.toHaveBeenCalled();
     expect(context.publish).not.toHaveBeenCalled();
     expect(context.recordMix).not.toHaveBeenCalled();

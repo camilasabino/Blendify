@@ -19,10 +19,14 @@ import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/re
 import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
 import { Artist } from '../../domain/artist/artist.entity';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
 import type { Playlist } from '../../domain/playlist/playlist.entity';
 import { DISCOVERY_CATALOG } from '../../domain/repositories/discovery-catalog.port';
 import { MUSIC_PROVIDER_FACTORY } from '../../domain/repositories/music-provider.factory.port';
-import type { ResolveTrackOptions } from '../../domain/repositories/music-provider.port';
+import {
+  CATALOG_PROVIDER_FACTORY,
+  type ResolveTrackOptions,
+} from '../../domain/repositories/catalog-provider.port';
 import { PLAYLIST_REPOSITORY } from '../../domain/repositories/playlist.repository.port';
 import { PROVIDER_QUOTA } from '../../domain/repositories/provider-quota.port';
 import { USAGE_STATS_REPOSITORY } from '../../domain/repositories/usage-stats.repository.port';
@@ -192,6 +196,10 @@ async function createApp(world: World): Promise<INestApplication> {
       DiscoverPlaylistUseCase,
       PublishPlaylistService,
       GenreTrackCatalogService,
+      {
+        provide: CATALOG_PROVIDER_FACTORY,
+        useValue: { forMarket: () => world.provider },
+      },
       {
         provide: MUSIC_PROVIDER_FACTORY,
         useValue: { forUser: () => world.provider },
@@ -483,6 +491,23 @@ describe('Spotify Mode generation characterization', () => {
       expect(world.usageStats.recordMix).not.toHaveBeenCalled();
     });
 
+    it('fails as unavailable, not as missing tracks, when the catalog cannot be reached', async () => {
+      world.provider.resolveTrack.mockRejectedValue(
+        new CatalogUnavailableError(),
+      );
+
+      const response = await request(httpServer())
+        .post('/api/playlists/mix')
+        .send(artistMixBody)
+        .expect(503);
+
+      expect(response.body).toMatchObject({ code: 'CATALOG_UNAVAILABLE' });
+      expect(world.provider.resolveTrack).toHaveBeenCalledTimes(1);
+      expect(world.provider.createPlaylist).not.toHaveBeenCalled();
+      expect(world.playlists.save).not.toHaveBeenCalled();
+      expect(world.usageStats.recordMix).not.toHaveBeenCalled();
+    });
+
     it('fails without catalog or publication work when the quota is blocked', async () => {
       world.quota.assertAvailable.mockImplementation(() => {
         throw new BusinessRuleError(
@@ -567,6 +592,29 @@ describe('Spotify Mode generation characterization', () => {
           }),
         ],
       });
+    });
+  });
+
+  describe('genre mix with an unavailable catalog', () => {
+    it('fails as unavailable instead of falling back to empty genre results', async () => {
+      world.provider.resolveTrack.mockRejectedValue(
+        new CatalogUnavailableError(),
+      );
+
+      const response = await request(httpServer())
+        .post('/api/playlists/mix')
+        .send({
+          kind: 'genre_mix',
+          genreIds: ['jazz'],
+          tracksPerSeed: 4,
+          popularity: 'balanced',
+        })
+        .expect(503);
+
+      expect(response.body).toMatchObject({ code: 'CATALOG_UNAVAILABLE' });
+      expect(world.provider.searchArtists).not.toHaveBeenCalled();
+      expect(world.provider.createPlaylist).not.toHaveBeenCalled();
+      expect(world.usageStats.recordMix).not.toHaveBeenCalled();
     });
   });
 

@@ -220,6 +220,34 @@ describe('SpotifyAppTokenProvider', () => {
     },
   );
 
+  it('drops the cached token when that token is invalidated', async () => {
+    mockPost
+      .mockResolvedValueOnce(tokenResponse('revoked-token'))
+      .mockResolvedValueOnce(tokenResponse('fresh-token'));
+    const provider = createProvider();
+
+    await provider.getAccessToken();
+    provider.invalidate('revoked-token');
+
+    await expect(provider.getAccessToken()).resolves.toBe('fresh-token');
+    expect(mockPost).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores invalidation of a token that is no longer cached', async () => {
+    mockPost
+      .mockResolvedValueOnce(tokenResponse('old-token', 60))
+      .mockResolvedValueOnce(tokenResponse('current-token'));
+    const provider = createProvider();
+
+    await provider.getAccessToken();
+    jest.setSystemTime(start + 30_000);
+    await provider.getAccessToken();
+    provider.invalidate('old-token');
+
+    await expect(provider.getAccessToken()).resolves.toBe('current-token');
+    expect(mockPost).toHaveBeenCalledTimes(2);
+  });
+
   it('fails before any request when credentials are not configured', async () => {
     await expect(
       createProvider({ SPOTIFY_CLIENT_ID: 'client-id' }).getAccessToken(),

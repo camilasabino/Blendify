@@ -7,7 +7,11 @@ import {
   type PlaylistSeedDto,
   type PopularityMode as PopularityModeValue,
 } from '@blendify/contracts';
-import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
+import {
+  CATALOG_PROVIDER_FACTORY,
+  type CatalogProviderFactoryPort,
+  type CatalogProviderPort,
+} from '../../domain/repositories/catalog-provider.port';
 import {
   MUSIC_PROVIDER_FACTORY,
   type MusicProviderFactoryPort,
@@ -35,6 +39,7 @@ import { pickBestArtistMatch } from '../../domain/artist/artist-name-match';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { Track } from '../../domain/track/track.entity';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
 import { MAX_TRACKS, maxTracksPerSeedForCount } from '../../domain/constants';
 import {
   preferPopularTracks,
@@ -43,6 +48,7 @@ import {
   type ArtistTrackQuery,
 } from '../../domain/genre/artist-mix-queries';
 import {
+  isFatalCatalogError,
   isSpotifyQuotaError,
   resolveCatalogWithPoolExpand,
 } from '../../domain/genre/catalog-resolve';
@@ -81,6 +87,8 @@ export class GeneratePlaylistUseCase {
   private readonly logger = new Logger(GeneratePlaylistUseCase.name);
 
   constructor(
+    @Inject(CATALOG_PROVIDER_FACTORY)
+    private readonly catalogs: CatalogProviderFactoryPort,
     @Inject(MUSIC_PROVIDER_FACTORY)
     private readonly providers: MusicProviderFactoryPort,
     @Inject(PROVIDER_QUOTA) private readonly quota: ProviderQuotaPort,
@@ -105,9 +113,9 @@ export class GeneratePlaylistUseCase {
 
     this.quota.assertAvailable();
 
-    const provider = this.providers.forUser(input.userId);
+    const catalog = this.catalogs.forMarket(input.market);
     const artists = await this.resolveArtists(
-      provider,
+      catalog,
       input.artistIds,
       input.artists,
       tracker,
@@ -133,7 +141,7 @@ export class GeneratePlaylistUseCase {
       });
 
     const tracksByArtist = await this.fetchTracksForMix(
-      provider,
+      catalog,
       artists,
       input.tracksPerSeed,
       input.popularity,
@@ -190,7 +198,7 @@ export class GeneratePlaylistUseCase {
     });
     const response = await this.publisher.execute({
       playlist,
-      provider,
+      provider: this.providers.forUser(user.id),
       spotifyUserId: user.spotifyId,
       coverImageBase64: input.coverImageBase64,
       fallbackImageUrl:
@@ -232,7 +240,7 @@ export class GeneratePlaylistUseCase {
   }
 
   private async resolveArtists(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     artistIds: string[],
     snapshots?: Array<{ id: string; name: string; imageUrl?: string | null }>,
     tracker?: GenerationProgressTracker,
@@ -247,7 +255,7 @@ export class GeneratePlaylistUseCase {
     tracker?.report('resolving_seeds', 0, Math.max(1, artistIds.length));
     const fetched =
       spotifyIdsToFetch.length > 0
-        ? await provider.getArtistsByIds(spotifyIdsToFetch)
+        ? await catalog.getArtistsByIds(spotifyIdsToFetch)
         : [];
     const fetchedById = new Map(
       fetched.map((artist) => [artist.id.getValue(), artist] as const),
@@ -260,7 +268,7 @@ export class GeneratePlaylistUseCase {
     for (const id of artistIds) {
       index += 1;
       const resolved = isPendingArtistId(id)
-        ? await this.resolvePendingArtist(provider, id, fromClient)
+        ? await this.resolvePendingArtist(catalog, id, fromClient)
         : this.resolveKnownArtist(id, fromClient, fetchedById);
 
       if (!resolved) {
@@ -285,7 +293,7 @@ export class GeneratePlaylistUseCase {
   }
 
   private async resolvePendingArtist(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     id: string,
     fromClient: Map<
       string,
@@ -301,7 +309,7 @@ export class GeneratePlaylistUseCase {
         { id },
       );
     }
-    const matches = await provider.searchArtists(name, 3);
+    const matches = await catalog.searchArtists(name, 3);
     const best = pickBestArtistMatch(name, matches);
     if (!best) {
       throw new BusinessRuleError(
@@ -333,7 +341,7 @@ export class GeneratePlaylistUseCase {
   }
 
   private async fetchTracksForMix(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     artists: Artist[],
     tracksPerSeed: number,
     mode: PopularityModeValue,
@@ -356,7 +364,7 @@ export class GeneratePlaylistUseCase {
       // Small over-fetch so a shortfall on one seed can be topped up from others.
       const fetchBudget = Math.min(MAX_TRACKS, tracksPerSeed + 3);
       const collected = await this.fetchTracksForArtist(
-        provider,
+        catalog,
         artist,
         fetchBudget,
         mode,
@@ -394,14 +402,14 @@ export class GeneratePlaylistUseCase {
    * Remaining shortfall → artist search.
    */
   private async fetchTracksForArtist(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     artist: Artist,
     tracksPerSeed: number,
     mode: PopularityModeValue,
     onMatched?: (matched: number) => void,
   ): Promise<Track[]> {
     const collected = await this.fetchTracksForArtistFromLastFm(
-      provider,
+      catalog,
       artist,
       tracksPerSeed,
       mode,
@@ -411,7 +419,7 @@ export class GeneratePlaylistUseCase {
     if (collected.length < tracksPerSeed) {
       this.quota.assertAvailable();
       await this.appendArtistSearchFallback(
-        provider,
+        catalog,
         artist,
         collected,
         tracksPerSeed,
@@ -423,14 +431,14 @@ export class GeneratePlaylistUseCase {
   }
 
   private async appendArtistSearchFallback(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     artist: Artist,
     collected: Track[],
     tracksPerSeed: number,
     onMatched?: (matched: number) => void,
   ): Promise<void> {
     try {
-      const page = await provider.searchTracks(`artist:"${artist.name}"`, {
+      const page = await catalog.searchTracks(`artist:"${artist.name}"`, {
         limit: 10,
         offset: 0,
       });
@@ -444,6 +452,7 @@ export class GeneratePlaylistUseCase {
         onMatched?.(Math.min(collected.length, tracksPerSeed));
       }
     } catch (error) {
+      if (error instanceof CatalogUnavailableError) throw error;
       if (isSpotifyQuotaError(error)) {
         if (collected.length === 0) throw error;
         return;
@@ -457,7 +466,7 @@ export class GeneratePlaylistUseCase {
   }
 
   private async fetchTracksForArtistFromLastFm(
-    provider: MusicProviderPort,
+    catalog: CatalogProviderPort,
     artist: Artist,
     tracksPerSeed: number,
     mode: PopularityModeValue,
@@ -478,7 +487,7 @@ export class GeneratePlaylistUseCase {
       }));
 
       return await resolveCatalogWithPoolExpand(
-        provider,
+        catalog,
         refs,
         mode,
         tracksPerSeed,
@@ -491,7 +500,7 @@ export class GeneratePlaylistUseCase {
         },
       );
     } catch (error) {
-      if (isSpotifyQuotaError(error)) throw error;
+      if (isFatalCatalogError(error)) throw error;
       return [];
     }
   }

@@ -3,7 +3,7 @@ import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { Artist } from '../../domain/artist/artist.entity';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import type { DiscoveryCatalogPort } from '../../domain/repositories/discovery-catalog.port';
-import type { MusicProviderFactoryPort } from '../../domain/repositories/music-provider.factory.port';
+import type { CatalogProviderFactoryPort } from '../../domain/repositories/catalog-provider.port';
 
 function makeArtist(id: string, name: string, imageUrl?: string): Artist {
   return Artist.create({
@@ -24,15 +24,15 @@ describe('SearchArtistsUseCase', () => {
   };
 
   let searchArtists: jest.Mock;
+  let forMarket: jest.Mock;
   let useCase: SearchArtistsUseCase;
 
   beforeEach(() => {
     jest.resetAllMocks();
     searchArtists = jest.fn();
-    const providers = {
-      forUser: () => ({ searchArtists }),
-    } as unknown as MusicProviderFactoryPort;
-    useCase = new SearchArtistsUseCase(providers, discovery);
+    forMarket = jest.fn(() => ({ searchArtists }));
+    const catalogs = { forMarket } as unknown as CatalogProviderFactoryPort;
+    useCase = new SearchArtistsUseCase(catalogs, discovery);
   });
 
   it('searches Spotify artists and maps DTOs', async () => {
@@ -42,12 +42,13 @@ describe('SearchArtistsUseCase', () => {
     ]);
 
     await expect(
-      useCase.execute('user-1', { query: 'Sade', limit: 5 }),
+      useCase.execute({ query: 'Sade', limit: 5, market: 'AR' }),
     ).resolves.toEqual([
       { id: 'a1', name: 'Sade', imageUrl: 'https://img' },
       { id: 'a2', name: 'Prince', imageUrl: null },
     ]);
     expect(searchArtists).toHaveBeenCalledWith('Sade', 5);
+    expect(forMarket).toHaveBeenCalledWith('AR');
   });
 
   it('resolves names to unique best Spotify matches', async () => {
@@ -57,11 +58,12 @@ describe('SearchArtistsUseCase', () => {
       .mockResolvedValueOnce([makeArtist('a2', 'Prince')]);
 
     await expect(
-      useCase.resolveNames('user-1', [' Sade ', '', 'Sade', 'Prince']),
+      useCase.resolveNames([' Sade ', '', 'Sade', 'Prince'], 'BR'),
     ).resolves.toEqual([
       { id: 'a1', name: 'Sade', imageUrl: null },
       { id: 'a2', name: 'Prince', imageUrl: null },
     ]);
+    expect(forMarket).toHaveBeenCalledWith('BR');
   });
 
   it('returns empty when the seed name is blank', async () => {
