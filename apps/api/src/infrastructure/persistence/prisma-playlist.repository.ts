@@ -11,7 +11,7 @@ import {
 } from '@blendify/contracts';
 import { Playlist } from '../../domain/playlist/playlist.entity';
 import { PlaylistName } from '../../domain/value-objects/playlist-name.vo';
-import { Track } from '../../domain/track/track.entity';
+import { Track, type TrackArtist } from '../../domain/track/track.entity';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
 import {
@@ -31,6 +31,9 @@ interface TrackJson {
   albumName?: string;
   albumImageUrl?: string | null;
   previewUrl?: string | null;
+  artists?: TrackArtist[];
+  isrc?: string | null;
+  externalUrl?: string | null;
 }
 
 @Injectable()
@@ -67,6 +70,9 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
           albumName: track.albumName,
           albumImageUrl: track.albumImageUrl,
           previewUrl: track.previewUrl,
+          artists: track.artists,
+          isrc: track.isrc,
+          externalUrl: track.externalUrl,
         })),
       ),
       generation: toJson(playlist.generation),
@@ -181,6 +187,9 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
           albumName: track.albumName,
           albumImageUrl: track.albumImageUrl ?? undefined,
           previewUrl: track.previewUrl ?? undefined,
+          artists: track.artists,
+          isrc: track.isrc ?? undefined,
+          externalUrl: track.externalUrl ?? undefined,
         }),
       ),
       generation,

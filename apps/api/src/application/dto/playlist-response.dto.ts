@@ -18,6 +18,9 @@ export function toTrackResponse(track: Track): TrackDto {
     albumName: track.albumName,
     albumImageUrl: track.albumImageUrl,
     previewUrl: track.previewUrl,
+    artists: track.artists.map((artist) => ({ ...artist })),
+    isrc: track.isrc,
+    externalUrl: track.externalUrl,
   };
 }
 

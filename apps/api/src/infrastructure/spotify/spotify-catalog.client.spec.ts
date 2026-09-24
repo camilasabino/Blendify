@@ -243,6 +243,99 @@ describe('SpotifyCatalogClient', () => {
   });
 });
 
+describe('SpotifyCatalogClient.searchTracks portable metadata', () => {
+  const spotifyTrack = {
+    id: 'track-1',
+    name: 'Stay',
+    duration_ms: 141_000,
+    uri: 'spotify:track:track-1',
+    artists: [
+      { id: 'kid-id', name: 'The Kid LAROI' },
+      { id: 'bieber-id', name: 'Justin Bieber' },
+    ],
+    external_ids: { isrc: 'usum72105936' },
+    external_urls: { spotify: 'https://open.spotify.com/track/track-1' },
+  };
+
+  it('maps credited artists, isrc and external url', async () => {
+    const { api } = createApi({ tracks: { items: [spotifyTrack] } });
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR');
+
+    const [track] = await client.searchTracks('Stay');
+
+    expect(track.artistId.getValue()).toBe('kid-id');
+    expect(track.artists).toEqual([
+      { id: 'kid-id', name: 'The Kid LAROI' },
+      { id: 'bieber-id', name: 'Justin Bieber' },
+    ]);
+    expect(track.isrc).toBe('USUM72105936');
+    expect(track.externalUrl).toBe('https://open.spotify.com/track/track-1');
+  });
+
+  it('maps a track without optional portable metadata', async () => {
+    const { api } = createApi({
+      tracks: {
+        items: [
+          {
+            ...spotifyTrack,
+            artists: [{ id: 'kid-id', name: 'The Kid LAROI' }],
+            external_ids: {},
+            external_urls: undefined,
+          },
+        ],
+      },
+    });
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR');
+
+    const [track] = await client.searchTracks('Stay');
+
+    expect(track.artists).toEqual([{ id: 'kid-id', name: 'The Kid LAROI' }]);
+    expect(track.isrc).toBeUndefined();
+    expect(track.externalUrl).toBeUndefined();
+  });
+
+  it('round-trips portable metadata through the search cache', async () => {
+    const { api, raw } = createApi({ tracks: { items: [spotifyTrack] } });
+    const { cache } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    await client.searchTracks('Stay');
+    const [cached] = await client.searchTracks('Stay');
+
+    expect(raw).toHaveBeenCalledTimes(1);
+    expect(cached.artists).toEqual([
+      { id: 'kid-id', name: 'The Kid LAROI' },
+      { id: 'bieber-id', name: 'Justin Bieber' },
+    ]);
+    expect(cached.isrc).toBe('USUM72105936');
+    expect(cached.externalUrl).toBe('https://open.spotify.com/track/track-1');
+  });
+
+  it('hydrates cache entries written before portable metadata existed', async () => {
+    const { api, raw } = createApi();
+    const { cache, store } = createCache();
+    store.set('spotify:search-tracks:AR:stay:10:0', [
+      {
+        id: 'track-1',
+        name: 'Stay',
+        artistId: 'kid-id',
+        artistName: 'The Kid LAROI',
+        durationMs: 141_000,
+        popularity: 0,
+        uri: 'spotify:track:track-1',
+      },
+    ]);
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    const [track] = await client.searchTracks('Stay');
+
+    expect(raw).not.toHaveBeenCalled();
+    expect(track.artists).toEqual([{ id: 'kid-id', name: 'The Kid LAROI' }]);
+    expect(track.isrc).toBeUndefined();
+    expect(track.externalUrl).toBeUndefined();
+  });
+});
+
 describe('SpotifyCatalogClient.resolveTrack', () => {
   it('attributes collaborations to the selected Spotify artist id', async () => {
     const { api } = createApi({
@@ -270,6 +363,10 @@ describe('SpotifyCatalogClient.resolveTrack', () => {
 
     expect(track?.artistId.getValue()).toBe('duffy-id');
     expect(track?.artistName).toBe('Duffy');
+    expect(track?.artists).toEqual([
+      { id: 'guest-id', name: 'Guest' },
+      { id: 'duffy-id', name: 'Duffy' },
+    ]);
   });
 
   it('returns null for a successful search without a usable match', async () => {

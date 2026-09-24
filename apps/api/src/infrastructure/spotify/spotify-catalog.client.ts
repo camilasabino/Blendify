@@ -10,7 +10,7 @@ import type {
   ResolveTrackOptions,
   SearchTracksOptions,
 } from '../../domain/repositories/catalog-provider.port';
-import { Track } from '../../domain/track/track.entity';
+import { Track, type TrackArtist } from '../../domain/track/track.entity';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
 import { RedisCacheService } from '../cache/redis-cache.service';
@@ -41,6 +41,8 @@ interface SpotifyTrack {
   preview_url?: string | null;
   artists: { id: string; name: string }[];
   album?: { name: string; images?: SpotifyImage[] };
+  external_ids?: { isrc?: string | null };
+  external_urls?: { spotify?: string | null };
 }
 
 type CachedArtist = {
@@ -60,6 +62,9 @@ type CachedTrack = {
   albumName?: string;
   albumImageUrl?: string;
   previewUrl?: string;
+  artists?: TrackArtist[];
+  isrc?: string;
+  externalUrl?: string;
 };
 
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -324,6 +329,9 @@ function mapTrack(
     albumName: item.album?.name,
     albumImageUrl: item.album?.images?.[0]?.url,
     previewUrl: item.preview_url ?? undefined,
+    artists: item.artists,
+    isrc: item.external_ids?.isrc ?? undefined,
+    externalUrl: item.external_urls?.spotify ?? undefined,
   });
 }
 
@@ -355,6 +363,9 @@ function serializeTrack(track: Track): CachedTrack {
     albumName: track.albumName,
     albumImageUrl: track.albumImageUrl,
     previewUrl: track.previewUrl,
+    artists: [...track.artists],
+    isrc: track.isrc,
+    externalUrl: track.externalUrl,
   };
 }
 
@@ -370,6 +381,9 @@ function hydrateTrack(track: CachedTrack): Track {
     albumName: track.albumName,
     albumImageUrl: track.albumImageUrl,
     previewUrl: track.previewUrl,
+    artists: track.artists,
+    isrc: track.isrc,
+    externalUrl: track.externalUrl,
   });
 }
 

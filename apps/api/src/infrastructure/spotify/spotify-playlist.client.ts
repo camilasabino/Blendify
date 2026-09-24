@@ -25,6 +25,8 @@ interface SpotifyPlaylistTrack {
   preview_url?: string | null;
   artists?: Array<{ id?: string; name?: string }>;
   album?: { name?: string; images?: SpotifyImage[] };
+  external_ids?: { isrc?: string | null };
+  external_urls?: { spotify?: string | null };
 }
 
 export class SpotifyPlaylistClient {
@@ -463,5 +465,11 @@ function mapPlaylistTrack(item?: SpotifyPlaylistTrack | null): Track | null {
     albumName: item.album?.name,
     albumImageUrl: item.album?.images?.[0]?.url,
     previewUrl: item.preview_url ?? undefined,
+    artists: item.artists?.map((credit) => ({
+      id: credit.id,
+      name: credit.name ?? '',
+    })),
+    isrc: item.external_ids?.isrc ?? undefined,
+    externalUrl: item.external_urls?.spotify ?? undefined,
   });
 }

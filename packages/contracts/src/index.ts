@@ -75,6 +75,16 @@ export const TrackSchema = z.object({
   albumName: z.string().optional(),
   albumImageUrl: z.string().nullable().optional(),
   previewUrl: z.string().nullable().optional(),
+  artists: z
+    .array(
+      z.object({
+        id: z.string().min(1).optional(),
+        name: z.string().min(1).max(200),
+      }),
+    )
+    .optional(),
+  isrc: z.string().min(1).optional(),
+  externalUrl: z.string().min(1).optional(),
 });
 
 export const TrackSeedSchema = TrackSchema.pick({

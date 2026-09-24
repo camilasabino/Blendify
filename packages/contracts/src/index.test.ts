@@ -8,6 +8,8 @@ import {
   PlaylistLibraryQuerySchema,
   PlaylistGenerationSchema,
   PlaylistSummarySchema,
+  TrackSchema,
+  TrackSeedSchema,
 } from './index';
 
 describe('playlist contracts', () => {
@@ -132,5 +134,60 @@ describe('playlist contracts', () => {
         },
       }),
     ).toThrow();
+  });
+});
+
+describe('track contracts', () => {
+  const legacyTrack = {
+    id: 'track-1',
+    name: 'Stay',
+    artistId: 'kid-id',
+    artistName: 'The Kid LAROI',
+    durationMs: 141_000,
+    popularity: 0,
+    uri: 'spotify:track:track-1',
+  };
+
+  it('accepts a track without portable metadata', () => {
+    expect(TrackSchema.parse(legacyTrack)).toEqual(legacyTrack);
+  });
+
+  it('accepts credited artists, isrc and external url', () => {
+    const track = {
+      ...legacyTrack,
+      artists: [
+        { id: 'kid-id', name: 'The Kid LAROI' },
+        { name: 'Uncredited Id' },
+      ],
+      isrc: 'USUM72105936',
+      externalUrl: 'https://open.spotify.com/track/track-1',
+    };
+
+    expect(TrackSchema.parse(track)).toEqual(track);
+  });
+
+  it('rejects malformed credited artists', () => {
+    expect(() =>
+      TrackSchema.parse({ ...legacyTrack, artists: [{ id: 'x' }] }),
+    ).toThrow();
+    expect(() =>
+      TrackSchema.parse({ ...legacyTrack, artists: [{ name: '' }] }),
+    ).toThrow();
+    expect(() =>
+      TrackSchema.parse({ ...legacyTrack, artists: 'The Kid LAROI' }),
+    ).toThrow();
+  });
+
+  it('keeps portable metadata out of track seeds', () => {
+    const seed = TrackSeedSchema.parse({
+      ...legacyTrack,
+      artists: [{ id: 'kid-id', name: 'The Kid LAROI' }],
+      isrc: 'USUM72105936',
+      externalUrl: 'https://open.spotify.com/track/track-1',
+    });
+
+    expect(seed).not.toHaveProperty('artists');
+    expect(seed).not.toHaveProperty('isrc');
+    expect(seed).not.toHaveProperty('externalUrl');
   });
 });
