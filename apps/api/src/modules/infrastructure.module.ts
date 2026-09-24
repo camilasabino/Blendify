@@ -12,6 +12,7 @@ import { PrismaPlaylistRepository } from '../infrastructure/persistence/prisma-p
 import { PrismaService } from '../infrastructure/persistence/prisma.service';
 import { PrismaUsageStatsRepository } from '../infrastructure/persistence/prisma-usage-stats.repository';
 import { PrismaUserRepository } from '../infrastructure/persistence/prisma-user.repository';
+import { SpotifyAppTokenProvider } from '../infrastructure/spotify/spotify-app-token.provider';
 import { SpotifyAuthClient } from '../infrastructure/spotify/spotify-auth.client';
 import { SpotifyMusicProvider } from '../infrastructure/spotify/spotify-music.provider';
 import { SpotifyQuotaService } from '../infrastructure/spotify/spotify-quota.service';
@@ -24,6 +25,7 @@ const providers = [
   RedisCacheService,
   SpotifyAuthClient,
   SpotifyTokenService,
+  SpotifyAppTokenProvider,
   LastFmClient,
   SpotifyMusicProvider,
   SpotifyQuotaService,
