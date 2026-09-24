@@ -11,6 +11,7 @@ import {
   SearchQuerySchema,
   type SearchQuery,
 } from '@blendify/contracts';
+import { RateLimit } from '../request-limits/rate-limit.guard';
 
 const ResolveArtistsSchema = z.object({
   names: z.array(z.string().trim().min(1)).max(MAX_ARTISTS),
@@ -24,6 +25,7 @@ export class ArtistsController {
   constructor(private readonly search: SearchArtistsUseCase) {}
 
   @Get('search')
+  @RateLimit('search')
   @ApiOperation({ summary: 'Search artists on Spotify' })
   async searchArtists(
     @CurrentUser() _user: User,
@@ -37,6 +39,7 @@ export class ArtistsController {
   }
 
   @Get('similar')
+  @RateLimit('similar')
   @ApiOperation({
     summary:
       'Suggest similar artists from Last.fm only (no Spotify). Spotify IDs are resolved when creating the playlist.',
@@ -68,6 +71,7 @@ export class ArtistsController {
   }
 
   @Post('resolve')
+  @RateLimit('resolve')
   @ApiOperation({ summary: 'Resolve artist names to Spotify artists' })
   async resolve(
     @CurrentUser() _user: User,

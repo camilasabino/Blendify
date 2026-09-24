@@ -6,6 +6,7 @@ import { HealthModule } from './modules/health.module';
 import { InfrastructureModule } from './modules/infrastructure.module';
 import { PlaybackModule } from './modules/playback.module';
 import { PlaylistsModule } from './modules/playlists.module';
+import { RequestLimitsModule } from './modules/request-limits.module';
 import { StatsModule } from './modules/stats.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { StatsModule } from './modules/stats.module';
       envFilePath: ['.env', '../../.env'],
     }),
     InfrastructureModule,
+    RequestLimitsModule,
     AuthModule,
     CatalogModule,
     PlaylistsModule,

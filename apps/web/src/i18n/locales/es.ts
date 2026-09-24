@@ -196,6 +196,14 @@ export const es: Record<MessageKey, string> = {
     'Spotify está ocupado en este momento. Intenta de nuevo en {wait}.',
   'errors.spotifyRateLimit':
     'Hay demasiadas solicitudes. Intenta de nuevo en {wait}.',
+  'errors.rateLimited':
+    'Hay demasiadas solicitudes. Intenta de nuevo en {wait}.',
+  'errors.concurrencyLimited':
+    'Todavía se está creando otra playlist. Espera a que termine e intenta de nuevo.',
+  'errors.capacityExceeded':
+    'Blendify está ocupado en este momento. Intenta de nuevo en {wait}.',
+  'errors.serviceUnavailable':
+    'Blendify no está disponible temporalmente. Intenta de nuevo en {wait}.',
   'errors.wait.seconds': 'unos {n} segundos',
   'errors.wait.minutes': 'unos {n} minutos',
   'errors.wait.hours': 'unas {n} horas',

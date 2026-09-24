@@ -192,6 +192,14 @@ export const en = {
     'Spotify is busy right now. Try again in {wait}.',
   'errors.spotifyRateLimit':
     'Too many requests. Try again in {wait}.',
+  'errors.rateLimited':
+    'Too many requests. Try again in {wait}.',
+  'errors.concurrencyLimited':
+    'Another playlist is still being created. Wait for it to finish and try again.',
+  'errors.capacityExceeded':
+    'Blendify is busy right now. Try again in {wait}.',
+  'errors.serviceUnavailable':
+    'Blendify is temporarily unavailable. Try again in {wait}.',
   'errors.wait.seconds': 'about {n} seconds',
   'errors.wait.minutes': 'about {n} minutes',
   'errors.wait.hours': 'about {n} hours',

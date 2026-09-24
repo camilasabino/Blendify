@@ -1,19 +1,21 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { json, urlencoded } from 'express';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './presentation/filters/global-exception.filter';
+import { createBodyParser } from './presentation/http/body-limits';
+import { parseTrustProxy } from './presentation/request-limits/request-limits.config';
 
 async function bootstrap() {
-  // Disable default body parser so we can raise the limit for playlist covers
-  // (JPEG base64 can be ~250–350 KB; Express default is 100 KB).
-  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
   const config = app.get(ConfigService);
 
-  app.use(json({ limit: '1mb' }));
-  app.use(urlencoded({ extended: true, limit: '1mb' }));
+  app.set('trust proxy', parseTrustProxy(config.get<string>('TRUST_PROXY')));
+  app.use(createBodyParser());
   app.use(cookieParser(config.get<string>('COOKIE_SECRET')));
   app.enableCors({
     origin: config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173',

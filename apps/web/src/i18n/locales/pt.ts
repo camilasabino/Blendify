@@ -195,6 +195,14 @@ export const pt: Record<MessageKey, string> = {
     'O Spotify está ocupado no momento. Tente novamente em {wait}.',
   'errors.spotifyRateLimit':
     'Há solicitações demais. Tente novamente em {wait}.',
+  'errors.rateLimited':
+    'Há solicitações demais. Tente novamente em {wait}.',
+  'errors.concurrencyLimited':
+    'Outra playlist ainda está sendo criada. Aguarde terminar e tente novamente.',
+  'errors.capacityExceeded':
+    'O Blendify está ocupado no momento. Tente novamente em {wait}.',
+  'errors.serviceUnavailable':
+    'O Blendify está temporariamente indisponível. Tente novamente em {wait}.',
   'errors.wait.seconds': 'cerca de {n} segundos',
   'errors.wait.minutes': 'cerca de {n} minutos',
   'errors.wait.hours': 'cerca de {n} horas',

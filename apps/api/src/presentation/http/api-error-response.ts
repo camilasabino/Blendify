@@ -4,6 +4,7 @@ import { ZodError } from 'zod';
 import { DomainError } from '../../domain/errors/domain.error';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
+import { RequestLimitError } from './request-limit.error';
 
 export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
   if (exception instanceof ZodError) {
@@ -12,6 +13,15 @@ export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
       code: 'VALIDATION_ERROR',
       message: exception.issues.map((i) => i.message).join('; '),
       details: { issues: exception.issues },
+    };
+  }
+
+  if (exception instanceof RequestLimitError) {
+    return {
+      statusCode: exception.statusCode,
+      code: exception.code,
+      message: exception.message,
+      details: { retryAfterSeconds: exception.retryAfterSeconds },
     };
   }
 
@@ -80,7 +90,21 @@ function httpCode(status: number): string {
       return 'NOT_FOUND';
     case 409:
       return 'CONFLICT';
+    case 413:
+      return 'PAYLOAD_TOO_LARGE';
     default:
       return status >= 500 ? 'INTERNAL_ERROR' : 'HTTP_ERROR';
   }
+}
+
+export function retryAfterHeaderValue(body: ApiErrorResponse): string | null {
+  const seconds = body.details?.retryAfterSeconds;
+  if (
+    typeof seconds !== 'number' ||
+    !Number.isFinite(seconds) ||
+    seconds <= 0
+  ) {
+    return null;
+  }
+  return String(Math.ceil(seconds));
 }

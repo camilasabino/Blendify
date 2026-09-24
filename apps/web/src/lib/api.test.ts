@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { ApiError, api, getApiErrorMessage, isSpotifyRateLimited } from '@/lib/api'
+import {
+  ApiError,
+  api,
+  getApiErrorMessage,
+  isRequestLimited,
+  isSpotifyRateLimited,
+} from '@/lib/api'
 import type { CreateDiscoverRequest, CreateMixRequest } from '@/lib/api'
 import type { MessageKey } from '@/i18n/messages'
 
@@ -55,6 +61,38 @@ describe('isSpotifyRateLimited', () => {
   it('ignores unrelated errors', () => {
     expect(isSpotifyRateLimited(new ApiError('nope', 500))).toBe(false)
     expect(isSpotifyRateLimited(new Error('x'))).toBe(false)
+  })
+})
+
+function requestLimitError(code: string, statusCode: number, retryAfterSeconds = 30) {
+  return new ApiError('limited', statusCode, {
+    statusCode,
+    code,
+    message: 'limited',
+    details: { retryAfterSeconds },
+  })
+}
+
+describe('request limit errors', () => {
+  it('are not treated as Spotify rate limits', () => {
+    const error = requestLimitError('RATE_LIMITED', 429)
+    expect(isRequestLimited(error)).toBe(true)
+    expect(isSpotifyRateLimited(error)).toBe(false)
+  })
+
+  it('ignores unrelated and inherited codes', () => {
+    expect(isRequestLimited(requestLimitError('SPOTIFY_RATE_LIMITED', 429))).toBe(false)
+    expect(isRequestLimited(requestLimitError('constructor', 429))).toBe(false)
+    expect(isRequestLimited(new Error('x'))).toBe(false)
+  })
+
+  it.each([
+    ['RATE_LIMITED', 429, 'errors.rateLimited:wait=errors.wait.seconds:n=30'],
+    ['CAPACITY_EXCEEDED', 503, 'errors.capacityExceeded:wait=errors.wait.seconds:n=30'],
+    ['SERVICE_UNAVAILABLE', 503, 'errors.serviceUnavailable:wait=errors.wait.seconds:n=30'],
+    ['CONCURRENCY_LIMITED', 429, 'errors.concurrencyLimited'],
+  ])('localizes %s', (code, status, expected) => {
+    expect(getApiErrorMessage(requestLimitError(code, status), t)).toBe(expected)
   })
 })
 

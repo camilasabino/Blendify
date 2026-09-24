@@ -235,6 +235,18 @@ Generation limits:
 
 Redis stores external catalog responses and uses append-only persistence in Docker Compose. If Redis is unavailable, the API falls back to an in-memory cache so temporary infrastructure failures do not take down the application.
 
+### Request protection
+
+Catalog and generation routes are protected by Redis-backed limits that work across API instances:
+
+- Rate limits per bucket (`search`, `similar`, `resolve`, `generation`), keyed by user ID when signed in and by client IP otherwise. Rejections return `429 RATE_LIMITED` with `Retry-After`. Defaults live in code; `RATE_LIMIT_OVERRIDES` accepts `bucket=limit/windowSeconds` entries (for example `generation=20/600,search=120/60`) and invalid values stop the API at startup.
+- Generation concurrency per client and globally (`GENERATION_CONCURRENCY_PER_CLIENT`, `GENERATION_CONCURRENCY_GLOBAL`). Permits are renewable Redis leases, released when the generation finishes or fails; a crashed process frees its permits when the lease expires. Rejections return `429 CONCURRENCY_LIMITED` or `503 CAPACITY_EXCEEDED`.
+- Request bodies default to 16 KB; Library bulk actions allow 64 KB and Spotify Mode generation (with cover upload) 512 KB. Oversized bodies return `413 PAYLOAD_TOO_LARGE`.
+
+When Redis is unavailable outside production, limits fall back to process memory. In production they never do: `search` and `similar` stay available (fail-open, with throttled warnings), while `resolve` and generation return `503 SERVICE_UNAVAILABLE` until Redis recovers. The Redis connection reconnects automatically.
+
+Client IP comes from Express `req.ip`. `TRUST_PROXY` defaults to `false`, so forwarded headers are ignored; set a hop count or the proxy addresses/CIDRs for the deployed topology (`true` is rejected). The resolved address must be a valid IP; otherwise the socket address is used. IPv4-mapped IPv6 addresses are normalized; IPv6 clients are keyed by full address, not by /64 prefix.
+
 ### Logging
 
 Outbound Spotify, Last.fm, and token-refresh calls use structured JSON logging. Tokens, secrets, API keys, and sensitive query parameters are redacted before output.

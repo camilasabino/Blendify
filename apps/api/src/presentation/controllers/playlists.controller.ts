@@ -42,6 +42,8 @@ import {
   writeNdjsonGeneration,
 } from '../http/ndjson-generation';
 import type { ProgressReporter } from '../../application/services/generation-progress.tracker';
+import { RateLimit } from '../request-limits/rate-limit.guard';
+import { LimitGenerationConcurrency } from '../request-limits/generation-concurrency.interceptor';
 
 type MixRequest = z.output<typeof CreateMixRequestSchema>;
 type DiscoverRequest = z.output<typeof CreateDiscoverRequestSchema>;
@@ -63,6 +65,8 @@ export class PlaylistsController {
   ) {}
 
   @Post('mix')
+  @RateLimit('generation')
+  @LimitGenerationConcurrency()
   @ApiOperation({ summary: 'Generate a Spotify playlist mix' })
   async createMix(
     @CurrentUser() user: User,
@@ -79,6 +83,8 @@ export class PlaylistsController {
   }
 
   @Post('discover')
+  @RateLimit('generation')
+  @LimitGenerationConcurrency()
   @ApiOperation({ summary: 'Generate a Spotify discovery playlist' })
   async createDiscover(
     @CurrentUser() user: User,

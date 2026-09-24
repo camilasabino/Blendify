@@ -1,4 +1,4 @@
-import { api, getApiErrorMessage, isSpotifyRateLimited, type Artist } from '@/lib/api'
+import { api, getApiErrorMessage, isRequestLimited, isSpotifyRateLimited, type Artist } from '@/lib/api'
 import { SearchCombobox } from '@/components/ui/search-combobox'
 import { useT } from '@/i18n/use-t'
 
@@ -25,7 +25,7 @@ export function ArtistSearch(props: ArtistSearchProps) {
       clearLabel={t('search.clear')}
       emptyLabel={t('search.empty')}
       errorLabel={(error) =>
-        isSpotifyRateLimited(error)
+        isSpotifyRateLimited(error) || isRequestLimited(error)
           ? getApiErrorMessage(error, t, 'search.rateLimited')
           : t('search.error')
       }

@@ -7,6 +7,7 @@ import { USER_REPOSITORY } from '../domain/repositories/user.repository.port';
 import { USAGE_STATS_REPOSITORY } from '../domain/repositories/usage-stats.repository.port';
 import { DISCOVERY_CATALOG } from '../domain/repositories/discovery-catalog.port';
 import { RedisCacheService } from '../infrastructure/cache/redis-cache.service';
+import { RedisConnection } from '../infrastructure/cache/redis-connection';
 import { SpotifyTokenService } from '../infrastructure/auth/spotify-token.service';
 import { LastFmClient } from '../infrastructure/lastfm/lastfm.client';
 import { PrismaPlaylistRepository } from '../infrastructure/persistence/prisma-playlist.repository';
@@ -23,6 +24,7 @@ const providers = [
   PrismaUserRepository,
   PrismaPlaylistRepository,
   PrismaUsageStatsRepository,
+  RedisConnection,
   RedisCacheService,
   SpotifyAuthClient,
   SpotifyTokenService,

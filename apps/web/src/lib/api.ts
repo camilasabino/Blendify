@@ -21,6 +21,7 @@ const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 export {
   ApiError,
   getApiErrorMessage,
+  isRequestLimited,
   isSpotifyRateLimited,
 } from '@/lib/api-error'
 import { ApiError } from '@/lib/api-error'

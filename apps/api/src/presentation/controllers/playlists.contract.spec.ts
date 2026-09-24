@@ -11,6 +11,7 @@ import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playli
 import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
 import { GlobalExceptionFilter } from '../filters/global-exception.filter';
 import { PlaylistsController } from './playlists.controller';
+import { inMemoryRequestLimitProviders } from '../request-limits/request-limits.testing';
 
 describe('PlaylistsController contracts', () => {
   let app: INestApplication;
@@ -31,6 +32,7 @@ describe('PlaylistsController contracts', () => {
         { provide: RenamePlaylistUseCase, useValue: rename },
         { provide: RemovePlaylistFromLibraryUseCase, useValue: remove },
         { provide: BulkLibraryUseCase, useValue: bulk },
+        ...inMemoryRequestLimitProviders(),
       ],
     })
       .overrideGuard(JwtAuthGuard)

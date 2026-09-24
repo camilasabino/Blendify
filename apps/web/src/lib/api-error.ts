@@ -22,9 +22,28 @@ export class ApiError extends Error {
   }
 }
 
+const REQUEST_LIMIT_MESSAGES: Record<string, MessageKey> = {
+  RATE_LIMITED: 'errors.rateLimited',
+  CONCURRENCY_LIMITED: 'errors.concurrencyLimited',
+  CAPACITY_EXCEEDED: 'errors.capacityExceeded',
+  SERVICE_UNAVAILABLE: 'errors.serviceUnavailable',
+}
+
+function requestLimitMessageKey(error: unknown): MessageKey | null {
+  if (!(error instanceof ApiError) || !error.code) return null
+  return Object.hasOwn(REQUEST_LIMIT_MESSAGES, error.code)
+    ? REQUEST_LIMIT_MESSAGES[error.code]
+    : null
+}
+
+export function isRequestLimited(error: unknown): boolean {
+  return requestLimitMessageKey(error) !== null
+}
+
 export function isSpotifyRateLimited(error: unknown): boolean {
   return (
     error instanceof ApiError &&
+    !isRequestLimited(error) &&
     (error.status === 429 ||
       error.code === 'SPOTIFY_RATE_LIMITED' ||
       error.code === 'SPOTIFY_QUOTA_EXCEEDED')
@@ -72,6 +91,18 @@ function mapSpotifyThrottleMessage(
     })
   }
   return null
+}
+
+function mapRequestLimitMessage(
+  error: ApiError,
+  t: Translate,
+): string | null {
+  const key = requestLimitMessageKey(error)
+  if (!key) return null
+  if (error.code === 'CONCURRENCY_LIMITED') return t(key)
+  return t(key, {
+    wait: formatRetryWaitLabel(t, readRetryAfterSeconds(error.details), false),
+  })
 }
 
 function mapMaxSelectionMessage(
@@ -147,6 +178,7 @@ export function getApiErrorMessage(
   }
 
   return (
+    mapRequestLimitMessage(error, t) ??
     mapSpotifyThrottleMessage(error, t) ??
     mapMaxSelectionMessage(error, t, fallbackKey) ??
     mapNamedResolveMessage(error, t) ??

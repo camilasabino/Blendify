@@ -39,6 +39,7 @@ import { TrackId } from '../../domain/value-objects/track-id.vo';
 import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
 import { GlobalExceptionFilter } from '../filters/global-exception.filter';
 import { PlaylistsController } from './playlists.controller';
+import { inMemoryRequestLimitProviders } from '../request-limits/request-limits.testing';
 
 const SPOTIFY_PLAYLIST = {
   id: 'spotify-playlist-1',
@@ -216,6 +217,7 @@ async function createApp(world: World): Promise<INestApplication> {
       { provide: RenamePlaylistUseCase, useValue: unused },
       { provide: RemovePlaylistFromLibraryUseCase, useValue: unused },
       { provide: BulkLibraryUseCase, useValue: unused },
+      ...inMemoryRequestLimitProviders(),
     ],
   })
     .overrideGuard(JwtAuthGuard)

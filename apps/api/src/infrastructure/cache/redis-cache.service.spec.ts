@@ -1,4 +1,5 @@
 import { RedisCacheService, sanitizeRedisUrl } from './redis-cache.service';
+import { RedisConnection } from './redis-connection';
 import { ConfigService } from '@nestjs/config';
 
 describe('RedisCacheService memory fallback', () => {
@@ -6,7 +7,7 @@ describe('RedisCacheService memory fallback', () => {
     const config = {
       get: () => 'redis://127.0.0.1:1',
     } as unknown as ConfigService;
-    const cache = new RedisCacheService(config);
+    const cache = new RedisCacheService(new RedisConnection(config));
 
     await cache.setJson('blendify:test:key', { ok: true }, 60_000);
     await expect(

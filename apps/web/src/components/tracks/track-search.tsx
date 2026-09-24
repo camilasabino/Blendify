@@ -1,5 +1,5 @@
 import type { TrackDto } from '@blendify/contracts'
-import { api, getApiErrorMessage, isSpotifyRateLimited } from '@/lib/api'
+import { api, getApiErrorMessage, isRequestLimited, isSpotifyRateLimited } from '@/lib/api'
 import { SearchCombobox } from '@/components/ui/search-combobox'
 import { useT } from '@/i18n/use-t'
 import { formatDuration } from '@/lib/utils'
@@ -27,7 +27,7 @@ export function TrackSearch(props: TrackSearchProps) {
       clearLabel={t('search.clear')}
       emptyLabel={t('search.trackEmpty')}
       errorLabel={(error) =>
-        isSpotifyRateLimited(error)
+        isSpotifyRateLimited(error) || isRequestLimited(error)
           ? getApiErrorMessage(error, t, 'search.rateLimited')
           : t('search.trackError')
       }

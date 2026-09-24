@@ -6,6 +6,7 @@ import { User } from '../../domain/user/user.entity';
 import { SearchTracksUseCase } from '../../application/use-cases/search-tracks.use-case';
 import { SearchQuerySchema, type SearchQuery } from '@blendify/contracts';
 import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
+import { RateLimit } from '../request-limits/rate-limit.guard';
 
 @ApiTags('tracks')
 @ApiCookieAuth()
@@ -15,6 +16,7 @@ export class TracksController {
   constructor(private readonly search: SearchTracksUseCase) {}
 
   @Get('search')
+  @RateLimit('search')
   @ApiOperation({ summary: 'Search tracks on Spotify' })
   async searchTracks(
     @CurrentUser() _user: User,
