@@ -25,9 +25,10 @@ import {
 import type { z } from 'zod';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
-import { GeneratePlaylistUseCase } from '../../application/use-cases/generate-playlist.use-case';
-import { GenerateGenrePlaylistUseCase } from '../../application/use-cases/generate-genre-playlist.use-case';
-import { DiscoverPlaylistUseCase } from '../../application/use-cases/discover-playlist.use-case';
+import {
+  CreateSpotifyPlaylistUseCase,
+  type SpotifyPlaylistRequest,
+} from '../../application/use-cases/create-spotify-playlist.use-case';
 import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
 import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
 import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
@@ -53,9 +54,7 @@ type BulkRequest = z.output<typeof BulkLibraryRequestSchema>;
 @Controller('api/playlists')
 export class PlaylistsController {
   constructor(
-    private readonly generateArtists: GeneratePlaylistUseCase,
-    private readonly generateGenres: GenerateGenrePlaylistUseCase,
-    private readonly discover: DiscoverPlaylistUseCase,
+    private readonly createPlaylist: CreateSpotifyPlaylistUseCase,
     private readonly library: ListLibraryPlaylistsUseCase,
     private readonly detail: GetPlaylistDetailUseCase,
     private readonly rename: RenamePlaylistUseCase,
@@ -72,10 +71,10 @@ export class PlaylistsController {
     @Res({ passthrough: true }) res: Response,
   ) {
     if (!acceptsNdjson(req)) {
-      return this.runMix(user.id, body);
+      return this.create(user.id, body);
     }
     await writeNdjsonGeneration(res, (onProgress) =>
-      this.runMix(user.id, body, onProgress),
+      this.create(user.id, body, onProgress),
     );
   }
 
@@ -89,10 +88,10 @@ export class PlaylistsController {
     @Res({ passthrough: true }) res: Response,
   ) {
     if (!acceptsNdjson(req)) {
-      return this.discover.execute({ ...body, userId: user.id });
+      return this.create(user.id, body);
     }
     await writeNdjsonGeneration(res, (onProgress) =>
-      this.discover.execute({ ...body, userId: user.id }, { onProgress }),
+      this.create(user.id, body, onProgress),
     );
   }
 
@@ -156,14 +155,14 @@ export class PlaylistsController {
     return { ok: true as const };
   }
 
-  private runMix(
+  private create(
     userId: string,
-    body: MixRequest,
+    request: SpotifyPlaylistRequest,
     onProgress?: ProgressReporter,
   ) {
-    const options = onProgress ? { onProgress } : undefined;
-    return body.kind === 'genre_mix'
-      ? this.generateGenres.execute({ ...body, userId }, options)
-      : this.generateArtists.execute({ ...body, userId }, options);
+    return this.createPlaylist.execute(
+      { userId, request },
+      onProgress ? { onProgress } : undefined,
+    );
   }
 }

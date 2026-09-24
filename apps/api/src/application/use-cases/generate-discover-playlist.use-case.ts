@@ -1,16 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { randomInt, randomUUID } from 'node:crypto';
-import { PopularityMode, type PlaylistDetail } from '@blendify/contracts';
+import { randomInt } from 'node:crypto';
+import { PopularityMode } from '@blendify/contracts';
 import type { z } from 'zod';
 import {
   CATALOG_PROVIDER_FACTORY,
   type CatalogProviderFactoryPort,
   type CatalogProviderPort,
 } from '../../domain/repositories/catalog-provider.port';
-import {
-  MUSIC_PROVIDER_FACTORY,
-  type MusicProviderFactoryPort,
-} from '../../domain/repositories/music-provider.factory.port';
 import {
   PROVIDER_QUOTA,
   type ProviderQuotaPort,
@@ -20,21 +16,13 @@ import {
   type DiscoveryCatalogPort,
 } from '../../domain/repositories/discovery-catalog.port';
 import {
-  USER_REPOSITORY,
-  UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
-import {
-  USAGE_STATS_REPOSITORY,
-  UsageStatsRepositoryPort,
-} from '../../domain/repositories/usage-stats.repository.port';
-import {
   normalizeArtistName,
   pickStrictArtistMatch,
 } from '../../domain/artist/artist-name-match';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { Track } from '../../domain/track/track.entity';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
-import { Playlist } from '../../domain/playlist/playlist.entity';
+import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { maxTracksPerSeedForCount } from '../../domain/constants';
 import {
@@ -55,45 +43,38 @@ import {
 import { primaryArtistName } from '../../domain/discovery/similar-track-query';
 import { createOrderingStrategy } from '../../domain/services/strategies/track-ordering.strategy';
 import {
-  DiscoverPlaylistDto,
-  DiscoverPlaylistSchema,
-} from '../dto/discover-playlist.dto';
-import { GeneratePlaylistUseCase } from './generate-playlist.use-case';
-import { PublishPlaylistService } from '../services/publish-playlist.service';
+  GenerateDiscoverPlaylistDto,
+  GenerateDiscoverPlaylistSchema,
+} from '../dto/generate-discover-playlist.dto';
+import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import {
   GenerationProgressTracker,
   monotonicProgressReporter,
   type ProgressReporter,
 } from '../services/generation-progress.tracker';
 
-type DiscoverInput = z.output<typeof DiscoverPlaylistSchema>;
+type DiscoverInput = z.output<typeof GenerateDiscoverPlaylistSchema>;
 type ArtistDiscoverInput = Extract<DiscoverInput, { kind: 'discover_artist' }>;
 type TrackDiscoverInput = Extract<DiscoverInput, { kind: 'discover_track' }>;
 
 @Injectable()
-export class DiscoverPlaylistUseCase {
-  private readonly logger = new Logger(DiscoverPlaylistUseCase.name);
+export class GenerateDiscoverPlaylistUseCase {
+  private readonly logger = new Logger(GenerateDiscoverPlaylistUseCase.name);
 
   constructor(
-    private readonly generate: GeneratePlaylistUseCase,
+    private readonly artistMix: GenerateArtistMixUseCase,
     @Inject(DISCOVERY_CATALOG)
     private readonly discoveryCatalog: DiscoveryCatalogPort,
     @Inject(CATALOG_PROVIDER_FACTORY)
     private readonly catalogs: CatalogProviderFactoryPort,
-    @Inject(MUSIC_PROVIDER_FACTORY)
-    private readonly providers: MusicProviderFactoryPort,
     @Inject(PROVIDER_QUOTA) private readonly quota: ProviderQuotaPort,
-    @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
-    @Inject(USAGE_STATS_REPOSITORY)
-    private readonly usageStats: UsageStatsRepositoryPort,
-    private readonly publisher: PublishPlaylistService,
   ) {}
 
   async execute(
-    raw: DiscoverPlaylistDto,
+    raw: GenerateDiscoverPlaylistDto,
     options?: { onProgress?: ProgressReporter },
-  ): Promise<PlaylistDetail> {
-    const input = DiscoverPlaylistSchema.parse(raw);
+  ): Promise<GeneratedPlaylist> {
+    const input = GenerateDiscoverPlaylistSchema.parse(raw);
     const onProgress = monotonicProgressReporter(options?.onProgress);
 
     if (!this.discoveryCatalog.isConfigured()) {
@@ -112,7 +93,7 @@ export class DiscoverPlaylistUseCase {
   private async executeFromArtist(
     input: ArtistDiscoverInput,
     onProgress?: ProgressReporter,
-  ): Promise<PlaylistDetail> {
+  ): Promise<GeneratedPlaylist> {
     const tracker = new GenerationProgressTracker(onProgress);
     const catalog = this.catalogs.forMarket(input.market);
     tracker.report('resolving_seeds', 0, 1);
@@ -189,9 +170,8 @@ export class DiscoverPlaylistUseCase {
       `Discover artist mix for "${seed.name}": target ${input.targetTrackCount}, ${artists.length} artist(s), ${tracksPerSeed} track(s)/artist`,
     );
 
-    const playlist = await this.generate.execute(
+    return this.artistMix.execute(
       {
-        userId: input.userId,
         market: input.market,
         kind: 'artist_mix',
         name,
@@ -201,8 +181,6 @@ export class DiscoverPlaylistUseCase {
         tracksPerSeed,
         popularity: input.popularity,
         orderMode: input.orderMode,
-        coverImageBase64: input.coverImageBase64,
-        persistToLibrary: input.persistToLibrary,
         maxTracks: input.targetTrackCount,
         displaySeeds: [
           {
@@ -224,29 +202,16 @@ export class DiscoverPlaylistUseCase {
           popularity: input.popularity,
           orderMode: input.orderMode,
         },
-        usageSeeds: [
-          {
-            id: seed.id.getValue(),
-            name: seed.name,
-            imageUrl: seed.imageUrl ?? null,
-          },
-        ],
       },
       { onProgress },
     );
-
-    return playlist;
   }
 
   private async executeFromTrack(
     input: TrackDiscoverInput,
     onProgress?: ProgressReporter,
-  ): Promise<PlaylistDetail> {
+  ): Promise<GeneratedPlaylist> {
     const tracker = new GenerationProgressTracker(onProgress);
-    const user = await this.users.findById(input.userId);
-    if (!user) {
-      throw new BusinessRuleError('User not found', 'USER_NOT_FOUND');
-    }
 
     this.quota.assertAvailable();
 
@@ -339,9 +304,7 @@ export class DiscoverPlaylistUseCase {
       `Discover track mix for "${seedTrack.name}": ${tracks.length}/${input.targetTrackCount}`,
     );
 
-    const playlist = Playlist.create({
-      id: randomUUID(),
-      userId: user.id,
+    return GeneratedPlaylist.create({
       name: playlistName,
       description,
       seeds: [
@@ -375,41 +338,10 @@ export class DiscoverPlaylistUseCase {
         popularity: input.popularity,
         orderMode: input.orderMode,
       },
-    });
-    const response = await this.publisher.execute({
-      playlist,
-      provider: this.providers.forUser(user.id),
-      spotifyUserId: user.spotifyId,
-      coverImageBase64: input.coverImageBase64,
-      fallbackImageUrl:
+      coverCandidateUrl:
         seedTrack.albumImageUrl ??
         tracks.find((track) => track.albumImageUrl)?.albumImageUrl,
-      persistToLibrary: input.persistToLibrary,
-      onProgress,
     });
-
-    try {
-      await this.usageStats.recordMix({
-        userId: user.id,
-        kind: 'artist',
-        seeds: [
-          {
-            kind: 'artist' as const,
-            seedKey: seedTrack.artistId.getValue(),
-            name: seedTrack.artistName,
-            imageUrl: seedTrack.albumImageUrl ?? null,
-          },
-        ],
-      });
-    } catch (statsError) {
-      this.logger.warn(
-        `Usage stats recording failed: ${
-          statsError instanceof Error ? statsError.message : String(statsError)
-        }`,
-      );
-    }
-
-    return response;
   }
 
   private async resolveSeedArtist(

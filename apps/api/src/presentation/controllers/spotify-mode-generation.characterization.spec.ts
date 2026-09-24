@@ -10,9 +10,10 @@ import {
 import { GenreTrackCatalogService } from '../../application/services/genre-track-catalog.service';
 import { PublishPlaylistService } from '../../application/services/publish-playlist.service';
 import { BulkLibraryUseCase } from '../../application/use-cases/bulk-library.use-case';
-import { DiscoverPlaylistUseCase } from '../../application/use-cases/discover-playlist.use-case';
-import { GenerateGenrePlaylistUseCase } from '../../application/use-cases/generate-genre-playlist.use-case';
-import { GeneratePlaylistUseCase } from '../../application/use-cases/generate-playlist.use-case';
+import { CreateSpotifyPlaylistUseCase } from '../../application/use-cases/create-spotify-playlist.use-case';
+import { GenerateArtistMixUseCase } from '../../application/use-cases/generate-artist-mix.use-case';
+import { GenerateDiscoverPlaylistUseCase } from '../../application/use-cases/generate-discover-playlist.use-case';
+import { GenerateGenreMixUseCase } from '../../application/use-cases/generate-genre-mix.use-case';
 import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
 import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
 import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
@@ -191,9 +192,10 @@ async function createApp(world: World): Promise<INestApplication> {
   const module = await Test.createTestingModule({
     controllers: [PlaylistsController],
     providers: [
-      GeneratePlaylistUseCase,
-      GenerateGenrePlaylistUseCase,
-      DiscoverPlaylistUseCase,
+      GenerateArtistMixUseCase,
+      GenerateGenreMixUseCase,
+      GenerateDiscoverPlaylistUseCase,
+      CreateSpotifyPlaylistUseCase,
       PublishPlaylistService,
       GenreTrackCatalogService,
       {

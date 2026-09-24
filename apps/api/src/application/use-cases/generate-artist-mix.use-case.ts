@@ -1,8 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import {
   PopularityMode,
-  type PlaylistDetail,
   type PlaylistGeneration,
   type PlaylistSeedDto,
   type PopularityMode as PopularityModeValue,
@@ -13,10 +11,6 @@ import {
   type CatalogProviderPort,
 } from '../../domain/repositories/catalog-provider.port';
 import {
-  MUSIC_PROVIDER_FACTORY,
-  type MusicProviderFactoryPort,
-} from '../../domain/repositories/music-provider.factory.port';
-import {
   PROVIDER_QUOTA,
   type ProviderQuotaPort,
 } from '../../domain/repositories/provider-quota.port';
@@ -24,16 +18,8 @@ import {
   DISCOVERY_CATALOG,
   type DiscoveryCatalogPort,
 } from '../../domain/repositories/discovery-catalog.port';
-import {
-  USER_REPOSITORY,
-  UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
-import {
-  USAGE_STATS_REPOSITORY,
-  UsageStatsRepositoryPort,
-} from '../../domain/repositories/usage-stats.repository.port';
 import { PlaylistGenerationService } from '../../domain/services/playlist-generation.service';
-import { Playlist } from '../../domain/playlist/playlist.entity';
+import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
 import { Artist } from '../../domain/artist/artist.entity';
 import { pickBestArtistMatch } from '../../domain/artist/artist-name-match';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
@@ -57,10 +43,9 @@ import {
   buildDefaultPlaylistName,
 } from '../../domain/playlist/default-playlist-name';
 import {
-  GeneratePlaylistDto,
-  GeneratePlaylistSchema,
-} from '../dto/generate-playlist.dto';
-import { PublishPlaylistService } from '../services/publish-playlist.service';
+  GenerateArtistMixDto,
+  GenerateArtistMixSchema,
+} from '../dto/generate-artist-mix.dto';
 import {
   GenerationProgressTracker,
   type ProgressReporter,
@@ -82,34 +67,24 @@ function rankModeForPopularity(
 }
 
 @Injectable()
-export class GeneratePlaylistUseCase {
+export class GenerateArtistMixUseCase {
   private readonly generation = new PlaylistGenerationService();
-  private readonly logger = new Logger(GeneratePlaylistUseCase.name);
+  private readonly logger = new Logger(GenerateArtistMixUseCase.name);
 
   constructor(
     @Inject(CATALOG_PROVIDER_FACTORY)
     private readonly catalogs: CatalogProviderFactoryPort,
-    @Inject(MUSIC_PROVIDER_FACTORY)
-    private readonly providers: MusicProviderFactoryPort,
     @Inject(PROVIDER_QUOTA) private readonly quota: ProviderQuotaPort,
     @Inject(DISCOVERY_CATALOG)
     private readonly discoveryCatalog: DiscoveryCatalogPort,
-    @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
-    @Inject(USAGE_STATS_REPOSITORY)
-    private readonly usageStats: UsageStatsRepositoryPort,
-    private readonly publisher: PublishPlaylistService,
   ) {}
 
   async execute(
-    raw: GeneratePlaylistDto,
+    raw: GenerateArtistMixDto,
     options?: { onProgress?: ProgressReporter },
-  ): Promise<PlaylistDetail> {
-    const input = GeneratePlaylistSchema.parse(raw);
+  ): Promise<GeneratedPlaylist> {
+    const input = GenerateArtistMixSchema.parse(raw);
     const tracker = new GenerationProgressTracker(options?.onProgress);
-    const user = await this.users.findById(input.userId);
-    if (!user) {
-      throw new BusinessRuleError('User not found', 'USER_NOT_FOUND');
-    }
 
     this.quota.assertAvailable();
 
@@ -187,56 +162,16 @@ export class GeneratePlaylistUseCase {
         popularity: input.popularity,
         orderMode: input.orderMode,
       } satisfies PlaylistGeneration);
-    const playlist = Playlist.create({
-      id: randomUUID(),
-      userId: user.id,
+    return GeneratedPlaylist.create({
       name: playlistName,
       description: playlistDescription,
+      generation,
       seeds,
       tracks,
-      generation,
-    });
-    const response = await this.publisher.execute({
-      playlist,
-      provider: this.providers.forUser(user.id),
-      spotifyUserId: user.spotifyId,
-      coverImageBase64: input.coverImageBase64,
-      fallbackImageUrl:
+      coverCandidateUrl:
         artists.find((artist) => artist.imageUrl)?.imageUrl ??
         tracks.find((track) => track.albumImageUrl)?.albumImageUrl,
-      persistToLibrary: input.persistToLibrary,
-      onProgress: options?.onProgress,
     });
-
-    try {
-      const statsSeeds =
-        input.usageSeeds && input.usageSeeds.length > 0
-          ? input.usageSeeds.map((seed) => ({
-              kind: 'artist' as const,
-              seedKey: seed.id,
-              name: seed.name,
-              imageUrl: seed.imageUrl ?? null,
-            }))
-          : artists.map((artist) => ({
-              kind: 'artist' as const,
-              seedKey: artist.id.getValue(),
-              name: artist.name,
-              imageUrl: artist.imageUrl ?? null,
-            }));
-      await this.usageStats.recordMix({
-        userId: user.id,
-        kind: 'artist',
-        seeds: statsSeeds,
-      });
-    } catch (statsError) {
-      this.logger.warn(
-        `Usage stats recording failed: ${
-          statsError instanceof Error ? statsError.message : String(statsError)
-        }`,
-      );
-    }
-
-    return response;
   }
 
   private async resolveArtists(

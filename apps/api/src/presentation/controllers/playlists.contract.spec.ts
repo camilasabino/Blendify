@@ -4,9 +4,7 @@ import type { Server } from 'http';
 import request from 'supertest';
 import { BulkLibraryUseCase } from '../../application/use-cases/bulk-library.use-case';
 import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
-import { DiscoverPlaylistUseCase } from '../../application/use-cases/discover-playlist.use-case';
-import { GenerateGenrePlaylistUseCase } from '../../application/use-cases/generate-genre-playlist.use-case';
-import { GeneratePlaylistUseCase } from '../../application/use-cases/generate-playlist.use-case';
+import { CreateSpotifyPlaylistUseCase } from '../../application/use-cases/create-spotify-playlist.use-case';
 import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
 import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
 import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
@@ -16,9 +14,7 @@ import { PlaylistsController } from './playlists.controller';
 
 describe('PlaylistsController contracts', () => {
   let app: INestApplication;
-  const generateArtists = { execute: jest.fn() };
-  const generateGenres = { execute: jest.fn() };
-  const discover = { execute: jest.fn() };
+  const createPlaylist = { execute: jest.fn() };
   const library = { execute: jest.fn() };
   const detail = { execute: jest.fn() };
   const rename = { execute: jest.fn() };
@@ -29,9 +25,7 @@ describe('PlaylistsController contracts', () => {
     const module = await Test.createTestingModule({
       controllers: [PlaylistsController],
       providers: [
-        { provide: GeneratePlaylistUseCase, useValue: generateArtists },
-        { provide: GenerateGenrePlaylistUseCase, useValue: generateGenres },
-        { provide: DiscoverPlaylistUseCase, useValue: discover },
+        { provide: CreateSpotifyPlaylistUseCase, useValue: createPlaylist },
         { provide: ListLibraryPlaylistsUseCase, useValue: library },
         { provide: GetPlaylistDetailUseCase, useValue: detail },
         { provide: RenamePlaylistUseCase, useValue: rename },
@@ -68,7 +62,7 @@ describe('PlaylistsController contracts', () => {
   }
 
   it('parses and delegates an artist mix request', async () => {
-    generateArtists.execute.mockResolvedValue({ id: 'playlist-1' });
+    createPlaylist.execute.mockResolvedValue({ id: 'playlist-1' });
 
     await request(httpServer())
       .post('/api/playlists/mix')
@@ -80,18 +74,21 @@ describe('PlaylistsController contracts', () => {
       })
       .expect(201, { id: 'playlist-1' });
 
-    expect(generateArtists.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(createPlaylist.execute).toHaveBeenCalledWith(
+      {
         userId: 'user-1',
-        orderMode: 'random',
-        persistToLibrary: true,
-      }),
+        request: expect.objectContaining({
+          kind: 'artist_mix',
+          orderMode: 'random',
+          persistToLibrary: true,
+        }) as Record<string, unknown>,
+      },
       undefined,
     );
   });
 
-  it('routes a genre mix to the genre generator', async () => {
-    generateGenres.execute.mockResolvedValue({ id: 'playlist-genre' });
+  it('delegates a genre mix request', async () => {
+    createPlaylist.execute.mockResolvedValue({ id: 'playlist-genre' });
 
     await request(httpServer())
       .post('/api/playlists/mix')
@@ -103,20 +100,22 @@ describe('PlaylistsController contracts', () => {
       })
       .expect(201, { id: 'playlist-genre' });
 
-    expect(generateGenres.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(createPlaylist.execute).toHaveBeenCalledWith(
+      {
         userId: 'user-1',
-        genreIds: ['jazz'],
-        orderMode: 'random',
-        persistToLibrary: true,
-      }),
+        request: expect.objectContaining({
+          kind: 'genre_mix',
+          genreIds: ['jazz'],
+          orderMode: 'random',
+          persistToLibrary: true,
+        }) as Record<string, unknown>,
+      },
       undefined,
     );
-    expect(generateArtists.execute).not.toHaveBeenCalled();
   });
 
   it('accepts a Discover description and canonical seed', async () => {
-    discover.execute.mockResolvedValue({ id: 'playlist-2' });
+    createPlaylist.execute.mockResolvedValue({ id: 'playlist-2' });
 
     await request(httpServer())
       .post('/api/playlists/discover')
@@ -129,17 +128,21 @@ describe('PlaylistsController contracts', () => {
       })
       .expect(201, { id: 'playlist-2' });
 
-    expect(discover.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(createPlaylist.execute).toHaveBeenCalledWith(
+      {
         userId: 'user-1',
-        description: 'Deep catalog',
-        orderMode: 'random',
-      }),
+        request: expect.objectContaining({
+          kind: 'discover_artist',
+          description: 'Deep catalog',
+          orderMode: 'random',
+        }) as Record<string, unknown>,
+      },
+      undefined,
     );
   });
 
   it('accepts a track as the Discover seed', async () => {
-    discover.execute.mockResolvedValue({ id: 'playlist-track' });
+    createPlaylist.execute.mockResolvedValue({ id: 'playlist-track' });
 
     await request(httpServer())
       .post('/api/playlists/discover')
@@ -157,13 +160,16 @@ describe('PlaylistsController contracts', () => {
       })
       .expect(201, { id: 'playlist-track' });
 
-    expect(discover.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(createPlaylist.execute).toHaveBeenCalledWith(
+      {
         userId: 'user-1',
-        kind: 'discover_track',
-        trackId: 'track-1',
-        orderMode: 'random',
-      }),
+        request: expect.objectContaining({
+          kind: 'discover_track',
+          trackId: 'track-1',
+          orderMode: 'random',
+        }) as Record<string, unknown>,
+      },
+      undefined,
     );
   });
 

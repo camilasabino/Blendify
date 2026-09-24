@@ -1,26 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
-import {
-  GenreMixRequestSchema,
-  type PlaylistDetail,
-} from '@blendify/contracts';
+import { Inject, Injectable } from '@nestjs/common';
+import { GenreMixRequestSchema } from '@blendify/contracts';
 import {
   CATALOG_PROVIDER_FACTORY,
   type CatalogProviderFactoryPort,
 } from '../../domain/repositories/catalog-provider.port';
-import {
-  MUSIC_PROVIDER_FACTORY,
-  type MusicProviderFactoryPort,
-} from '../../domain/repositories/music-provider.factory.port';
-import {
-  USER_REPOSITORY,
-  UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
-import {
-  USAGE_STATS_REPOSITORY,
-  UsageStatsRepositoryPort,
-} from '../../domain/repositories/usage-stats.repository.port';
-import { Playlist } from '../../domain/playlist/playlist.entity';
+import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import {
   MAX_GENRES,
@@ -39,46 +23,36 @@ import {
 } from '../../domain/playlist/default-playlist-name';
 import { z } from 'zod';
 import { GenreTrackCatalogService } from '../services/genre-track-catalog.service';
-import { PublishPlaylistService } from '../services/publish-playlist.service';
 import {
   GenerationProgressTracker,
   type ProgressReporter,
 } from '../services/generation-progress.tracker';
 
-const GenerateGenrePlaylistSchema = GenreMixRequestSchema.extend({
-  userId: z.string().min(1),
+const GenerateGenreMixSchema = GenreMixRequestSchema.omit({
+  coverImageBase64: true,
+  persistToLibrary: true,
+}).extend({
   market: z.string().optional(),
 });
 
-type GenerateGenrePlaylistDto = z.input<typeof GenerateGenrePlaylistSchema>;
+type GenerateGenreMixDto = z.input<typeof GenerateGenreMixSchema>;
 
 @Injectable()
-export class GenerateGenrePlaylistUseCase {
+export class GenerateGenreMixUseCase {
   private readonly generation = new GenrePlaylistGenerationService();
-  private readonly logger = new Logger(GenerateGenrePlaylistUseCase.name);
 
   constructor(
     @Inject(CATALOG_PROVIDER_FACTORY)
     private readonly catalogs: CatalogProviderFactoryPort,
-    @Inject(MUSIC_PROVIDER_FACTORY)
-    private readonly providers: MusicProviderFactoryPort,
-    @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
-    @Inject(USAGE_STATS_REPOSITORY)
-    private readonly usageStats: UsageStatsRepositoryPort,
     private readonly genreTrackCatalog: GenreTrackCatalogService,
-    private readonly publisher: PublishPlaylistService,
   ) {}
 
   async execute(
-    raw: GenerateGenrePlaylistDto,
+    raw: GenerateGenreMixDto,
     options?: { onProgress?: ProgressReporter },
-  ): Promise<PlaylistDetail> {
-    const input = GenerateGenrePlaylistSchema.parse(raw);
+  ): Promise<GeneratedPlaylist> {
+    const input = GenerateGenreMixSchema.parse(raw);
     const tracker = new GenerationProgressTracker(options?.onProgress);
-    const user = await this.users.findById(input.userId);
-    if (!user) {
-      throw new BusinessRuleError('User not found', 'USER_NOT_FOUND');
-    }
 
     const genres = this.resolveGenres(input.genreIds);
     if (genres.length === 0) {
@@ -146,13 +120,9 @@ export class GenerateGenrePlaylistUseCase {
       name: genre.name,
       imageUrl: coverCandidates.get(genreTrackGroupKey(genre.id)) ?? null,
     }));
-    const playlist = Playlist.create({
-      id: randomUUID(),
-      userId: user.id,
+    return GeneratedPlaylist.create({
       name: playlistName,
       description: playlistDescription,
-      seeds,
-      tracks,
       generation: {
         version: 1,
         kind: 'genre_mix',
@@ -161,38 +131,11 @@ export class GenerateGenrePlaylistUseCase {
         popularity: input.popularity,
         orderMode: input.orderMode,
       },
-    });
-    const response = await this.publisher.execute({
-      playlist,
-      provider: this.providers.forUser(user.id),
-      spotifyUserId: user.spotifyId,
-      coverImageBase64: input.coverImageBase64,
-      fallbackImageUrl: tracks.find((track) => track.albumImageUrl)
+      seeds,
+      tracks,
+      coverCandidateUrl: tracks.find((track) => track.albumImageUrl)
         ?.albumImageUrl,
-      persistToLibrary: input.persistToLibrary,
-      onProgress: options?.onProgress,
     });
-
-    try {
-      await this.usageStats.recordMix({
-        userId: user.id,
-        kind: 'genre',
-        seeds: genres.map((genre) => ({
-          kind: 'genre' as const,
-          seedKey: genre.id,
-          name: genre.name,
-          imageUrl: coverCandidates.get(genreTrackGroupKey(genre.id)) ?? null,
-        })),
-      });
-    } catch (statsError) {
-      this.logger.warn(
-        `Usage stats recording failed: ${
-          statsError instanceof Error ? statsError.message : String(statsError)
-        }`,
-      );
-    }
-
-    return response;
   }
 
   private resolveGenres(genreIds: string[]): CuratedGenre[] {

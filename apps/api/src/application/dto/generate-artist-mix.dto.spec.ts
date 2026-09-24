@@ -1,11 +1,10 @@
 import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
-import { GeneratePlaylistSchema } from './generate-playlist.dto';
+import { GenerateArtistMixSchema } from './generate-artist-mix.dto';
 
-describe('GeneratePlaylistSchema', () => {
+describe('GenerateArtistMixSchema', () => {
   it('accepts a minimal valid payload with popularity', () => {
-    const parsed = GeneratePlaylistSchema.parse({
+    const parsed = GenerateArtistMixSchema.parse({
       kind: 'artist_mix',
-      userId: 'user-1',
       artistIds: ['a1'],
       tracksPerSeed: 10,
       popularity: PopularityMode.BALANCED,
@@ -15,15 +14,13 @@ describe('GeneratePlaylistSchema', () => {
     expect(parsed.tracksPerSeed).toBe(10);
     expect(parsed.popularity).toBe(PopularityMode.BALANCED);
     expect(parsed.orderMode).toBe(TrackOrderMode.RANDOM);
-    expect(parsed.persistToLibrary).toBe(true);
     expect(parsed.name).toBe('');
     expect(parsed.description).toBe('');
   });
 
   it('accepts client artist snapshots', () => {
-    const parsed = GeneratePlaylistSchema.parse({
+    const parsed = GenerateArtistMixSchema.parse({
       kind: 'artist_mix',
-      userId: 'user-1',
       artistIds: ['a1'],
       tracksPerSeed: 20,
       popularity: PopularityMode.POPULAR,
@@ -34,9 +31,8 @@ describe('GeneratePlaylistSchema', () => {
 
   it('rejects empty artistIds', () => {
     expect(() =>
-      GeneratePlaylistSchema.parse({
+      GenerateArtistMixSchema.parse({
         kind: 'artist_mix',
-        userId: 'u',
         artistIds: [],
         tracksPerSeed: 10,
         popularity: PopularityMode.BALANCED,
@@ -46,10 +42,25 @@ describe('GeneratePlaylistSchema', () => {
 
   it('requires the artist mix discriminator and track count', () => {
     expect(() =>
-      GeneratePlaylistSchema.parse({
-        userId: 'u',
+      GenerateArtistMixSchema.parse({
         artistIds: ['a1'],
         popularity: PopularityMode.BALANCED,
+      }),
+    ).toThrow();
+  });
+
+  it.each([
+    ['userId', 'user-1'],
+    ['persistToLibrary', true],
+    ['coverImageBase64', 'aGVsbG8='],
+  ])('rejects the publication-only field %s', (field, value) => {
+    expect(() =>
+      GenerateArtistMixSchema.parse({
+        kind: 'artist_mix',
+        artistIds: ['a1'],
+        tracksPerSeed: 10,
+        popularity: PopularityMode.BALANCED,
+        [field]: value,
       }),
     ).toThrow();
   });
