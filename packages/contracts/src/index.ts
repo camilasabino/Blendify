@@ -199,6 +199,21 @@ export const CreateDiscoverRequestSchema = z.discriminatedUnion('kind', [
   DiscoverTrackRequestSchema,
 ]);
 
+const publicationOnlyFields = {
+  coverImageBase64: true,
+  persistToLibrary: true,
+} as const;
+
+export const GenerateMixRequestSchema = z.discriminatedUnion('kind', [
+  ArtistMixRequestSchema.omit(publicationOnlyFields),
+  GenreMixRequestSchema.omit(publicationOnlyFields),
+]);
+
+export const GenerateDiscoverRequestSchema = z.discriminatedUnion('kind', [
+  DiscoverArtistRequestSchema.omit(publicationOnlyFields),
+  DiscoverTrackRequestSchema.omit(publicationOnlyFields),
+]);
+
 export const RenamePlaylistRequestSchema = z.object({
   name: z.string().trim().min(1).max(100),
 }).strict();
@@ -278,6 +293,15 @@ export const PlaylistDetailSchema = PlaylistSummarySchema.extend({
   generation: PlaylistGenerationSchema,
 });
 
+export const GeneratedPlaylistSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  generation: PlaylistGenerationSchema,
+  seeds: z.array(PlaylistSeedSchema),
+  tracks: z.array(TrackSchema),
+  coverCandidateUrl: z.string().optional(),
+});
+
 export const PlaylistLibraryPageSchema = z.object({
   playlists: z.array(PlaylistSummarySchema),
   total: z.number().int().nonnegative(),
@@ -332,14 +356,33 @@ export const GenerationProgressSchema = z.object({
   etaSeconds: z.number().int().nonnegative().nullable().optional(),
 });
 
+const GenerationProgressEventSchema = GenerationProgressSchema.extend({
+  type: z.literal('progress'),
+});
+const GenerationErrorEventSchema = ApiErrorResponseSchema.extend({
+  type: z.literal('error'),
+});
+
 export const GenerationStreamEventSchema = z.discriminatedUnion('type', [
-  GenerationProgressSchema.extend({ type: z.literal('progress') }),
+  GenerationProgressEventSchema,
   z.object({
     type: z.literal('result'),
     playlist: PlaylistDetailSchema,
   }),
-  ApiErrorResponseSchema.extend({ type: z.literal('error') }),
+  GenerationErrorEventSchema,
 ]);
+
+export const GeneratedPlaylistStreamEventSchema = z.discriminatedUnion(
+  'type',
+  [
+    GenerationProgressEventSchema,
+    z.object({
+      type: z.literal('result'),
+      playlist: GeneratedPlaylistSchema,
+    }),
+    GenerationErrorEventSchema,
+  ],
+);
 
 export type ArtistDto = z.infer<typeof ArtistSchema>;
 export type UserDto = z.infer<typeof UserSchema>;
@@ -352,8 +395,13 @@ export type PlaylistSeedDto = z.infer<typeof PlaylistSeedSchema>;
 export type PlaylistGeneration = z.infer<typeof PlaylistGenerationSchema>;
 export type CreateMixRequest = z.input<typeof CreateMixRequestSchema>;
 export type CreateDiscoverRequest = z.input<typeof CreateDiscoverRequestSchema>;
+export type GenerateMixRequest = z.input<typeof GenerateMixRequestSchema>;
+export type GenerateDiscoverRequest = z.input<
+  typeof GenerateDiscoverRequestSchema
+>;
 export type PlaylistSummary = z.infer<typeof PlaylistSummarySchema>;
 export type PlaylistDetail = z.infer<typeof PlaylistDetailSchema>;
+export type GeneratedPlaylistDto = z.infer<typeof GeneratedPlaylistSchema>;
 export type PlaylistLibraryPage = z.infer<typeof PlaylistLibraryPageSchema>;
 export type BulkLibraryResult = z.infer<typeof BulkLibraryResultSchema>;
 export type PlaylistLibraryQuery = z.infer<
@@ -370,6 +418,9 @@ export type GenerationPhase = z.infer<typeof GenerationPhaseSchema>;
 export type GenerationProgress = z.infer<typeof GenerationProgressSchema>;
 export type GenerationStreamEvent = z.infer<
   typeof GenerationStreamEventSchema
+>;
+export type GeneratedPlaylistStreamEvent = z.infer<
+  typeof GeneratedPlaylistStreamEventSchema
 >;
 export type StartPlaybackRequest = z.infer<typeof StartPlaybackRequestSchema>;
 export type PlaybackDeviceDto = z.infer<typeof PlaybackDeviceSchema>;

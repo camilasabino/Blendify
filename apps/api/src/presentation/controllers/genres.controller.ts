@@ -1,14 +1,11 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GenreCatalogService } from '../../application/services/genre-catalog.service';
 import { toGenreDto } from '../../domain/genre/curated-genres';
-import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
 import { SearchQuerySchema, type SearchQuery } from '@blendify/contracts';
 import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
 
 @ApiTags('genres')
-@ApiCookieAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('api/genres')
 export class GenresController {
   constructor(private readonly catalog: GenreCatalogService) {}

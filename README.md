@@ -235,13 +235,29 @@ Generation limits:
 
 Redis stores external catalog responses and uses append-only persistence in Docker Compose. If Redis is unavailable, the API falls back to an in-memory cache so temporary infrastructure failures do not take down the application.
 
+### API access
+
+Catalog and generation work without a Spotify session. Everything tied to a Spotify account requires one.
+
+| Access | Routes |
+| --- | --- |
+| Public | `GET /api/health`, `GET /api/auth/spotify`, `GET /api/auth/spotify/callback`, `GET /api/auth/me` (returns `{ "user": null }` without a session), `POST /api/auth/logout` |
+| Public, optional session | `GET /api/artists/search`, `GET /api/artists/similar`, `POST /api/artists/resolve`, `GET /api/tracks/search`, `POST /api/generate/mix`, `POST /api/generate/discover` |
+| Public, no session lookup | `GET /api/genres`, `GET /api/genres/search`, `GET /api/genres/explore` |
+| Spotify session required | `POST /api/playlists/mix`, `POST /api/playlists/discover`, `GET /api/playlists`, `GET/PATCH/DELETE /api/playlists/:id`, `POST /api/playlists/bulk`, `GET/DELETE /api/stats`, `GET /api/player/devices`, `POST /api/player/play` |
+
+- On public routes the session is only used to identify the caller for rate limiting. A missing, expired, invalid, or orphaned session counts as anonymous; it never produces a `401`. An unexpected failure while reading the session also falls back to anonymous and logs a throttled `auth.optional_session_failed` warning.
+- `POST /api/generate/mix` and `POST /api/generate/discover` accept the same bodies as their `/api/playlists/*` counterparts without `coverImageBase64` and `persistToLibrary` (unknown fields are rejected). They return the generated playlist (`name`, `description`, `generation`, `seeds`, `tracks`, optional `coverCandidateUrl`) and never publish to Spotify, save to the Library, or record usage statistics. With `Accept: application/x-ndjson` they stream `progress` events (no `publishing` phase) followed by a terminal `result` or `error` event.
+- `POST /api/playlists/mix` and `POST /api/playlists/discover` keep their Spotify Mode meaning: generate, publish to Spotify, save to the Library when requested, and record usage statistics.
+- Mutating requests must carry an `Origin` (or `Referer`) matching `FRONTEND_URL`, and CORS only admits that origin. This protects signed-in browsers against cross-site requests; it is not an abuse control, since non-browser clients can set any header. Abuse control for public routes comes from the request protection below.
+
 ### Request protection
 
 Catalog and generation routes are protected by Redis-backed limits that work across API instances:
 
-- Rate limits per bucket (`search`, `similar`, `resolve`, `generation`), keyed by user ID when signed in and by client IP otherwise. Rejections return `429 RATE_LIMITED` with `Retry-After`. Defaults live in code; `RATE_LIMIT_OVERRIDES` accepts `bucket=limit/windowSeconds` entries (for example `generation=20/600,search=120/60`) and invalid values stop the API at startup.
+- Rate limits per bucket, keyed by user ID when signed in and by client IP otherwise: `search` (artist and track search), `similar` (similar artists), `resolve` (artist name resolution), and `generation` (`/api/playlists/mix|discover` and `/api/generate/mix|discover`). Curated genre routes serve local data with no external provider cost and are intentionally not rate limited. Rejections return `429 RATE_LIMITED` with `Retry-After`. Defaults live in code; `RATE_LIMIT_OVERRIDES` accepts `bucket=limit/windowSeconds` entries (for example `generation=20/600,search=120/60`) and invalid values stop the API at startup.
 - Generation concurrency per client and globally (`GENERATION_CONCURRENCY_PER_CLIENT`, `GENERATION_CONCURRENCY_GLOBAL`). Permits are renewable Redis leases, released when the generation finishes or fails; a crashed process frees its permits when the lease expires. Rejections return `429 CONCURRENCY_LIMITED` or `503 CAPACITY_EXCEEDED`.
-- Request bodies default to 16 KB; Library bulk actions allow 64 KB and Spotify Mode generation (with cover upload) 512 KB. Oversized bodies return `413 PAYLOAD_TOO_LARGE`.
+- Request bodies default to 16 KB; Library bulk actions allow 64 KB, Spotify Mode generation (with cover upload) 512 KB, and public generation (`/api/generate/*`) 32 KB. Oversized bodies return `413 PAYLOAD_TOO_LARGE`.
 
 When Redis is unavailable outside production, limits fall back to process memory. In production they never do: `search` and `similar` stay available (fail-open, with throttled warnings), while `resolve` and generation return `503 SERVICE_UNAVAILABLE` until Redis recovers. The Redis connection reconnects automatically.
 

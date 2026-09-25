@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth.module';
 import { CatalogModule } from './modules/catalog.module';
+import { GenerationModule } from './modules/generation.module';
 import { HealthModule } from './modules/health.module';
 import { InfrastructureModule } from './modules/infrastructure.module';
 import { PlaybackModule } from './modules/playback.module';
@@ -19,6 +20,7 @@ import { StatsModule } from './modules/stats.module';
     RequestLimitsModule,
     AuthModule,
     CatalogModule,
+    GenerationModule,
     PlaylistsModule,
     StatsModule,
     PlaybackModule,

@@ -21,6 +21,7 @@ import {
 import type { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import type { GenerateDiscoverPlaylistUseCase } from './generate-discover-playlist.use-case';
 import type { GenerateGenreMixUseCase } from './generate-genre-mix.use-case';
+import { GeneratePlaylistUseCase } from './generate-playlist.use-case';
 
 const track = Track.create({
   id: TrackId.create('track-1'),
@@ -115,9 +116,11 @@ function setup() {
     { findById } as unknown as UserRepositoryPort,
     { forUser },
     { recordMix } as unknown as UsageStatsRepositoryPort,
-    { execute: artistMix } as unknown as GenerateArtistMixUseCase,
-    { execute: genreMix } as unknown as GenerateGenreMixUseCase,
-    { execute: discover } as unknown as GenerateDiscoverPlaylistUseCase,
+    new GeneratePlaylistUseCase(
+      { execute: artistMix } as unknown as GenerateArtistMixUseCase,
+      { execute: genreMix } as unknown as GenerateGenreMixUseCase,
+      { execute: discover } as unknown as GenerateDiscoverPlaylistUseCase,
+    ),
     { execute: publish } as unknown as PublishPlaylistService,
   );
 
@@ -346,12 +349,13 @@ describe('CreateSpotifyPlaylistUseCase', () => {
     context.discover.mockImplementation(
       (_request: unknown, options?: { onProgress?: ProgressReporter }) => {
         options?.onProgress?.(progress(60));
-        options?.onProgress?.(progress(95));
+        options?.onProgress?.(progress(20));
+        options?.onProgress?.(progress(90));
         return Promise.resolve(artistMixPlaylist);
       },
     );
     context.publish.mockImplementation((input) => {
-      input.onProgress?.(progress(92));
+      input.onProgress?.(progress(95));
       input.onProgress?.(progress(100));
       return Promise.resolve({ id: 'published' } as PlaylistDetail);
     });
@@ -366,7 +370,7 @@ describe('CreateSpotifyPlaylistUseCase', () => {
       onProgress.mock.calls.map(
         ([event]: [GenerationProgress]) => event.percent,
       ),
-    ).toEqual([60, 95, 100]);
+    ).toEqual([60, 90, 95, 100]);
   });
 
   it('forwards Mix progress unchanged to generation and publication', async () => {

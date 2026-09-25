@@ -34,6 +34,16 @@ export const ROUTE_BODY_LIMITS: RouteBodyLimit[] = [
     path: '/api/playlists/discover',
     limit: BODY_LIMITS.spotifyGeneration,
   },
+  {
+    method: 'POST',
+    path: '/api/generate/mix',
+    limit: BODY_LIMITS.publicGeneration,
+  },
+  {
+    method: 'POST',
+    path: '/api/generate/discover',
+    limit: BODY_LIMITS.publicGeneration,
+  },
 ];
 
 export function bodyLimitFor(

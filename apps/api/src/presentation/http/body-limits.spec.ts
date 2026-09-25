@@ -30,6 +30,8 @@ describe('bodyLimitFor', () => {
     expect(bodyLimitFor('post', '/API/Playlists/Mix/')).toBe('512kb');
     expect(bodyLimitFor('POST', '/api/playlists/discover')).toBe('512kb');
     expect(bodyLimitFor('POST', '/api/playlists/bulk')).toBe('64kb');
+    expect(bodyLimitFor('POST', '/api/generate/mix')).toBe('32kb');
+    expect(bodyLimitFor('POST', '/api/generate/discover/')).toBe('32kb');
   });
 
   it('declares the approved profiles', () => {
@@ -39,7 +41,7 @@ describe('bodyLimitFor', () => {
       spotifyGeneration: '512kb',
       publicGeneration: '32kb',
     });
-    expect(ROUTE_BODY_LIMITS).toHaveLength(3);
+    expect(ROUTE_BODY_LIMITS).toHaveLength(5);
   });
 });
 
@@ -71,6 +73,24 @@ describe('createBodyParser', () => {
       .set('Content-Type', 'application/json')
       .send(jsonOfSize(530_000))
       .expect(413);
+  });
+
+  it('keeps public generation on the smaller profile', async () => {
+    await request(app())
+      .post('/api/generate/mix')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfSize(30_000))
+      .expect(200);
+    await request(app())
+      .post('/api/generate/discover')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfSize(33_000))
+      .expect(413);
+    await request(app())
+      .post('/api/playlists/discover')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfSize(33_000))
+      .expect(200);
   });
 
   it('applies the default limit to urlencoded bodies', async () => {

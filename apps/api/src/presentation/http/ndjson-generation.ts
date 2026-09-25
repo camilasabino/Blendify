@@ -1,8 +1,4 @@
-import type {
-  GenerationProgress,
-  GenerationStreamEvent,
-  PlaylistDetail,
-} from '@blendify/contracts';
+import type { ApiErrorResponse, GenerationProgress } from '@blendify/contracts';
 import type { Request, Response } from 'express';
 import { toApiErrorResponse } from './api-error-response';
 
@@ -13,17 +9,22 @@ export function acceptsNdjson(req: Request): boolean {
   return accept.includes(NDJSON);
 }
 
-export async function writeNdjsonGeneration(
+type NdjsonGenerationEvent<TPlaylist> =
+  | ({ type: 'progress' } & GenerationProgress)
+  | { type: 'result'; playlist: TPlaylist }
+  | ({ type: 'error' } & ApiErrorResponse);
+
+export async function writeNdjsonGeneration<TPlaylist>(
   res: Response,
   run: (
     onProgress: (progress: GenerationProgress) => void,
-  ) => Promise<PlaylistDetail>,
+  ) => Promise<TPlaylist>,
 ): Promise<void> {
   res.status(200);
   res.setHeader('Content-Type', `${NDJSON}; charset=utf-8`);
   res.setHeader('Cache-Control', 'no-cache, no-transform');
 
-  const write = (event: GenerationStreamEvent) => {
+  const write = (event: NdjsonGenerationEvent<TPlaylist>) => {
     res.write(`${JSON.stringify(event)}\n`);
   };
 

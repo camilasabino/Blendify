@@ -3,6 +3,11 @@ import {
   ApiErrorResponseSchema,
   CreateDiscoverRequestSchema,
   CreateMixRequestSchema,
+  GenerateDiscoverRequestSchema,
+  GenerateMixRequestSchema,
+  GeneratedPlaylistSchema,
+  GeneratedPlaylistStreamEventSchema,
+  GenerationStreamEventSchema,
   MAX_ARTISTS,
   PlaylistDetailSchema,
   PlaylistLibraryQuerySchema,
@@ -189,5 +194,143 @@ describe('track contracts', () => {
     expect(seed).not.toHaveProperty('artists');
     expect(seed).not.toHaveProperty('isrc');
     expect(seed).not.toHaveProperty('externalUrl');
+  });
+});
+
+describe('guest generation contracts', () => {
+  const artistMix = {
+    kind: 'artist_mix',
+    artistIds: ['artist-1'],
+    tracksPerSeed: 10,
+    popularity: 'balanced',
+  };
+  const genreMix = {
+    kind: 'genre_mix',
+    genreIds: ['jazz'],
+    tracksPerSeed: 10,
+    popularity: 'balanced',
+  };
+  const discoverArtist = {
+    kind: 'discover_artist',
+    artistId: 'artist-1',
+    targetTrackCount: 15,
+    popularity: 'balanced',
+  };
+  const discoverTrack = {
+    kind: 'discover_track',
+    trackId: 'track-1',
+    track: {
+      id: 'track-1',
+      name: 'Stay',
+      artistId: 'kid-id',
+      artistName: 'The Kid LAROI',
+    },
+    targetTrackCount: 15,
+    popularity: 'balanced',
+  };
+  const cases = [
+    { schema: GenerateMixRequestSchema, body: artistMix },
+    { schema: GenerateMixRequestSchema, body: genreMix },
+    { schema: GenerateDiscoverRequestSchema, body: discoverArtist },
+    { schema: GenerateDiscoverRequestSchema, body: discoverTrack },
+  ];
+
+  it.each(cases)('accepts the $body.kind generation inputs', ({ schema, body }) => {
+    const parsed = schema.parse(body);
+
+    expect(parsed).toMatchObject({
+      ...body,
+      name: '',
+      description: '',
+      orderMode: 'random',
+    });
+    expect(parsed).not.toHaveProperty('persistToLibrary');
+    expect(parsed).not.toHaveProperty('coverImageBase64');
+  });
+
+  it.each(
+    cases.flatMap(({ schema, body }) =>
+      [
+        { coverImageBase64: 'aGVsbG8=' },
+        { persistToLibrary: false },
+        { market: 'US' },
+        { maxTracks: 10 },
+        { displaySeeds: [] },
+        { generation: {} },
+      ].map((extra) => ({
+        schema,
+        body,
+        field: Object.keys(extra)[0],
+        extra,
+      })),
+    ),
+  )('rejects $field on $body.kind', ({ schema, body, extra }) => {
+    expect(schema.safeParse({ ...body, ...extra }).success).toBe(false);
+  });
+
+  it('keeps Spotify Mode requests accepting publication fields', () => {
+    expect(
+      CreateMixRequestSchema.parse({
+        ...artistMix,
+        coverImageBase64: 'aGVsbG8=',
+        persistToLibrary: false,
+      }),
+    ).toMatchObject({ coverImageBase64: 'aGVsbG8=', persistToLibrary: false });
+  });
+
+  const generated = {
+    name: 'Blendify · Mix · Sade',
+    description: 'Made with Blendify from Sade.',
+    generation: {
+      version: 1,
+      kind: 'artist_mix',
+      tracksPerSeed: 1,
+      seeds: [{ id: 'artist-1', name: 'Sade' }],
+      popularity: 'balanced',
+      orderMode: 'random',
+    },
+    seeds: [{ type: 'artist', id: 'artist-1', name: 'Sade' }],
+    tracks: [
+      {
+        id: 'track-1',
+        name: 'Smooth Operator',
+        artistId: 'artist-1',
+        artistName: 'Sade',
+        durationMs: 250_000,
+        popularity: 0,
+        uri: 'spotify:track:track-1',
+        artists: [{ id: 'artist-1', name: 'Sade' }],
+        isrc: 'GBBBM8400012',
+        externalUrl: 'https://open.spotify.com/track/track-1',
+      },
+    ],
+    coverCandidateUrl: 'https://images.example/cover.jpg',
+  };
+
+  it('round-trips a generated playlist without destination state', () => {
+    const parsed = GeneratedPlaylistSchema.parse({
+      ...generated,
+      id: 'playlist-1',
+      spotifyId: 'spotify-1',
+      status: 'COMPLETED',
+    });
+
+    expect(parsed).toEqual(generated);
+  });
+
+  it('streams generated playlists with the shared event envelope', () => {
+    const result = { type: 'result', playlist: generated };
+
+    expect(GeneratedPlaylistStreamEventSchema.parse(result)).toEqual(result);
+    expect(GenerationStreamEventSchema.safeParse(result).success).toBe(false);
+    expect(
+      GeneratedPlaylistStreamEventSchema.parse({
+        type: 'progress',
+        phase: 'matching_tracks',
+        current: 1,
+        total: 2,
+        percent: 50,
+      }),
+    ).toMatchObject({ type: 'progress' });
   });
 });

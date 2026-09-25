@@ -23,26 +23,12 @@ import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
 import { Playlist } from '../../domain/playlist/playlist.entity';
 import { PublishPlaylistService } from '../services/publish-playlist.service';
-import {
-  monotonicProgressReporter,
-  type ProgressReporter,
-} from '../services/generation-progress.tracker';
-import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
-import { GenerateGenreMixUseCase } from './generate-genre-mix.use-case';
-import { GenerateDiscoverPlaylistUseCase } from './generate-discover-playlist.use-case';
+import type { ProgressReporter } from '../services/generation-progress.tracker';
+import { GeneratePlaylistUseCase } from './generate-playlist.use-case';
 
 export type SpotifyPlaylistRequest =
   | z.output<typeof CreateMixRequestSchema>
   | z.output<typeof CreateDiscoverRequestSchema>;
-
-type GenerationRequest = DistributiveOmit<
-  SpotifyPlaylistRequest,
-  'coverImageBase64' | 'persistToLibrary'
->;
-
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
-  ? Omit<T, K>
-  : never;
 
 type UsageRecord = {
   kind: 'artist' | 'genre';
@@ -59,9 +45,7 @@ export class CreateSpotifyPlaylistUseCase {
     private readonly providers: MusicProviderFactoryPort,
     @Inject(USAGE_STATS_REPOSITORY)
     private readonly usageStats: UsageStatsRepositoryPort,
-    private readonly artistMix: GenerateArtistMixUseCase,
-    private readonly genreMix: GenerateGenreMixUseCase,
-    private readonly discover: GenerateDiscoverPlaylistUseCase,
+    private readonly generator: GeneratePlaylistUseCase,
     private readonly publisher: PublishPlaylistService,
   ) {}
 
@@ -75,11 +59,12 @@ export class CreateSpotifyPlaylistUseCase {
     }
 
     const { coverImageBase64, persistToLibrary, ...request } = input.request;
-    const onProgress = isDiscover(request)
-      ? monotonicProgressReporter(options?.onProgress)
-      : options?.onProgress;
+    const onProgress = options?.onProgress;
 
-    const generated = await this.generate(request, onProgress);
+    const generated = await this.generator.execute(
+      request,
+      onProgress ? { onProgress } : undefined,
+    );
 
     const playlist = Playlist.create({
       id: randomUUID(),
@@ -115,27 +100,6 @@ export class CreateSpotifyPlaylistUseCase {
 
     return response;
   }
-
-  private generate(
-    request: GenerationRequest,
-    onProgress?: ProgressReporter,
-  ): Promise<GeneratedPlaylist> {
-    const options = onProgress ? { onProgress } : undefined;
-    switch (request.kind) {
-      case 'artist_mix':
-        return this.artistMix.execute(request, options);
-      case 'genre_mix':
-        return this.genreMix.execute(request, options);
-      default:
-        return this.discover.execute(request, options);
-    }
-  }
-}
-
-function isDiscover(request: GenerationRequest): boolean {
-  return (
-    request.kind === 'discover_artist' || request.kind === 'discover_track'
-  );
 }
 
 function usageRecordFor(generated: GeneratedPlaylist): UsageRecord {

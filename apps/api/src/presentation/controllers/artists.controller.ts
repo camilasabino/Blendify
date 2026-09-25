@@ -1,9 +1,7 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
-import { User } from '../../domain/user/user.entity';
+import { OptionalJwtAuthGuard } from '../../infrastructure/auth/optional-jwt-auth.guard';
 import { SearchArtistsUseCase } from '../../application/use-cases/search-artists.use-case';
 import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
 import {
@@ -18,8 +16,7 @@ const ResolveArtistsSchema = z.object({
 });
 
 @ApiTags('artists')
-@ApiCookieAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(OptionalJwtAuthGuard)
 @Controller('api/artists')
 export class ArtistsController {
   constructor(private readonly search: SearchArtistsUseCase) {}
@@ -28,7 +25,6 @@ export class ArtistsController {
   @RateLimit('search')
   @ApiOperation({ summary: 'Search artists on Spotify' })
   async searchArtists(
-    @CurrentUser() _user: User,
     @Query(new ZodValidationPipe(SearchQuerySchema)) query: SearchQuery,
   ): Promise<{ artists: unknown[] }> {
     const artists = await this.search.execute({
@@ -45,7 +41,6 @@ export class ArtistsController {
       'Suggest similar artists from Last.fm only (no Spotify). Spotify IDs are resolved when creating the playlist.',
   })
   async similar(
-    @CurrentUser() _user: User,
     @Query('name') name?: string,
     @Query('exclude') excludeRaw?: string,
     @Query('offset') offsetRaw?: string,
@@ -74,7 +69,6 @@ export class ArtistsController {
   @RateLimit('resolve')
   @ApiOperation({ summary: 'Resolve artist names to Spotify artists' })
   async resolve(
-    @CurrentUser() _user: User,
     @Body(new ZodValidationPipe(ResolveArtistsSchema))
     body: z.output<typeof ResolveArtistsSchema>,
   ): Promise<{ artists: unknown[] }> {

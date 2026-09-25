@@ -1,8 +1,10 @@
 import type {
+  GeneratedPlaylistDto,
   PlaylistDetail,
   PlaylistSummary,
   TrackDto,
 } from '@blendify/contracts';
+import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
 import { Playlist } from '../../domain/playlist/playlist.entity';
 import { Track } from '../../domain/track/track.entity';
 
@@ -49,5 +51,18 @@ export function toPlaylistDetail(playlist: Playlist): PlaylistDetail {
     ...toPlaylistSummary(playlist),
     tracks: playlist.tracks.map(toTrackResponse),
     generation: playlist.generation,
+  };
+}
+
+export function toGeneratedPlaylistResponse(
+  playlist: GeneratedPlaylist,
+): GeneratedPlaylistDto {
+  return {
+    name: playlist.name,
+    description: playlist.description,
+    generation: playlist.generation,
+    seeds: [...playlist.seeds],
+    tracks: playlist.tracks.map(toTrackResponse),
+    coverCandidateUrl: playlist.coverCandidateUrl,
   };
 }

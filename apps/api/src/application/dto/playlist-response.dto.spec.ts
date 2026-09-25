@@ -1,8 +1,16 @@
-import { TrackSchema } from '@blendify/contracts';
+import {
+  GeneratedPlaylistSchema,
+  TrackSchema,
+  type PlaylistGeneration,
+} from '@blendify/contracts';
+import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
 import { Track } from '../../domain/track/track.entity';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
-import { toTrackResponse } from './playlist-response.dto';
+import {
+  toGeneratedPlaylistResponse,
+  toTrackResponse,
+} from './playlist-response.dto';
 
 function makeTrack(extra: Partial<Parameters<typeof Track.create>[0]> = {}) {
   return Track.create({
@@ -52,5 +60,43 @@ describe('toTrackResponse', () => {
     ]);
     expect(response.isrc).toBeUndefined();
     expect(response.externalUrl).toBeUndefined();
+  });
+});
+
+describe('toGeneratedPlaylistResponse', () => {
+  const generation: PlaylistGeneration = {
+    version: 1,
+    kind: 'artist_mix',
+    tracksPerSeed: 1,
+    seeds: [{ id: 'bieber-id', name: 'Justin Bieber' }],
+    popularity: 'balanced',
+    orderMode: 'random',
+  };
+
+  it('exposes the generated playlist without destination state', () => {
+    const track = makeTrack({ isrc: 'USUM72105936' });
+    const response = toGeneratedPlaylistResponse(
+      GeneratedPlaylist.create({
+        name: 'Blendify · Mix · Justin Bieber',
+        description: 'Made with Blendify.',
+        generation,
+        seeds: [{ type: 'artist', id: 'bieber-id', name: 'Justin Bieber' }],
+        tracks: [track],
+        coverCandidateUrl: 'https://images.example/cover.jpg',
+      }),
+    );
+
+    expect(GeneratedPlaylistSchema.parse(response)).toEqual(response);
+    expect(response).toEqual({
+      name: 'Blendify · Mix · Justin Bieber',
+      description: 'Made with Blendify.',
+      generation,
+      seeds: [{ type: 'artist', id: 'bieber-id', name: 'Justin Bieber' }],
+      tracks: [toTrackResponse(track)],
+      coverCandidateUrl: 'https://images.example/cover.jpg',
+    });
+    for (const key of ['id', 'userId', 'spotifyId', 'spotifyUrl', 'status']) {
+      expect(response).not.toHaveProperty(key);
+    }
   });
 });

@@ -14,6 +14,7 @@ import { CreateSpotifyPlaylistUseCase } from '../../application/use-cases/create
 import { GenerateArtistMixUseCase } from '../../application/use-cases/generate-artist-mix.use-case';
 import { GenerateDiscoverPlaylistUseCase } from '../../application/use-cases/generate-discover-playlist.use-case';
 import { GenerateGenreMixUseCase } from '../../application/use-cases/generate-genre-mix.use-case';
+import { GeneratePlaylistUseCase } from '../../application/use-cases/generate-playlist.use-case';
 import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
 import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
 import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
@@ -196,6 +197,7 @@ async function createApp(world: World): Promise<INestApplication> {
       GenerateArtistMixUseCase,
       GenerateGenreMixUseCase,
       GenerateDiscoverPlaylistUseCase,
+      GeneratePlaylistUseCase,
       CreateSpotifyPlaylistUseCase,
       PublishPlaylistService,
       GenreTrackCatalogService,
