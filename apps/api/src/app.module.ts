@@ -9,6 +9,7 @@ import { PlaybackModule } from './modules/playback.module';
 import { PlaylistsModule } from './modules/playlists.module';
 import { RequestLimitsModule } from './modules/request-limits.module';
 import { StatsModule } from './modules/stats.module';
+import { TransfersModule } from './modules/transfers.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { StatsModule } from './modules/stats.module';
     AuthModule,
     CatalogModule,
     GenerationModule,
+    TransfersModule,
     PlaylistsModule,
     StatsModule,
     PlaybackModule,

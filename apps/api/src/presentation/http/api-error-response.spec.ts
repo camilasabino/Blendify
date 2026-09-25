@@ -1,5 +1,6 @@
 import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import { TransferError } from '../../domain/errors/transfer.error';
 import { toApiErrorResponse } from './api-error-response';
 
 describe('toApiErrorResponse', () => {
@@ -30,5 +31,26 @@ describe('toApiErrorResponse', () => {
     expect(toApiErrorResponse(BusinessRuleError.noTracksFound())).toMatchObject(
       { statusCode: 422, code: 'NO_TRACKS_FOUND' },
     );
+  });
+
+  it.each([
+    [TransferError.tokenInvalid(), 400, 'TRANSFER_TOKEN_INVALID'],
+    [TransferError.tokenExpired(), 410, 'TRANSFER_TOKEN_EXPIRED'],
+    [TransferError.playlistRejected(), 422, 'TRANSFER_PLAYLIST_REJECTED'],
+  ])('maps %s without retry metadata', (error, statusCode, code) => {
+    const response = toApiErrorResponse(error);
+
+    expect(response).toMatchObject({ statusCode, code });
+    expect(response).not.toHaveProperty('details');
+  });
+
+  it('maps an unavailable transfer provider to a retryable 503', () => {
+    expect(toApiErrorResponse(TransferError.providerUnavailable(45))).toEqual({
+      statusCode: 503,
+      code: 'TRANSFER_PROVIDER_UNAVAILABLE',
+      message:
+        'The transfer service is temporarily unavailable. Try again shortly.',
+      details: { retryAfterSeconds: 45 },
+    });
   });
 });

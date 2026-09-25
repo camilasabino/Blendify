@@ -5,6 +5,7 @@ export const RATE_LIMIT_BUCKETS = [
   'similar',
   'resolve',
   'generation',
+  'transfer',
 ] as const;
 export type RateLimitBucket = (typeof RATE_LIMIT_BUCKETS)[number];
 
@@ -24,6 +25,11 @@ export const DEFAULT_RATE_LIMITS: RateLimitPolicies = {
   resolve: { limit: 20, windowMs: 60_000, onStoreUnavailable: 'fail-closed' },
   generation: {
     limit: 12,
+    windowMs: 600_000,
+    onStoreUnavailable: 'fail-closed',
+  },
+  transfer: {
+    limit: 10,
     windowMs: 600_000,
     onStoreUnavailable: 'fail-closed',
   },

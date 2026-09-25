@@ -154,7 +154,7 @@ describe('RequestLimiter', () => {
       },
     );
 
-    it.each(['resolve', 'generation'] as const)(
+    it.each(['resolve', 'generation', 'transfer'] as const)(
       'fails closed for %s in production, whether authenticated or not',
       async (bucket) => {
         const limiter = new RequestLimiter(

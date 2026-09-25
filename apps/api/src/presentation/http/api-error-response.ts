@@ -4,7 +4,18 @@ import { ZodError } from 'zod';
 import { DomainError } from '../../domain/errors/domain.error';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
+import {
+  TransferError,
+  type TransferErrorCode,
+} from '../../domain/errors/transfer.error';
 import { RequestLimitError } from './request-limit.error';
+
+const TRANSFER_ERROR_STATUS: Record<TransferErrorCode, number> = {
+  TRANSFER_TOKEN_INVALID: HttpStatus.BAD_REQUEST,
+  TRANSFER_TOKEN_EXPIRED: HttpStatus.GONE,
+  TRANSFER_PLAYLIST_REJECTED: HttpStatus.UNPROCESSABLE_ENTITY,
+  TRANSFER_PROVIDER_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+};
 
 export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
   if (exception instanceof ZodError) {
@@ -22,6 +33,17 @@ export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
       code: exception.code,
       message: exception.message,
       details: { retryAfterSeconds: exception.retryAfterSeconds },
+    };
+  }
+
+  if (exception instanceof TransferError) {
+    return {
+      statusCode: TRANSFER_ERROR_STATUS[exception.code],
+      code: exception.code,
+      message: exception.message,
+      ...(exception.retryAfterSeconds
+        ? { details: { retryAfterSeconds: exception.retryAfterSeconds } }
+        : {}),
     };
   }
 

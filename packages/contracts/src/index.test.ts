@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ApiErrorResponseSchema,
   CreateDiscoverRequestSchema,
+  CreateTransferRequestSchema,
   CreateMixRequestSchema,
   GenerateDiscoverRequestSchema,
   GenerateMixRequestSchema,
@@ -13,6 +14,8 @@ import {
   PlaylistLibraryQuerySchema,
   PlaylistGenerationSchema,
   PlaylistSummarySchema,
+  PlaylistTransferSchema,
+  TRANSFER_TOKEN_MAX_LENGTH,
   TrackSchema,
   TrackSeedSchema,
 } from './index';
@@ -305,6 +308,10 @@ describe('guest generation contracts', () => {
       },
     ],
     coverCandidateUrl: 'https://images.example/cover.jpg',
+    transfer: {
+      token: 'signed-transfer-token',
+      expiresAt: '2026-09-25T13:00:00.000Z',
+    },
   };
 
   it('round-trips a generated playlist without destination state', () => {
@@ -332,5 +339,67 @@ describe('guest generation contracts', () => {
         percent: 50,
       }),
     ).toMatchObject({ type: 'progress' });
+  });
+
+  it('accepts a generated playlist whose transfer is unavailable', () => {
+    const unavailable = { ...generated, transfer: null };
+
+    expect(GeneratedPlaylistSchema.parse(unavailable)).toEqual(unavailable);
+    const { transfer: _transfer, ...withoutTransfer } = generated;
+    expect(GeneratedPlaylistSchema.safeParse(withoutTransfer).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('transfer contracts', () => {
+  it('accepts only a transfer token', () => {
+    expect(
+      CreateTransferRequestSchema.parse({ transferToken: 'token' }),
+    ).toEqual({ transferToken: 'token' });
+
+    for (const extra of [
+      { tracks: [] },
+      { destination: 'spotify' },
+      { sourceName: 'Other' },
+      { sourceLogo: 'https://evil.example/logo.png' },
+      { userId: 'user-1' },
+      { accessToken: 'spotify-token' },
+    ]) {
+      expect(
+        CreateTransferRequestSchema.safeParse({
+          transferToken: 'token',
+          ...extra,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('bounds the transfer token length', () => {
+    expect(
+      CreateTransferRequestSchema.safeParse({ transferToken: '' }).success,
+    ).toBe(false);
+    expect(
+      CreateTransferRequestSchema.safeParse({
+        transferToken: 'x'.repeat(TRANSFER_TOKEN_MAX_LENGTH + 1),
+      }).success,
+    ).toBe(false);
+  });
+
+  it('describes a provider-neutral transfer result', () => {
+    const transfer = {
+      url: 'https://soundiiz.com/go/import-playlist/abc123',
+      expiresAt: '2026-09-26T12:00:00.000Z',
+      trackCount: 2,
+    };
+
+    expect(PlaylistTransferSchema.parse(transfer)).toEqual(transfer);
+    expect(
+      PlaylistTransferSchema.safeParse({ ...transfer, trackCount: 0 }).success,
+    ).toBe(false);
+    expect(
+      PlaylistTransferSchema.safeParse({ ...transfer, url: 'not a url' })
+        .success,
+    ).toBe(false);
   });
 });

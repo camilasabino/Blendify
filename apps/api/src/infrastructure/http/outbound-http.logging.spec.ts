@@ -1,5 +1,8 @@
+import { Logger } from '@nestjs/common';
+import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios';
 import {
   buildOutboundHttpLog,
+  createOutboundHttp,
   parseOutboundRequestBody,
   resolveOutboundUrl,
   sanitizeOutboundUrl,
@@ -110,5 +113,49 @@ describe('outbound http logging', () => {
           typeof item === 'object' && item != null && '_omitted' in item,
       ),
     ).toBe(true);
+  });
+});
+
+describe('outbound http body logging', () => {
+  const adapter: AxiosAdapter = (config: InternalAxiosRequestConfig) =>
+    Promise.resolve({
+      data: { shareUrl: 'https://soundiiz.com/go/import-playlist/secret-link' },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  async function logLine(options?: { logBodies?: boolean }): Promise<string> {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    await createOutboundHttp({ adapter }, options).post(
+      'https://soundiiz.com/go/import-playlist',
+      { tracklist: [{ title: 'Private Track Title' }] },
+    );
+    return String(log.mock.calls[0][0]);
+  }
+
+  it('keeps logging request and response bodies by default', async () => {
+    const line = await logLine();
+
+    expect(line).toContain('Private Track Title');
+    expect(line).toContain('secret-link');
+  });
+
+  it('omits bodies when disabled but keeps request metadata', async () => {
+    const line = JSON.parse(await logLine({ logBodies: false })) as Record<
+      string,
+      unknown
+    >;
+
+    expect(line).toEqual({
+      type: 'outbound_http',
+      method: 'POST',
+      url: 'https://soundiiz.com/go/import-playlist',
+      status: 200,
+      durationMs: expect.any(Number) as number,
+    });
   });
 });

@@ -84,6 +84,7 @@ describe('toGeneratedPlaylistResponse', () => {
         tracks: [track],
         coverCandidateUrl: 'https://images.example/cover.jpg',
       }),
+      null,
     );
 
     expect(GeneratedPlaylistSchema.parse(response)).toEqual(response);
@@ -94,9 +95,28 @@ describe('toGeneratedPlaylistResponse', () => {
       seeds: [{ type: 'artist', id: 'bieber-id', name: 'Justin Bieber' }],
       tracks: [toTrackResponse(track)],
       coverCandidateUrl: 'https://images.example/cover.jpg',
+      transfer: null,
     });
     for (const key of ['id', 'userId', 'spotifyId', 'spotifyUrl', 'status']) {
       expect(response).not.toHaveProperty(key);
     }
+  });
+
+  it('exposes the transfer offer with an ISO expiry', () => {
+    const response = toGeneratedPlaylistResponse(
+      GeneratedPlaylist.create({
+        name: 'Blendify · Mix · Justin Bieber',
+        generation,
+        seeds: [{ type: 'artist', id: 'bieber-id', name: 'Justin Bieber' }],
+        tracks: [makeTrack()],
+      }),
+      { token: 'signed', expiresAt: new Date('2026-09-25T13:00:00Z') },
+    );
+
+    expect(response.transfer).toEqual({
+      token: 'signed',
+      expiresAt: '2026-09-25T13:00:00.000Z',
+    });
+    expect(GeneratedPlaylistSchema.parse(response)).toEqual(response);
   });
 });

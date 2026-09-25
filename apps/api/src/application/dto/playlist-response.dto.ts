@@ -7,6 +7,7 @@ import type {
 import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
 import { Playlist } from '../../domain/playlist/playlist.entity';
 import { Track } from '../../domain/track/track.entity';
+import type { PlaylistTransferOffer } from '../services/playlist-transfer-tokens.service';
 
 export function toTrackResponse(track: Track): TrackDto {
   return {
@@ -56,6 +57,7 @@ export function toPlaylistDetail(playlist: Playlist): PlaylistDetail {
 
 export function toGeneratedPlaylistResponse(
   playlist: GeneratedPlaylist,
+  transfer: PlaylistTransferOffer | null,
 ): GeneratedPlaylistDto {
   return {
     name: playlist.name,
@@ -64,5 +66,8 @@ export function toGeneratedPlaylistResponse(
     seeds: [...playlist.seeds],
     tracks: playlist.tracks.map(toTrackResponse),
     coverCandidateUrl: playlist.coverCandidateUrl,
+    transfer: transfer
+      ? { token: transfer.token, expiresAt: transfer.expiresAt.toISOString() }
+      : null,
   };
 }

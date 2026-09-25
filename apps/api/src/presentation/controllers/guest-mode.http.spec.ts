@@ -11,6 +11,7 @@ import {
   GeneratedPlaylistSchema,
   GeneratedPlaylistStreamEventSchema,
   PlaylistDetailSchema,
+  PlaylistTransferSchema,
   type GeneratedPlaylistStreamEvent,
 } from '@blendify/contracts';
 import { GenreCatalogService } from '../../application/services/genre-catalog.service';
@@ -25,6 +26,8 @@ import { GenerateGenreMixUseCase } from '../../application/use-cases/generate-ge
 import { GeneratePlaylistUseCase } from '../../application/use-cases/generate-playlist.use-case';
 import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
 import { GetUserStatsUseCase } from '../../application/use-cases/get-user-stats.use-case';
+import { CreatePlaylistTransferUseCase } from '../../application/use-cases/create-playlist-transfer.use-case';
+import { PlaylistTransferTokens } from '../../application/services/playlist-transfer-tokens.service';
 import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
 import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
 import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
@@ -32,11 +35,14 @@ import { ResetUserStatsUseCase } from '../../application/use-cases/reset-user-st
 import { SearchArtistsUseCase } from '../../application/use-cases/search-artists.use-case';
 import { SearchTracksUseCase } from '../../application/use-cases/search-tracks.use-case';
 import { Artist } from '../../domain/artist/artist.entity';
+import { TransferError } from '../../domain/errors/transfer.error';
+import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
 import type { Playlist } from '../../domain/playlist/playlist.entity';
 import { CATALOG_PROVIDER_FACTORY } from '../../domain/repositories/catalog-provider.port';
 import { DISCOVERY_CATALOG } from '../../domain/repositories/discovery-catalog.port';
 import { MUSIC_PROVIDER_FACTORY } from '../../domain/repositories/music-provider.factory.port';
 import { PLAYLIST_REPOSITORY } from '../../domain/repositories/playlist.repository.port';
+import { PLAYLIST_TRANSFER_GATEWAY } from '../../domain/repositories/playlist-transfer.gateway.port';
 import { PROVIDER_QUOTA } from '../../domain/repositories/provider-quota.port';
 import { USAGE_STATS_REPOSITORY } from '../../domain/repositories/usage-stats.repository.port';
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository.port';
@@ -48,6 +54,7 @@ import { AuthService } from '../../infrastructure/auth/auth.service';
 import { JwtStrategy } from '../../infrastructure/auth/jwt.strategy';
 import { SpotifyAuthClient } from '../../infrastructure/spotify/spotify-auth.client';
 import { GlobalExceptionFilter } from '../filters/global-exception.filter';
+import { GuestTransferGate } from '../guards/guest-transfer.gate';
 import { OriginCsrfGuard } from '../guards/origin-csrf.guard';
 import { createBodyParser } from '../http/body-limits';
 import { RequestLimiter } from '../request-limits/request-limiter';
@@ -65,6 +72,7 @@ import { PlayerController } from './player.controller';
 import { PlaylistsController } from './playlists.controller';
 import { StatsController } from './stats.controller';
 import { TracksController } from './tracks.controller';
+import { TransfersController } from './transfers.controller';
 
 const FRONTEND = 'http://localhost:5173';
 const ANY_IP = expect.stringMatching(/^ip:/) as string;
@@ -95,7 +103,11 @@ function makeTrack(artistName: string, trackName: string): Track {
     durationMs: 200_000,
     popularity: 0,
     uri: `spotify:track:${id}`,
-    isrc: `ISRC${slug(id).slice(0, 8).toUpperCase()}`,
+    isrc: id
+      .replaceAll(/[^a-z0-9]/g, '')
+      .toUpperCase()
+      .padEnd(12, '0')
+      .slice(0, 12),
     externalUrl: `https://open.spotify.com/track/${id}`,
   });
 }
@@ -210,6 +222,15 @@ function createWorld() {
     stats: { execute: jest.fn() },
     resetStats: { execute: jest.fn() },
     playback: { listDevices: jest.fn(), play: jest.fn() },
+    transferGateway: {
+      createTransfer: jest.fn(() =>
+        Promise.resolve({
+          url: 'https://soundiiz.com/go/import-playlist/0123456789abcdef0123456789abcdef',
+          expiresAt: new Date('2026-09-26T12:00:00.000Z'),
+          trackCount: 2,
+        }),
+      ),
+    },
   };
 }
 
@@ -218,12 +239,13 @@ type World = ReturnType<typeof createWorld>;
 async function createApp(
   world: World,
   limits: Partial<RequestLimitsConfig> = {},
+  env: Record<string, string> = {},
 ): Promise<INestApplication> {
   const module = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({
         ignoreEnvFile: true,
-        load: [() => ({ FRONTEND_URL: FRONTEND, JWT_SECRET })],
+        load: [() => ({ FRONTEND_URL: FRONTEND, JWT_SECRET, ...env })],
       }),
       PassportModule.register({ defaultStrategy: 'jwt' }),
       JwtModule.register({
@@ -241,6 +263,7 @@ async function createApp(
       PlaylistsController,
       StatsController,
       PlayerController,
+      TransfersController,
     ],
     providers: [
       AuthService,
@@ -278,6 +301,10 @@ async function createApp(
       { provide: GetUserStatsUseCase, useValue: world.stats },
       { provide: ResetUserStatsUseCase, useValue: world.resetStats },
       { provide: ControlPlaybackUseCase, useValue: world.playback },
+      PlaylistTransferTokens,
+      GuestTransferGate,
+      CreatePlaylistTransferUseCase,
+      { provide: PLAYLIST_TRANSFER_GATEWAY, useValue: world.transferGateway },
       ...inMemoryRequestLimitProviders(limits),
     ],
   }).compile();
@@ -381,9 +408,12 @@ describe('Guest Mode HTTP boundary', () => {
   let world: World;
   let app: INestApplication;
 
-  async function start(limits: Partial<RequestLimitsConfig> = {}) {
+  async function start(
+    limits: Partial<RequestLimitsConfig> = {},
+    env: Record<string, string> = {},
+  ) {
     world = createWorld();
-    app = await createApp(world, limits);
+    app = await createApp(world, limits, env);
   }
 
   afterEach(async () => {
@@ -962,6 +992,350 @@ describe('Guest Mode HTTP boundary', () => {
         .set('Origin', FRONTEND)
         .send(discoverArtistBody)
         .expect(201);
+    });
+  });
+
+  describe('guest transfer', () => {
+    const ENABLED = { GUEST_TRANSFER_ENABLED: 'true' };
+
+    function issueToken(): string {
+      const offer = app.get(PlaylistTransferTokens).issue(
+        GeneratedPlaylist.create({
+          name: 'Blendify · Mix · Sade',
+          description: 'Made with Blendify from Sade.',
+          generation: {
+            version: 1,
+            kind: 'artist_mix',
+            tracksPerSeed: 1,
+            seeds: [{ id: 'sade', name: 'Sade' }],
+            popularity: 'balanced',
+            orderMode: 'random',
+          },
+          seeds: [{ type: 'artist', id: 'sade', name: 'Sade' }],
+          tracks: [
+            makeTrack('Sade', 'Smooth Operator'),
+            makeTrack('Sade', 'No Ordinary Love'),
+          ],
+        }),
+      );
+      return offer!.token;
+    }
+
+    function transfer(body: unknown) {
+      return request(httpServer())
+        .post('/api/transfers')
+        .set('Origin', FRONTEND)
+        .send(body as object);
+    }
+
+    function expectNoTransferSideEffects() {
+      expectNoSpotifySideEffects();
+      expect(world.users.findById).not.toHaveBeenCalled();
+      expect(world.provider.searchArtists).not.toHaveBeenCalled();
+      expect(world.provider.resolveTrack).not.toHaveBeenCalled();
+    }
+
+    describe('while GUEST_TRANSFER_ENABLED is off', () => {
+      beforeEach(() => start());
+
+      it.each(generationCases)(
+        'generates $body.kind without a transfer offer',
+        async ({ path, body }) => {
+          const response = await request(httpServer())
+            .post(path)
+            .set('Origin', FRONTEND)
+            .send(body)
+            .expect(201);
+
+          expect(GeneratedPlaylistSchema.parse(response.body).transfer).toBe(
+            null,
+          );
+        },
+      );
+
+      it('hides the transfer route before limiting or calling the provider', async () => {
+        const consume = jest.spyOn(app.get(RequestLimiter), 'consume');
+
+        const response = await transfer({ transferToken: issueToken() }).expect(
+          404,
+        );
+
+        expect(response.body).toMatchObject({ code: 'NOT_FOUND' });
+        expect(consume).not.toHaveBeenCalled();
+        expect(world.transferGateway.createTransfer).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('while GUEST_TRANSFER_ENABLED is on', () => {
+      beforeEach(() => start({}, ENABLED));
+
+      it.each(generationCases)(
+        'transfers a generated $body.kind without a session or Spotify side effects',
+        async ({ path, body }) => {
+          const generated = await request(httpServer())
+            .post(path)
+            .set('Origin', FRONTEND)
+            .send(body)
+            .expect(201);
+          const playlist = GeneratedPlaylistSchema.parse(generated.body);
+          expect(playlist.transfer).not.toBeNull();
+          expect(Date.parse(playlist.transfer!.expiresAt)).toBeGreaterThan(
+            Date.now(),
+          );
+          jest.clearAllMocks();
+
+          const response = await transfer({
+            transferToken: playlist.transfer!.token,
+          }).expect(201);
+
+          expect(PlaylistTransferSchema.parse(response.body)).toEqual({
+            url: 'https://soundiiz.com/go/import-playlist/0123456789abcdef0123456789abcdef',
+            expiresAt: '2026-09-26T12:00:00.000Z',
+            trackCount: 2,
+          });
+          expect(Object.keys(response.body as object).sort()).toEqual([
+            'expiresAt',
+            'trackCount',
+            'url',
+          ]);
+          expect(world.transferGateway.createTransfer).toHaveBeenCalledWith({
+            title: playlist.name,
+            ...(playlist.description
+              ? { description: playlist.description }
+              : {}),
+            tracks: playlist.tracks.map((track) => ({
+              title: track.name,
+              artists: track.artists!.map((artist) => artist.name),
+              isrc: track.isrc,
+            })),
+          });
+          expectNoTransferSideEffects();
+        },
+      );
+
+      it('includes the transfer offer in the NDJSON result event', async () => {
+        const response = await request(httpServer())
+          .post('/api/generate/mix')
+          .set('Origin', FRONTEND)
+          .set('Accept', 'application/x-ndjson')
+          .buffer(true)
+          .parse(readNdjson)
+          .send(artistMixBody)
+          .expect(200);
+
+        const result = parseEvents(response.body as string).at(-1);
+        expect(result?.type).toBe('result');
+        if (result?.type === 'result') {
+          expect(result.playlist.transfer?.token).toEqual(expect.any(String));
+        }
+      });
+
+      it('gives a valid session identical transfer semantics under a user identity', async () => {
+        const token = issueToken();
+        const consume = jest.spyOn(app.get(RequestLimiter), 'consume');
+
+        const anonymous = await transfer({ transferToken: token }).expect(201);
+        const signedIn = await request(httpServer())
+          .post('/api/transfers')
+          .set('Origin', FRONTEND)
+          .set('Cookie', await sessionCookie('user-1'))
+          .send({ transferToken: token })
+          .expect(201);
+
+        expect(signedIn.body).toEqual(anonymous.body);
+        expect(world.transferGateway.createTransfer.mock.calls[1]).toEqual(
+          world.transferGateway.createTransfer.mock.calls[0],
+        );
+        expect(
+          consume.mock.calls.map(([bucket, identity]) => [
+            bucket,
+            identity.key,
+          ]),
+        ).toEqual([
+          ['transfer', ANY_IP],
+          ['transfer', 'u:user-1'],
+        ]);
+      });
+
+      it('treats stale or unusable sessions as guests', async () => {
+        const token = issueToken();
+
+        for (const cookie of Object.values(await staleCookies())) {
+          await request(httpServer())
+            .post('/api/transfers')
+            .set('Origin', FRONTEND)
+            .set('Cookie', cookie)
+            .send({ transferToken: token })
+            .expect(201);
+        }
+      });
+
+      it('requires the configured frontend origin', async () => {
+        const token = issueToken();
+
+        await request(httpServer())
+          .post('/api/transfers')
+          .send({ transferToken: token })
+          .expect(403);
+        await request(httpServer())
+          .post('/api/transfers')
+          .set('Origin', 'https://evil.example')
+          .send({ transferToken: token })
+          .expect(403);
+
+        expect(world.transferGateway.createTransfer).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        { tracks: [{ title: 'Any', artists: ['Any'] }] },
+        { destination: 'spotify' },
+        { sourceName: 'Other brand' },
+        { sourceLogo: 'https://evil.example/logo.png' },
+        { userId: 'user-1' },
+        { accessToken: 'spotify-access-token' },
+      ])('rejects caller-supplied %j', async (extra) => {
+        const response = await transfer({
+          transferToken: issueToken(),
+          ...extra,
+        }).expect(400);
+
+        expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+        expect(world.transferGateway.createTransfer).not.toHaveBeenCalled();
+      });
+
+      it('rejects arbitrary playlists without a transfer token', async () => {
+        await transfer({
+          title: 'Anything',
+          tracklist: [{ title: 'x', artists: ['y'] }],
+        }).expect(400);
+
+        expect(world.transferGateway.createTransfer).not.toHaveBeenCalled();
+      });
+
+      it('rejects a tampered token', async () => {
+        const [header, body, signature] = issueToken().split('.');
+        const payload = JSON.parse(
+          Buffer.from(body, 'base64url').toString('utf8'),
+        ) as { pl: { title: string } };
+        payload.pl.title = 'Visit evil.example';
+        const forged = [
+          header,
+          Buffer.from(JSON.stringify(payload)).toString('base64url'),
+          signature,
+        ].join('.');
+
+        const response = await transfer({ transferToken: forged }).expect(400);
+
+        expect(response.body).toMatchObject({ code: 'TRANSFER_TOKEN_INVALID' });
+        expect(world.transferGateway.createTransfer).not.toHaveBeenCalled();
+      });
+
+      it('rejects a session cookie JWT used as a transfer token', async () => {
+        const sessionJwt = (await sessionCookie('user-1')).split('=')[1];
+
+        const response = await transfer({ transferToken: sessionJwt }).expect(
+          400,
+        );
+
+        expect(response.body).toMatchObject({ code: 'TRANSFER_TOKEN_INVALID' });
+      });
+
+      it('reports an expired token as gone', async () => {
+        const realNow = Date.now();
+        jest.spyOn(Date, 'now').mockReturnValue(realNow - 2 * 60 * 60 * 1000);
+        const token = issueToken();
+        jest.spyOn(Date, 'now').mockReturnValue(realNow);
+
+        const response = await transfer({ transferToken: token }).expect(410);
+
+        expect(response.body).toMatchObject({ code: 'TRANSFER_TOKEN_EXPIRED' });
+        expect(world.transferGateway.createTransfer).not.toHaveBeenCalled();
+      });
+
+      it('maps a provider rejection to 422', async () => {
+        world.transferGateway.createTransfer.mockRejectedValueOnce(
+          TransferError.playlistRejected(),
+        );
+
+        const response = await transfer({ transferToken: issueToken() }).expect(
+          422,
+        );
+
+        expect(response.body).toMatchObject({
+          code: 'TRANSFER_PLAYLIST_REJECTED',
+        });
+      });
+
+      it('maps provider unavailability to 503 with Retry-After', async () => {
+        world.transferGateway.createTransfer.mockRejectedValueOnce(
+          TransferError.providerUnavailable(30),
+        );
+
+        const response = await transfer({ transferToken: issueToken() }).expect(
+          503,
+        );
+
+        expect(response.body).toMatchObject({
+          code: 'TRANSFER_PROVIDER_UNAVAILABLE',
+          details: { retryAfterSeconds: 30 },
+        });
+        expect(response.headers['retry-after']).toBe('30');
+      });
+
+      it('selects the 64 KB transfer body limit', async () => {
+        const token = issueToken();
+
+        const tooLong = await transfer({
+          transferToken: 'x'.repeat(48_001),
+        }).expect(400);
+        expect(tooLong.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+
+        const oversized = await request(httpServer())
+          .post('/api/transfers')
+          .set('Origin', FRONTEND)
+          .set('Content-Type', 'application/json')
+          .send(
+            JSON.stringify({
+              transferToken: token,
+              pad: 'x'.repeat(64 * 1024),
+            }),
+          )
+          .expect(413);
+        expect(oversized.body).toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
+        expect(world.transferGateway.createTransfer).not.toHaveBeenCalled();
+      });
+    });
+
+    it('applies the transfer bucket', async () => {
+      await start(
+        {
+          rateLimits: {
+            ...DEFAULT_RATE_LIMITS,
+            transfer: { ...DEFAULT_RATE_LIMITS.transfer, limit: 1 },
+          },
+        },
+        ENABLED,
+      );
+      const token = issueToken();
+
+      await transfer({ transferToken: token }).expect(201);
+      const limited = await transfer({ transferToken: token }).expect(429);
+
+      expect(limited.body).toMatchObject({ code: 'RATE_LIMITED' });
+      expect(limited.headers['retry-after']).toBeDefined();
+      expect(world.transferGateway.createTransfer).toHaveBeenCalledTimes(1);
+    });
+
+    it('fails closed in production when the limiter store is unavailable', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      await start({ production: true }, ENABLED);
+
+      const response = await transfer({ transferToken: issueToken() }).expect(
+        503,
+      );
+
+      expect(response.body).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+      expect(world.transferGateway.createTransfer).not.toHaveBeenCalled();
     });
   });
 });

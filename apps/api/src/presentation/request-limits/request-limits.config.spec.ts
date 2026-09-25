@@ -27,8 +27,21 @@ describe('resolveRateLimits', () => {
     expect(limits.resolve).toEqual(DEFAULT_RATE_LIMITS.resolve);
   });
 
+  it('defines a fail-closed transfer bucket that can be overridden', () => {
+    expect(DEFAULT_RATE_LIMITS.transfer).toEqual({
+      limit: 10,
+      windowMs: 600_000,
+      onStoreUnavailable: 'fail-closed',
+    });
+    expect(resolveRateLimits('transfer=3/60').transfer).toEqual({
+      limit: 3,
+      windowMs: 60_000,
+      onStoreUnavailable: 'fail-closed',
+    });
+  });
+
   it.each([
-    ['unknown bucket', 'transfer=5/60', /unknown bucket "transfer"/],
+    ['unknown bucket', 'upload=5/60', /unknown bucket "upload"/],
     ['duplicate bucket', 'search=5/60,search=6/60', /duplicate bucket/],
     ['zero limit', 'search=0/60', /positive integer/],
     ['negative window', 'search=5/-60', /positive integer/],

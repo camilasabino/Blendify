@@ -14,6 +14,7 @@ export const BODY_LIMITS = {
   bulk: '64kb',
   spotifyGeneration: '512kb',
   publicGeneration: '32kb',
+  transfer: '64kb',
 } as const;
 
 export interface RouteBodyLimit {
@@ -44,6 +45,7 @@ export const ROUTE_BODY_LIMITS: RouteBodyLimit[] = [
     path: '/api/generate/discover',
     limit: BODY_LIMITS.publicGeneration,
   },
+  { method: 'POST', path: '/api/transfers', limit: BODY_LIMITS.transfer },
 ];
 
 export function bodyLimitFor(

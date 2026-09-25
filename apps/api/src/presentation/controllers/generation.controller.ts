@@ -12,6 +12,7 @@ import {
   type PlaylistGenerationRequest,
 } from '../../application/use-cases/generate-playlist.use-case';
 import { toGeneratedPlaylistResponse } from '../../application/dto/playlist-response.dto';
+import { PlaylistTransferTokens } from '../../application/services/playlist-transfer-tokens.service';
 import type { ProgressReporter } from '../../application/services/generation-progress.tracker';
 import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
 import {
@@ -20,12 +21,17 @@ import {
 } from '../http/ndjson-generation';
 import { RateLimit } from '../request-limits/rate-limit.guard';
 import { LimitGenerationConcurrency } from '../request-limits/generation-concurrency.interceptor';
+import { GuestTransferGate } from '../guards/guest-transfer.gate';
 
 @ApiTags('generate')
 @UseGuards(OptionalJwtAuthGuard)
 @Controller('api/generate')
 export class GenerationController {
-  constructor(private readonly generator: GeneratePlaylistUseCase) {}
+  constructor(
+    private readonly generator: GeneratePlaylistUseCase,
+    private readonly transferTokens: PlaylistTransferTokens,
+    private readonly transferGate: GuestTransferGate,
+  ) {}
 
   @Post('mix')
   @RateLimit('generation')
@@ -76,6 +82,9 @@ export class GenerationController {
       request,
       onProgress ? { onProgress } : undefined,
     );
-    return toGeneratedPlaylistResponse(generated);
+    const transfer = this.transferGate.enabled
+      ? this.transferTokens.issue(generated)
+      : null;
+    return toGeneratedPlaylistResponse(generated, transfer);
   }
 }

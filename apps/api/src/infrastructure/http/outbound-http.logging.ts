@@ -350,10 +350,15 @@ export function buildOutboundHttpLog(input: {
   };
 }
 
+export interface OutboundHttpLoggingOptions {
+  logBodies?: boolean;
+}
+
 function logOutbound(
   config: InternalAxiosRequestConfig | undefined,
   status: string | number,
-  responseBody?: unknown,
+  responseBody: unknown,
+  logBodies: boolean,
 ): void {
   if (!config) return;
   const timed = config as TimedConfig;
@@ -362,7 +367,7 @@ function logOutbound(
   const method = (config.method ?? 'GET').toUpperCase();
   const url = resolveOutboundUrl(config);
   const request =
-    methodMayHaveBody(method) && config.data !== undefined
+    logBodies && methodMayHaveBody(method) && config.data !== undefined
       ? parseOutboundRequestBody(config.data)
       : undefined;
   const payload = buildOutboundHttpLog({
@@ -371,7 +376,7 @@ function logOutbound(
     status,
     durationMs,
     ...(request !== undefined ? { request } : {}),
-    response: responseBody,
+    ...(logBodies ? { response: responseBody } : {}),
   });
   const line = JSON.stringify(payload);
 
@@ -386,7 +391,10 @@ function logOutbound(
   logger.log(line);
 }
 
-export function attachOutboundHttpLogging(client: AxiosInstance): void {
+export function attachOutboundHttpLogging(
+  client: AxiosInstance,
+  { logBodies = true }: OutboundHttpLoggingOptions = {},
+): void {
   client.interceptors.request.use((config) => {
     const timed = config as TimedConfig;
     timed.__outboundStartedAt = Date.now();
@@ -395,14 +403,14 @@ export function attachOutboundHttpLogging(client: AxiosInstance): void {
 
   client.interceptors.response.use(
     (response: AxiosResponse) => {
-      logOutbound(response.config, response.status, response.data);
+      logOutbound(response.config, response.status, response.data, logBodies);
       return response;
     },
     (error: unknown) => {
       if (axios.isAxiosError(error)) {
         const ax = error as AxiosError;
         const status = ax.response?.status ?? ax.code ?? 'ERROR';
-        logOutbound(ax.config, status, ax.response?.data);
+        logOutbound(ax.config, status, ax.response?.data, logBodies);
         return Promise.reject(error);
       }
       logger.warn(
@@ -424,8 +432,9 @@ export function attachOutboundHttpLogging(client: AxiosInstance): void {
 
 export function createOutboundHttp(
   config?: CreateAxiosDefaults,
+  options?: OutboundHttpLoggingOptions,
 ): AxiosInstance {
   const client = axios.create(config);
-  attachOutboundHttpLogging(client);
+  attachOutboundHttpLogging(client, options);
   return client;
 }

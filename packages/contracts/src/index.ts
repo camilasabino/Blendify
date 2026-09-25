@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const MAX_ARTISTS = 12;
 export const MAX_GENRES = 5;
 export const MAX_TRACKS = 50;
+export const TRANSFER_TOKEN_MAX_LENGTH = 48_000;
 
 export const POPULARITY_MODES = ['popular', 'balanced', 'rarities'] as const;
 export const TRACK_ORDER_MODES = ['artist', 'title', 'random'] as const;
@@ -293,6 +294,11 @@ export const PlaylistDetailSchema = PlaylistSummarySchema.extend({
   generation: PlaylistGenerationSchema,
 });
 
+export const PlaylistTransferOfferSchema = z.object({
+  token: z.string().min(1).max(TRANSFER_TOKEN_MAX_LENGTH),
+  expiresAt: z.string(),
+});
+
 export const GeneratedPlaylistSchema = z.object({
   name: z.string(),
   description: z.string(),
@@ -300,6 +306,19 @@ export const GeneratedPlaylistSchema = z.object({
   seeds: z.array(PlaylistSeedSchema),
   tracks: z.array(TrackSchema),
   coverCandidateUrl: z.string().optional(),
+  transfer: PlaylistTransferOfferSchema.nullable(),
+});
+
+export const CreateTransferRequestSchema = z
+  .object({
+    transferToken: z.string().min(1).max(TRANSFER_TOKEN_MAX_LENGTH),
+  })
+  .strict();
+
+export const PlaylistTransferSchema = z.object({
+  url: z.url(),
+  expiresAt: z.string(),
+  trackCount: z.number().int().positive(),
 });
 
 export const PlaylistLibraryPageSchema = z.object({
@@ -402,6 +421,11 @@ export type GenerateDiscoverRequest = z.input<
 export type PlaylistSummary = z.infer<typeof PlaylistSummarySchema>;
 export type PlaylistDetail = z.infer<typeof PlaylistDetailSchema>;
 export type GeneratedPlaylistDto = z.infer<typeof GeneratedPlaylistSchema>;
+export type PlaylistTransferOfferDto = z.infer<
+  typeof PlaylistTransferOfferSchema
+>;
+export type CreateTransferRequest = z.infer<typeof CreateTransferRequestSchema>;
+export type PlaylistTransferDto = z.infer<typeof PlaylistTransferSchema>;
 export type PlaylistLibraryPage = z.infer<typeof PlaylistLibraryPageSchema>;
 export type BulkLibraryResult = z.infer<typeof BulkLibraryResultSchema>;
 export type PlaylistLibraryQuery = z.infer<

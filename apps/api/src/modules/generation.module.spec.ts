@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { GeneratePlaylistUseCase } from '../application/use-cases/generate-playlist.use-case';
 import { CATALOG_PROVIDER_FACTORY } from '../domain/repositories/catalog-provider.port';
@@ -33,7 +34,15 @@ class CatalogOnlyPortsModule {}
 describe('GenerationModule', () => {
   it('resolves without user, publication, persistence, or stats ports', async () => {
     const module = await Test.createTestingModule({
-      imports: [CatalogOnlyPortsModule, GenerationModule],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          ignoreEnvFile: true,
+          load: [() => ({ JWT_SECRET: 'module-test-secret' })],
+        }),
+        CatalogOnlyPortsModule,
+        GenerationModule,
+      ],
     }).compile();
 
     expect(module.get(GenerationController)).toBeInstanceOf(

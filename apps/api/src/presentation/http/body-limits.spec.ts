@@ -32,6 +32,7 @@ describe('bodyLimitFor', () => {
     expect(bodyLimitFor('POST', '/api/playlists/bulk')).toBe('64kb');
     expect(bodyLimitFor('POST', '/api/generate/mix')).toBe('32kb');
     expect(bodyLimitFor('POST', '/api/generate/discover/')).toBe('32kb');
+    expect(bodyLimitFor('POST', '/api/transfers')).toBe('64kb');
   });
 
   it('declares the approved profiles', () => {
@@ -40,8 +41,9 @@ describe('bodyLimitFor', () => {
       bulk: '64kb',
       spotifyGeneration: '512kb',
       publicGeneration: '32kb',
+      transfer: '64kb',
     });
-    expect(ROUTE_BODY_LIMITS).toHaveLength(5);
+    expect(ROUTE_BODY_LIMITS).toHaveLength(6);
   });
 });
 

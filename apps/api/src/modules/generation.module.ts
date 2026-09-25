@@ -5,8 +5,10 @@ import { GenerateDiscoverPlaylistUseCase } from '../application/use-cases/genera
 import { GenerateGenreMixUseCase } from '../application/use-cases/generate-genre-mix.use-case';
 import { GeneratePlaylistUseCase } from '../application/use-cases/generate-playlist.use-case';
 import { GenerationController } from '../presentation/controllers/generation.controller';
+import { TransferTokensModule } from './transfer-tokens.module';
 
 @Module({
+  imports: [TransferTokensModule],
   controllers: [GenerationController],
   providers: [
     GenreTrackCatalogService,
