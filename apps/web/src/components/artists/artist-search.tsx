@@ -1,4 +1,5 @@
 import { api, getApiErrorMessage, isRequestLimited, isSpotifyRateLimited, type Artist } from '@/lib/api'
+import { SpotifyLink } from '@/components/brand/spotify-link'
 import { SearchCombobox } from '@/components/ui/search-combobox'
 import { useT } from '@/i18n/use-t'
 
@@ -46,11 +47,17 @@ export function ArtistSearch(props: ArtistSearchProps) {
           )}
           <span className="truncate text-sm text-cream-50">{artist.name}</span>
           {selected ? (
-            <span className="ml-auto text-xs text-cream-400">
+            <span className="ml-auto shrink-0 text-xs text-cream-400">
               {t('search.added')}
             </span>
           ) : null}
         </>
+      )}
+      renderOptionAction={(artist) => (
+        <SpotifyLink
+          href={artist.externalUrl}
+          label={t('spotify.openArtist', { name: artist.name })}
+        />
       )}
     />
   )

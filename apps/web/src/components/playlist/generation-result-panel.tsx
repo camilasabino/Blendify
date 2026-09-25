@@ -15,7 +15,7 @@ import type {
   GenerationProgress,
   PlaylistDetail,
 } from '@blendify/contracts'
-import { SpotifyMark } from '@/components/brand/spotify-mark'
+import { SpotifyLogo } from '@/components/brand/spotify-mark'
 import { CoverErrorNotice } from '@/components/playlist/generation-form-shared'
 import { GeneratedTrackList } from '@/components/playlist/generated-track-list'
 import { PlaylistPreview } from '@/components/playlist/playlist-preview'
@@ -32,7 +32,13 @@ import {
   type GenerationOutcome,
 } from '@/lib/playlist-generation'
 import { formatSongCount } from '@/lib/song-count'
-import { cn, formatListeningTime, toSafeHttpsUrl } from '@/lib/utils'
+import {
+  cn,
+  focusRing,
+  formatListeningTime,
+  toSafeHttpsUrl,
+  toSpotifyUrl,
+} from '@/lib/utils'
 
 function phaseMessageKey(phase: GenerationProgress['phase']): MessageKey {
   switch (phase) {
@@ -342,14 +348,34 @@ function ReadyResult({
   )
 }
 
-function GuestCover({ url }: Readonly<{ url: string | null }>) {
-  if (url) {
+type GuestArtwork = Readonly<{ imageUrl: string; spotifyUrl: string }>
+
+function guestArtwork(
+  artwork: GeneratedPlaylistDto['coverArtwork'],
+): GuestArtwork | null {
+  const imageUrl = toSafeHttpsUrl(artwork?.imageUrl)
+  const spotifyUrl = toSpotifyUrl(artwork?.spotifyUrl)
+  return imageUrl && spotifyUrl ? { imageUrl, spotifyUrl } : null
+}
+
+function GuestCover({ artwork }: Readonly<{ artwork: GuestArtwork | null }>) {
+  const t = useT()
+  if (artwork) {
     return (
-      <img
-        src={url}
-        alt=""
-        className="size-20 shrink-0 rounded-card object-cover ring-1 ring-divider sm:size-24"
-      />
+      <a
+        href={artwork.spotifyUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={t('guestResult.openArtworkInSpotify')}
+        title={t('guestResult.openArtworkInSpotify')}
+        className={cn('shrink-0 rounded-control', focusRing)}
+      >
+        <img
+          src={artwork.imageUrl}
+          alt=""
+          className="size-20 rounded-control object-cover ring-1 ring-divider sm:size-24"
+        />
+      </a>
     )
   }
   return (
@@ -380,13 +406,13 @@ function GuestReadyResult({
     trackCount,
     requestedTrackCount,
   )
-  const coverUrl = toSafeHttpsUrl(playlist.coverCandidateUrl)
+  const artwork = guestArtwork(playlist.coverArtwork)
 
   return (
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="flex items-start gap-4">
-          <GuestCover url={coverUrl} />
+          <GuestCover artwork={artwork} />
           <div className="min-w-0 space-y-2">
             {playlist.description ? (
               <p className="break-words text-sm text-cream-200">
@@ -400,13 +426,13 @@ function GuestReadyResult({
               isNearCompleteFill={isNearCompleteFill}
               isShortFill={isShortFill}
             />
-            <p className="flex items-start gap-1.5 text-xs text-cream-400">
-              <span aria-hidden className="mt-px inline-flex">
-                <SpotifyMark className="size-3.5" title="" />
+            <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-cream-400">
+              <span>
+                {artwork
+                  ? t('guestResult.attributionWithArtwork')
+                  : t('guestResult.attribution')}
               </span>
-              {coverUrl
-                ? t('guestResult.attributionWithArtwork')
-                : t('guestResult.attribution')}
+              <SpotifyLogo />
             </p>
           </div>
         </div>

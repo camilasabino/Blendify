@@ -42,7 +42,6 @@ function makePlaylist(tracks: Track[], description?: string) {
     generation,
     seeds: [{ type: 'artist', id: 'daft-punk', name: 'Daft Punk' }],
     tracks,
-    coverCandidateUrl: 'https://images.example/cover.jpg',
   });
 }
 

@@ -114,6 +114,12 @@ export function toSafeHttpsUrl(value: string | null | undefined): string | null 
   }
 }
 
+export function toSpotifyUrl(value: string | null | undefined): string | null {
+  const safe = toSafeHttpsUrl(value)
+  if (!safe) return null
+  return new URL(safe).hostname === 'open.spotify.com' ? safe : null
+}
+
 export function formatCreditedArtists(track: {
   artistName: string
   artists?: { name: string }[]

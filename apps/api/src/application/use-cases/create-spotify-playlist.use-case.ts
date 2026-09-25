@@ -80,7 +80,6 @@ export class CreateSpotifyPlaylistUseCase {
       provider: this.providers.forUser(user.id),
       spotifyUserId: user.spotifyId,
       coverImageBase64,
-      fallbackImageUrl: generated.coverCandidateUrl,
       persistToLibrary,
       onProgress,
     });

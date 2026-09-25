@@ -436,15 +436,6 @@ function LibraryItemPreviewPanel({
   )
 }
 
-function resolveCoverImage(playlist: PlaylistSummary): string | null {
-  const seedImageUrl = playlist.seeds
-    .flatMap((seed) =>
-      seed.type === 'track' || !seed.imageUrl ? [] : [seed.imageUrl],
-    )
-    .at(0)
-  return playlist.imageUrl ?? seedImageUrl ?? null
-}
-
 export function LibraryItem({
   playlist,
   selecting,
@@ -518,8 +509,9 @@ export function LibraryItem({
   }
 
   const title = libraryDisplayTitle(playlist, t)
-  const imageUrl = resolveCoverImage(playlist)
-  const cover = <LibraryItemCover imageUrl={imageUrl} deleted={deleted} />
+  const cover = (
+    <LibraryItemCover imageUrl={playlist.imageUrl} deleted={deleted} />
+  )
   const meta = (
     <LibraryItemMeta
       playlist={playlist}

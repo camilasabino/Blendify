@@ -16,24 +16,27 @@ async function bootstrap() {
 
   app.set('trust proxy', parseTrustProxy(config.get<string>('TRUST_PROXY')));
   app.use(createBodyParser());
-  app.use(cookieParser(config.get<string>('COOKIE_SECRET')));
+  app.use(cookieParser());
   app.enableCors({
-    origin: config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173',
+    origin: config.getOrThrow<string>('FRONTEND_URL'),
     credentials: true,
   });
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.enableShutdownHooks();
 
-  const swagger = new DocumentBuilder()
-    .setTitle('Blendify API')
-    .setDescription('Build Spotify playlists from your favorite artists')
-    .setVersion('1.0')
-    .addCookieAuth('blendify_session')
-    .build();
-  SwaggerModule.setup(
-    'api/docs',
-    app,
-    SwaggerModule.createDocument(app, swagger),
-  );
+  if (config.get<string>('NODE_ENV') !== 'production') {
+    const swagger = new DocumentBuilder()
+      .setTitle('Blendify API')
+      .setDescription('Build Spotify playlists from your favorite artists')
+      .setVersion('1.0')
+      .addCookieAuth('blendify_session')
+      .build();
+    SwaggerModule.setup(
+      'api/docs',
+      app,
+      SwaggerModule.createDocument(app, swagger),
+    );
+  }
 
   const port = config.get<number>('PORT') ?? 3000;
   await app.listen(port);

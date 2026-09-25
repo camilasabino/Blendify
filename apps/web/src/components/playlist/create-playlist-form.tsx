@@ -513,12 +513,6 @@ export function MixPlaylistForm() {
           coverImageBase64 = await renderPlaylistCoverBase64({
             title: name,
             kind: 'mix',
-            imageUrls:
-              mode === 'artists'
-                ? artists
-                    .map((a) => a.imageUrl)
-                    .filter((url): url is string => Boolean(url))
-                : [],
           })
         } catch {
           setCoverError(t('create.coverFailed'))

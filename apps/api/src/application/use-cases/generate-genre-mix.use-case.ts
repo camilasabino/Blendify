@@ -4,7 +4,11 @@ import {
   CATALOG_PROVIDER_FACTORY,
   type CatalogProviderFactoryPort,
 } from '../../domain/repositories/catalog-provider.port';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
+import {
+  GeneratedPlaylist,
+  pickLinkedCoverArtwork,
+  trackCoverSource,
+} from '../../domain/playlist/generated-playlist';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import {
   MAX_GENRES,
@@ -133,8 +137,7 @@ export class GenerateGenreMixUseCase {
       },
       seeds,
       tracks,
-      coverCandidateUrl: tracks.find((track) => track.albumImageUrl)
-        ?.albumImageUrl,
+      coverArtwork: pickLinkedCoverArtwork(tracks.map(trackCoverSource)),
     });
   }
 

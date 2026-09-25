@@ -43,7 +43,6 @@ function generated(
     generation,
     seeds,
     tracks: [track],
-    coverCandidateUrl: 'https://images.example/cover.jpg',
   });
 }
 
@@ -190,7 +189,6 @@ describe('CreateSpotifyPlaylistUseCase', () => {
       provider: context.provider,
       spotifyUserId: 'spotify-user-1',
       coverImageBase64: 'aGVsbG8=',
-      fallbackImageUrl: 'https://images.example/cover.jpg',
       persistToLibrary: false,
     });
     expect(published.playlist).toMatchObject({

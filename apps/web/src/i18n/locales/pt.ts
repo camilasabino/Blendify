@@ -376,13 +376,19 @@ export const pt: Record<MessageKey, string> = {
   'guestResult.temporary':
     'Esta playlist é temporária. Ela será perdida se você sair desta página ou recarregá-la.',
   'guestResult.attribution':
-    'Dados das músicas do Spotify.',
+    'Dados das músicas do',
   'guestResult.attributionWithArtwork':
-    'Dados das músicas e imagem do Spotify.',
+    'Dados das músicas e imagem do',
   'guestResult.trackList':
     'Músicas desta playlist',
   'guestResult.openTrackInSpotify':
     'Abrir {track} de {artists} no Spotify',
+  'guestResult.openArtworkInSpotify':
+    'Abrir no Spotify a origem da capa',
+  'footer.privacy':
+    'Privacidade',
+  'spotify.openArtist':
+    'Abrir {name} no Spotify',
   'transfer.title':
     'Transferir com o Soundiiz',
   'transfer.explainer':

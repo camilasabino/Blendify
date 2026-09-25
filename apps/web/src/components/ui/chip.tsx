@@ -38,6 +38,7 @@ type RemovableChipProps = Readonly<{
   removeLabel: string
   imageUrl?: string | null
   leading?: ReactNode
+  action?: ReactNode
   highlighted?: boolean
   className?: string
 }>
@@ -48,6 +49,7 @@ export function RemovableChip({
   removeLabel,
   imageUrl,
   leading,
+  action,
   highlighted,
   className,
 }: RemovableChipProps) {
@@ -75,6 +77,7 @@ export function RemovableChip({
         </span>
       ) : null}
       <span className="max-w-40 truncate">{label}</span>
+      {action}
       <button
         type="button"
         onClick={onRemove}

@@ -9,7 +9,9 @@ import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
 import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 
-function makeTrack(): Track {
+function makeTrack(
+  extra: Partial<Parameters<typeof Track.create>[0]> = {},
+): Track {
   return Track.create({
     id: TrackId.create('track-1'),
     name: 'Smooth Operator',
@@ -18,6 +20,7 @@ function makeTrack(): Track {
     durationMs: 250_000,
     popularity: 80,
     uri: 'spotify:track:track-1',
+    ...extra,
   });
 }
 
@@ -71,7 +74,6 @@ describe('GenerateArtistMixUseCase', () => {
     });
     expect(result).toMatchObject({
       name: 'Blendify · Mix · Sade',
-      coverCandidateUrl: 'https://images.example/sade.jpg',
       seeds: [
         {
           type: 'artist',
@@ -95,6 +97,85 @@ describe('GenerateArtistMixUseCase', () => {
     expect(result.tracks.map((track) => track.id.getValue())).toEqual([
       'track-1',
     ]);
+  });
+
+  it('never uses a client-supplied Spotify link for cover artwork', async () => {
+    const context = setup();
+    context.searchTracks.mockResolvedValue([
+      makeTrack({
+        albumImageUrl: 'https://i.scdn.co/image/album',
+        externalUrl: 'https://open.spotify.com/track/track-1',
+      }),
+    ]);
+
+    const result = await context.useCase.execute({
+      kind: 'artist_mix',
+      artistIds: ['artist-1'],
+      artists: [
+        {
+          id: 'artist-1',
+          name: 'Sade',
+          imageUrl: 'https://images.example/sade.jpg',
+          externalUrl: 'https://attacker.example/artist',
+        },
+      ],
+      tracksPerSeed: 1,
+      popularity: PopularityMode.BALANCED,
+    });
+
+    expect(result.coverArtwork).toEqual({
+      imageUrl: 'https://i.scdn.co/image/album',
+      spotifyUrl: 'https://open.spotify.com/track/track-1',
+    });
+  });
+
+  it('links catalog artist artwork to the artist on Spotify', async () => {
+    const context = setup();
+    const getArtistsByIds = jest.fn().mockResolvedValue([
+      Artist.create({
+        id: ArtistId.create('artist-1'),
+        name: 'Sade',
+        imageUrl: 'https://i.scdn.co/image/sade',
+        externalUrl: 'https://open.spotify.com/artist/artist-1',
+      }),
+    ]);
+    context.forMarket.mockReturnValue({
+      searchTracks: context.searchTracks,
+      getArtistsByIds,
+    });
+
+    const result = await context.useCase.execute({
+      kind: 'artist_mix',
+      artistIds: ['artist-1'],
+      tracksPerSeed: 1,
+      popularity: PopularityMode.BALANCED,
+    });
+
+    expect(getArtistsByIds).toHaveBeenCalledWith(['artist-1']);
+    expect(result.coverArtwork).toEqual({
+      imageUrl: 'https://i.scdn.co/image/sade',
+      spotifyUrl: 'https://open.spotify.com/artist/artist-1',
+    });
+  });
+
+  it('has no cover artwork when nothing carries a Spotify link', async () => {
+    const context = setup();
+
+    const result = await context.useCase.execute({
+      kind: 'artist_mix',
+      artistIds: ['artist-1'],
+      artists: [
+        {
+          id: 'artist-1',
+          name: 'Sade',
+          imageUrl: 'https://images.example/sade.jpg',
+        },
+      ],
+      tracksPerSeed: 1,
+      popularity: PopularityMode.BALANCED,
+    });
+
+    expect(result.coverArtwork).toBeUndefined();
   });
 
   it('stops before catalog work when quota is blocked', async () => {

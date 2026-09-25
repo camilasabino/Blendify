@@ -11,8 +11,14 @@
     "dev": "npm run dev --workspaces --if-present",
     "dev:api": "npm run start:dev -w @blendify/api",
     "dev:web": "npm run dev -w @blendify/web",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build:api && npm run build -w @blendify/web",
+    "build:contracts": "npm run build -w @blendify/contracts",
+    "build:api": "npm run build:contracts && npm run prisma:generate -w @blendify/api && npm run build -w @blendify/api",
+    "build:web": "npm run build:contracts && npm run build -w @blendify/web",
+    "check:railway": "tsc -p .railway/tsconfig.json",
+    "pretest": "npm run build:contracts",
     "test": "npm run test --workspaces --if-present",
+    "pretest:api": "npm run build:contracts",
     "test:api": "npm run test -w @blendify/api",
     "test:web": "npm run test -w @blendify/web",
     "sonar:coverage": "node scripts/merge-sonar-coverage.mjs",
@@ -32,11 +38,12 @@
     "prepare": "husky"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "railway": "3.11.0"
   }
 }

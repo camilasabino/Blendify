@@ -67,6 +67,32 @@ describe('Landing', () => {
   })
 })
 
+describe('Privacy Policy', () => {
+  beforeEach(() => {
+    setAuthState(null)
+    stubApi({})
+  })
+
+  it('is public and linked from the footer', async () => {
+    const user = userEvent.setup()
+    renderApp('/')
+
+    await user.click(await screen.findByRole('link', { name: 'Privacy' }))
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' }),
+    ).toBeVisible()
+    expect(screen.getByTestId('location')).toHaveTextContent('/privacy')
+    expect(
+      screen.getByRole('link', { name: 'Manage apps connected to Spotify' }),
+    ).toHaveAttribute('href', 'https://www.spotify.com/account/apps/')
+    expect(screen.getByText(/blendify_session/)).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: 'Email contacto@camilasabino.dev' }),
+    ).toHaveAttribute('href', 'mailto:contacto@camilasabino.dev')
+  })
+})
+
 describe('Guest routing', () => {
   beforeEach(() => {
     setAuthState(null)

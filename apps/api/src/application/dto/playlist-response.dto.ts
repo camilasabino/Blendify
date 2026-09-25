@@ -65,7 +65,9 @@ export function toGeneratedPlaylistResponse(
     generation: playlist.generation,
     seeds: [...playlist.seeds],
     tracks: playlist.tracks.map(toTrackResponse),
-    coverCandidateUrl: playlist.coverCandidateUrl,
+    ...(playlist.coverArtwork
+      ? { coverArtwork: { ...playlist.coverArtwork } }
+      : {}),
     transfer: transfer
       ? { token: transfer.token, expiresAt: transfer.expiresAt.toISOString() }
       : null,

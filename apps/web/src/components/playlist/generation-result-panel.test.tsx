@@ -179,24 +179,49 @@ describe('GenerationResultPanel in Guest Mode', () => {
     expect(screen.queryByRole('link', { name: /Blue in Green/ })).toBeNull()
   })
 
-  it('attributes Spotify artwork when the cover comes from Spotify', () => {
+  it('links Spotify artwork back to its Spotify source', () => {
     const { container } = renderGuest({
       ...guestJazzPlaylist,
-      coverCandidateUrl: 'https://i.scdn.co/image/cover',
+      coverArtwork: {
+        imageUrl: 'https://i.scdn.co/image/cover',
+        spotifyUrl: 'https://open.spotify.com/track/track-1',
+      },
     })
 
-    expect(screen.getByText('Track details and artwork from Spotify.')).toBeVisible()
-    expect(container.querySelector('img')).toHaveAttribute(
+    expect(screen.getByText('Track details and artwork from')).toBeVisible()
+    expect(screen.getByRole('img', { name: 'Spotify' })).toBeVisible()
+    const link = screen.getByRole('link', {
+      name: 'Open cover artwork source in Spotify',
+    })
+    expect(link).toHaveAttribute('href', 'https://open.spotify.com/track/track-1')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link.querySelector('img')).toHaveAttribute(
       'src',
       'https://i.scdn.co/image/cover',
     )
+    expect(container.querySelectorAll('img[src^="https://i.scdn.co"]')).toHaveLength(1)
+  })
+
+  it('does not show Spotify artwork without a Spotify link', () => {
+    const { container } = renderGuest({
+      ...guestJazzPlaylist,
+      coverArtwork: {
+        imageUrl: 'https://i.scdn.co/image/cover',
+        spotifyUrl: 'https://example.com/not-spotify',
+      },
+    })
+
+    expect(screen.getByText('Track details from')).toBeVisible()
+    expect(container.querySelector('img[src^="https://i.scdn.co"]')).toBeNull()
   })
 
   it('attributes only track details when no Spotify artwork is shown', () => {
     const { container } = renderGuest()
 
-    expect(screen.getByText('Track details from Spotify.')).toBeVisible()
-    expect(container.querySelector('img')).toBeNull()
+    expect(screen.getByText('Track details from')).toBeVisible()
+    expect(screen.getByRole('img', { name: 'Spotify' })).toBeVisible()
+    expect(container.querySelector('img[src^="https://i.scdn.co"]')).toBeNull()
   })
 
   it('keeps a result without transfer complete and without a transfer control', () => {

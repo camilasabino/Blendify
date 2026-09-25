@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { validateEnvironment } from './config/production-environment';
 import { AuthModule } from './modules/auth.module';
 import { CatalogModule } from './modules/catalog.module';
 import { GenerationModule } from './modules/generation.module';
@@ -16,6 +17,7 @@ import { TransfersModule } from './modules/transfers.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '../../.env'],
+      validate: validateEnvironment,
     }),
     InfrastructureModule,
     RequestLimitsModule,

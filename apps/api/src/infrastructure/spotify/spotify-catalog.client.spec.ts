@@ -243,6 +243,50 @@ describe('SpotifyCatalogClient', () => {
   });
 });
 
+describe('SpotifyCatalogClient artist link-back', () => {
+  const artistPayload = {
+    artists: {
+      items: [
+        {
+          id: 'artist-1',
+          name: 'Sade',
+          images: [{ url: 'https://i.scdn.co/image/sade' }],
+          external_urls: {
+            spotify: 'https://open.spotify.com/artist/artist-1',
+          },
+        },
+      ],
+    },
+  };
+
+  it('maps and caches the Spotify artist URL', async () => {
+    const { api, raw } = createApi(artistPayload);
+    const { cache } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    const [fresh] = await client.searchArtists('Sade');
+    const [cached] = await client.searchArtists('Sade');
+
+    expect(raw).toHaveBeenCalledTimes(1);
+    expect(fresh.externalUrl).toBe('https://open.spotify.com/artist/artist-1');
+    expect(cached.externalUrl).toBe('https://open.spotify.com/artist/artist-1');
+  });
+
+  it('keeps artists without a Spotify URL unlinked', async () => {
+    const { api } = createApi({
+      artists: { items: [{ id: 'artist-1', name: 'Sade' }] },
+    });
+
+    const [artist] = await new SpotifyCatalogClient(
+      api,
+      createTokens(),
+      'AR',
+    ).searchArtists('Sade');
+
+    expect(artist.externalUrl).toBeUndefined();
+  });
+});
+
 describe('SpotifyCatalogClient.searchTracks portable metadata', () => {
   const spotifyTrack = {
     id: 'track-1',

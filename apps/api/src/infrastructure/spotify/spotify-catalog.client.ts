@@ -30,6 +30,7 @@ interface SpotifyArtist {
   id: string;
   name: string;
   images?: SpotifyImage[];
+  external_urls?: { spotify?: string };
 }
 
 interface SpotifyTrack {
@@ -49,6 +50,7 @@ type CachedArtist = {
   id: string;
   name: string;
   imageUrl?: string;
+  externalUrl?: string;
 };
 
 type CachedTrack = {
@@ -306,6 +308,7 @@ function mapArtist(item: SpotifyArtist): Artist {
     id: ArtistId.create(item.id),
     name: item.name,
     imageUrl: item.images?.[0]?.url,
+    externalUrl: item.external_urls?.spotify ?? undefined,
   });
 }
 
@@ -340,6 +343,7 @@ function serializeArtist(artist: Artist): CachedArtist {
     id: artist.id.getValue(),
     name: artist.name,
     imageUrl: artist.imageUrl,
+    externalUrl: artist.externalUrl,
   };
 }
 
@@ -348,6 +352,7 @@ function hydrateArtist(artist: CachedArtist): Artist {
     id: ArtistId.create(artist.id),
     name: artist.name,
     imageUrl: artist.imageUrl,
+    externalUrl: artist.externalUrl,
   });
 }
 

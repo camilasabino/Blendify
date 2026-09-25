@@ -55,7 +55,7 @@ npm test -w @blendify/api -- -t "test name"
 npm test -w @blendify/web -- path/to/file.test.ts
 ```
 
-Requires Node.js 20+, npm 10+, and Docker (PostgreSQL 16 + Redis 7) or compatible local services. See README.md for full environment setup (`.env` files, Spotify OAuth scopes/redirect URI, Last.fm key).
+Requires Node.js 22+ (CI and production pin 22 via `.nvmrc`), npm 10+, and Docker (PostgreSQL 16 + Redis 7) or compatible local services. See README.md for full environment setup (`.env` files, Spotify OAuth scopes/redirect URI, Last.fm key).
 
 Git hooks (Husky + commitlint) enforce Conventional Commits and run lint on pre-commit/pre-push. Commit subjects must follow `feat:`, `fix:`, `docs:`, `chore:`, etc.
 
@@ -67,7 +67,7 @@ Git hooks (Husky + commitlint) enforce Conventional Commits and run lint on pre-
 
 **Web app** (`apps/web/src`) is a Vite SPA: `pages/` for route-level screens (mix, discover, library, stats, landing), `stores/` for Zustand state (e.g. `auth-store.ts`), `lib/` for API client, error mapping, generation streaming, and other framework-agnostic helpers, `hooks/` and `components/` for UI, `i18n/` for English/Spanish/Brazilian Portuguese translations.
 
-**Auth**: Spotify OAuth with server-side token storage in PostgreSQL and an HTTP-only `blendify_session` cookie (no tokens in the browser). Session cookies are always `Secure`, so use `localhost` (not `127.0.0.1`) locally.
+**Auth**: Spotify OAuth with server-side token storage in PostgreSQL and an HTTP-only `blendify_session` cookie (no tokens in the browser). Session cookies are always `Secure` and host-only; the canonical local origin is `http://127.0.0.1:5173` (Spotify rejects `localhost` redirect URIs). Production deployment is documented in `docs/deployment.md`.
 
 **External API pressure**: Spotify Development Mode has a strict rolling request budget. The API mitigates this with Redis-backed search/catalog caches, sequential resolution, lazy suggestions, and typed quota errors surfaced through `spotify-quota-guard`/`spotify-quota.service`. Generation limits: 12 artists per Artist Mix, 5 genres per Genre Mix, 50 tracks per playlist, `floor(50 / seedCount)` tracks per seed.
 

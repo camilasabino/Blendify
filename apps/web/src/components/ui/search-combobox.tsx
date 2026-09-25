@@ -1,7 +1,9 @@
 import {
   useEffect,
   useId,
+  useRef,
   useState,
+  type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
@@ -57,6 +59,7 @@ function SearchComboboxOptions<T extends { id: string }>({
   onHover,
   onSelect,
   renderOption,
+  renderOptionAction,
 }: Readonly<{
   isError: boolean
   isFetching: boolean
@@ -74,6 +77,7 @@ function SearchComboboxOptions<T extends { id: string }>({
   onHover: (index: number) => void
   onSelect: (item: T) => void
   renderOption: (item: T, selected: boolean) => ReactNode
+  renderOptionAction?: (item: T) => ReactNode
 }>) {
   return (
     <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-card border border-divider bg-raised py-1 shadow-xl shadow-charcoal-950/60 animate-fade-in">
@@ -91,26 +95,34 @@ function SearchComboboxOptions<T extends { id: string }>({
           const active = index === activeIndex
           return (
             <li
-              id={optionId(index)}
               key={item.id}
-              role="option"
-              aria-selected={active}
-              aria-disabled={selected || disabled || undefined}
-              onMouseEnter={() => !selected && onHover(index)}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => onSelect(item)}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return
-                event.preventDefault()
-                onSelect(item)
-              }}
+              role="none"
               className={cn(
-                'flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150',
-                selected ? 'cursor-default opacity-40' : 'cursor-pointer',
+                'flex w-full items-center pr-1 transition-colors duration-150',
                 active && !selected && 'bg-accent-soft',
               )}
             >
-              {renderOption(item, selected)}
+              <div
+                id={optionId(index)}
+                role="option"
+                aria-selected={active}
+                aria-disabled={selected || disabled || undefined}
+                onMouseEnter={() => !selected && onHover(index)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => onSelect(item)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  onSelect(item)
+                }}
+                className={cn(
+                  'flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left',
+                  selected ? 'cursor-default opacity-40' : 'cursor-pointer',
+                )}
+              >
+                {renderOption(item, selected)}
+              </div>
+              {renderOptionAction?.(item)}
             </li>
           )
         })}
@@ -125,6 +137,7 @@ export function SearchCombobox<T extends { id: string }>({
   selectedIds,
   onSelect,
   renderOption,
+  renderOptionAction,
   inputId,
   label,
   resultsLabel,
@@ -140,6 +153,7 @@ export function SearchCombobox<T extends { id: string }>({
   selectedIds: Set<string>
   onSelect: (item: T) => void
   renderOption: (item: T, selected: boolean) => ReactNode
+  renderOptionAction?: (item: T) => ReactNode
   inputId?: string
   label?: string
   resultsLabel: string
@@ -158,6 +172,7 @@ export function SearchCombobox<T extends { id: string }>({
   const [debounced, setDebounced] = useState('')
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(query.trim()), 600)
@@ -257,7 +272,15 @@ export function SearchCombobox<T extends { id: string }>({
   })
 
   return (
-    <div className={cn('relative', className)}>
+    <div
+      ref={containerRef}
+      className={cn('relative', className)}
+      onBlur={(event: FocusEvent<HTMLDivElement>) => {
+        const next = event.relatedTarget
+        if (next instanceof Node && containerRef.current?.contains(next)) return
+        setOpen(false)
+      }}
+    >
       <div className="relative">
         <Search
           aria-hidden
@@ -273,7 +296,6 @@ export function SearchCombobox<T extends { id: string }>({
             setOpen(true)
           }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
@@ -324,6 +346,7 @@ export function SearchCombobox<T extends { id: string }>({
           onHover={setActiveIndex}
           onSelect={select}
           renderOption={renderOption}
+          renderOptionAction={renderOptionAction}
         />
       ) : null}
     </div>

@@ -1,6 +1,8 @@
 import { JwtService } from '@nestjs/jwt';
 import type { Response } from 'express';
-import { AuthService } from './auth.service';
+import { ConfigService } from '@nestjs/config';
+import { AuthService, SESSION_TTL_SECONDS } from './auth.service';
+import { sessionJwtOptions } from '../../modules/auth.module';
 import type { UserRepositoryPort } from '../../domain/repositories/user.repository.port';
 import { User } from '../../domain/user/user.entity';
 
@@ -60,6 +62,25 @@ describe('AuthService cookie options', () => {
         sameSite: 'lax',
       }),
     );
+  });
+
+  it('uses one seven-day lifetime for the session cookie and JWT', async () => {
+    const auth = service();
+    const cookie = jest.fn<void, [string, string, Record<string, unknown>]>();
+    auth.setSessionCookie({ cookie } as unknown as Response, 'token');
+
+    const options = cookie.mock.calls[0][2];
+    expect(SESSION_TTL_SECONDS).toBe(7 * 24 * 60 * 60);
+    expect(options.maxAge).toBe(SESSION_TTL_SECONDS * 1000);
+    expect(options).not.toHaveProperty('domain');
+
+    const jwt = new JwtService(
+      sessionJwtOptions(new ConfigService({ JWT_SECRET: 'x'.repeat(48) })),
+    );
+    const payload = jwt.decode<{ iat: number; exp: number }>(
+      await jwt.signAsync({ sub: 'u1', spotifyId: 's1' }),
+    );
+    expect(payload.exp - payload.iat).toBe(SESSION_TTL_SECONDS);
   });
 
   it('consumes oauth state only once', () => {

@@ -9,14 +9,20 @@ export class SpotifyAuthClient {
   private readonly api: AxiosInstance;
 
   constructor(private readonly config: ConfigService) {
-    this.accountsApi = createOutboundHttp({
-      baseURL: 'https://accounts.spotify.com',
-      timeout: 15_000,
-    });
-    this.api = createOutboundHttp({
-      baseURL: 'https://api.spotify.com/v1',
-      timeout: 15_000,
-    });
+    this.accountsApi = createOutboundHttp(
+      {
+        baseURL: 'https://accounts.spotify.com',
+        timeout: 15_000,
+      },
+      { logBodies: false },
+    );
+    this.api = createOutboundHttp(
+      {
+        baseURL: 'https://api.spotify.com/v1',
+        timeout: 15_000,
+      },
+      { logBodies: false },
+    );
   }
 
   getAuthorizationUrl(state: string): string {

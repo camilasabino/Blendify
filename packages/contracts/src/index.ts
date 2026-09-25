@@ -54,6 +54,7 @@ export const ArtistSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(200),
   imageUrl: z.string().max(500).nullable().optional(),
+  externalUrl: z.string().min(1).max(500).optional(),
 });
 
 export const UserSchema = z.object({
@@ -305,7 +306,12 @@ export const GeneratedPlaylistSchema = z.object({
   generation: PlaylistGenerationSchema,
   seeds: z.array(PlaylistSeedSchema),
   tracks: z.array(TrackSchema),
-  coverCandidateUrl: z.string().optional(),
+  coverArtwork: z
+    .object({
+      imageUrl: z.string().min(1),
+      spotifyUrl: z.string().min(1),
+    })
+    .optional(),
   transfer: PlaylistTransferOfferSchema.nullable(),
 });
 

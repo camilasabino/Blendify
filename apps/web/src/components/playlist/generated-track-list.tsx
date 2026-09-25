@@ -1,41 +1,28 @@
 import { useId } from 'react'
 import type { TrackDto } from '@blendify/contracts'
-import { SpotifyMark } from '@/components/brand/spotify-mark'
+import { SpotifyLink } from '@/components/brand/spotify-link'
 import { TrackListToggle } from '@/components/playlist/track-list-disclosure'
 import { useTrackListDisclosure } from '@/hooks/use-track-list-disclosure'
 import { useT } from '@/i18n/use-t'
 import {
-  cn,
-  focusRing,
   formatCreditedArtists,
   formatDuration,
-  toSafeHttpsUrl,
+  toSpotifyUrl,
 } from '@/lib/utils'
 
 function TrackSpotifyLink({ track }: Readonly<{ track: TrackDto }>) {
   const t = useT()
-  const href = toSafeHttpsUrl(track.externalUrl)
-  if (!href) return <span aria-hidden className="size-8 shrink-0" />
-  const label = t('guestResult.openTrackInSpotify', {
-    track: track.name,
-    artists: formatCreditedArtists(track),
-  })
+  if (!toSpotifyUrl(track.externalUrl)) {
+    return <span aria-hidden className="size-[43px] shrink-0" />
+  }
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={label}
-      title={label}
-      className={cn(
-        'inline-flex size-8 shrink-0 items-center justify-center rounded-control text-white transition-colors hover:bg-hover',
-        focusRing,
-      )}
-    >
-      <span aria-hidden className="inline-flex">
-        <SpotifyMark variant="mono" className="size-3.5" title="" />
-      </span>
-    </a>
+    <SpotifyLink
+      href={track.externalUrl}
+      label={t('guestResult.openTrackInSpotify', {
+        track: track.name,
+        artists: formatCreditedArtists(track),
+      })}
+    />
   )
 }
 

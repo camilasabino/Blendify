@@ -23,21 +23,7 @@ function StatCard({
   )
 }
 
-function ArtistAvatar({
-  imageUrl,
-}: Readonly<{
-  imageUrl?: string | null
-}>) {
-  if (imageUrl) {
-    return (
-      <img
-        src={imageUrl}
-        alt=""
-        className="size-8 shrink-0 rounded-full object-cover ring-1 ring-divider"
-      />
-    )
-  }
-
+function ArtistAvatar() {
   return (
     <span
       className="flex size-8 shrink-0 items-center justify-center rounded-full bg-charcoal-700 text-accent-fg ring-1 ring-divider"
@@ -48,8 +34,8 @@ function ArtistAvatar({
   )
 }
 
-function artistRankLeading(item: RankedSeedUsage) {
-  return <ArtistAvatar imageUrl={item.imageUrl} />
+function artistRankLeading() {
+  return <ArtistAvatar />
 }
 
 function genreRankLeading(item: RankedSeedUsage) {

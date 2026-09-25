@@ -82,7 +82,10 @@ describe('toGeneratedPlaylistResponse', () => {
         generation,
         seeds: [{ type: 'artist', id: 'bieber-id', name: 'Justin Bieber' }],
         tracks: [track],
-        coverCandidateUrl: 'https://images.example/cover.jpg',
+        coverArtwork: {
+          imageUrl: 'https://i.scdn.co/image/cover',
+          spotifyUrl: 'https://open.spotify.com/track/1',
+        },
       }),
       null,
     );
@@ -94,12 +97,29 @@ describe('toGeneratedPlaylistResponse', () => {
       generation,
       seeds: [{ type: 'artist', id: 'bieber-id', name: 'Justin Bieber' }],
       tracks: [toTrackResponse(track)],
-      coverCandidateUrl: 'https://images.example/cover.jpg',
+      coverArtwork: {
+        imageUrl: 'https://i.scdn.co/image/cover',
+        spotifyUrl: 'https://open.spotify.com/track/1',
+      },
       transfer: null,
     });
     for (const key of ['id', 'userId', 'spotifyId', 'spotifyUrl', 'status']) {
       expect(response).not.toHaveProperty(key);
     }
+  });
+
+  it('omits artwork that has no Spotify link', () => {
+    const response = toGeneratedPlaylistResponse(
+      GeneratedPlaylist.create({
+        name: 'Blendify · Mix · Justin Bieber',
+        generation,
+        seeds: [{ type: 'artist', id: 'bieber-id', name: 'Justin Bieber' }],
+        tracks: [makeTrack()],
+      }),
+      null,
+    );
+
+    expect(response).not.toHaveProperty('coverArtwork');
   });
 
   it('exposes the transfer offer with an ISO expiry', () => {

@@ -20,7 +20,11 @@ import {
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { Track } from '../../domain/track/track.entity';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
+import {
+  GeneratedPlaylist,
+  pickLinkedCoverArtwork,
+  trackCoverSource,
+} from '../../domain/playlist/generated-playlist';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { maxTracksPerSeedForCount } from '../../domain/constants';
 import {
@@ -326,9 +330,9 @@ export class GenerateDiscoverPlaylistUseCase {
         popularity: input.popularity,
         orderMode: input.orderMode,
       },
-      coverCandidateUrl:
-        seedTrack.albumImageUrl ??
-        tracks.find((track) => track.albumImageUrl)?.albumImageUrl,
+      coverArtwork: pickLinkedCoverArtwork(
+        [seedTrack, ...tracks].map(trackCoverSource),
+      ),
     });
   }
 

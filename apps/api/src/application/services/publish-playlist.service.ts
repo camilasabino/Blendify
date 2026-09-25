@@ -24,7 +24,6 @@ export class PublishPlaylistService {
     provider: MusicProviderPort;
     spotifyUserId: string;
     coverImageBase64?: string;
-    fallbackImageUrl?: string;
     persistToLibrary: boolean;
     onProgress?: ProgressReporter;
   }): Promise<PlaylistDetail> {
@@ -65,10 +64,9 @@ export class PublishPlaylistService {
     playlist.linkToSpotify(remote.id, remote.url);
     try {
       const snapshot = await provider.getPlaylistSnapshot(remote.id);
-      playlist.setImageUrl(snapshot?.imageUrl ?? input.fallbackImageUrl);
+      playlist.setImageUrl(snapshot?.imageUrl);
     } catch (error) {
       this.logger.warn(`Playlist image lookup failed: ${errorMessage(error)}`);
-      playlist.setImageUrl(input.fallbackImageUrl);
     }
     playlist.markCompleted();
 

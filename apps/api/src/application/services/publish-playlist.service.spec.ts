@@ -95,7 +95,7 @@ describe('PublishPlaylistService', () => {
     });
   });
 
-  it('uses the fallback image and skips persistence when optional calls fail', async () => {
+  it('keeps no image and skips persistence when optional calls fail', async () => {
     const playlist = makePlaylist();
     const save = jest.fn();
     const playlists = {
@@ -120,12 +120,11 @@ describe('PublishPlaylistService', () => {
       provider,
       spotifyUserId: 'spotify-user-1',
       coverImageBase64: 'jpeg-data',
-      fallbackImageUrl: 'https://images.example/fallback.jpg',
       persistToLibrary: false,
     });
 
     expect(save).not.toHaveBeenCalled();
     expect(result.status).toBe('COMPLETED');
-    expect(result.imageUrl).toBe('https://images.example/fallback.jpg');
+    expect(result.imageUrl).toBeNull();
   });
 });

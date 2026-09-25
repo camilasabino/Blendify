@@ -144,10 +144,12 @@ function toArtistDto(artist: {
   id: { getValue(): string };
   name: string;
   imageUrl?: string;
+  externalUrl?: string;
 }): ArtistDto {
   return {
     id: artist.id.getValue(),
     name: artist.name,
     imageUrl: artist.imageUrl ?? null,
+    ...(artist.externalUrl ? { externalUrl: artist.externalUrl } : {}),
   };
 }

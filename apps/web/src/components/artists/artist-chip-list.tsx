@@ -1,4 +1,5 @@
 import type { Artist } from '@/lib/api'
+import { SpotifyLink } from '@/components/brand/spotify-link'
 import { RemovableChip } from '@/components/ui/chip'
 import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
@@ -25,6 +26,13 @@ export function ArtistChipList({
           key={artist.id}
           label={artist.name}
           imageUrl={artist.imageUrl}
+          action={
+            <SpotifyLink
+              href={artist.externalUrl}
+              label={t('spotify.openArtist', { name: artist.name })}
+              className="-my-1 size-7"
+            />
+          }
           onRemove={() => onRemove(artist.id)}
           removeLabel={t('create.removeArtist', { name: artist.name })}
         />

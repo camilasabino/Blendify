@@ -16,10 +16,13 @@ export class SpotifyTokenService {
     @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
     private readonly config: ConfigService,
   ) {
-    this.accountsApi = createOutboundHttp({
-      baseURL: 'https://accounts.spotify.com',
-      timeout: 15_000,
-    });
+    this.accountsApi = createOutboundHttp(
+      {
+        baseURL: 'https://accounts.spotify.com',
+        timeout: 15_000,
+      },
+      { logBodies: false },
+    );
   }
 
   async getValidAccessToken(userId: string): Promise<string> {

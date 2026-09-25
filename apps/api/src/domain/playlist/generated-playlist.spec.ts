@@ -3,7 +3,11 @@ import { MAX_TRACKS } from '../constants';
 import { Track } from '../track/track.entity';
 import { ArtistId } from '../value-objects/artist-id.vo';
 import { TrackId } from '../value-objects/track-id.vo';
-import { GeneratedPlaylist } from './generated-playlist';
+import {
+  GeneratedPlaylist,
+  pickLinkedCoverArtwork,
+  trackCoverSource,
+} from './generated-playlist';
 
 function makeTrack(index: number): Track {
   return Track.create({
@@ -38,7 +42,6 @@ describe('GeneratedPlaylist', () => {
       generation,
       seeds,
       tracks: [makeTrack(1), makeTrack(2)],
-      coverCandidateUrl: 'https://images.example/sade.jpg',
     });
 
     expect(playlist.name).toBe('Sade Mix');
@@ -46,7 +49,6 @@ describe('GeneratedPlaylist', () => {
     expect(playlist.generation).toEqual(generation);
     expect(playlist.seeds).toEqual(seeds);
     expect(playlist.tracks).toHaveLength(2);
-    expect(playlist.coverCandidateUrl).toBe('https://images.example/sade.jpg');
   });
 
   it('does not share mutable state with its input', () => {
@@ -69,13 +71,60 @@ describe('GeneratedPlaylist', () => {
     });
 
     expect(Object.keys(playlist).sort()).toEqual([
-      'coverCandidateUrl',
+      'coverArtwork',
       'description',
       'generation',
       'name',
       'seeds',
       'tracks',
     ]);
+  });
+
+  it('picks the first artwork that carries its own Spotify link', () => {
+    expect(
+      pickLinkedCoverArtwork([
+        { imageUrl: 'https://i.scdn.co/image/unlinked' },
+        { spotifyUrl: 'https://open.spotify.com/artist/no-image' },
+        {
+          imageUrl: ' https://i.scdn.co/image/linked ',
+          spotifyUrl: ' https://open.spotify.com/track/linked ',
+        },
+        {
+          imageUrl: 'https://i.scdn.co/image/later',
+          spotifyUrl: 'https://open.spotify.com/track/later',
+        },
+      ]),
+    ).toEqual({
+      imageUrl: 'https://i.scdn.co/image/linked',
+      spotifyUrl: 'https://open.spotify.com/track/linked',
+    });
+  });
+
+  it('has no cover artwork when no image has a Spotify link', () => {
+    expect(
+      pickLinkedCoverArtwork([
+        { imageUrl: 'https://i.scdn.co/image/unlinked', spotifyUrl: '  ' },
+      ]),
+    ).toBeUndefined();
+  });
+
+  it('links track artwork to the same track', () => {
+    const track = Track.create({
+      id: TrackId.create('t1'),
+      name: 'Smooth Operator',
+      artistId: ArtistId.create('artist-1'),
+      artistName: 'Sade',
+      durationMs: 1000,
+      popularity: 0,
+      uri: 'spotify:track:t1',
+      albumImageUrl: 'https://i.scdn.co/image/album',
+      externalUrl: 'https://open.spotify.com/track/t1',
+    });
+
+    expect(trackCoverSource(track)).toEqual({
+      imageUrl: 'https://i.scdn.co/image/album',
+      spotifyUrl: 'https://open.spotify.com/track/t1',
+    });
   });
 
   it('requires at least one seed', () => {

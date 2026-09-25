@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -13,6 +13,7 @@ import {
 } from '@/lib/api'
 import type { TrackDto } from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
+import { SpotifyLink } from '@/components/brand/spotify-link'
 import { TrackSearch } from '@/components/tracks/track-search'
 import { GenerationResultPanel } from '@/components/playlist/generation-result-panel'
 import {
@@ -37,7 +38,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import { RadioCardGroup } from '@/components/ui/radio-card-group'
 import { useT } from '@/i18n/use-t'
 import { readPersistToLibraryPreference } from '@/lib/persist-to-library-preference'
-import { cn, focusRing } from '@/lib/utils'
+import { cn, focusRing, formatCreditedArtists } from '@/lib/utils'
 import { buildDiscoverPlaylistName } from '@/lib/playlist-name'
 import { renderPlaylistCoverBase64 } from '@/lib/playlist-cover'
 import { useCapabilities } from '@/hooks/use-capabilities'
@@ -117,6 +118,12 @@ function DiscoverSeedField({
           <SelectedSeed
             imageUrl={artist.imageUrl}
             title={artist.name}
+            action={
+              <SpotifyLink
+                href={artist.externalUrl}
+                label={t('spotify.openArtist', { name: artist.name })}
+              />
+            }
             imageRounded
             removeLabel={t('create.removeArtist', { name: artist.name })}
             onRemove={onRemoveArtist}
@@ -141,6 +148,15 @@ function DiscoverSeedField({
           imageUrl={track.albumImageUrl}
           title={track.name}
           subtitle={track.artistName}
+          action={
+            <SpotifyLink
+              href={track.externalUrl}
+              label={t('guestResult.openTrackInSpotify', {
+                track: track.name,
+                artists: formatCreditedArtists(track),
+              })}
+            />
+          }
           removeLabel={t('discover.removeTrack', { name: track.name })}
           onRemove={onRemoveTrack}
         />
@@ -252,14 +268,9 @@ export function DiscoverPlaylistForm() {
 
   async function renderDiscoverCover(
     title: string,
-    imageUrl: string | null | undefined,
   ): Promise<string | undefined> {
     try {
-      return await renderPlaylistCoverBase64({
-        title,
-        kind: 'discover',
-        imageUrls: imageUrl ? [imageUrl] : [],
-      })
+      return await renderPlaylistCoverBase64({ title, kind: 'discover' })
     } catch {
       setCoverError(t('create.coverFailed'))
       return undefined
@@ -302,7 +313,7 @@ export function DiscoverPlaylistForm() {
         ...sharedBase,
       }
       coverImageBase64 = shouldRenderCover
-        ? await renderDiscoverCover(playlistName, seedTrack.albumImageUrl)
+        ? await renderDiscoverCover(playlistName)
         : undefined
     } else {
       if (!artist) return
@@ -322,7 +333,7 @@ export function DiscoverPlaylistForm() {
         ...sharedBase,
       }
       coverImageBase64 = shouldRenderCover
-        ? await renderDiscoverCover(playlistName, seedArtist.imageUrl)
+        ? await renderDiscoverCover(playlistName)
         : undefined
     }
 
@@ -559,6 +570,7 @@ function SelectedSeed({
   imageUrl,
   title,
   subtitle,
+  action,
   imageRounded,
   removeLabel,
   onRemove,
@@ -566,6 +578,7 @@ function SelectedSeed({
   imageUrl?: string | null
   title: string
   subtitle?: string
+  action?: ReactNode
   imageRounded?: boolean
   removeLabel: string
   onRemove: () => void
@@ -597,6 +610,7 @@ function SelectedSeed({
           <p className="truncate text-xs text-cream-400">{subtitle}</p>
         ) : null}
       </div>
+      {action}
       <button
         type="button"
         onClick={onRemove}

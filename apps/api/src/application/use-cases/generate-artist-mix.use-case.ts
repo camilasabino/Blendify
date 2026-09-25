@@ -18,7 +18,11 @@ import {
   type DiscoveryCatalogPort,
 } from '../../domain/repositories/discovery-catalog.port';
 import { PlaylistGenerationService } from '../../domain/services/playlist-generation.service';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
+import {
+  GeneratedPlaylist,
+  pickLinkedCoverArtwork,
+  trackCoverSource,
+} from '../../domain/playlist/generated-playlist';
 import { Artist } from '../../domain/artist/artist.entity';
 import { pickBestArtistMatch } from '../../domain/artist/artist-name-match';
 import { ArtistId } from '../../domain/value-objects/artist-id.vo';
@@ -150,9 +154,13 @@ export class GenerateArtistMixUseCase {
       generation,
       seeds,
       tracks,
-      coverCandidateUrl:
-        artists.find((artist) => artist.imageUrl)?.imageUrl ??
-        tracks.find((track) => track.albumImageUrl)?.albumImageUrl,
+      coverArtwork: pickLinkedCoverArtwork([
+        ...artists.map((artist) => ({
+          imageUrl: artist.imageUrl,
+          spotifyUrl: artist.externalUrl,
+        })),
+        ...tracks.map(trackCoverSource),
+      ]),
     });
   }
 

@@ -26,6 +26,11 @@ const LibraryPage = lazy(() =>
     default: module.LibraryPage,
   })),
 )
+const PrivacyPage = lazy(() =>
+  import('@/pages/privacy-page').then((module) => ({
+    default: module.PrivacyPage,
+  })),
+)
 const StatsPage = lazy(() =>
   import('@/pages/stats-page').then((module) => ({
     default: module.StatsPage,
@@ -39,6 +44,7 @@ export default function App() {
     <Suspense fallback={<RouteLoading />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/app" element={<AppShell />}>
           <Route index element={<Navigate to="mix" replace />} />
           <Route path="mix" element={<MixPlaylistPage />} />

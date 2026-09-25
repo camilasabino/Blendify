@@ -25,10 +25,13 @@ export class SpotifyAppTokenProvider {
   private inFlight: Promise<string> | null = null;
 
   constructor(private readonly config: ConfigService) {
-    this.accountsApi = createOutboundHttp({
-      baseURL: 'https://accounts.spotify.com',
-      timeout: 15_000,
-    });
+    this.accountsApi = createOutboundHttp(
+      {
+        baseURL: 'https://accounts.spotify.com',
+        timeout: 15_000,
+      },
+      { logBodies: false },
+    );
   }
 
   getAccessToken(): Promise<string> {

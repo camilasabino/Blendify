@@ -1,8 +1,9 @@
 import type { TrackDto } from '@blendify/contracts'
 import { api, getApiErrorMessage, isRequestLimited, isSpotifyRateLimited } from '@/lib/api'
+import { SpotifyLink } from '@/components/brand/spotify-link'
 import { SearchCombobox } from '@/components/ui/search-combobox'
 import { useT } from '@/i18n/use-t'
-import { formatDuration } from '@/lib/utils'
+import { formatCreditedArtists, formatDuration } from '@/lib/utils'
 
 type TrackSearchProps = Readonly<{
   selectedIds: Set<string>
@@ -63,6 +64,15 @@ export function TrackSearch(props: TrackSearchProps) {
             </span>
           ) : null}
         </>
+      )}
+      renderOptionAction={(track) => (
+        <SpotifyLink
+          href={track.externalUrl}
+          label={t('guestResult.openTrackInSpotify', {
+            track: track.name,
+            artists: formatCreditedArtists(track),
+          })}
+        />
       )}
     />
   )

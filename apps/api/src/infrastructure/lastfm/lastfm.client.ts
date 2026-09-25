@@ -101,13 +101,17 @@ export class LastFmClient implements DiscoveryCatalogPort {
   ) {
     const key = config.get<string>('LASTFM_API_KEY')?.trim();
     this.apiKey = key || null;
-    this.http = createOutboundHttp({
-      baseURL: 'https://ws.audioscrobbler.com/2.0/',
-      timeout: 12_000,
-      headers: {
-        'User-Agent': 'Blendify/1.0 (https://github.com/camilasabino/Blendify)',
+    this.http = createOutboundHttp(
+      {
+        baseURL: 'https://ws.audioscrobbler.com/2.0/',
+        timeout: 12_000,
+        headers: {
+          'User-Agent':
+            'Blendify/1.0 (https://github.com/camilasabino/Blendify)',
+        },
       },
-    });
+      { logBodies: config.get<string>('NODE_ENV') !== 'production' },
+    );
   }
 
   isConfigured(): boolean {

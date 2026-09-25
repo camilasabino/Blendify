@@ -1,6 +1,6 @@
 import { useEffect, useId, type KeyboardEvent } from 'react'
 import { LogOut, Music2 } from 'lucide-react'
-import { SpotifyMark } from '@/components/brand/spotify-mark'
+import { SpotifyIcon } from '@/components/brand/spotify-mark'
 import { usePopover, popoverSurfaceClass } from '@/hooks/use-popover'
 import { useT } from '@/i18n/use-t'
 import { cn, focusRing } from '@/lib/utils'
@@ -76,12 +76,6 @@ export function AccountMenu({
             <Music2 aria-hidden className="size-4 text-accent-fg" />
           </span>
         )}
-        <span
-          aria-hidden
-          className="absolute bottom-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-charcoal-950 ring-1 ring-charcoal-950"
-        >
-          <SpotifyMark className="size-3" title="" />
-        </span>
       </button>
 
       {open ? (
@@ -98,10 +92,8 @@ export function AccountMenu({
           className={cn(popoverSurfaceClass, 'w-max min-w-44 max-w-64 rounded-card py-1')}
         >
           {displayName ? (
-            <p className="flex items-center gap-2 border-b border-divider px-3 pb-2 pt-1.5 text-xs text-cream-400">
-              <span aria-hidden className="inline-flex">
-                <SpotifyMark className="size-3.5" title="" />
-              </span>
+            <p className="flex items-center gap-[11px] border-b border-divider px-3 pb-2 pt-1.5 text-xs text-cream-400">
+              <SpotifyIcon alt="Spotify" />
               <span className="min-w-0 truncate">{displayName}</span>
             </p>
           ) : null}

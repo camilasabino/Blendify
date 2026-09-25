@@ -58,6 +58,8 @@ jobs:
         working-directory: .
       - run: npm run lint
       - run: npm run build
+        env:
+          VITE_API_URL: https://api.blendify.camilasabino.dev
       - run: npx vitest run
 
   sonar:

@@ -103,7 +103,7 @@ The API follows ports-and-adapters boundaries. Spotify is exposed through focuse
 
 ### Requirements
 
-- Node.js 20 or newer.
+- Node.js 22 or newer (CI and production use Node 22, pinned in `.nvmrc`).
 - npm 10 or newer.
 - Docker Desktop or compatible PostgreSQL 16 and Redis 7 services.
 - A [Spotify Developer](https://developer.spotify.com/dashboard) application.
@@ -128,13 +128,12 @@ SPOTIFY_CLIENT_ID=
 SPOTIFY_CLIENT_SECRET=
 LASTFM_API_KEY=
 JWT_SECRET=replace-with-a-long-random-value
-COOKIE_SECRET=replace-with-a-long-random-value
 ```
 
 Use this exact Spotify redirect URI:
 
 ```text
-http://localhost:3000/api/auth/spotify/callback
+http://127.0.0.1:3000/api/auth/spotify/callback
 ```
 
 Required Spotify scopes:
@@ -146,7 +145,7 @@ ugc-image-upload
 user-read-playback-state user-modify-playback-state
 ```
 
-Use `localhost` consistently (not `127.0.0.1`). Session cookies are always `Secure`; browsers treat `http://localhost` as a secure context, but plain `http://127.0.0.1` will not store them.
+Use `127.0.0.1` consistently (not `localhost`): Spotify rejects `localhost` redirect URIs, and `FRONTEND_URL` must match the browser origin exactly for CORS and the origin check. Session cookies are always `Secure`; browsers treat loopback addresses as secure contexts.
 
 ### 2. Start infrastructure and prepare Prisma
 
@@ -168,11 +167,11 @@ npm run dev:api
 npm run dev:web
 ```
 
-Open http://localhost:5173.
+Open http://127.0.0.1:5173.
 
-- API: http://localhost:3000
-- Swagger: http://localhost:3000/api/docs
-- Health: http://localhost:3000/api/health
+- API: http://127.0.0.1:3000
+- Swagger (outside production only): http://127.0.0.1:3000/api/docs
+- Health: http://127.0.0.1:3000/api/health
 
 For a one-command local start, run `npm run start`. Lifecycle logs are written to `.blendify/logs/`.
 
@@ -181,7 +180,9 @@ For a one-command local start, run `npm run start`. Lifecycle logs are written t
 ```bash
 npm run dev:api          # Nest watch mode
 npm run dev:web          # Vite development server
-npm run build            # build every workspace
+npm run build            # build contracts, API (with Prisma Client) and web
+npm run build:api        # contracts + Prisma Client + Nest build (Railway)
+npm run build:web        # contracts + web bundle (requires VITE_API_URL)
 npm run test             # run contract, API, and web tests
 npm run lint             # ESLint + oxlint
 npm run format:check     # verify API formatting

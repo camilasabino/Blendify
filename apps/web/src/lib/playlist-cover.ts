@@ -3,8 +3,6 @@ export type PlaylistCoverKind = 'mix' | 'discover'
 export type PlaylistCoverInput = {
   title: string
   kind?: PlaylistCoverKind
-  /** Artist portraits or album art — used like Spotify Daily Mix. */
-  imageUrls?: string[]
 }
 
 type CoverPalette = {
@@ -18,8 +16,6 @@ type CoverPalette = {
 
 const COVER_SIZE = 640
 const MAX_COVER_BYTES = 250 * 1024
-const MAX_COVER_IMAGES = 4
-const IMAGE_LOAD_TIMEOUT_MS = 5_000
 const JPEG_QUALITIES = [0.92, 0.85, 0.75, 0.65, 0.55] as const
 const TITLE_LEN_XL = 32
 const TITLE_LEN_LG = 22
@@ -56,17 +52,11 @@ export async function renderPlaylistCoverBase64(
   const kind = input.kind ?? inferKind(input.title)
   const { eyebrow, headline } = splitTitle(input.title)
   const palette = pickPalette(kind, headline)
-  const images = await loadCoverImages(input.imageUrls ?? [], MAX_COVER_IMAGES)
 
   const barH = Math.round(COVER_SIZE * 0.22)
   const artH = COVER_SIZE - barH
 
-  if (images.length > 0) {
-    paintPhotoField(ctx, COVER_SIZE, artH, images)
-    paintPhotoScrim(ctx, COVER_SIZE, artH)
-  } else {
-    paintGraphicField(ctx, COVER_SIZE, artH, palette, headline)
-  }
+  paintGraphicField(ctx, COVER_SIZE, artH, palette, headline)
 
   paintBrandMark(ctx, palette)
   paintBottomBar(
@@ -182,115 +172,6 @@ function pickPalette(kind: PlaylistCoverKind, seed: string): CoverPalette {
     hash = (hash * 31 + (seed.codePointAt(i) ?? 0)) >>> 0
   }
   return palettes[hash % palettes.length]!
-}
-
-async function loadCoverImages(
-  urls: string[],
-  max: number,
-): Promise<HTMLImageElement[]> {
-  const unique = [...new Set(urls.filter(Boolean))].slice(0, max)
-  const loaded = await Promise.all(unique.map((url) => loadImage(url)))
-  return loaded.filter((img): img is HTMLImageElement => Boolean(img))
-}
-
-function loadImage(url: string): Promise<HTMLImageElement | null> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    let settled = false
-    const finish = (value: HTMLImageElement | null) => {
-      if (settled) return
-      settled = true
-      window.clearTimeout(timeout)
-      resolve(value)
-    }
-    const timeout = window.setTimeout(
-      () => finish(null),
-      IMAGE_LOAD_TIMEOUT_MS,
-    )
-    img.crossOrigin = 'anonymous'
-    img.onload = () => finish(img)
-    img.onerror = () => finish(null)
-    img.src = url
-  })
-}
-
-function paintPhotoField(
-  ctx: CanvasRenderingContext2D,
-  size: number,
-  artH: number,
-  images: HTMLImageElement[],
-): void {
-  const count = Math.min(images.length, 4)
-  const at = (index: number) => images[index]
-  const first = at(0)
-  if (!first) return
-
-  if (count === 1) {
-    drawCoverImage(ctx, first, 0, 0, size, artH)
-    return
-  }
-
-  const second = at(1)
-  if (!second) return
-
-  if (count === 2) {
-    const w = size / 2
-    drawCoverImage(ctx, first, 0, 0, w, artH)
-    drawCoverImage(ctx, second, w, 0, w, artH)
-    return
-  }
-
-  const third = at(2)
-  if (!third) return
-  const half = size / 2
-
-  if (count === 3) {
-    drawCoverImage(ctx, first, 0, 0, half, artH)
-    drawCoverImage(ctx, second, half, 0, half, artH / 2)
-    drawCoverImage(ctx, third, half, artH / 2, half, artH / 2)
-    return
-  }
-
-  const fourth = at(3)
-  if (!fourth) return
-  const cellH = artH / 2
-  drawCoverImage(ctx, first, 0, 0, half, cellH)
-  drawCoverImage(ctx, second, half, 0, half, cellH)
-  drawCoverImage(ctx, third, 0, cellH, half, cellH)
-  drawCoverImage(ctx, fourth, half, cellH, half, cellH)
-}
-
-function drawCoverImage(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): void {
-  const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight)
-  const dw = img.naturalWidth * scale
-  const dh = img.naturalHeight * scale
-  const dx = x + (w - dw) / 2
-  const dy = y + (h - dh) / 2
-  ctx.save()
-  ctx.beginPath()
-  ctx.rect(x, y, w, h)
-  ctx.clip()
-  ctx.drawImage(img, dx, dy, dw, dh)
-  ctx.restore()
-}
-
-function paintPhotoScrim(
-  ctx: CanvasRenderingContext2D,
-  size: number,
-  artH: number,
-): void {
-  const scrim = ctx.createLinearGradient(0, artH * 0.45, 0, artH)
-  scrim.addColorStop(0, 'rgba(0,0,0,0)')
-  scrim.addColorStop(1, 'rgba(0,0,0,0.35)')
-  ctx.fillStyle = scrim
-  ctx.fillRect(0, 0, size, artH)
 }
 
 function paintGraphicField(

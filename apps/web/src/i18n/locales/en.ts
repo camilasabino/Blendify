@@ -369,13 +369,19 @@ export const en = {
   'guestResult.temporary':
     'This playlist is temporary. It will be lost if you leave this page or refresh it.',
   'guestResult.attribution':
-    'Track details from Spotify.',
+    'Track details from',
   'guestResult.attributionWithArtwork':
-    'Track details and artwork from Spotify.',
+    'Track details and artwork from',
   'guestResult.trackList':
     'Songs in this playlist',
   'guestResult.openTrackInSpotify':
     'Open {track} by {artists} in Spotify',
+  'guestResult.openArtworkInSpotify':
+    'Open cover artwork source in Spotify',
+  'footer.privacy':
+    'Privacy',
+  'spotify.openArtist':
+    'Open {name} in Spotify',
   'transfer.title':
     'Transfer with Soundiiz',
   'transfer.explainer':

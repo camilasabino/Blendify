@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ApiErrorResponseSchema,
+  ArtistSchema,
   CreateDiscoverRequestSchema,
   CreateTransferRequestSchema,
   CreateMixRequestSchema,
@@ -142,6 +143,25 @@ describe('playlist contracts', () => {
         },
       }),
     ).toThrow();
+  });
+});
+
+describe('artist contracts', () => {
+  it('carries the optional Spotify artist URL', () => {
+    const artist = {
+      id: 'artist-1',
+      name: 'Sade',
+      imageUrl: 'https://i.scdn.co/image/sade',
+      externalUrl: 'https://open.spotify.com/artist/artist-1',
+    };
+
+    expect(ArtistSchema.parse(artist)).toEqual(artist);
+    expect(
+      ArtistSchema.parse({ id: 'artist-1', name: 'Sade', imageUrl: null }),
+    ).not.toHaveProperty('externalUrl');
+    expect(
+      ArtistSchema.safeParse({ ...artist, externalUrl: '' }).success,
+    ).toBe(false);
   });
 });
 
@@ -307,7 +327,10 @@ describe('guest generation contracts', () => {
         externalUrl: 'https://open.spotify.com/track/track-1',
       },
     ],
-    coverCandidateUrl: 'https://images.example/cover.jpg',
+    coverArtwork: {
+      imageUrl: 'https://i.scdn.co/image/cover',
+      spotifyUrl: 'https://open.spotify.com/track/track-1',
+    },
     transfer: {
       token: 'signed-transfer-token',
       expiresAt: '2026-09-25T13:00:00.000Z',
@@ -339,6 +362,26 @@ describe('guest generation contracts', () => {
         percent: 50,
       }),
     ).toMatchObject({ type: 'progress' });
+  });
+
+  it('never exposes cover artwork without its Spotify link', () => {
+    const { coverArtwork, ...withoutArtwork } = generated;
+
+    expect(GeneratedPlaylistSchema.parse(withoutArtwork)).toEqual(
+      withoutArtwork,
+    );
+    expect(
+      GeneratedPlaylistSchema.safeParse({
+        ...generated,
+        coverArtwork: { imageUrl: coverArtwork.imageUrl },
+      }).success,
+    ).toBe(false);
+    expect(
+      GeneratedPlaylistSchema.parse({
+        ...withoutArtwork,
+        coverCandidateUrl: 'https://images.example/cover.jpg',
+      }),
+    ).not.toHaveProperty('coverCandidateUrl');
   });
 
   it('accepts a generated playlist whose transfer is unavailable', () => {

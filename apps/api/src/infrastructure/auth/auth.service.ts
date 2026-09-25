@@ -17,7 +17,7 @@ export interface SessionPayload {
 const COOKIE_NAME = 'blendify_session';
 const OAUTH_STATE_COOKIE = 'oauth_state';
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /** Browsers occasionally hit the OAuth callback twice; coalesce by code. */
 const inFlightCallbacks = new Map<
@@ -102,8 +102,8 @@ export class AuthService {
 
   /**
    * Shared cookie flags for session + OAuth state (must match on clearCookie).
-   * Always Secure: browsers treat http://localhost as a secure context; use that
-   * (not 127.0.0.1) for local HTTP so OAuth session cookies still stick.
+   * Always Secure: browsers treat loopback origins (http://127.0.0.1) as secure
+   * contexts, so local HTTP sessions still work.
    */
   cookieOptions(maxAgeMs: number): CookieOptions {
     return {
@@ -128,7 +128,11 @@ export class AuthService {
   }
 
   setSessionCookie(res: Response, token: string): void {
-    res.cookie(COOKIE_NAME, token, this.cookieOptions(SESSION_TTL_MS));
+    res.cookie(
+      COOKIE_NAME,
+      token,
+      this.cookieOptions(SESSION_TTL_SECONDS * 1000),
+    );
   }
 
   clearSessionCookie(res: Response): void {

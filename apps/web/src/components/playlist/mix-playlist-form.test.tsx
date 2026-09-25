@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MixPlaylistForm } from '@/components/playlist/mix-playlist-form'
+import { renderPlaylistCoverBase64 } from '@/lib/playlist-cover'
 import {
   jsonResponse,
   ndjsonResponse,
@@ -113,6 +114,10 @@ describe('MixPlaylistForm generation modes', () => {
       genreIds: ['jazz'],
       persistToLibrary: true,
       coverImageBase64: 'cover-data',
+    })
+    expect(renderPlaylistCoverBase64).toHaveBeenCalledWith({
+      title: 'Blendify · Mix · Jazz',
+      kind: 'mix',
     })
     expect(screen.getByRole('link', { name: 'Open in Spotify' })).toHaveAttribute(
       'href',
