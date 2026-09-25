@@ -5,11 +5,6 @@ import { Artist } from '../../domain/artist/artist.entity';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
 import {
-  preferPopularTracks,
-  preferRareTracks,
-  rankTracksForMix,
-} from '../../domain/genre/artist-mix-queries';
-import {
   isFatalCatalogError,
   isSpotifyQuotaError,
   resolveAttemptBudget,
@@ -19,11 +14,7 @@ import {
   type CuratedGenre,
   genreTrackGroupKey,
 } from '../../domain/genre/curated-genres';
-import {
-  buildGenreQueries,
-  tracksPerSeedArtist,
-  type GenreTrackQuery,
-} from '../../domain/genre/genre-playlist-generation.service';
+import { tracksPerSeedArtist } from '../../domain/genre/genre-playlist-generation.service';
 import {
   DISCOVERY_CATALOG,
   type DiscoveryCatalogPort,
@@ -112,7 +103,6 @@ export class GenreTrackCatalogService {
     tracks: Track[];
     coverUrl: string | undefined;
   }> {
-    const plan = buildGenreQueries(genre, popularity);
     const genreKey = genreTrackGroupKey(genre.id);
     let collected = await this.resolveTagTracks(
       provider,
@@ -128,7 +118,6 @@ export class GenreTrackCatalogService {
       const fallback = await this.resolveSeedArtistTracks(
         provider,
         genre,
-        plan,
         tracksPerSeed,
       );
       coverUrl = fallback.coverUrl;
@@ -138,19 +127,11 @@ export class GenreTrackCatalogService {
       }
     }
 
-    let ranked = rankTracksForMix(collected, plan.rank);
-    if (plan.minPopularity != null && plan.minPopularity > 0) {
-      ranked = preferPopularTracks(ranked, tracksPerSeed, plan.minPopularity);
-    }
-    if (plan.maxPopularity != null) {
-      ranked = preferRareTracks(ranked, tracksPerSeed, plan.maxPopularity);
-    }
-
     if (!coverUrl) {
-      coverUrl = ranked.find((track) => track.albumImageUrl)?.albumImageUrl;
+      coverUrl = collected.find((track) => track.albumImageUrl)?.albumImageUrl;
     }
 
-    return { genreKey, tracks: ranked, coverUrl };
+    return { genreKey, tracks: collected, coverUrl };
   }
 
   private async resolveTagTracks(
@@ -190,7 +171,6 @@ export class GenreTrackCatalogService {
   private async resolveSeedArtistTracks(
     provider: CatalogProviderPort,
     genre: CuratedGenre,
-    plan: GenreTrackQuery,
     tracksPerSeed: number,
   ): Promise<{ tracks: Track[]; coverUrl: string | undefined }> {
     // Each fallback seed costs a Spotify search, so cap fan-out tightly.
@@ -240,7 +220,7 @@ export class GenreTrackCatalogService {
     }
 
     return {
-      tracks: rankTracksForMix(collected, plan.rank),
+      tracks: collected,
       coverUrl: seedArtists[0]?.imageUrl,
     };
   }

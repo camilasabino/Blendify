@@ -13,6 +13,7 @@ export type SimilarTrackCandidate = {
   artistName: string;
   mbid?: string;
   match?: number;
+  playcount?: number;
   url?: string;
   imageUrl?: string;
 };

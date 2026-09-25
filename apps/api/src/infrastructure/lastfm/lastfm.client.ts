@@ -37,6 +37,7 @@ type LastFmSimilarTrackNode = {
   name?: string;
   mbid?: string;
   match?: string | number;
+  playcount?: string | number;
   url?: string;
   artist?: { name?: string; mbid?: string } | string;
   image?: LastFmImage[];
@@ -199,7 +200,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
     const safeLimit = Math.min(Math.max(limit, 1), 100);
     // Versioned because query-variant rules affect the recommendation set.
     const cacheKey = this.key(
-      'similar-tracks-v3',
+      'similar-tracks-v4',
       `${artist.toLowerCase()}|${track.toLowerCase()}|${safeLimit}`,
     );
 
@@ -468,6 +469,16 @@ function coerceFiniteNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+function parsePlaycount(value: unknown): number | undefined {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value >= 0 ? value : undefined;
+  }
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    return Number(value.trim());
+  }
+  return undefined;
+}
+
 function mapSimilarArtist(
   node: LastFmArtistNode,
 ): SimilarArtistCandidate | null {
@@ -493,11 +504,13 @@ function mapSimilarTrack(
     typeof artistRaw === 'string' ? artistRaw.trim() : artistRaw?.name?.trim();
   if (!artistName) return null;
   const match = coerceFiniteNumber(node.match);
+  const playcount = parsePlaycount(node.playcount);
   return {
     name,
     artistName,
     mbid: node.mbid?.trim() || undefined,
     match: Number.isFinite(match) ? match : undefined,
+    playcount,
     url: node.url?.trim() || undefined,
     imageUrl: pickImageUrl(node.image),
   };

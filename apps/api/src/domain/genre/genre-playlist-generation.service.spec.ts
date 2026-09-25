@@ -1,21 +1,12 @@
-import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
+import { TrackOrderMode } from '@blendify/contracts';
 import {
-  buildGenreQueries,
   GenrePlaylistGenerationService,
   selectTracksWithArtistDiversity,
   tracksPerSeedArtist,
 } from './genre-playlist-generation.service';
-import type { CuratedGenre } from './curated-genres';
 import { Track } from '../track/track.entity';
 import { TrackId } from '../value-objects/track-id.vo';
 import { ArtistId } from '../value-objects/artist-id.vo';
-
-const jazz: CuratedGenre = {
-  id: 'jazz',
-  name: 'Jazz',
-  spotifyGenre: 'jazz',
-  keywords: [],
-};
 
 function track(
   artistId: string,
@@ -32,29 +23,6 @@ function track(
     uri: `spotify:track:${id}`,
   });
 }
-
-describe('buildGenreQueries', () => {
-  it('builds popularity plans without Spotify artist queries', () => {
-    for (const mode of Object.values(PopularityMode)) {
-      const plan = buildGenreQueries(jazz, mode);
-      expect(plan.artistLimit).toBeGreaterThanOrEqual(20);
-      expect(plan.genre.id).toBe('jazz');
-    }
-  });
-
-  it('uses popularity ranking for popular mode', () => {
-    const plan = buildGenreQueries(jazz, PopularityMode.POPULAR);
-    expect(plan.rank).toBe('popularity_desc');
-    expect(plan.minPopularity).toBe(35);
-    expect(plan.artistLimit).toBe(24);
-  });
-
-  it('skips chart head for rarities mode', () => {
-    const plan = buildGenreQueries(jazz, PopularityMode.RARITIES);
-    expect(plan.rank).toBe('popularity_asc');
-    expect(plan.maxPopularity).toBe(55);
-  });
-});
 
 describe('selectTracksWithArtistDiversity', () => {
   it('spreads picks across artists before repeating anyone', () => {

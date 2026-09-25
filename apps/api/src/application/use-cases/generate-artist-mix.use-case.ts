@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
-  PopularityMode,
   type PlaylistGeneration,
   type PlaylistSeedDto,
   type PopularityMode as PopularityModeValue,
@@ -28,12 +27,6 @@ import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
 import { MAX_TRACKS, maxTracksPerSeedForCount } from '../../domain/constants';
 import {
-  preferPopularTracks,
-  preferRareTracks,
-  rankTracksForMix,
-  type ArtistTrackQuery,
-} from '../../domain/genre/artist-mix-queries';
-import {
   isFatalCatalogError,
   isSpotifyQuotaError,
   resolveCatalogWithPoolExpand,
@@ -53,17 +46,6 @@ import {
 
 function isPendingArtistId(id: string): boolean {
   return id.startsWith('pending:');
-}
-
-/** Popularity ceiling used when preferring rarer chart tracks. */
-const RARITY_POPULARITY_CEILING = 55;
-
-function rankModeForPopularity(
-  mode: PopularityModeValue,
-): ArtistTrackQuery['rank'] {
-  if (mode === PopularityMode.POPULAR) return 'popularity_desc';
-  if (mode === PopularityMode.RARITIES) return 'popularity_asc';
-  return 'as_found';
 }
 
 @Injectable()
@@ -309,23 +291,12 @@ export class GenerateArtistMixUseCase {
         },
       );
 
-      let ranked = rankTracksForMix(collected, rankModeForPopularity(mode));
-      if (mode === PopularityMode.POPULAR) {
-        ranked = preferPopularTracks(ranked, fetchBudget);
-      } else if (mode === PopularityMode.RARITIES) {
-        ranked = preferRareTracks(
-          ranked,
-          fetchBudget,
-          RARITY_POPULARITY_CEILING,
-        );
-      }
-
       matched = Math.min(
         totalNeeded,
-        baseMatched + Math.min(ranked.length, tracksPerSeed),
+        baseMatched + Math.min(collected.length, tracksPerSeed),
       );
       tracker?.report('matching_tracks', matched, Math.max(1, totalNeeded));
-      map.set(artistId, ranked);
+      map.set(artistId, collected);
     }
 
     return map;

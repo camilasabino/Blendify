@@ -1,6 +1,4 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { randomInt } from 'node:crypto';
-import { PopularityMode } from '@blendify/contracts';
 import type { z } from 'zod';
 import {
   CATALOG_PROVIDER_FACTORY,
@@ -26,11 +24,6 @@ import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { maxTracksPerSeedForCount } from '../../domain/constants';
 import {
-  preferPopularTracks,
-  preferRareTracks,
-} from '../../domain/genre/artist-mix-queries';
-import { catalogCandidateBudget } from '../../domain/genre/catalog-window';
-import {
   DISCOVER_MIN_SIMILAR,
   DISCOVER_MIN_SIMILAR_TRACKS,
   DISCOVER_SIMILAR_FETCH,
@@ -41,6 +34,7 @@ import {
   tracksPerSeedForDiscoverTarget,
 } from '../../domain/playlist/discover-playlist-name';
 import { primaryArtistName } from '../../domain/discovery/similar-track-query';
+import { selectSimilarTrackCandidates } from '../../domain/discovery/similar-track-familiarity';
 import { createOrderingStrategy } from '../../domain/services/strategies/track-ordering.strategy';
 import {
   GenerateDiscoverPlaylistDto,
@@ -56,6 +50,7 @@ import {
 type DiscoverInput = z.output<typeof GenerateDiscoverPlaylistSchema>;
 type ArtistDiscoverInput = Extract<DiscoverInput, { kind: 'discover_artist' }>;
 type TrackDiscoverInput = Extract<DiscoverInput, { kind: 'discover_track' }>;
+type SimilarTrackRef = { name: string; artistName: string; playcount?: number };
 
 @Injectable()
 export class GenerateDiscoverPlaylistUseCase {
@@ -220,7 +215,7 @@ export class GenerateDiscoverPlaylistUseCase {
     const seedTrack = await this.resolveSeedTrack(catalog, input);
     tracker.report('resolving_seeds', 1, 1);
 
-    let similarRaw: Array<{ name: string; artistName: string }>;
+    let similarRaw: SimilarTrackRef[];
     try {
       similarRaw = await this.collectSimilarTrackCandidates(
         seedTrack,
@@ -247,13 +242,12 @@ export class GenerateDiscoverPlaylistUseCase {
     }
 
     const neededSimilar = input.targetTrackCount;
-    const resolveBudget = catalogCandidateBudget(neededSimilar);
     tracker.report('matching_tracks', 0, Math.max(1, neededSimilar));
     const resolvedSimilar = await this.resolveSimilarTracks(
       catalog,
-      similarRaw.slice(0, resolveBudget),
+      selectSimilarTrackCandidates(similarRaw, input.popularity, neededSimilar),
       seedTrack.id.getValue(),
-      resolveBudget,
+      neededSimilar,
       (matched) => {
         tracker.report(
           'matching_tracks',
@@ -271,13 +265,7 @@ export class GenerateDiscoverPlaylistUseCase {
       );
     }
 
-    const filteredSimilar = selectTracksByPopularity(
-      resolvedSimilar,
-      neededSimilar,
-      input.popularity,
-    );
-
-    const tracksByArtist = groupTracksByArtist(filteredSimilar);
+    const tracksByArtist = groupTracksByArtist(resolvedSimilar);
     const ordered = createOrderingStrategy(input.orderMode).order(
       tracksByArtist,
     );
@@ -451,12 +439,12 @@ export class GenerateDiscoverPlaylistUseCase {
   private async collectSimilarTrackCandidates(
     seedTrack: Track,
     limit: number,
-  ): Promise<Array<{ name: string; artistName: string }>> {
+  ): Promise<SimilarTrackRef[]> {
     const seedKey = normalizeTrackKey(seedTrack.artistName, seedTrack.name);
     const seen = new Set<string>([seedKey]);
-    const out: Array<{ name: string; artistName: string }> = [];
+    const out: SimilarTrackRef[] = [];
 
-    const push = (items: Array<{ name: string; artistName: string }>): void => {
+    const push = (items: SimilarTrackRef[]): void => {
       for (const item of items) {
         if (out.length >= limit) return;
         const name = item.name.trim();
@@ -465,7 +453,7 @@ export class GenerateDiscoverPlaylistUseCase {
         const key = normalizeTrackKey(artistName, name);
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push({ name, artistName });
+        out.push({ name, artistName, playcount: item.playcount });
       }
     };
 
@@ -478,6 +466,7 @@ export class GenerateDiscoverPlaylistUseCase {
       similar.map((t) => ({
         name: t.name,
         artistName: t.artistName,
+        playcount: t.playcount,
       })),
     );
 
@@ -496,6 +485,7 @@ export class GenerateDiscoverPlaylistUseCase {
         top.map((t) => ({
           name: t.trackName,
           artistName: t.artistName,
+          playcount: t.playcount,
         })),
       );
     }
@@ -518,6 +508,7 @@ export class GenerateDiscoverPlaylistUseCase {
           top.map((t) => ({
             name: t.trackName,
             artistName: t.artistName || artist.name,
+            playcount: t.playcount,
           })),
         );
       }
@@ -528,7 +519,7 @@ export class GenerateDiscoverPlaylistUseCase {
 
   private async resolveSimilarTracks(
     catalog: CatalogProviderPort,
-    candidates: Array<{ name: string; artistName: string }>,
+    candidates: SimilarTrackRef[],
     seedTrackId: string,
     limit: number,
     onMatched?: (matched: number) => void,
@@ -559,39 +550,6 @@ export class GenerateDiscoverPlaylistUseCase {
 
 function normalizeTrackKey(artistName: string, trackName: string): string {
   return `${normalizeArtistName(artistName)}|${normalizeArtistName(trackName)}`;
-}
-
-function selectTracksByPopularity(
-  tracks: Track[],
-  needed: number,
-  popularity: PopularityMode,
-): Track[] {
-  switch (popularity) {
-    case PopularityMode.POPULAR:
-      return preferPopularTracks(tracks, needed).slice(0, needed);
-    case PopularityMode.RARITIES:
-      return preferRareTracks(tracks, needed).slice(0, needed);
-    case PopularityMode.BALANCED:
-    default: {
-      // Keep Last.fm similarity order with a light shuffle of the middle.
-      const copy = [...tracks];
-      if (copy.length > 4) {
-        const head = copy.slice(0, 2);
-        const mid = copy.slice(2, -1);
-        const tail = copy.slice(-1);
-        for (let i = mid.length - 1; i > 0; i -= 1) {
-          const j = randomInt(0, i + 1);
-          const current = mid[i];
-          const swap = mid[j];
-          if (current === undefined || swap === undefined) continue;
-          mid[i] = swap;
-          mid[j] = current;
-        }
-        return [...head, ...mid, ...tail].slice(0, needed);
-      }
-      return copy.slice(0, needed);
-    }
-  }
 }
 
 function groupTracksByArtist(tracks: Track[]): Map<string, Track[]> {

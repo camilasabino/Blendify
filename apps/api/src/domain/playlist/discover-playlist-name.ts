@@ -4,7 +4,7 @@ import { MAX_ARTISTS } from '../constants';
 export const DISCOVER_SIMILAR_FETCH = 40;
 export const DISCOVER_MIN_SIMILAR = 2;
 export const DISCOVER_MIN_SIMILAR_TRACKS = 4;
-export const DISCOVER_SIMILAR_TRACK_FETCH = 80;
+export const DISCOVER_SIMILAR_TRACK_FETCH = 100;
 
 /**
  * How many similar artists to include (seed is excluded from the mix).

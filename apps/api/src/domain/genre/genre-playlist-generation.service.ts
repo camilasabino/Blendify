@@ -2,56 +2,8 @@ import { Track } from '../track/track.entity';
 import { TrackDeduplicationService } from '../services/track-deduplication.service';
 import { DuplicateTrackSpecification } from '../services/specifications/duplicate-track.specification';
 import { createOrderingStrategy } from '../services/strategies/track-ordering.strategy';
-import {
-  PopularityMode,
-  type PopularityMode as PopularityModeValue,
-  type TrackOrderMode,
-} from '@blendify/contracts';
-import { CuratedGenre } from './curated-genres';
+import type { TrackOrderMode } from '@blendify/contracts';
 import { MAX_TRACKS } from '../constants';
-
-/**
- * Genre playlists resolve seed artists via Last.fm tag charts, then pull a
- * small number of tracks per artist so broad genres stay diverse.
- */
-export interface GenreTrackQuery {
-  genre: CuratedGenre;
-  /** Fallback seed-artist count if tag-track resolve underfills. */
-  artistLimit: number;
-  rank: 'popularity_desc' | 'popularity_asc' | 'as_found';
-  minPopularity?: number;
-  /** Soft ceiling for rarities (applied via preferRareTracks). */
-  maxPopularity?: number;
-}
-
-export function buildGenreQueries(
-  genre: CuratedGenre,
-  mode: PopularityModeValue,
-): GenreTrackQuery {
-  switch (mode) {
-    case PopularityMode.POPULAR:
-      return {
-        genre,
-        // Enough seeds for diversity without serial Spotify timeouts.
-        artistLimit: 24,
-        rank: 'popularity_desc',
-        minPopularity: 35,
-      };
-    case PopularityMode.BALANCED:
-      return {
-        genre,
-        artistLimit: 28,
-        rank: 'as_found',
-      };
-    case PopularityMode.RARITIES:
-      return {
-        genre,
-        artistLimit: 24,
-        rank: 'popularity_asc',
-        maxPopularity: 55,
-      };
-  }
-}
 
 /**
  * How many tracks to pull per seed artist while building the candidate pool.
