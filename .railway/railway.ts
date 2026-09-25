@@ -35,6 +35,7 @@ export default defineRailway(() => {
       restartPolicyMaxRetries: 5,
     },
     env: {
+      RAILPACK_NODE_NPM_INSTALL: 'npm ci',
       NODE_ENV: 'production',
       PORT: '8080',
       FRONTEND_URL: 'https://blendify.camilasabino.dev',
