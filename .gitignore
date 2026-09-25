@@ -43,3 +43,7 @@ apps/web/test-results/
 *.tsbuildinfo
 .cache/
 .blendify/
+
+# Internal development docs (specs, progress, follow-ups) stay local
+docs/specs/
+docs/followups/
