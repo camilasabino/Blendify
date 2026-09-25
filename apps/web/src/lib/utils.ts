@@ -91,3 +91,33 @@ export function estimateTrackCount(
   const raw = Math.max(0, seedCount) * Math.max(0, tracksPerSeed)
   return { total: Math.min(raw, cap), capped: raw > cap }
 }
+
+export function formatDateTime(iso: string, locale?: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  const localeTag = locale === 'pt' ? 'pt-BR' : locale
+  return new Intl.DateTimeFormat(localeTag ?? undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+export function toSafeHttpsUrl(value: string | null | undefined): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' ? url.href : null
+  } catch {
+    return null
+  }
+}
+
+export function formatCreditedArtists(track: {
+  artistName: string
+  artists?: { name: string }[]
+}): string {
+  const names = track.artists?.map((artist) => artist.name) ?? []
+  return names.length > 0 ? names.join(', ') : track.artistName
+}

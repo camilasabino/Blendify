@@ -1,7 +1,9 @@
 import { useId } from 'react'
 import {
+  Blend,
   Check,
   CircleCheck,
+  Clock,
   Copy,
   ExternalLink,
   Plus,
@@ -9,18 +11,28 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import type {
+  GeneratedPlaylistDto,
   GenerationProgress,
   PlaylistDetail,
 } from '@blendify/contracts'
+import { SpotifyMark } from '@/components/brand/spotify-mark'
 import { CoverErrorNotice } from '@/components/playlist/generation-form-shared'
+import { GeneratedTrackList } from '@/components/playlist/generated-track-list'
 import { PlaylistPreview } from '@/components/playlist/playlist-preview'
+import { TransferAction } from '@/components/playlist/transfer-action'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { useGenerationFill } from '@/hooks/use-generation-feedback'
 import { useT } from '@/i18n/use-t'
 import type { MessageKey } from '@/i18n/messages'
+import type { AppMode } from '@/lib/capabilities'
 import { readPersistToLibraryPreference } from '@/lib/persist-to-library-preference'
+import {
+  outcomeDurationMs,
+  outcomeTrackCount,
+  type GenerationOutcome,
+} from '@/lib/playlist-generation'
 import { formatSongCount } from '@/lib/song-count'
-import { cn, formatListeningTime } from '@/lib/utils'
+import { cn, formatListeningTime, toSafeHttpsUrl } from '@/lib/utils'
 
 function phaseMessageKey(phase: GenerationProgress['phase']): MessageKey {
   switch (phase) {
@@ -80,11 +92,28 @@ function GenerationProgressBar({
   )
 }
 
+function readyKey(mode: AppMode): MessageKey {
+  return mode === 'guest' ? 'create.readyGuest' : 'create.ready'
+}
+
+function failedTitleKey(mode: AppMode): MessageKey {
+  return mode === 'guest' ? 'create.failedTitleGuest' : 'create.failedTitle'
+}
+
+function leaveNoteKey(mode: AppMode): MessageKey {
+  if (mode === 'guest') return 'create.leaveNoteGuest'
+  return readPersistToLibraryPreference()
+    ? 'create.leaveNoteLibrary'
+    : 'create.leaveNoteSpotify'
+}
+
 function GeneratingState({
+  mode,
   progress,
   workingHintKey,
   requestStarted,
 }: Readonly<{
+  mode: AppMode
   progress: GenerationProgress | null
   workingHintKey: MessageKey
   requestStarted: boolean
@@ -122,9 +151,7 @@ function GeneratingState({
       ) : null}
       {requestStarted ? (
         <p className="text-xs leading-relaxed text-cream-400">
-          {readPersistToLibraryPreference()
-            ? t('create.leaveNoteLibrary')
-            : t('create.leaveNoteSpotify')}
+          {t(leaveNoteKey(mode))}
         </p>
       ) : null}
     </div>
@@ -246,20 +273,20 @@ function NextStepActions({
 }
 
 function resultMeta(
-  result: PlaylistDetail,
+  result: GenerationOutcome,
   t: ReturnType<typeof useT>,
 ): string {
+  const durationMs = outcomeDurationMs(result)
   return [
-    formatSongCount(result.trackCount, t),
-    result.totalDurationMs > 0
-      ? formatListeningTime(result.totalDurationMs)
-      : null,
+    formatSongCount(outcomeTrackCount(result), t),
+    durationMs > 0 ? formatListeningTime(durationMs) : null,
   ]
     .filter(Boolean)
     .join(' · ')
 }
 
 function ReadyResult({
+  outcome,
   result,
   requestedTrackCount,
   copied,
@@ -267,6 +294,7 @@ function ReadyResult({
   onAdjust,
   onCreateAnother,
 }: Readonly<{
+  outcome: GenerationOutcome
   result: PlaylistDetail
   requestedTrackCount: number
   copied: boolean
@@ -276,7 +304,7 @@ function ReadyResult({
 }>) {
   const t = useT()
   const { isNearCompleteFill, isShortFill } = useGenerationFill(
-    result,
+    result.trackCount,
     requestedTrackCount,
   )
 
@@ -284,7 +312,7 @@ function ReadyResult({
     <div className="space-y-6">
       <div className="space-y-4">
         <div>
-          <p className="text-sm text-cream-300">{resultMeta(result, t)}</p>
+          <p className="text-sm text-cream-300">{resultMeta(outcome, t)}</p>
           <FillStatusMessages
             trackCount={result.trackCount}
             requestedTrackCount={requestedTrackCount}
@@ -314,7 +342,139 @@ function ReadyResult({
   )
 }
 
+function GuestCover({ url }: Readonly<{ url: string | null }>) {
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt=""
+        className="size-20 shrink-0 rounded-card object-cover ring-1 ring-divider sm:size-24"
+      />
+    )
+  }
+  return (
+    <span className="flex size-20 shrink-0 items-center justify-center rounded-card bg-linear-to-br from-amber-400 to-amber-700 text-on-accent sm:size-24">
+      <Blend aria-hidden className="size-7" />
+    </span>
+  )
+}
+
+function GuestReadyResult({
+  outcome,
+  playlist,
+  requestedTrackCount,
+  onRegenerate,
+  onAdjust,
+  onCreateAnother,
+}: Readonly<{
+  outcome: GenerationOutcome
+  playlist: GeneratedPlaylistDto
+  requestedTrackCount: number
+  onRegenerate: () => void
+  onAdjust: () => void
+  onCreateAnother: () => void
+}>) {
+  const t = useT()
+  const trackCount = playlist.tracks.length
+  const { isNearCompleteFill, isShortFill } = useGenerationFill(
+    trackCount,
+    requestedTrackCount,
+  )
+  const coverUrl = toSafeHttpsUrl(playlist.coverCandidateUrl)
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex items-start gap-4">
+          <GuestCover url={coverUrl} />
+          <div className="min-w-0 space-y-2">
+            {playlist.description ? (
+              <p className="break-words text-sm text-cream-200">
+                {playlist.description}
+              </p>
+            ) : null}
+            <p className="text-sm text-cream-300">{resultMeta(outcome, t)}</p>
+            <FillStatusMessages
+              trackCount={trackCount}
+              requestedTrackCount={requestedTrackCount}
+              isNearCompleteFill={isNearCompleteFill}
+              isShortFill={isShortFill}
+            />
+            <p className="flex items-start gap-1.5 text-xs text-cream-400">
+              <span aria-hidden className="mt-px inline-flex">
+                <SpotifyMark className="size-3.5" title="" />
+              </span>
+              {coverUrl
+                ? t('guestResult.attributionWithArtwork')
+                : t('guestResult.attribution')}
+            </p>
+          </div>
+        </div>
+        <p className="flex items-start gap-2 text-sm leading-relaxed text-cream-300">
+          <Clock aria-hidden className="mt-0.5 size-4 shrink-0 text-cream-400" />
+          {t('guestResult.temporary')}
+        </p>
+        {playlist.transfer ? (
+          <TransferAction
+            key={playlist.transfer.token}
+            offer={playlist.transfer}
+            onRegenerate={onRegenerate}
+          />
+        ) : null}
+        <NextStepActions
+          onAdjust={onAdjust}
+          onCreateAnother={onCreateAnother}
+        />
+      </div>
+      <GeneratedTrackList tracks={playlist.tracks} />
+    </div>
+  )
+}
+
+function ResultBody({
+  outcome,
+  requestedTrackCount,
+  copied,
+  onCopy,
+  onRetry,
+  onAdjust,
+  onCreateAnother,
+}: Readonly<{
+  outcome: GenerationOutcome
+  requestedTrackCount: number
+  copied: boolean
+  onCopy: (url: string) => void
+  onRetry: () => void
+  onAdjust: () => void
+  onCreateAnother: () => void
+}>) {
+  if (outcome.mode === 'guest') {
+    return (
+      <GuestReadyResult
+        outcome={outcome}
+        playlist={outcome.playlist}
+        requestedTrackCount={requestedTrackCount}
+        onRegenerate={onRetry}
+        onAdjust={onAdjust}
+        onCreateAnother={onCreateAnother}
+      />
+    )
+  }
+  return (
+    <ReadyResult
+      outcome={outcome}
+      result={outcome.playlist}
+      requestedTrackCount={requestedTrackCount}
+      copied={copied}
+      onCopy={onCopy}
+      onAdjust={onAdjust}
+      onCreateAnother={onCreateAnother}
+    />
+  )
+}
+
 export function GenerationResultPanel({
+  mode,
   isGenerating,
   result,
   progress,
@@ -330,8 +490,9 @@ export function GenerationResultPanel({
   onAdjust,
   onCreateAnother,
 }: Readonly<{
+  mode: AppMode
   isGenerating: boolean
-  result: PlaylistDetail | null
+  result: GenerationOutcome | null
   progress: GenerationProgress | null
   error: string | null
   coverError: string | null
@@ -352,15 +513,16 @@ export function GenerationResultPanel({
 
   const showError = !isGenerating && error != null
   const showResult = !isGenerating && !showError && result != null
-  let title = result?.name ?? t('create.ready')
+  const readyLabel = t(readyKey(result?.mode ?? mode))
+  let title = result?.playlist.name ?? readyLabel
   if (isGenerating) title = t(workingTitleKey)
-  else if (showError) title = t('create.failedTitle')
+  else if (showError) title = t(failedTitleKey(mode))
 
   let announcement = ''
   if (isGenerating) {
     announcement = progressAnnouncement(progress, workingHintKey, t)
   } else if (showResult) {
-    announcement = `${t('create.ready')}: ${result.name}. ${resultMeta(result, t)}`
+    announcement = `${readyLabel}: ${result.playlist.name}. ${resultMeta(result, t)}`
   }
 
   return (
@@ -377,7 +539,7 @@ export function GenerationResultPanel({
         {showResult ? (
           <p className="flex items-center gap-1.5 text-eyebrow text-accent-fg">
             <CircleCheck aria-hidden className="size-3.5" />
-            {t('create.ready')}
+            {readyLabel}
           </p>
         ) : null}
         <h2
@@ -393,6 +555,7 @@ export function GenerationResultPanel({
       <output className="sr-only">{announcement}</output>
       {isGenerating ? (
         <GeneratingState
+          mode={mode}
           progress={progress}
           workingHintKey={workingHintKey}
           requestStarted={requestStarted}
@@ -403,11 +566,12 @@ export function GenerationResultPanel({
       ) : null}
       <CoverErrorNotice message={coverError} />
       {showResult ? (
-        <ReadyResult
-          result={result}
+        <ResultBody
+          outcome={result}
           requestedTrackCount={requestedTrackCount}
           copied={copied}
           onCopy={onCopy}
+          onRetry={onRetry}
           onAdjust={onAdjust}
           onCreateAnother={onCreateAnother}
         />

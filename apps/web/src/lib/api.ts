@@ -1,19 +1,28 @@
-import type {
-  ArtistDto,
-  BulkLibraryAction,
-  BulkLibraryResult,
-  CreateDiscoverRequest,
-  CreateMixRequest,
-  GenreDto,
-  GenerationProgress,
-  OkResponse,
-  PlaybackDeviceDto,
-  PlaylistDetail,
-  PlaylistLibraryPage,
-  StartPlaybackRequest,
-  TrackDto,
-  UserDto,
-  UserUsageStats,
+import {
+  GeneratedPlaylistSchema,
+  GeneratedPlaylistStreamEventSchema,
+  GenerationStreamEventSchema,
+  PlaylistDetailSchema,
+  PlaylistTransferSchema,
+  type ArtistDto,
+  type BulkLibraryAction,
+  type BulkLibraryResult,
+  type CreateDiscoverRequest,
+  type CreateMixRequest,
+  type GenerateDiscoverRequest,
+  type GenerateMixRequest,
+  type GeneratedPlaylistDto,
+  type GenreDto,
+  type GenerationProgress,
+  type OkResponse,
+  type PlaybackDeviceDto,
+  type PlaylistDetail,
+  type PlaylistLibraryPage,
+  type PlaylistTransferDto,
+  type StartPlaybackRequest,
+  type TrackDto,
+  type UserDto,
+  type UserUsageStats,
 } from '@blendify/contracts'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
@@ -21,11 +30,17 @@ const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 export {
   ApiError,
   getApiErrorMessage,
+  getTransferErrorMessage,
+  getTransferErrorRecovery,
   isRequestLimited,
   isSpotifyRateLimited,
 } from '@/lib/api-error'
-import { ApiError } from '@/lib/api-error'
-import { readGenerationStream } from '@/lib/generation-stream'
+import { ApiError, invalidGenerationResponseError } from '@/lib/api-error'
+import {
+  readGenerationStream,
+  type GenerationContract,
+  type GenerationProgressHandler,
+} from '@/lib/generation-stream'
 
 export type User = UserDto
 export type Artist = ArtistDto
@@ -35,9 +50,13 @@ export type {
   BulkLibraryResult,
   CreateDiscoverRequest,
   CreateMixRequest,
+  GenerateDiscoverRequest,
+  GenerateMixRequest,
+  GeneratedPlaylistDto,
   GenerationProgress,
   PlaylistDetail,
   PlaylistLibraryPage,
+  PlaylistTransferDto,
   UserUsageStats,
 }
 export type { DiscoverTrackTarget, RankedSeedUsage } from '@blendify/contracts'
@@ -88,11 +107,24 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return payload as T
 }
 
-async function requestGeneration(
+const SPOTIFY_GENERATION: GenerationContract<PlaylistDetail> = {
+  events: GenerationStreamEventSchema,
+  result: PlaylistDetailSchema,
+}
+
+const GUEST_GENERATION: GenerationContract<GeneratedPlaylistDto> = {
+  events: GeneratedPlaylistStreamEventSchema,
+  result: GeneratedPlaylistSchema,
+}
+
+type GenerationOptions = { onProgress?: GenerationProgressHandler }
+
+async function requestGeneration<T>(
   path: string,
   body: unknown,
-  onProgress?: (progress: GenerationProgress) => void,
-): Promise<PlaylistDetail> {
+  contract: GenerationContract<T>,
+  onProgress?: GenerationProgressHandler,
+): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     credentials: 'include',
@@ -120,14 +152,16 @@ async function requestGeneration(
   }
 
   if (contentType.includes('application/x-ndjson')) {
-    return readGenerationStream(response, onProgress)
+    return readGenerationStream(response, contract.events, onProgress)
   }
 
   if (!response.ok) {
     throw new ApiError(`Request failed (${response.status})`, response.status)
   }
 
-  return (await response.json()) as PlaylistDetail
+  const parsed = contract.result.safeParse(await response.json())
+  if (!parsed.success) throw invalidGenerationResponseError()
+  return parsed.data
 }
 
 export const api = {
@@ -176,16 +210,55 @@ export const api = {
       body: { names },
     }),
 
-  createMix: (
-    input: CreateMixRequest,
-    options?: { onProgress?: (progress: GenerationProgress) => void },
-  ) => requestGeneration('/api/playlists/mix', input, options?.onProgress),
+  createMix: (input: CreateMixRequest, options?: GenerationOptions) =>
+    requestGeneration(
+      '/api/playlists/mix',
+      input,
+      SPOTIFY_GENERATION,
+      options?.onProgress,
+    ),
 
-  createDiscover: (
-    input: CreateDiscoverRequest,
-    options?: { onProgress?: (progress: GenerationProgress) => void },
+  createDiscover: (input: CreateDiscoverRequest, options?: GenerationOptions) =>
+    requestGeneration(
+      '/api/playlists/discover',
+      input,
+      SPOTIFY_GENERATION,
+      options?.onProgress,
+    ),
+
+  generateMix: (input: GenerateMixRequest, options?: GenerationOptions) =>
+    requestGeneration(
+      '/api/generate/mix',
+      input,
+      GUEST_GENERATION,
+      options?.onProgress,
+    ),
+
+  generateDiscover: (
+    input: GenerateDiscoverRequest,
+    options?: GenerationOptions,
   ) =>
-    requestGeneration('/api/playlists/discover', input, options?.onProgress),
+    requestGeneration(
+      '/api/generate/discover',
+      input,
+      GUEST_GENERATION,
+      options?.onProgress,
+    ),
+
+  createTransfer: async (
+    transferToken: string,
+  ): Promise<PlaylistTransferDto> => {
+    const parsed = PlaylistTransferSchema.safeParse(
+      await request<unknown>('/api/transfers', {
+        method: 'POST',
+        body: { transferToken },
+      }),
+    )
+    if (!parsed.success) {
+      throw new ApiError('Invalid transfer response', 502)
+    }
+    return parsed.data
+  },
 
   getUsageStats: () => request<UserUsageStats>('/api/stats'),
 

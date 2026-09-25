@@ -22,6 +22,17 @@ export class ApiError extends Error {
   }
 }
 
+export const INVALID_GENERATION_RESPONSE = 'INVALID_GENERATION_RESPONSE'
+
+export function invalidGenerationResponseError(): ApiError {
+  const message = 'Invalid generation response'
+  return new ApiError(message, 502, {
+    statusCode: 502,
+    code: INVALID_GENERATION_RESPONSE,
+    message,
+  })
+}
+
 const REQUEST_LIMIT_MESSAGES: Record<string, MessageKey> = {
   RATE_LIMITED: 'errors.rateLimited',
   CONCURRENCY_LIMITED: 'errors.concurrencyLimited',
@@ -157,6 +168,21 @@ const STATIC_ERROR_MESSAGES: Record<string, MessageKey> = {
   PLAYBACK_UNAUTHORIZED: 'preview.sessionExpired',
   PLAYBACK_INVALID: 'preview.invalidPlayback',
   PLAYBACK_FAILED: 'preview.playError',
+  CATALOG_UNAVAILABLE: 'errors.catalogUnavailable',
+  [INVALID_GENERATION_RESPONSE]: 'errors.invalidGenerationResponse',
+  TRANSFER_TOKEN_INVALID: 'transfer.errorInvalid',
+  TRANSFER_TOKEN_EXPIRED: 'transfer.errorExpired',
+  TRANSFER_PLAYLIST_REJECTED: 'transfer.errorRejected',
+}
+
+function mapTransferUnavailableMessage(
+  error: ApiError,
+  t: Translate,
+): string | null {
+  if (error.code !== 'TRANSFER_PROVIDER_UNAVAILABLE') return null
+  return t('transfer.errorUnavailable', {
+    wait: formatRetryWaitLabel(t, readRetryAfterSeconds(error.details), false),
+  })
 }
 
 function mapStaticCodeMessage(
@@ -179,10 +205,29 @@ export function getApiErrorMessage(
 
   return (
     mapRequestLimitMessage(error, t) ??
+    mapTransferUnavailableMessage(error, t) ??
     mapSpotifyThrottleMessage(error, t) ??
     mapMaxSelectionMessage(error, t, fallbackKey) ??
     mapNamedResolveMessage(error, t) ??
     mapStaticCodeMessage(error.code, t) ??
     t(fallbackKey)
   )
+}
+
+export type TransferErrorRecovery = 'regenerate' | 'retry' | 'none'
+
+export function getTransferErrorRecovery(error: unknown): TransferErrorRecovery {
+  if (!(error instanceof ApiError)) return 'retry'
+  if (
+    error.code === 'TRANSFER_TOKEN_EXPIRED' ||
+    error.code === 'TRANSFER_TOKEN_INVALID'
+  ) {
+    return 'regenerate'
+  }
+  if (error.code === 'TRANSFER_PLAYLIST_REJECTED') return 'none'
+  return 'retry'
+}
+
+export function getTransferErrorMessage(error: unknown, t: Translate): string {
+  return getApiErrorMessage(error, t, 'transfer.failed')
 }

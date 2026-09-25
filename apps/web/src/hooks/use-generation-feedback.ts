@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import type { PlaylistDetail } from '@blendify/contracts'
 import { copyToClipboard } from '@/lib/utils'
 
 export function useCopiedLink() {
@@ -15,11 +14,10 @@ export function useCopiedLink() {
 }
 
 export function useGenerationFill(
-  result: PlaylistDetail | null,
+  trackCount: number,
   requestedTrackCount: number,
 ) {
   return useMemo(() => {
-    const trackCount = result?.trackCount ?? 0
     const incomplete =
       requestedTrackCount > 0 &&
       trackCount > 0 &&
@@ -30,5 +28,5 @@ export function useGenerationFill(
       isNearCompleteFill: incomplete && fillRatio >= 0.85,
       isShortFill: incomplete && fillRatio < 0.85,
     }
-  }, [requestedTrackCount, result])
+  }, [requestedTrackCount, trackCount])
 }

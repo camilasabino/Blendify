@@ -3,8 +3,7 @@ import type { MessageKey } from './en'
 export const es: Record<MessageKey, string> = {
   'brand.tagline': 'Mezcla la música que te gusta en nuevas playlists.',
   'brand.description':
-    'Mezcla artistas o géneros, o empieza desde un artista o una canción. Blendify arma la playlist y la guarda en tu Spotify.',
-  'nav.logIn': 'Iniciar sesión',
+    'Mezcla artistas o géneros, o empieza desde un artista o una canción. Blendify arma la playlist; conecta Spotify para guardarla en tu cuenta.',
   'nav.logOut': 'Cerrar sesión',
   'nav.account': 'Menú de cuenta',
   'nav.create': 'Mezclar',
@@ -13,7 +12,6 @@ export const es: Record<MessageKey, string> = {
   'nav.stats': 'Estadísticas',
   'nav.main': 'Menú principal',
   'nav.skipToContent': 'Saltar al contenido',
-  'landing.ctaLogin': 'Entrar con Spotify',
   'playlist.description.empty': 'Creada con Blendify.',
   'playlist.description.one': 'Creada con Blendify a partir de {name}.',
   'playlist.description.two':
@@ -67,7 +65,7 @@ export const es: Record<MessageKey, string> = {
   'create.eyebrow': 'Mezclar',
   'create.title': 'Crea tu mezcla',
   'create.subtitle':
-    'Elige artistas o géneros, ajusta la mezcla y guárdala en Spotify.',
+    'Elige artistas o géneros y ajusta la mezcla.',
   'create.modeArtists': 'Artistas',
   'create.modeGenres': 'Géneros',
   'create.stepSource': 'Artistas o géneros',
@@ -360,8 +358,71 @@ export const es: Record<MessageKey, string> = {
   'library.kindDiscover': 'Descubrimiento',
   'library.titleMany': '{first}, {second} y {count} más',
   'landing.trust':
-    'Las playlists se crean como privadas en tu cuenta de Spotify.',
+    'Conectar Spotify es opcional. Las playlists que guardes se crean como privadas en tu cuenta de Spotify.',
   'stats.useCountOne': '1 playlist',
   'stats.useCountMany': '{count} playlists',
   'stats.overview': 'Resumen',
+  'nav.connectSpotify':
+    'Conectar Spotify',
+  'landing.ctaTry':
+    'Probar Blendify',
+  'spotifyRequired.library':
+    'Conecta Spotify para usar tu Biblioteca.',
+  'spotifyRequired.stats':
+    'Conecta Spotify para ver tus estadísticas.',
+  'spotifyRequired.dismiss':
+    'Cerrar aviso',
+  'common.opensNewTab':
+    '(se abre en una pestaña nueva)',
+  'create.leaveNoteGuest':
+    'Mantén esta página abierta hasta que la playlist esté lista. No se guarda en ningún lado.',
+  'create.recreateNoteGuest':
+    'Si cambias esta configuración, se crea una playlist nueva que reemplaza la que ves aquí.',
+  'guestResult.temporary':
+    'Esta playlist es temporal. Se perderá si sales de esta página o la recargas.',
+  'guestResult.attribution':
+    'Datos de las canciones de Spotify.',
+  'guestResult.attributionWithArtwork':
+    'Datos de las canciones e imagen de Spotify.',
+  'guestResult.trackList':
+    'Canciones de esta playlist',
+  'guestResult.openTrackInSpotify':
+    'Abrir {track} de {artists} en Spotify',
+  'transfer.title':
+    'Transferir con Soundiiz',
+  'transfer.explainer':
+    'Soundiiz abrirá una página externa donde podrás elegir el servicio de destino y completar la transferencia. La playlist todavía no se creó en ningún servicio.',
+  'transfer.prepare':
+    'Preparar transferencia',
+  'transfer.preparing':
+    'Preparando transferencia…',
+  'transfer.ready':
+    'Transferencia preparada para {count} canciones. Disponible hasta el {expires}.',
+  'transfer.continue':
+    'Continuar en Soundiiz',
+  'transfer.failed':
+    'No se pudo preparar la transferencia. Intenta de nuevo.',
+  'transfer.regenerate':
+    'Generar de nuevo',
+  'transfer.errorInvalid':
+    'Esta playlist ya no se puede transferir. Genérala de nuevo para transferirla.',
+  'transfer.errorExpired':
+    'La opción de transferencia de esta playlist venció. Genera la playlist de nuevo para transferirla.',
+  'transfer.errorRejected':
+    'Soundiiz no pudo aceptar esta playlist. Prueba generar otra.',
+  'transfer.errorUnavailable':
+    'Soundiiz no responde en este momento. Intenta de nuevo en {wait}.',
+  'errors.catalogUnavailable':
+    'El catálogo de música no está disponible temporalmente. Intenta de nuevo en unos minutos.',
+  'errors.invalidGenerationResponse':
+    'Blendify recibió una respuesta inesperada. Intenta de nuevo.',
+  'create.stepSize': 'Tamaño',
+  'create.generateGuest': 'Generar playlist',
+  'create.generatingGuest': 'Generando…',
+  'create.generateNewGuest': 'Generar playlist nueva',
+  'create.workingGuest': 'Generando tu playlist',
+  'create.workingHintGuest': 'Buscando canciones para tu playlist…',
+  'discover.workingHintGuest': 'Buscando canciones relacionadas para tu playlist…',
+  'create.readyGuest': 'Playlist generada',
+  'create.failedTitleGuest': 'No se pudo generar la playlist',
 }

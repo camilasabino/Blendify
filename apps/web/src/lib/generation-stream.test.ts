@@ -4,7 +4,12 @@ import {
   readGenerationStream,
 } from '@/lib/generation-stream'
 import { ApiError } from '@/lib/api-error'
-import type { PlaylistDetail } from '@blendify/contracts'
+import {
+  GeneratedPlaylistStreamEventSchema,
+  GenerationStreamEventSchema,
+  type GeneratedPlaylistDto,
+  type PlaylistDetail,
+} from '@blendify/contracts'
 
 const playlist = {
   id: 'playlist-1',
@@ -44,6 +49,7 @@ describe('parseGenerationStreamLine', () => {
           percent: 26,
           etaSeconds: 12,
         }),
+        GenerationStreamEventSchema,
       ),
     ).toMatchObject({
       type: 'progress',
@@ -54,9 +60,16 @@ describe('parseGenerationStreamLine', () => {
   })
 
   it('ignores blank and invalid lines', () => {
-    expect(parseGenerationStreamLine('')).toBeNull()
-    expect(parseGenerationStreamLine('{nope')).toBeNull()
-    expect(parseGenerationStreamLine(JSON.stringify({ type: 'nope' }))).toBeNull()
+    expect(parseGenerationStreamLine('', GenerationStreamEventSchema)).toBeNull()
+    expect(
+      parseGenerationStreamLine('{nope', GenerationStreamEventSchema),
+    ).toBeNull()
+    expect(
+      parseGenerationStreamLine(
+        JSON.stringify({ type: 'nope' }),
+        GenerationStreamEventSchema,
+      ),
+    ).toBeNull()
   })
 })
 
@@ -80,9 +93,13 @@ describe('readGenerationStream', () => {
       headers: { 'Content-Type': 'application/x-ndjson' },
     })
 
-    const result = await readGenerationStream(response, (event) => {
-      progress.push(event.percent)
-    })
+    const result = await readGenerationStream(
+      response,
+      GenerationStreamEventSchema,
+      (event) => {
+        progress.push(event.percent)
+      },
+    )
 
     expect(progress).toEqual([50])
     expect(result.id).toBe('playlist-1')
@@ -102,7 +119,74 @@ describe('readGenerationStream', () => {
           status: 200,
           headers: { 'Content-Type': 'application/x-ndjson' },
         }),
+        GenerationStreamEventSchema,
       ),
     ).rejects.toEqual(expect.any(ApiError))
+  })
+})
+
+const generatedPlaylist = {
+  name: 'Mix',
+  description: '',
+  generation: playlist.generation,
+  seeds: playlist.seeds,
+  tracks: [],
+  transfer: null,
+} satisfies GeneratedPlaylistDto
+
+function ndjson(...events: unknown[]): Response {
+  return new Response(`${events.map((event) => JSON.stringify(event)).join('\n')}\n`, {
+    status: 200,
+    headers: { 'Content-Type': 'application/x-ndjson' },
+  })
+}
+
+describe('readGenerationStream contracts', () => {
+  it('returns a Guest generated playlist with the Guest schema', async () => {
+    const result = await readGenerationStream(
+      ndjson({ type: 'result', playlist: generatedPlaylist }),
+      GeneratedPlaylistStreamEventSchema,
+    )
+
+    expect(result).toEqual(generatedPlaylist)
+  })
+
+  it('rejects a Guest result read with the Spotify schema', async () => {
+    await expect(
+      readGenerationStream(
+        ndjson({ type: 'result', playlist: generatedPlaylist }),
+        GenerationStreamEventSchema,
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_GENERATION_RESPONSE' })
+  })
+
+  it('rejects a Spotify result read with the Guest schema', async () => {
+    await expect(
+      readGenerationStream(
+        ndjson({ type: 'result', playlist }),
+        GeneratedPlaylistStreamEventSchema,
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_GENERATION_RESPONSE' })
+  })
+
+  it('resolves on the terminal result event without waiting for the stream to close', async () => {
+    const encoder = new TextEncoder()
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `${JSON.stringify({ type: 'result', playlist: generatedPlaylist })}\n`,
+          ),
+        )
+      },
+    })
+    const response = new Response(body, {
+      status: 200,
+      headers: { 'Content-Type': 'application/x-ndjson' },
+    })
+
+    await expect(
+      readGenerationStream(response, GeneratedPlaylistStreamEventSchema),
+    ).resolves.toEqual(generatedPlaylist)
   })
 })

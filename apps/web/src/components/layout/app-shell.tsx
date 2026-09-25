@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   BarChart3,
   Blend,
@@ -6,19 +7,48 @@ import {
   Library,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
+import { useCapabilities } from '@/hooks/use-capabilities'
 import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { PreferencesMenu } from '@/components/layout/preferences-menu'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
 import { AccountMenu } from '@/components/layout/account-menu'
+import { ConnectSpotifyButton } from '@/components/layout/connect-spotify-button'
+import { readSpotifyRequiredState } from '@/lib/spotify-required'
+import { SpotifyRequiredNotice } from '@/components/layout/spotify-required-notice'
 import { Footer } from '@/components/layout/footer'
 import { useT } from '@/i18n/use-t'
+import type { MessageKey } from '@/i18n/messages'
+import type { SpotifyOnlyCapability } from '@/lib/capabilities'
 import { cn, focusRing, pageGutter, shellGutter } from '@/lib/utils'
 
-const NAV_ITEMS = [
+type NavItem = {
+  to: string
+  labelKey: MessageKey
+  icon: typeof Blend
+  requires?: SpotifyOnlyCapability
+}
+
+const NAV_ITEMS: readonly NavItem[] = [
   { to: '/app/mix', labelKey: 'nav.create', icon: Blend },
   { to: '/app/discover', labelKey: 'nav.discover', icon: Compass },
-  { to: '/app/library', labelKey: 'nav.library', icon: Library },
-  { to: '/app/stats', labelKey: 'nav.stats', icon: BarChart3 },
+  {
+    to: '/app/library',
+    labelKey: 'nav.library',
+    icon: Library,
+    requires: 'canUseLibrary',
+  },
+  {
+    to: '/app/stats',
+    labelKey: 'nav.stats',
+    icon: BarChart3,
+    requires: 'canUseStats',
+  },
+]
+
+const USER_SCOPED_QUERY_KEYS = [
+  ['playlists'],
+  ['usage-stats'],
+  ['playback-devices'],
 ] as const
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -41,7 +71,33 @@ const tabLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function AppShell() {
   const { user, logout } = useAuth()
+  const capabilities = useCapabilities()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const t = useT()
+  const navItems = NAV_ITEMS.filter(
+    (item) => !item.requires || capabilities[item.requires],
+  )
+  const spotifyRequired =
+    capabilities.mode === 'guest'
+      ? readSpotifyRequiredState(location.state)
+      : null
+
+  async function logOut() {
+    const onSpotifyOnlyRoute = NAV_ITEMS.some(
+      (item) => item.requires && location.pathname.startsWith(item.to),
+    )
+    if (onSpotifyOnlyRoute) navigate('/app/mix', { replace: true })
+    await logout()
+    for (const queryKey of USER_SCOPED_QUERY_KEYS) {
+      queryClient.removeQueries({ queryKey })
+    }
+  }
+
+  function dismissSpotifyRequired() {
+    navigate(location.pathname, { replace: true, state: null })
+  }
 
   return (
     <div className="bg-atmosphere bg-grain relative flex min-h-svh flex-col overflow-x-hidden">
@@ -75,7 +131,7 @@ export function AppShell() {
             className="hidden items-center gap-1 justify-self-center lg:flex"
             aria-label={t('nav.main')}
           >
-            {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
+            {navItems.map(({ to, labelKey, icon: Icon }) => (
               <NavLink key={to} to={to} className={navLinkClass}>
                 <Icon aria-hidden className="size-4" />
                 {t(labelKey)}
@@ -85,19 +141,26 @@ export function AppShell() {
 
           <div className="flex min-w-0 items-center justify-self-end gap-0.5 sm:gap-1">
             <LanguageSwitcher />
-            <PreferencesMenu />
-            <span aria-hidden className="w-0.5 shrink-0 sm:mx-1 sm:h-5 sm:w-px sm:bg-divider" />
-            <AccountMenu
-              displayName={user?.displayName}
-              imageUrl={user?.imageUrl}
-              onLogOut={() => void logout()}
-            />
+            {capabilities.mode === 'spotify' ? (
+              <>
+                <PreferencesMenu />
+                <span aria-hidden className="w-0.5 shrink-0 sm:mx-1 sm:h-5 sm:w-px sm:bg-divider" />
+                <AccountMenu
+                  displayName={user?.displayName}
+                  imageUrl={user?.imageUrl}
+                  onLogOut={() => void logOut()}
+                />
+              </>
+            ) : null}
+            {capabilities.isResolved && capabilities.mode === 'guest' ? (
+              <ConnectSpotifyButton compact />
+            ) : null}
           </div>
         </div>
 
         <nav className="lg:hidden" aria-label={t('nav.main')}>
           <div className="mx-auto flex w-full max-w-6xl gap-1 px-2 pt-1 sm:px-6 md:justify-center md:gap-2">
-            {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
+            {navItems.map(({ to, labelKey, icon: Icon }) => (
               <NavLink key={to} to={to} className={tabLinkClass}>
                 <Icon aria-hidden className="size-4 shrink-0" />
                 {t(labelKey)}
@@ -112,6 +175,12 @@ export function AppShell() {
         tabIndex={-1}
         className={cn(pageGutter, 'relative z-10 flex-1 py-8 outline-none sm:py-10')}
       >
+        {spotifyRequired ? (
+          <SpotifyRequiredNotice
+            feature={spotifyRequired}
+            onDismiss={dismissSpotifyRequired}
+          />
+        ) : null}
         <Outlet />
       </main>
 

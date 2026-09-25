@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 import { ArrowDown, ArrowRight, Blend, Compass, Lock } from 'lucide-react'
-import { useAuth } from '@/hooks/use-auth'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { useCapabilities } from '@/hooks/use-capabilities'
+import { buttonVariants } from '@/components/ui/button'
+import { ConnectSpotifyButton } from '@/components/layout/connect-spotify-button'
 import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
-import { SpotifyMark } from '@/components/brand/spotify-mark'
 import { Footer } from '@/components/layout/footer'
 import { useT } from '@/i18n/use-t'
 import { buildDefaultPlaylistName } from '@/lib/playlist-name'
@@ -16,7 +16,9 @@ const DEMO_TRACK_WIDTHS = ['w-3/4', 'w-1/2', 'w-2/3']
 const DEMO_TRACK_COUNT = 30
 
 export function LandingPage() {
-  const { isAuthenticated, isLoading, login } = useAuth()
+  const capabilities = useCapabilities()
+  const isAuthenticated = capabilities.mode === 'spotify'
+  const showConnect = capabilities.isResolved && !isAuthenticated
   const t = useT()
 
   return (
@@ -43,12 +45,7 @@ export function LandingPage() {
         </Link>
         <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSwitcher />
-          {!isAuthenticated ? (
-            <Button size="sm" variant="ghost" onClick={login} disabled={isLoading}>
-              <SpotifyMark aria-hidden className="size-4" />
-              {t('nav.logIn')}
-            </Button>
-          ) : null}
+          {showConnect ? <ConnectSpotifyButton compact /> : null}
         </div>
       </header>
 
@@ -94,16 +91,21 @@ export function LandingPage() {
               </>
             ) : (
               <div className="space-y-3">
-                <Button
-                  size="lg"
-                  className="animate-pulse-glow"
-                  onClick={login}
-                  disabled={isLoading}
-                >
-                  <SpotifyMark variant="mono" className="size-5 text-charcoal-950" />
-                  {t('landing.ctaLogin')}
-                  <ArrowRight aria-hidden className="size-4" />
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    to="/app/mix"
+                    className={cn(
+                      buttonVariants({ size: 'lg' }),
+                      'animate-pulse-glow',
+                    )}
+                  >
+                    {t('landing.ctaTry')}
+                    <ArrowRight aria-hidden className="size-4" />
+                  </Link>
+                  {showConnect ? (
+                    <ConnectSpotifyButton size="lg" variant="outline" />
+                  ) : null}
+                </div>
                 <p className="flex items-start gap-1.5 text-sm text-cream-400">
                   <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
                   {t('landing.trust')}
@@ -164,8 +166,7 @@ function HeroDemo() {
             <p className="truncate text-sm font-semibold text-cream-50">
               {playlistName}
             </p>
-            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-cream-400">
-              <SpotifyMark className="size-3" />
+            <p className="mt-0.5 text-xs text-cream-400">
               {formatSongCount(DEMO_TRACK_COUNT, t)}
             </p>
           </div>

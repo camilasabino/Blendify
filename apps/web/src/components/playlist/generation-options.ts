@@ -14,6 +14,8 @@ import type {
 } from '@blendify/contracts'
 import type { MessageKey } from '@/i18n/messages'
 import type { useT } from '@/i18n/use-t'
+import type { AppMode } from '@/lib/capabilities'
+import type { GenerationOutcome } from '@/lib/playlist-generation'
 
 export type GenerationOption<T extends string> = {
   value: T
@@ -120,4 +122,48 @@ export function buildRecipeSummary(
     },
     t,
   )
+}
+
+export function recreateNote(
+  result: GenerationOutcome | null,
+  t: ReturnType<typeof useT>,
+): string | null {
+  if (!result) return null
+  return result.mode === 'spotify'
+    ? t('create.recreateNote')
+    : t('create.recreateNoteGuest')
+}
+
+export type GenerationFormCopy = {
+  detailsTitle: MessageKey
+  generate: MessageKey
+  generating: MessageKey
+  generateNew: MessageKey
+  workingTitle: MessageKey
+  workingHint: MessageKey
+}
+
+export function generationFormCopy(
+  mode: AppMode,
+  kind: 'mix' | 'discover',
+): GenerationFormCopy {
+  if (mode === 'guest') {
+    return {
+      detailsTitle: 'create.stepSize',
+      generate: 'create.generateGuest',
+      generating: 'create.generatingGuest',
+      generateNew: 'create.generateNewGuest',
+      workingTitle: 'create.workingGuest',
+      workingHint:
+        kind === 'mix' ? 'create.workingHintGuest' : 'discover.workingHintGuest',
+    }
+  }
+  return {
+    detailsTitle: 'create.stepDetails',
+    generate: kind === 'mix' ? 'create.generate' : 'discover.generate',
+    generating: kind === 'mix' ? 'create.generating' : 'discover.generating',
+    generateNew: 'create.generateNew',
+    workingTitle: kind === 'mix' ? 'create.working' : 'discover.working',
+    workingHint: kind === 'mix' ? 'create.workingHint' : 'discover.workingHint',
+  }
 }

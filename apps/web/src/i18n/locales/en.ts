@@ -1,8 +1,7 @@
 export const en = {
   'brand.tagline': 'Blend the music you love into new playlists.',
   'brand.description':
-    'Mix artists or genres, or start from a single artist or song. Blendify builds the playlist and saves it to your Spotify.',
-  'nav.logIn': 'Log in',
+    'Mix artists or genres, or start from a single artist or song. Blendify builds the playlist; connect Spotify to save it to your account.',
   'nav.logOut': 'Log out',
   'nav.account': 'Account menu',
   'nav.create': 'Mix',
@@ -11,7 +10,6 @@ export const en = {
   'nav.stats': 'Stats',
   'nav.main': 'Main menu',
   'nav.skipToContent': 'Skip to content',
-  'landing.ctaLogin': 'Log in with Spotify',
   'playlist.description.empty': 'Made with Blendify.',
   'playlist.description.one': 'Made with Blendify from {name}.',
   'playlist.description.two': 'Made with Blendify from {first} and {second}.',
@@ -62,7 +60,7 @@ export const en = {
   'create.eyebrow': 'Mix',
   'create.title': 'Create your mix',
   'create.subtitle':
-    'Choose artists or genres, fine-tune the mix, and save it to Spotify.',
+    'Choose artists or genres and fine-tune the mix.',
   'create.modeArtists': 'Artists',
   'create.modeGenres': 'Genres',
   'create.stepSource': 'Artists or genres',
@@ -347,10 +345,74 @@ export const en = {
   'library.kindMix': 'Mix',
   'library.kindDiscover': 'Discover',
   'library.titleMany': '{first}, {second} + {count} more',
-  'landing.trust': 'Playlists are created as private in your Spotify account.',
+  'landing.trust':
+    'Connecting Spotify is optional. Playlists you save are created as private in your Spotify account.',
   'stats.useCountOne': '1 playlist',
   'stats.useCountMany': '{count} playlists',
   'stats.overview': 'Overview',
+  'nav.connectSpotify':
+    'Connect Spotify',
+  'landing.ctaTry':
+    'Try Blendify',
+  'spotifyRequired.library':
+    'Connect Spotify to use your Library.',
+  'spotifyRequired.stats':
+    'Connect Spotify to see your stats.',
+  'spotifyRequired.dismiss':
+    'Dismiss',
+  'common.opensNewTab':
+    '(opens in a new tab)',
+  'create.leaveNoteGuest':
+    'Keep this page open until the playlist is ready. It isn’t saved anywhere.',
+  'create.recreateNoteGuest':
+    'Changing these settings creates a new playlist that replaces the one shown here.',
+  'guestResult.temporary':
+    'This playlist is temporary. It will be lost if you leave this page or refresh it.',
+  'guestResult.attribution':
+    'Track details from Spotify.',
+  'guestResult.attributionWithArtwork':
+    'Track details and artwork from Spotify.',
+  'guestResult.trackList':
+    'Songs in this playlist',
+  'guestResult.openTrackInSpotify':
+    'Open {track} by {artists} in Spotify',
+  'transfer.title':
+    'Transfer with Soundiiz',
+  'transfer.explainer':
+    'Soundiiz will open an external page where you can choose the destination service and complete the transfer. The playlist hasn’t been created on any service yet.',
+  'transfer.prepare':
+    'Prepare transfer',
+  'transfer.preparing':
+    'Preparing transfer…',
+  'transfer.ready':
+    'Transfer prepared for {count} tracks. Available until {expires}.',
+  'transfer.continue':
+    'Continue on Soundiiz',
+  'transfer.failed':
+    'Couldn’t prepare the transfer. Please try again.',
+  'transfer.regenerate':
+    'Generate again',
+  'transfer.errorInvalid':
+    'This playlist can no longer be transferred. Generate it again to transfer it.',
+  'transfer.errorExpired':
+    'The transfer option for this playlist expired. Generate the playlist again to transfer it.',
+  'transfer.errorRejected':
+    'Soundiiz couldn’t accept this playlist. Try generating a different one.',
+  'transfer.errorUnavailable':
+    'Soundiiz isn’t responding right now. Try again in {wait}.',
+  'errors.catalogUnavailable':
+    'The music catalog is temporarily unavailable. Try again in a few minutes.',
+  'errors.invalidGenerationResponse':
+    'Blendify received an unexpected response. Please try again.',
+  'create.stepSize': 'Size',
+  'create.generateGuest': 'Generate playlist',
+  'create.generatingGuest': 'Generating…',
+  'create.generateNewGuest': 'Generate new playlist',
+  'create.workingGuest': 'Generating your playlist',
+  'create.workingHintGuest': 'Finding songs for your playlist…',
+  'discover.workingHintGuest': 'Finding related songs for your playlist…',
+  'create.readyGuest': 'Playlist generated',
+  'create.failedTitleGuest': 'Couldn’t generate the playlist',
 } as const
 
 export type MessageKey = keyof typeof en

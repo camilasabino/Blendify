@@ -1,8 +1,9 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
-import { useAuth } from '@/hooks/use-auth'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { useAuthBootstrap } from '@/hooks/use-auth'
 import { useT } from '@/i18n/use-t'
 import { AppShell } from '@/components/layout/app-shell'
+import { SpotifyOnlyRoute } from '@/components/layout/spotify-only-route'
 import { Spinner } from '@/components/ui/spinner'
 
 const LandingPage = lazy(() =>
@@ -31,39 +32,29 @@ const StatsPage = lazy(() =>
   })),
 )
 
-function ProtectedRoute() {
-  const { isAuthenticated, isLoading, isInitialized } = useAuth()
-  const t = useT()
-
-  if (!isInitialized || isLoading) {
-    return (
-      <output
-        className="bg-atmosphere flex min-h-svh items-center justify-center"
-        aria-label={t('common.loading')}
-      >
-        <Spinner size="lg" />
-      </output>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/" replace />
-  }
-
-  return <Outlet />
-}
-
 export default function App() {
+  useAuthBootstrap()
+
   return (
     <Suspense fallback={<RouteLoading />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route element={<ProtectedRoute />}>
-          <Route path="/app" element={<AppShell />}>
-            <Route index element={<Navigate to="mix" replace />} />
-            <Route path="mix" element={<MixPlaylistPage />} />
-            <Route path="discover" element={<DiscoverPlaylistPage />} />
+        <Route path="/app" element={<AppShell />}>
+          <Route index element={<Navigate to="mix" replace />} />
+          <Route path="mix" element={<MixPlaylistPage />} />
+          <Route path="discover" element={<DiscoverPlaylistPage />} />
+          <Route
+            element={
+              <SpotifyOnlyRoute capability="canUseLibrary" feature="library" />
+            }
+          >
             <Route path="library" element={<LibraryPage />} />
+          </Route>
+          <Route
+            element={
+              <SpotifyOnlyRoute capability="canUseStats" feature="stats" />
+            }
+          >
             <Route path="stats" element={<StatsPage />} />
           </Route>
         </Route>

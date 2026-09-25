@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect } from 'react'
 import { api, ApiError } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
 type SessionProbe = 'authenticated' | 'anonymous' | 'unreachable'
+
+const RETRY_DELAYS_MS = [0, 500, 1200, 2500, 4000]
+
+let inFlightRefresh: Promise<void> | null = null
+let needsRetry = false
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -30,65 +35,65 @@ async function probeSession(): Promise<{
   }
 }
 
-export function useAuth() {
-  const user = useAuthStore((s) => s.user)
-  const isLoading = useAuthStore((s) => s.isLoading)
-  const isInitialized = useAuthStore((s) => s.isInitialized)
-  const setUser = useAuthStore((s) => s.setUser)
-  const setLoading = useAuthStore((s) => s.setLoading)
-  const setInitialized = useAuthStore((s) => s.setInitialized)
-  const clear = useAuthStore((s) => s.clear)
-  const needsRetryRef = useRef(false)
+async function runSessionRefresh(retries: boolean): Promise<void> {
+  const { setUser, setLoading, setInitialized } = useAuthStore.getState()
+  setLoading(true)
+  const delays = retries ? RETRY_DELAYS_MS : [0]
 
-  const refresh = useCallback(
-    async (options: { retries?: boolean } = {}) => {
-      setLoading(true)
-      const delays = options.retries === false ? [0] : [0, 500, 1200, 2500, 4000]
-
-      let last: SessionProbe = 'unreachable'
-      for (const delay of delays) {
-        if (delay > 0) await sleep(delay)
-        const result = await probeSession()
-        last = result.status
-        if (result.status === 'authenticated') {
-          setUser(result.user)
-          needsRetryRef.current = false
-          break
-        }
-        if (result.status === 'anonymous') {
-          setUser(null)
-          needsRetryRef.current = false
-          break
-        }
-        // unreachable → keep trying
-      }
-
-      if (last === 'unreachable') {
-        // Don't invent a logout: leave user as-is and retry when the tab
-        // becomes visible again (typical after `npm run restart`).
-        needsRetryRef.current = true
-      }
-
-      setLoading(false)
-      setInitialized(true)
-    },
-    [setInitialized, setLoading, setUser],
-  )
-
-  useEffect(() => {
-    if (!isInitialized) {
-      void refresh({ retries: true })
+  let last: SessionProbe = 'unreachable'
+  for (const delay of delays) {
+    if (delay > 0) await sleep(delay)
+    const result = await probeSession()
+    last = result.status
+    if (result.status === 'authenticated') {
+      setUser(result.user)
+      needsRetry = false
+      break
     }
-  }, [isInitialized, refresh])
+    if (result.status === 'anonymous') {
+      setUser(null)
+      needsRetry = false
+      break
+    }
+    // unreachable → keep trying
+  }
+
+  if (last === 'unreachable') {
+    // Don't invent a logout: leave user as-is and retry when the tab
+    // becomes visible again (typical after `npm run restart`).
+    needsRetry = true
+  }
+
+  setLoading(false)
+  setInitialized(true)
+}
+
+export function refreshSession(
+  options: { retries?: boolean } = {},
+): Promise<void> {
+  inFlightRefresh ??= runSessionRefresh(options.retries !== false).finally(
+    () => {
+      inFlightRefresh = null
+    },
+  )
+  return inFlightRefresh
+}
+
+export function useAuthBootstrap(): void {
+  useEffect(() => {
+    if (!useAuthStore.getState().isInitialized) {
+      void refreshSession({ retries: true })
+    }
+  }, [])
 
   useEffect(() => {
     const retryIfNeeded = () => {
       if (
         document.visibilityState === 'visible' &&
-        needsRetryRef.current &&
+        needsRetry &&
         !useAuthStore.getState().isLoading
       ) {
-        void refresh({ retries: true })
+        void refreshSession({ retries: true })
       }
     }
     document.addEventListener('visibilitychange', retryIfNeeded)
@@ -97,7 +102,14 @@ export function useAuth() {
       document.removeEventListener('visibilitychange', retryIfNeeded)
       window.removeEventListener('focus', retryIfNeeded)
     }
-  }, [refresh])
+  }, [])
+}
+
+export function useAuth() {
+  const user = useAuthStore((s) => s.user)
+  const isLoading = useAuthStore((s) => s.isLoading)
+  const isInitialized = useAuthStore((s) => s.isInitialized)
+  const clear = useAuthStore((s) => s.clear)
 
   const login = useCallback(() => {
     window.location.href = api.loginUrl()
@@ -107,7 +119,7 @@ export function useAuth() {
     try {
       await api.logout()
     } finally {
-      needsRetryRef.current = false
+      needsRetry = false
       clear()
     }
   }, [clear])
@@ -119,6 +131,6 @@ export function useAuth() {
     isAuthenticated: Boolean(user),
     login,
     logout,
-    refresh,
+    refresh: refreshSession,
   }
 }

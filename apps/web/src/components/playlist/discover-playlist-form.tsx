@@ -5,13 +5,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import { Compass, X } from 'lucide-react'
 import {
-  api,
   getApiErrorMessage,
   type Artist,
   type DiscoverTrackTarget,
+  type GenerateDiscoverRequest,
   type GenerationProgress,
 } from '@/lib/api'
-import type { PlaylistDetail, TrackDto } from '@blendify/contracts'
+import type { TrackDto } from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
 import { TrackSearch } from '@/components/tracks/track-search'
 import { GenerationResultPanel } from '@/components/playlist/generation-result-panel'
@@ -26,6 +26,8 @@ import {
 import {
   buildGenerationSummary,
   buildRecipeSummary,
+  generationFormCopy,
+  recreateNote,
 } from '@/components/playlist/generation-options'
 import { Label } from '@/components/ui/label'
 import { PageContainer } from '@/components/ui/page-container'
@@ -38,7 +40,15 @@ import { readPersistToLibraryPreference } from '@/lib/persist-to-library-prefere
 import { cn, focusRing } from '@/lib/utils'
 import { buildDiscoverPlaylistName } from '@/lib/playlist-name'
 import { renderPlaylistCoverBase64 } from '@/lib/playlist-cover'
+import { useCapabilities } from '@/hooks/use-capabilities'
 import { useCopiedLink } from '@/hooks/use-generation-feedback'
+import type { AppMode } from '@/lib/capabilities'
+import {
+  outcomeTrackCount,
+  runDiscoverGeneration,
+  type GenerationOutcome,
+  type GenerationRun,
+} from '@/lib/playlist-generation'
 import { useGenerationSettingsCollapse } from '@/hooks/use-generation-settings-collapse'
 
 type SeedMode = 'artist' | 'track'
@@ -148,10 +158,12 @@ function DiscoverSeedField({
 export function DiscoverPlaylistForm() {
   const t = useT()
   const queryClient = useQueryClient()
+  const capabilities = useCapabilities()
   const [seedMode, setSeedMode] = useState<SeedMode>('artist')
   const [artist, setArtist] = useState<Artist | null>(null)
   const [track, setTrack] = useState<TrackDto | null>(null)
-  const [result, setResult] = useState<PlaylistDetail | null>(null)
+  const [result, setResult] = useState<GenerationOutcome | null>(null)
+  const [submittedMode, setSubmittedMode] = useState<AppMode>(capabilities.mode)
   const [progress, setProgress] = useState<GenerationProgress | null>(null)
   const [requestedTrackCount, setRequestedTrackCount] = useState(0)
   const [coverError, setCoverError] = useState<string | null>(null)
@@ -175,16 +187,18 @@ export function DiscoverPlaylistForm() {
   )
 
   const discoverMutation = useMutation({
-    mutationFn: (input: Parameters<typeof api.createDiscover>[0]) =>
-      api.createDiscover(input, { onProgress: setProgress }),
+    mutationFn: (run: GenerationRun<GenerateDiscoverRequest>) =>
+      runDiscoverGeneration({ ...run, onProgress: setProgress }),
     onMutate: () => {
       setProgress(null)
     },
-    onSuccess: (playlist) => {
-      setResult(playlist)
+    onSuccess: (outcome) => {
+      setResult(outcome)
       setProgress(null)
-      void queryClient.invalidateQueries({ queryKey: ['usage-stats'] })
-      void queryClient.invalidateQueries({ queryKey: ['playlists'] })
+      if (outcome.mode === 'spotify') {
+        void queryClient.invalidateQueries({ queryKey: ['usage-stats'] })
+        void queryClient.invalidateQueries({ queryKey: ['playlists'] })
+      }
     },
     onError: () => {
       setProgress(null)
@@ -209,7 +223,10 @@ export function DiscoverPlaylistForm() {
   }
 
   async function onSubmit(values: FormValues) {
-    if (isPreparing || discoverMutation.isPending) return
+    if (isPreparing || discoverMutation.isPending || !capabilities.isResolved) {
+      return
+    }
+    const generationMode = capabilities.mode
     if (seedMode === 'artist' && !artist) {
       form.setError('root', { message: t('discover.addArtist') })
       return
@@ -223,10 +240,11 @@ export function DiscoverPlaylistForm() {
     setCoverError(null)
     setResult(null)
     setRequestedTrackCount(values.targetTrackCount)
+    setSubmittedMode(generationMode)
     discoverMutation.reset()
 
     try {
-      await startDiscover(values)
+      await startDiscover(values, generationMode)
     } finally {
       setIsPreparing(false)
     }
@@ -248,29 +266,23 @@ export function DiscoverPlaylistForm() {
     }
   }
 
-  async function startDiscover(values: FormValues) {
+  async function startDiscover(values: FormValues, generationMode: AppMode) {
     const sharedBase = {
       targetTrackCount: values.targetTrackCount,
       popularity: values.popularity,
       orderMode: values.orderMode,
-      persistToLibrary: readPersistToLibraryPreference(),
     }
+    const shouldRenderCover =
+      generationMode === 'spotify' && values.generateCover
+
+    let request: GenerateDiscoverRequest
+    let coverImageBase64: string | undefined
 
     if (seedMode === 'track') {
       if (!track) return
       const seedTrack = track
       const playlistName = buildDiscoverPlaylistName(seedTrack.name)
-      const description = t('playlist.discoverDescription.track', {
-        seed: seedTrack.name,
-        artist: seedTrack.artistName,
-      })
-      const coverImageBase64 = values.generateCover
-        ? await renderDiscoverCover(
-            playlistName,
-            seedTrack.albumImageUrl,
-          )
-        : undefined
-      discoverMutation.mutate({
+      request = {
         kind: 'discover_track',
         trackId: seedTrack.id,
         track: {
@@ -283,33 +295,44 @@ export function DiscoverPlaylistForm() {
           durationMs: seedTrack.durationMs,
           popularity: seedTrack.popularity,
         },
-        description,
-        coverImageBase64,
+        description: t('playlist.discoverDescription.track', {
+          seed: seedTrack.name,
+          artist: seedTrack.artistName,
+        }),
         ...sharedBase,
-      })
-      return
+      }
+      coverImageBase64 = shouldRenderCover
+        ? await renderDiscoverCover(playlistName, seedTrack.albumImageUrl)
+        : undefined
+    } else {
+      if (!artist) return
+      const seedArtist = artist
+      const playlistName = buildDiscoverPlaylistName(seedArtist.name)
+      request = {
+        kind: 'discover_artist',
+        artistId: seedArtist.id,
+        artist: {
+          id: seedArtist.id,
+          name: seedArtist.name,
+          imageUrl: seedArtist.imageUrl ?? null,
+        },
+        description: t('playlist.discoverDescription.artist', {
+          seed: seedArtist.name,
+        }),
+        ...sharedBase,
+      }
+      coverImageBase64 = shouldRenderCover
+        ? await renderDiscoverCover(playlistName, seedArtist.imageUrl)
+        : undefined
     }
 
-    if (!artist) return
-    const seedArtist = artist
-    const playlistName = buildDiscoverPlaylistName(seedArtist.name)
-    const description = t('playlist.discoverDescription.artist', {
-      seed: seedArtist.name,
-    })
-    const coverImageBase64 = values.generateCover
-      ? await renderDiscoverCover(playlistName, seedArtist.imageUrl)
-      : undefined
     discoverMutation.mutate({
-      kind: 'discover_artist',
-      artistId: seedArtist.id,
-      artist: {
-        id: seedArtist.id,
-        name: seedArtist.name,
-        imageUrl: seedArtist.imageUrl ?? null,
+      mode: generationMode,
+      request,
+      publication: {
+        coverImageBase64,
+        persistToLibrary: readPersistToLibraryPreference(),
       },
-      description,
-      coverImageBase64,
-      ...sharedBase,
     })
   }
 
@@ -344,6 +367,8 @@ export function DiscoverPlaylistForm() {
     focusSettings()
   }
 
+  const formCopy = generationFormCopy(capabilities.mode, 'discover')
+  const workingCopy = generationFormCopy(submittedMode, 'discover')
   const isGenerating = isPreparing || discoverMutation.isPending
   const settingsCollapse = useGenerationSettingsCollapse(
     isGenerating,
@@ -352,7 +377,7 @@ export function DiscoverPlaylistForm() {
   const seedName = seedMode === 'artist' ? artist?.name : track?.name
   const targetTrackCount = form.watch('targetTrackCount')
   const settingsSummary = result
-    ? buildRecipeSummary(result.generation, result.trackCount, t)
+    ? buildRecipeSummary(result.playlist.generation, outcomeTrackCount(result), t)
     : buildGenerationSummary(
         {
           seedNames: seedName ? [seedName] : [],
@@ -369,12 +394,9 @@ export function DiscoverPlaylistForm() {
       ].join(' · ')
     : null
 
-  const disabledReason = discoverDisabledReason(
-    seedMode,
-    Boolean(artist),
-    Boolean(track),
-    t,
-  )
+  const disabledReason = capabilities.isResolved
+    ? discoverDisabledReason(seedMode, Boolean(artist), Boolean(track), t)
+    : t('common.loading')
   const generationError = discoverMutation.isError
     ? getApiErrorMessage(discoverMutation.error, t, 'discover.failed')
     : null
@@ -393,14 +415,15 @@ export function DiscoverPlaylistForm() {
         className="scroll-mt-24 outline-none empty:hidden"
       >
         <GenerationResultPanel
+          mode={submittedMode}
           isGenerating={isGenerating}
           result={result}
           progress={progress}
           error={generationError}
           coverError={coverError}
           requestedTrackCount={requestedTrackCount}
-          workingTitleKey="discover.working"
-          workingHintKey="discover.workingHint"
+          workingTitleKey={workingCopy.workingTitle}
+          workingHintKey={workingCopy.workingHint}
           requestStarted={discoverMutation.isPending}
           copied={copiedLink.copied}
           onCopy={(url) => void copiedLink.copy(url)}
@@ -415,7 +438,7 @@ export function DiscoverPlaylistForm() {
         collapsed={settingsCollapse.collapsed}
         onToggle={settingsCollapse.toggleSettings}
         summary={settingsSummary}
-        note={result ? t('create.recreateNote') : null}
+        note={recreateNote(result, t)}
       >
         <form
           ref={formRef}
@@ -467,7 +490,7 @@ export function DiscoverPlaylistForm() {
 
             <PopularityModeSection control={form.control} step={2} />
 
-            <FormSection step={3} title={t('create.stepDetails')}>
+            <FormSection step={3} title={t(formCopy.detailsTitle)}>
               <div className="divide-y divide-divider">
                 <div className="space-y-3 pb-4">
                   <p className="text-sm font-medium leading-none text-cream-200">
@@ -491,24 +514,26 @@ export function DiscoverPlaylistForm() {
                     )}
                   />
                 </div>
-                <div className="pt-4">
-                  <Controller
-                    control={form.control}
-                    name="generateCover"
-                    render={({ field }) => (
-                      <CoverToggle
-                        id="discoverGenerateCover"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        hint={
-                          seedMode === 'artist'
-                            ? t('discover.coverHintArtist')
-                            : t('discover.coverHintTrack')
-                        }
-                      />
-                    )}
-                  />
-                </div>
+                {capabilities.canPublishToSpotify ? (
+                  <div className="pt-4">
+                    <Controller
+                      control={form.control}
+                      name="generateCover"
+                      render={({ field }) => (
+                        <CoverToggle
+                          id="discoverGenerateCover"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          hint={
+                            seedMode === 'artist'
+                              ? t('discover.coverHintArtist')
+                              : t('discover.coverHintTrack')
+                          }
+                        />
+                      )}
+                    />
+                  </div>
+                ) : null}
               </div>
             </FormSection>
 
@@ -519,8 +544,8 @@ export function DiscoverPlaylistForm() {
             isGenerating={isGenerating}
             disabledReason={disabledReason}
             error={form.formState.errors.root?.message ?? null}
-            idleLabel={result ? t('create.generateNew') : t('discover.generate')}
-            busyLabel={t('discover.generating')}
+            idleLabel={result ? t(formCopy.generateNew) : t(formCopy.generate)}
+            busyLabel={t(formCopy.generating)}
             summary={estimateSummary}
             icon={Compass}
           />
