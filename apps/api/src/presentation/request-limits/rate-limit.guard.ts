@@ -11,7 +11,7 @@ import type { Request } from 'express';
 import { resolveClientIdentity } from './client-identity';
 import { logRequestLimitEvent } from './request-limit.logging';
 import { RequestLimiter } from './request-limiter';
-import type { RateLimitBucket } from './request-limits.config';
+import type { ClientIpSource, RateLimitBucket } from './request-limits.config';
 
 const RATE_LIMIT_BUCKET = 'blendify:rate-limit-bucket';
 
@@ -36,17 +36,23 @@ export class RateLimitGuard implements CanActivate {
     if (!bucket) return true;
 
     const req = context.switchToHttp().getRequest<Request>();
-    await this.limiter.consume(bucket, requestIdentity(req));
+    await this.limiter.consume(
+      bucket,
+      requestIdentity(req, this.limiter.clientIpSource),
+    );
     return true;
   }
 }
 
-export function requestIdentity(req: Request) {
-  return resolveClientIdentity(req, () =>
-    logRequestLimitEvent(
-      'request_limit.invalid_client_ip',
-      {},
-      { throttleKey: 'ip' },
-    ),
+export function requestIdentity(req: Request, source: ClientIpSource) {
+  return resolveClientIdentity(
+    req,
+    () =>
+      logRequestLimitEvent(
+        'request_limit.invalid_client_ip',
+        {},
+        { throttleKey: 'ip' },
+      ),
+    source,
   );
 }

@@ -24,7 +24,7 @@ export class GenerationConcurrencyInterceptor implements NestInterceptor {
   ): Promise<Observable<unknown>> {
     const req = context.switchToHttp().getRequest<Request>();
     const permit = await this.limiter.acquireGenerationPermit(
-      requestIdentity(req),
+      requestIdentity(req, this.limiter.clientIpSource),
     );
     try {
       return next.handle().pipe(finalize(() => void permit.release()));

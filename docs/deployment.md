@@ -28,7 +28,7 @@ Decisions:
 - The API is **not** proxied through Cloudflare. Cloudflare Universal SSL covers
   one subdomain level only (`*.camilasabino.dev`), so it cannot terminate
   `api.blendify.camilasabino.dev` without Advanced Certificate Manager, and a
-  second proxy would change the client-IP chain (see [TRUST_PROXY](#5-client-ip-and-trust_proxy)).
+  second proxy would change the client-IP chain (see [client IP](#5-client-ip-client_ip_source-and-trust_proxy)).
 - The browser calls the API origin directly with `credentials: 'include'`.
 - A future private service (for example a Python AI service) can join the
   same Railway project and be reached over `*.railway.internal` without a
@@ -274,32 +274,54 @@ private key material to the repository or to logs.
 | `postgres` | PostgreSQL 18.6, 5 GB volume, private networking only (no public TCP proxy), no Railway backups or PITR on Hobby; backups by manual `pg_dump` (section 7) |
 | `redis` | 512 MiB container memory limit, `maxmemory` 256 MiB, `noeviction`, RDB and AOF disabled, authenticated, private networking only |
 
-## 5. Client IP and `TRUST_PROXY`
+## 5. Client IP, `CLIENT_IP_SOURCE` and `TRUST_PROXY`
 
-Rate limits and generation concurrency key anonymous callers by `req.ip`.
+Rate limits and generation concurrency key anonymous callers by client IP
+(authenticated callers by user ID). Two settings are involved, and they are
+separate concerns:
 
-- Chain: browser → Railway edge → NestJS (one proxy hop).
-- Railway's edge appends the connecting address as the right-most
-  `X-Forwarded-For` entry. `TRUST_PROXY=1` makes Express trust exactly one hop
-  and take that entry; client-supplied entries to its left are ignored.
-- `TRUST_PROXY=true` is rejected at startup; `false` is rejected in
-  production.
-- `CF-Connecting-IP` and `X-Real-IP` are not used.
-- Direct-origin access: with a DNS-only API there is no proxy to bypass. The
-  generated `*.up.railway.app` domain goes through the same edge and produces
-  the same headers.
+- `CLIENT_IP_SOURCE` selects where the anonymous client IP comes from.
+- `TRUST_PROXY` only configures Express proxy trust (`req.ip`,
+  `req.protocol`); in production it is no longer used for client identity.
+
+Measured on Railway public networking (temporary `*.up.railway.app` domain,
+hashed diagnostics, Wi-Fi and cellular clients, HTTP/1.1 and HTTP/2):
+
+| Signal | Observed |
+|---|---|
+| `X-Forwarded-For` | Always two entries: `[client, Railway edge proxy]`. Client-supplied values are discarded by the edge. |
+| `X-Forwarded-For[0]` | The real client IP, stable across new and reused connections |
+| `X-Forwarded-For[1]` (= `req.ip` with `TRUST_PROXY=1`) | A Railway edge-proxy address from a small per-region pool; varies between connections |
+| Socket peer | Another internal address that changes per connection |
+| `X-Real-IP` | Overwritten by the edge with the real client IP |
+
+With `TRUST_PROXY=1` alone, one client was split across several limiter
+identities, so opening new connections bypassed the limits.
+
+Production therefore sets `CLIENT_IP_SOURCE=railway-x-forwarded-for`:
+
+- the identity is the **left-most** `X-Forwarded-For` entry, trimmed and
+  normalized; the entry count and the proxy chain are not walked;
+- a missing, empty, or invalid first entry maps to one shared `unknown`
+  identity and logs `request_limit.invalid_client_ip` (throttled); there is
+  no fallback to `req.ip` or the socket address;
+- `TRUST_PROXY` stays `1`. `TRUST_PROXY=true` is rejected at startup; `false`
+  is rejected in production. `CLIENT_IP_SOURCE` is required in production
+  (`express` or `railway-x-forwarded-for`); outside production it defaults to
+  `express`.
+
+Assumptions and limits:
+
+- The API is reachable publicly only through the Railway edge (generated
+  domain or DNS-only custom domain), which rewrites `X-Forwarded-For`.
 - Private network: another service in the same Railway project could reach
   the API without the edge and set `X-Forwarded-For`. Only our own services
   run there, and they must not call public endpoints.
+- Re-run the client-IP smoke test (section 13) after any networking change,
+  including adding the custom domain.
 
-**This is a deployment assumption. Verify it with the client-IP smoke test
-before declaring the deployment complete.** If the observed chain differs
-(for example an additional internal hop), stop and correct `TRUST_PROXY`
-from the observed/documented topology; never work around the test.
-
-If the API is ever proxied through Cloudflare, revisit this section: the chain
-gains a hop, TLS for a second-level subdomain needs ACM, and trust must be
-based on Cloudflare CIDRs rather than a hop count.
+If the API is ever proxied through Cloudflare, revisit this section: the
+left-most entry would no longer be written by the Railway edge alone.
 
 ## 6. Redis
 
@@ -495,7 +517,8 @@ set in Railway service variables (sealed) and declared there with
 | `SPOTIFY_REDIRECT_URI` | Yes | `https://api.blendify.camilasabino.dev/api/auth/spotify/callback` |
 | `SPOTIFY_SCOPES` | Yes | `user-read-email user-read-private playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload user-read-playback-state user-modify-playback-state` |
 | `SPOTIFY_CATALOG_MARKET` | Yes | ISO 3166-1 alpha-2, for example `AR` |
-| `TRUST_PROXY` | Yes | `1` (see section 5) |
+| `TRUST_PROXY` | Yes | `1` (Express proxy trust; see section 5) |
+| `CLIENT_IP_SOURCE` | Yes | `railway-x-forwarded-for` (anonymous client identity; see section 5) |
 | `RATE_LIMIT_OVERRIDES` | No | Unset (code defaults) |
 | `GENERATION_CONCURRENCY_PER_CLIENT` | No | Unset (default 2) |
 | `GENERATION_CONCURRENCY_GLOBAL` | No | Unset (default 6) |
@@ -531,6 +554,7 @@ With `NODE_ENV=production` the API refuses to start
 - `SPOTIFY_REDIRECT_URI` is not `https`;
 - `JWT_SECRET` is shorter than 32 characters or equals the example value;
 - `TRUST_PROXY` is `false`/`0` or invalid (`true` is always rejected);
+- `CLIENT_IP_SOURCE` is not `express` or `railway-x-forwarded-for`;
 - a removed variable is still set: `JWT_EXPIRES_IN`, `COOKIE_SECRET`, `API_URL`.
 
 The session lifetime is fixed at 7 days in code: the JWT `exp` and the cookie
@@ -544,6 +568,7 @@ The session lifetime is fixed at 7 days in code: the JWT `exp` and the cookie
 | `VITE_API_URL` | `http://127.0.0.1:3000` |
 | `SPOTIFY_REDIRECT_URI` | `http://127.0.0.1:3000/api/auth/spotify/callback` |
 | `TRUST_PROXY` | `false` |
+| `CLIENT_IP_SOURCE` | `express` (or unset) |
 
 `127.0.0.1` is the canonical local origin: Spotify rejects `localhost`
 redirect URIs, and CORS/origin checks compare origins exactly.
@@ -690,8 +715,12 @@ curl -s -o /dev/null -w '%{http_code}\n' \
       12 hex characters of `sha256("ip:<your public IP>")`:
       `printf 'ip:%s' "$(curl -s https://api.ipify.org)" | shasum -a 256 | cut -c1-12`.
 
-If all anonymous callers share one identity, or the spoofed header changes
-the identity, stop: correct `TRUST_PROXY` from the observed chain and repeat.
+Run the loop with separate connections (one `curl` per request) and once
+more reusing one connection; both must stop at 60.
+
+If all anonymous callers share one identity, new connections get a fresh
+bucket, or the spoofed header changes the identity, stop: correct
+`CLIENT_IP_SOURCE` from the observed chain and repeat.
 
 ## 14. Rate limits and capacity
 

@@ -1,4 +1,7 @@
-import { parseTrustProxy } from '../presentation/request-limits/request-limits.config';
+import {
+  parseClientIpSource,
+  parseTrustProxy,
+} from '../presentation/request-limits/request-limits.config';
 
 const EXAMPLE_JWT_SECRET = 'change-me-to-a-long-random-secret-in-production';
 const MIN_JWT_SECRET_LENGTH = 32;
@@ -15,6 +18,7 @@ const REQUIRED_IN_PRODUCTION = [
   'SPOTIFY_CATALOG_MARKET',
   'LASTFM_API_KEY',
   'TRUST_PROXY',
+  'CLIENT_IP_SOURCE',
 ] as const;
 
 const REMOVED_VARIABLES = ['JWT_EXPIRES_IN', 'COOKIE_SECRET', 'API_URL'];
@@ -67,6 +71,15 @@ export function validateEnvironment(env: Environment): Environment {
           'TRUST_PROXY must describe the production proxy chain (not false)',
         );
       }
+    } catch (error) {
+      problems.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  const clientIpSource = read(env, 'CLIENT_IP_SOURCE');
+  if (clientIpSource) {
+    try {
+      parseClientIpSource(clientIpSource);
     } catch (error) {
       problems.push(error instanceof Error ? error.message : String(error));
     }

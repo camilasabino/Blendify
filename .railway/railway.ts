@@ -45,6 +45,7 @@ export default defineRailway(() => {
         'user-read-email user-read-private playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload user-read-playback-state user-modify-playback-state',
       SPOTIFY_CATALOG_MARKET: 'AR',
       TRUST_PROXY: '1',
+      CLIENT_IP_SOURCE: 'railway-x-forwarded-for',
       GUEST_TRANSFER_ENABLED: 'false',
       DATABASE_URL: db.env.DATABASE_URL,
       REDIS_URL: cache.env.REDIS_URL,

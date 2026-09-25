@@ -11,6 +11,7 @@ import {
   logRequestLimitEvent,
 } from './request-limit.logging';
 import type {
+  ClientIpSource,
   GenerationConcurrencyConfig,
   RateLimitBucket,
   RequestLimitsConfig,
@@ -26,6 +27,10 @@ export class RequestLimiter {
     private readonly config: RequestLimitsConfig,
     private readonly newPermitId: () => string = randomUUID,
   ) {}
+
+  get clientIpSource(): ClientIpSource {
+    return this.config.clientIpSource;
+  }
 
   async consume(
     bucket: RateLimitBucket,

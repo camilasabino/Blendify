@@ -5,16 +5,27 @@ import {
   resolveClientIdentity,
   type ClientIdentity,
 } from './client-identity';
-import { parseTrustProxy } from './request-limits.config';
+import {
+  parseClientIpSource,
+  parseTrustProxy,
+  type ClientIpSource,
+} from './request-limits.config';
 
-function appWithTrustProxy(raw: string | undefined) {
+function appWithTrustProxy(
+  raw: string | undefined,
+  source: ClientIpSource = 'express',
+) {
   const app = express();
   app.set('trust proxy', parseTrustProxy(raw));
   app.get('/identity', (req, res) => {
     let invalid = false;
-    const identity = resolveClientIdentity(req, () => {
-      invalid = true;
-    });
+    const identity = resolveClientIdentity(
+      req,
+      () => {
+        invalid = true;
+      },
+      source,
+    );
     res.json({ identity, invalid });
   });
   return app;
@@ -100,5 +111,95 @@ describe('resolveClientIdentity', () => {
     expect(identityOf(res).identity.key).not.toContain('garbage');
     expect(identityOf(res).identity.key).toMatch(/^ip:(127\.0\.0\.1|::1)$/);
     expect(identityOf(res).invalid).toBe(true);
+  });
+});
+
+describe('resolveClientIdentity with the Railway X-Forwarded-For source', () => {
+  const railway = () => appWithTrustProxy('1', 'railway-x-forwarded-for');
+
+  it('uses the left-most entry added by the Railway edge', async () => {
+    const res = await request(railway())
+      .get('/identity')
+      .set('X-Forwarded-For', '203.0.113.10, 100.64.0.2');
+    expect(identityOf(res)).toEqual({
+      identity: { kind: 'ip', key: 'ip:203.0.113.10' },
+      invalid: false,
+    });
+  });
+
+  it('trims whitespace around the entries', async () => {
+    const res = await request(railway())
+      .get('/identity')
+      .set('X-Forwarded-For', ' 203.0.113.10 , 100.64.0.2 ');
+    expect(identityOf(res).identity.key).toBe('ip:203.0.113.10');
+  });
+
+  it('normalizes IPv6 and IPv4-mapped entries', async () => {
+    const ipv6 = await request(railway())
+      .get('/identity')
+      .set('X-Forwarded-For', '2001:DB8::10, 100.64.0.2');
+    expect(identityOf(ipv6).identity.key).toBe('ip:2001:db8::10');
+
+    const mapped = await request(railway())
+      .get('/identity')
+      .set('X-Forwarded-For', '::ffff:203.0.113.10, 100.64.0.2');
+    expect(identityOf(mapped).identity.key).toBe('ip:203.0.113.10');
+  });
+
+  it('always uses the left-most entry of a longer chain', async () => {
+    const res = await request(railway())
+      .get('/identity')
+      .set('X-Forwarded-For', '203.0.113.10, 198.51.100.9, 100.64.0.2');
+    expect(identityOf(res).identity.key).toBe('ip:203.0.113.10');
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['empty', ''],
+    ['an invalid first entry', 'garbage, 198.51.100.9'],
+    ['an empty first entry', ', 198.51.100.9'],
+    ['a first entry with a port', '203.0.113.10:443, 100.64.0.2'],
+  ])(
+    'uses the shared unknown identity when the header is %s',
+    async (_case, header) => {
+      const req = request(railway()).get('/identity');
+      const res = await (header === undefined
+        ? req
+        : req.set('X-Forwarded-For', header));
+      expect(identityOf(res)).toEqual({
+        identity: { kind: 'ip', key: 'ip:unknown' },
+        invalid: true,
+      });
+    },
+  );
+
+  it('keeps authenticated users keyed by user ID', () => {
+    const req = {
+      user: { id: 'user-1' },
+      headers: { 'x-forwarded-for': '203.0.113.10' },
+    } as unknown as Request;
+    expect(
+      resolveClientIdentity(req, undefined, 'railway-x-forwarded-for'),
+    ).toEqual({ kind: 'user', key: 'u:user-1' });
+  });
+});
+
+describe('parseClientIpSource', () => {
+  it('defaults to the Express source', () => {
+    expect(parseClientIpSource(undefined)).toBe('express');
+    expect(parseClientIpSource(' ')).toBe('express');
+  });
+
+  it('accepts the supported sources', () => {
+    expect(parseClientIpSource('express')).toBe('express');
+    expect(parseClientIpSource(' railway-x-forwarded-for ')).toBe(
+      'railway-x-forwarded-for',
+    );
+  });
+
+  it('rejects unsupported sources', () => {
+    expect(() => parseClientIpSource('x-real-ip')).toThrow(
+      'Invalid CLIENT_IP_SOURCE',
+    );
   });
 });

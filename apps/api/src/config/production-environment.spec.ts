@@ -14,6 +14,7 @@ const PRODUCTION = {
   SPOTIFY_CATALOG_MARKET: 'AR',
   LASTFM_API_KEY: 'lastfm-key',
   TRUST_PROXY: '1',
+  CLIENT_IP_SOURCE: 'railway-x-forwarded-for',
 };
 
 function expectInvalid(
@@ -49,6 +50,7 @@ describe('validateEnvironment', () => {
     'SPOTIFY_CATALOG_MARKET',
     'LASTFM_API_KEY',
     'TRUST_PROXY',
+    'CLIENT_IP_SOURCE',
   ])('requires %s', (name) => {
     expectInvalid({ [name]: undefined }, `${name} is required`);
     expectInvalid({ [name]: '  ' }, `${name} is required`);
@@ -89,6 +91,13 @@ describe('validateEnvironment', () => {
 
   it('reports an invalid TRUST_PROXY value', () => {
     expectInvalid({ TRUST_PROXY: 'true' }, 'TRUST_PROXY=true is not allowed');
+  });
+
+  it('rejects an unsupported CLIENT_IP_SOURCE', () => {
+    expectInvalid(
+      { CLIENT_IP_SOURCE: 'x-real-ip' },
+      'Invalid CLIENT_IP_SOURCE "x-real-ip"',
+    );
   });
 
   it.each(['JWT_EXPIRES_IN', 'COOKIE_SECRET', 'API_URL'])(

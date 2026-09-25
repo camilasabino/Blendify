@@ -16,9 +16,12 @@ import {
 const anonymous: ClientIdentity = { kind: 'ip', key: 'ip:203.0.113.7' };
 const user: ClientIdentity = { kind: 'user', key: 'u:user-1' };
 
-function config(overrides: Partial<RequestLimitsConfig> = {}) {
+function config(
+  overrides: Partial<RequestLimitsConfig> = {},
+): RequestLimitsConfig {
   return {
     production: false,
+    clientIpSource: 'express',
     rateLimits: {
       ...DEFAULT_RATE_LIMITS,
       search: { ...DEFAULT_RATE_LIMITS.search, limit: 2 },

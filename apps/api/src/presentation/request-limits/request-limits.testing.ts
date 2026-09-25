@@ -18,6 +18,7 @@ export function inMemoryRequestLimitProviders(
       useFactory: () =>
         new RequestLimiter(null, new MemoryRequestLimitStore(), {
           production: false,
+          clientIpSource: 'express',
           rateLimits: DEFAULT_RATE_LIMITS,
           concurrency: DEFAULT_GENERATION_CONCURRENCY,
           ...config,

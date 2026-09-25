@@ -49,8 +49,15 @@ export const DEFAULT_GENERATION_CONCURRENCY: GenerationConcurrencyConfig = {
   renewIntervalMs: 10_000,
 };
 
+export const CLIENT_IP_SOURCES = [
+  'express',
+  'railway-x-forwarded-for',
+] as const;
+export type ClientIpSource = (typeof CLIENT_IP_SOURCES)[number];
+
 export interface RequestLimitsConfig {
   production: boolean;
+  clientIpSource: ClientIpSource;
   rateLimits: RateLimitPolicies;
   concurrency: GenerationConcurrencyConfig;
 }
@@ -63,6 +70,7 @@ const OVERRIDE_ENTRY = /^([a-z]+)=([^/]+)\/(.+)$/;
 export function loadRequestLimitsConfig(env: EnvReader): RequestLimitsConfig {
   return {
     production: env('NODE_ENV') === 'production',
+    clientIpSource: parseClientIpSource(env('CLIENT_IP_SOURCE')),
     rateLimits: resolveRateLimits(env('RATE_LIMIT_OVERRIDES')),
     concurrency: {
       ...DEFAULT_GENERATION_CONCURRENCY,
@@ -111,6 +119,15 @@ export function resolveRateLimits(raw: string | undefined): RateLimitPolicies {
     };
   }
   return policies;
+}
+
+export function parseClientIpSource(raw: string | undefined): ClientIpSource {
+  const value = raw?.trim();
+  if (!value) return 'express';
+  if (isClientIpSource(value)) return value;
+  throw new Error(
+    `Invalid CLIENT_IP_SOURCE "${value}". Use one of: ${CLIENT_IP_SOURCES.join(', ')}.`,
+  );
 }
 
 export type TrustProxySetting = false | number | string[];
@@ -164,6 +181,10 @@ function parsePositiveInteger(
 
 function isPositiveInteger(value: string): boolean {
   return POSITIVE_INTEGER.test(value) && Number.isSafeInteger(Number(value));
+}
+
+function isClientIpSource(value: string): value is ClientIpSource {
+  return (CLIENT_IP_SOURCES as readonly string[]).includes(value);
 }
 
 function isRateLimitBucket(value: string): value is RateLimitBucket {

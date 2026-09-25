@@ -15,6 +15,7 @@ import { RequestLimiter } from './request-limiter';
 import {
   DEFAULT_GENERATION_CONCURRENCY,
   DEFAULT_RATE_LIMITS,
+  type ClientIpSource,
 } from './request-limits.config';
 import { inMemoryRequestLimitProviders } from './request-limits.testing';
 
@@ -48,10 +49,13 @@ class LimitedController {
   }
 }
 
-async function createApp(): Promise<INestApplication> {
+async function createApp(
+  clientIpSource: ClientIpSource = 'express',
+): Promise<INestApplication> {
   const module = await Test.createTestingModule({
     controllers: [LimitedController],
     providers: inMemoryRequestLimitProviders({
+      clientIpSource,
       rateLimits: {
         ...DEFAULT_RATE_LIMITS,
         search: { ...DEFAULT_RATE_LIMITS.search, limit: 2, windowMs: 1_000 },
@@ -175,5 +179,40 @@ describe('Request limits over HTTP', () => {
     await waitForPending(1);
     pending.shift()?.();
     expect((await next).status).toBe(201);
+  });
+});
+
+describe('Request limits over HTTP with the Railway client IP source', () => {
+  let app: INestApplication;
+
+  beforeEach(async () => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    app = await createApp('railway-x-forwarded-for');
+  });
+
+  afterEach(async () => {
+    await app.close();
+    jest.restoreAllMocks();
+  });
+
+  function search(forwardedFor?: string) {
+    const req = request(app.getHttpServer() as Server).get('/test/search');
+    return forwardedFor === undefined
+      ? req
+      : req.set('X-Forwarded-For', forwardedFor);
+  }
+
+  it('shares one bucket across different Railway edge hops', async () => {
+    await search('203.0.113.10, 100.64.0.2').expect(200);
+    await search('203.0.113.10, 100.64.0.3').expect(200);
+    await search('203.0.113.10, 100.64.0.4').expect(429);
+    await search('198.51.100.9, 100.64.0.2').expect(200);
+  });
+
+  it('puts requests without a usable header in the shared unknown bucket', async () => {
+    await search().expect(200);
+    await search('garbage').expect(200);
+    await search('').expect(429);
+    await search('203.0.113.10, 100.64.0.2').expect(200);
   });
 });
