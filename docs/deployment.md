@@ -20,7 +20,7 @@ browser ──► Railway edge (TLS, Let's Encrypt) ─► NestJS ─► https:/
 |---|---|---|
 | Web SPA | Cloudflare Workers static assets (`apps/web/wrangler.jsonc`) | Custom domain `blendify.camilasabino.dev`, SPA fallback |
 | API | Railway service `api` (Infrastructure as Code: `.railway/railway.ts`), Hobby plan, 1 replica | Custom domain `api.blendify.camilasabino.dev`, **DNS-only** |
-| PostgreSQL | Railway `postgres` database (`.railway/railway.ts`) | Private network only, daily volume backup |
+| PostgreSQL | Railway `postgres` database (`.railway/railway.ts`) | Private network only; backups by manual `pg_dump` (section 7) |
 | Redis | Railway `redis` database (`.railway/railway.ts`) | Private network only, `noeviction`, no persistence |
 
 Decisions:
@@ -121,8 +121,8 @@ configuration (see the sections referenced):
 
 - Redis start command and memory limit (`redis()` accepts only a region) —
   applied through Railway's Public GraphQL API, see [Redis](#6-redis).
-- PostgreSQL volume size and backup schedule (`postgres()` exposes no volume
-  options) — applied through the same API, see
+- PostgreSQL volume size (`postgres()` exposes no volume options) — applied
+  through the same API, see
   [PostgreSQL](#7-postgresql-prisma-migrations-and-backups).
 - Secret values (`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `JWT_SECRET`,
   `LASTFM_API_KEY`): declared with `preserve()`, so IaC never writes or
@@ -156,8 +156,7 @@ environment config paths defined by Railway's official schema
    `EnvironmentConfig` patch, for example
    `services.<redis service id>.deploy.startCommand`,
    `services.<redis service id>.deploy.limitOverride.containers.memoryBytes`,
-   `volumes.<postgres volume id>.sizeMB`,
-   `services.<postgres service id>.volumeMounts.<volume id>.backupSchedules`.
+   `volumes.<postgres volume id>.sizeMB`.
 2. `environmentStagedChanges(environmentId)` to review the staged patch; it
    must contain only the intended service.
 3. `environmentPatchCommitStaged(environmentId, commitMessage)` to commit
@@ -195,7 +194,7 @@ must stay 512 MiB unless it is changed intentionally.
 3. In the dashboard, set the four preserved secrets on `api` (sealed).
    Apply every staged variable change: a deploy triggered by the first
    applied variable does not pick up variables added afterwards.
-4. Configure Redis ([section 6](#6-redis)) and PostgreSQL size and backups
+4. Configure Redis ([section 6](#6-redis)) and the PostgreSQL volume size
    ([section 7](#7-postgresql-prisma-migrations-and-backups)) as in
    section 4.2.
 5. Generate a temporary `*.up.railway.app` domain for `api` if needed for
@@ -272,7 +271,7 @@ private key material to the repository or to logs.
 | Service | State |
 |---|---|
 | `api` | Railpack with `npm ci`, Node 22, 1 replica, `PORT=8080`, private connections to PostgreSQL and Redis, `/api/health` 200, `GUEST_TRANSFER_ENABLED=false`, no public domain yet |
-| `postgres` | PostgreSQL 18.6, 5 GB volume, Daily backup with 6-day retention, PITR disabled, private networking only |
+| `postgres` | PostgreSQL 18.6, 5 GB volume, private networking only (no public TCP proxy), no Railway backups or PITR on Hobby; backups by manual `pg_dump` (section 7) |
 | `redis` | 512 MiB container memory limit, `maxmemory` 256 MiB, `noeviction`, RDB and AOF disabled, authenticated, private networking only |
 
 ## 5. Client IP and `TRUST_PROXY`
@@ -365,8 +364,8 @@ environments), append `?family=0` to `REDIS_URL`.
 - Production runs **PostgreSQL 18.6** (Railway `postgres()` helper); local
   development uses PostgreSQL 16 (Docker Compose). The single migration
   applied cleanly on 18.6; keep new migrations portable across both.
-- Current state: 5 GB volume, Daily backup (6-day retention), PITR disabled,
-  private networking only.
+- Current state: 5 GB volume, private networking only (no public TCP proxy),
+  Railway Hobby plan, no Railway volume backups, PITR unavailable.
 - **Resizing:** in this project, resizing `postgres-volume` from 500 MB to
   5 GB restarted the PostgreSQL service (even with deploys skipped on the
   commit). Treat future production resizes as potentially disruptive and do
@@ -386,45 +385,87 @@ environments), append `?family=0` to `REDIS_URL`.
 
 ### Backups
 
-Required before public production use:
+On this account the Railway dashboard (`postgres` → Backups) states:
+"Creating backups and enabling point-in-time recovery (PITR) are only
+available for customers on the Pro plan." The workspace is on **Hobby**, so
+there are **no scheduled volume backups, no manual Railway volume backups,
+and no PITR**. Backups are logical dumps taken from a local machine.
 
-1. **Daily volume backup** (configured). Railway reports the schedule as
-   `DAILY` with a retention of 518400 s (6 days); backups are incremental
-   copy-on-write and billed at volume storage rates. The `postgres()` IaC
-   helper does not expose the schedule; it was set as in section 4.2 (the
-   dashboard `postgres` → Backups tab is equivalent). Check it with the
-   `volumeInstanceBackupScheduleList` query or in the dashboard.
-2. **Manual backup before any deploy that contains a new migration**, both:
-   - a manual volume backup (Backups → create; manual backups are limited to
-     50 % of the volume size), and
-   - a logical dump through the CLI tunnel (no public TCP proxy needed):
+#### Required: dump before any deploy that contains a migration
 
-     ```sh
-     railway connect postgres --tunnel-only   # or run pg_dump over `railway ssh -s postgres`
-     pg_dump "postgresql://postgres:<password>@localhost:<port>/railway" \
-       --format=custom --no-owner \
-       --file="blendify-$(date +%Y%m%d-%H%M%S).dump"
-     ```
+Run this before pushing any change that adds a Prisma migration (the
+pre-deploy runs `prisma migrate deploy` automatically). Requirements: Railway
+CLI logged in and linked to the project, and a local `pg_dump` whose major
+version is **≥ 18** (the server runs PostgreSQL 18.6).
 
-   Keep dumps outside the repository and delete them when no longer needed:
-   they contain Spotify tokens and account data.
-3. **Restore test, periodically** (for example monthly and after major
-   changes): restore the latest dump into a scratch database and check it.
+1. Terminal 1 — open a private tunnel over Railway SSH (no public TCP proxy is
+   created; it stays open until Ctrl+C):
 
    ```sh
-   createdb restore_drill   # on a local or scratch server
-   pg_restore --dbname="postgresql://…/restore_drill" --no-owner --exit-on-error <dump>
-   psql "postgresql://…/restore_drill" -c 'SELECT count(*) FROM users;'
+   railway connect postgres --tunnel-only --port 55432
    ```
 
-   A volume-backup restore creates a new volume, unmounts the previous one
-   (kept), and stages the change for review before deploying.
+2. Terminal 2 — dump in custom format to a directory outside the repository
+   and outside Railway. `railway run -s postgres` injects `PGUSER`,
+   `PGPASSWORD` and `PGDATABASE` from the `postgres` service into the command
+   without printing them:
 
-Optional upgrade, not a current requirement: **Point-in-Time Recovery**
-(pgBackRest WAL archiving to a Railway bucket; weekly full + daily
-differential backups, about 4 weeks of restore window; no separate fee, but
-bucket storage and egress are billed). Enable it only if the extra cost and
-restore complexity become justified.
+   ```sh
+   mkdir -p "$HOME/Backups/blendify"
+   railway run -s postgres -- sh -c 'pg_dump \
+     --host=127.0.0.1 --port=55432 \
+     --username="$PGUSER" --dbname="$PGDATABASE" \
+     --format=custom --no-owner \
+     --file="$HOME/Backups/blendify/blendify-prod-$(date -u +%Y%m%dT%H%M%SZ).dump"'
+   ```
+
+3. Verify the dump is non-empty and readable:
+
+   ```sh
+   DUMP="$(ls -t "$HOME"/Backups/blendify/blendify-prod-*.dump | head -1)"
+   test -s "$DUMP" && ls -lh "$DUMP"
+   pg_restore --list "$DUMP" | grep -E 'TABLE DATA public (users|playlists|seed_usages|user_usage_stats|_prisma_migrations)'
+   ```
+
+4. Only then push the change that triggers `prisma migrate deploy`.
+5. Close the tunnel (Ctrl+C in terminal 1).
+
+Dumps contain account data and Spotify tokens: keep them in a private,
+backed-up location, never in the repository, and delete old ones when no
+longer needed. Never paste `railway run … printenv` output anywhere.
+
+#### Restore drill (never against production)
+
+Verifies that a dump is actually restorable. Do it before the initial public
+release, periodically afterwards, and whenever the backup procedure changes.
+It uses a disposable local PostgreSQL 18 container:
+
+```sh
+docker run --rm -d --name blendify-restore-drill \
+  -e POSTGRES_PASSWORD=restore-drill -p 55433:5432 postgres:18
+sleep 5
+export PGPASSWORD=restore-drill
+createdb --host=127.0.0.1 --port=55433 --username=postgres restore_drill
+pg_restore --host=127.0.0.1 --port=55433 --username=postgres \
+  --dbname=restore_drill --no-owner --exit-on-error "$DUMP"
+psql --host=127.0.0.1 --port=55433 --username=postgres --dbname=restore_drill \
+  -c 'SELECT migration_name FROM _prisma_migrations;' \
+  -c 'SELECT count(*) AS users FROM users;'
+unset PGPASSWORD
+docker rm -f blendify-restore-drill
+```
+
+The restored database must contain every applied migration and plausible row
+counts. Restoring into production is not part of the drill; a real restore
+is a separate, deliberate recovery operation.
+
+#### Future upgrade path (not part of M10)
+
+If Blendify later stores data whose loss has a higher impact, options are:
+
+- Railway **Pro**, for native volume backups and PITR;
+- an automated offsite `pg_dump` (a scheduled Railway service that writes
+  dumps to external object storage).
 
 Redis needs no persistence or backups: it holds only cache, rate-limit and
 concurrency state.
@@ -570,7 +611,7 @@ share URLs, full tracklists, or secrets.
 5. Run the smoke tests (section 13).
 
 First deploy order: IaC apply (section 4.4) → secrets (dashboard), Redis
-settings and PostgreSQL size/backup schedule (section 4.2) → first API deploy → API custom
+settings and PostgreSQL volume size (section 4.2) → first API deploy → API custom
 domain → Worker deploy with `VITE_API_URL` → Spotify dashboard → smoke
 tests → remove the generated Railway domain.
 
@@ -796,10 +837,8 @@ Procedure:
    `https://www.spotify.com/account/apps/` (Blendify's stored tokens are
    already deleted in step 3). Playlists Blendify published remain in the
    user's Spotify account; the user deletes them in Spotify if wanted.
-7. **Backups:** deleted data remains in PostgreSQL volume backups until they
-   expire (6 days for daily backups) and in any manual dump; delete manual
-   dumps that contain the account, or let them expire under the retention
-   above.
+7. **Backups:** deleted data remains in any earlier manual `pg_dump`
+   (section 7); delete or rotate dumps that contain the account.
 8. **Reply** to the requester confirming the deletion and mentioning steps 6
    and 7.
 
