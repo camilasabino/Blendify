@@ -6,6 +6,11 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './presentation/filters/global-exception.filter';
 import { createBodyParser } from './presentation/http/body-limits';
+import {
+  CLIENT_IP_DIAGNOSTICS,
+  createClientIpDiagnostics,
+  parseClientIpDiagnostics,
+} from './presentation/request-limits/client-ip-diagnostics';
 import { parseTrustProxy } from './presentation/request-limits/request-limits.config';
 
 async function bootstrap() {
@@ -15,6 +20,9 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.set('trust proxy', parseTrustProxy(config.get<string>('TRUST_PROXY')));
+  if (parseClientIpDiagnostics(config.get<string>(CLIENT_IP_DIAGNOSTICS))) {
+    app.use(createClientIpDiagnostics());
+  }
   app.use(createBodyParser());
   app.use(cookieParser());
   app.enableCors({
