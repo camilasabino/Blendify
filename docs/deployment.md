@@ -44,7 +44,7 @@ Decisions:
 
 The existing `camilasabino.dev` site is not changed.
 
-## 3. Frontend (Cloudflare Workers Builds)
+## 3. Frontend (Cloudflare Workers static assets)
 
 Repository config: `apps/web/wrangler.jsonc`
 
@@ -69,8 +69,27 @@ Security headers: `apps/web/public/_headers` (copied to `dist/_headers`):
 A full resource CSP is intentionally not set: it would need an inventory of
 Spotify image hosts, Google Fonts, and the API origin, tested end to end.
 
-Workers Builds settings (Cloudflare dashboard → Workers → Create → Import a
-repository):
+### 3.1 How the live frontend is deployed (Wrangler CLI)
+
+Workers Builds is **not** connected for `blendify-web`. The production Worker
+is uploaded from a local clean checkout:
+
+```sh
+nvm use                      # Node 22 from .nvmrc
+npm ci
+VITE_API_URL=https://api.blendify.camilasabino.dev npm run build:web
+npx wrangler@4 deploy --config apps/web/wrangler.jsonc
+```
+
+The uploaded version records `source: wrangler` and
+`workers/triggered_by: upload` in its Cloudflare metadata, with the commit
+short SHA as the deploy message. There is no push-to-deploy for the SPA:
+every frontend release is a deliberate manual deploy.
+
+Standardizing this as GitHub Actions + Wrangler across the author's projects
+is a follow-up, not part of this milestone.
+
+### 3.2 Workers Builds (not active; reference for a future switch)
 
 | Setting | Value |
 |---|---|
@@ -81,6 +100,23 @@ repository):
 | Build watch paths | `apps/web/**`, `packages/contracts/**`, `package.json`, `package-lock.json`, `.nvmrc` |
 | Build variable | `VITE_API_URL=https://api.blendify.camilasabino.dev` |
 | Node version | from `.nvmrc` (22) |
+
+### 3.3 HTTP → HTTPS (pending manual Cloudflare task)
+
+`http://blendify.camilasabino.dev/` currently answers `200` instead of
+redirecting. The intended fix is a **scoped** Redirect Rule on the zone:
+
+| Field | Value |
+|---|---|
+| When incoming requests match | `(http.host eq "blendify.camilasabino.dev" and not ssl)` |
+| Target URL (dynamic) | `concat("https://blendify.camilasabino.dev", http.request.uri)` |
+| Status | `301` |
+| Preserve query string | enabled |
+
+Zone-wide "Always Use HTTPS" must stay **off**: it would change unrelated
+`camilasabino.dev` traffic. The Wrangler OAuth credentials only hold
+`zone:read`, so Redirect Rules cannot be created from the CLI; this is a
+dashboard action.
 
 `VITE_API_URL` is a **build** variable, not a runtime variable: Vite compiles
 it into the bundle. A production build fails when it is missing, not an
@@ -270,9 +306,37 @@ private key material to the repository or to logs.
 
 | Service | State |
 |---|---|
-| `api` | Railpack with `npm ci`, Node 22, 1 replica, `PORT=8080`, private connections to PostgreSQL and Redis, `/api/health` 200, `GUEST_TRANSFER_ENABLED=false`, no public domain yet |
-| `postgres` | PostgreSQL 18.6, 5 GB volume, private networking only (no public TCP proxy), no Railway backups or PITR on Hobby; backups by manual `pg_dump` (section 7) |
-| `redis` | 512 MiB container memory limit, `maxmemory` 256 MiB, `noeviction`, RDB and AOF disabled, authenticated, private networking only |
+| `api` | Railpack with `npm ci`, Node 22, 1 replica, `PORT=8080`, private connections to PostgreSQL and Redis, custom domain `api.blendify.camilasabino.dev` **ACTIVE** on port 8080 (the generated Railway domain was removed), `/api/health` 200, `CLIENT_IP_SOURCE=railway-x-forwarded-for`, `GUEST_TRANSFER_ENABLED=false`, `CLIENT_IP_DIAGNOSTICS` not set |
+| `postgres` | PostgreSQL 18.6, 5 GB volume, private networking only (no public domain, no public TCP proxy), no Railway backups or PITR on Hobby; backups by manual `pg_dump` (section 7) |
+| `redis` | 512 MiB container memory limit, `maxmemory` 256 MiB, `noeviction`, RDB and AOF disabled, authenticated, private networking only (no public domain, no public TCP proxy) |
+
+### 4.9 Automatic deploys (GitHub trigger)
+
+There is exactly **one** deployment trigger for production, and it is the only
+supported way the API reaches production:
+
+| Field | Value |
+|---|---|
+| Provider | `github` |
+| Repository | `camilasabino/Blendify` |
+| Branch | `main` |
+| Service / environment | `api` / `production` |
+| Wait for CI (`checkSuites`) | `true` |
+
+A push to `main` therefore waits for the GitHub check suites and deploys only
+when they pass. A commit that touches nothing under the service watch patterns
+(`apps/api/**`, `packages/contracts/**`, `package.json`,
+`package-lock.json`, `.nvmrc`) is recorded as `SKIPPED` with
+`"No changes to watched files"` — that is correct behavior for docs-only or
+`.railway/`-only commits, not a broken trigger. Do not create a second
+trigger and do not widen the watch patterns to force a deploy; use
+`railway deployment redeploy` when a rebuild of unchanged sources is needed.
+
+Read the current trigger state with:
+
+```sh
+railway api 'query { project(id: "<projectId>") { deploymentTriggers { edges { node { id branch provider repository checkSuites serviceId environmentId } } } } }'
+```
 
 ## 5. Client IP, `CLIENT_IP_SOURCE` and `TRUST_PROXY`
 
@@ -284,8 +348,10 @@ separate concerns:
 - `TRUST_PROXY` only configures Express proxy trust (`req.ip`,
   `req.protocol`); in production it is no longer used for client identity.
 
-Measured on Railway public networking (temporary `*.up.railway.app` domain,
-hashed diagnostics, Wi-Fi and cellular clients, HTTP/1.1 and HTTP/2):
+Measured on Railway public networking (first on a temporary
+`*.up.railway.app` domain with hashed diagnostics, then re-verified on the
+final `api.blendify.camilasabino.dev` custom domain; Wi-Fi and cellular
+clients, HTTP/1.1 and HTTP/2):
 
 | Signal | Observed |
 |---|---|
@@ -319,6 +385,14 @@ Assumptions and limits:
   run there, and they must not call public endpoints.
 - Re-run the client-IP smoke test (section 13) after any networking change,
   including adding the custom domain.
+
+Empirical result on the final custom domain: one client, repeated requests
+over separate connections and over one reused HTTP/2 connection, consumed a
+single limiter bucket; forged `X-Forwarded-For` (single and multi-entry) and
+forged `X-Real-IP` did not create a fresh identity; every
+`request_limit.rejected` line carried the same identity hash. A client on a
+different network got its own bucket, and the hash matched
+`sha256("ip:<public IP>")` truncated to 12 characters.
 
 If the API is ever proxied through Cloudflare, revisit this section: the
 left-most entry would no longer be written by the Railway edge alone.
@@ -614,6 +688,10 @@ share URLs, full tracklists, or secrets.
 
 - Outbound Spotify accounts/profile calls (`/api/token`, `/me`) log method,
   URL, status and duration only (`logBodies: false`).
+- The shared Spotify Web API client (catalog, search, playlist and playback
+  calls) also runs with `logBodies: false` whenever `NODE_ENV=production`, so
+  no catalog or search response body reaches the logs; method, sanitized URL,
+  status and duration remain.
 - Last.fm response bodies are not logged in production.
 - Soundiiz calls log no bodies; `transfer.created`/`transfer.failed` log
   counts, categories and durations only.
@@ -630,9 +708,12 @@ share URLs, full tracklists, or secrets.
 2. If `.railway/railway.ts` changed: `railway config plan`, review it
    against the known drift in section 4.3, then `railway config apply` only
    if nothing applied outside IaC would be removed.
-3. Railway builds from GitHub and runs the pre-deploy migration, then
-   switches traffic after `/api/health` returns 200.
-4. Cloudflare Workers Builds deploys the SPA.
+3. Railway's GitHub trigger (section 4.9) waits for the GitHub check suites,
+   then builds, runs the pre-deploy migration, and switches traffic after
+   `/api/health` returns 200. A commit outside the API watch patterns is
+   recorded as `SKIPPED`.
+4. Deploy the SPA manually with Wrangler (section 3.1). Workers Builds is not
+   connected, so a merge alone does not ship the frontend.
 5. Run the smoke tests (section 13).
 
 First deploy order: IaC apply (section 4.4) → secrets (dashboard), Redis
@@ -670,7 +751,8 @@ Do not enable Guest transfer for these tests.
 
 ### Security and operations
 
-- [ ] HTTPS on both hosts; `http://` redirects to `https://`.
+- [ ] HTTPS on both hosts; `http://` redirects to `https://` (frontend
+      redirect still pending, see section 3.3).
 - [ ] Response headers on the web host match section 3
       (`curl -sI https://blendify.camilasabino.dev/app/mix`).
 - [ ] DevTools → Application → Cookies (`api.blendify…`): `blendify_session`
@@ -721,6 +803,37 @@ more reusing one connection; both must stop at 60.
 If all anonymous callers share one identity, new connections get a fresh
 bucket, or the spoofed header changes the identity, stop: correct
 `CLIENT_IP_SOURCE` from the observed chain and repeat.
+
+### 13.1 Production validation record
+
+Full run against the live production URLs, API revision `84654c2` (the deploy
+built from that commit; `750ee9f` was correctly `SKIPPED` as a
+docs/`.railway` change), frontend Worker version
+`5ad815ca-43d1-49f5-93eb-683a74d55794` built from `750ee9f`.
+
+| Area | Result |
+|---|---|
+| Frontend | `/`, `/app/mix`, `/app/discover`, `/privacy`, arbitrary routes all serve `index.html` with 200; security headers and immutable asset caching as in section 3; no horizontal overflow at 320, 390 or 1280 px; no console errors |
+| Frontend bundle | Contains `https://api.blendify.camilasabino.dev`; no localhost API fallback |
+| API | `/api/health` 200 with `database: up`; custom domain active |
+| Guest catalog | Artist search, track search, genre list and genre search all answer with Spotify `externalUrl` per item |
+| Guest generation | One Mix, two seeds × 3 tracks: NDJSON progress rendered to completion, 6 tracks, every track linked to Spotify, cover artwork linked to its own Spotify resource, recipe summary shown, `transfer: null`, no transfer CTA anywhere |
+| Guest protected pages | `/app/library` and `/app/stats` redirect to Mix with the Connect Spotify notice |
+| Spotify OAuth | Full flow through `https://api.blendify.camilasabino.dev/api/auth/spotify/callback`, landing authenticated on `/app/mix`; no redirect-URI, client or state error |
+| Session cookie | `blendify_session` on `api.blendify.camilasabino.dev` (host-only, no `Domain`), `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, 7-day expiry |
+| Spotify Mode | One Mix (5 tracks) and one Discover (15 tracks) generated and published to Spotify; both reachable by their `open.spotify.com/playlist/...` links; no Guest transfer path in the authenticated UI |
+| Library | Both new playlists listed with correct kind, track count and duration; the only artwork shown is each playlist's own Spotify playlist image (`ab67706c…` mosaic), no catalog artist or album artwork reused as a cover |
+| Stats | Loads with coherent counters; `GET /api/stats` 200; no Spotify artist photos |
+| Logout | Session cookie removed, Spotify-only navigation gone, Library and Stats back to Guest behavior, Guest Mix still usable |
+| CORS | `Access-Control-Allow-Origin` is always exactly the production origin for a correct, foreign (`https://evil.example`) or sibling (`https://x.camilasabino.dev`) `Origin` and for no `Origin`; never `*`, never reflected; preflight identical |
+| CSRF | State-changing requests: production `Origin` allowed, missing `Origin` 403, `https://evil.example` 403, `https://x.camilasabino.dev` 403 |
+| Guest transfer gate | `POST /api/transfers` with the production `Origin` → `404`; with any other or no `Origin` → `403` from the CSRF guard before the gate |
+| Client IP / rate limit | See section 5: one identity per client across new and reused connections, forged `X-Forwarded-For` and `X-Real-IP` ineffective, a single identity hash in every rejection log line |
+| Logs | No `Authorization` headers, cookies, session or Spotify tokens, transfer URLs, or provider response bodies; only `{type, method, url, status, durationMs}` for outbound calls and hashed identities for limiter events; no Redis, database, `store_unavailable` or `invalid_client_ip` events |
+| Railway | Deployment `SUCCESS`, one production GitHub trigger, PostgreSQL and Redis private, `GUEST_TRANSFER_ENABLED=false`, `CLIENT_IP_SOURCE=railway-x-forwarded-for`, cost controls unchanged, `railway config plan` showing only the two known drifts from section 4.3 |
+
+Open item from this run: the HTTP → HTTPS Redirect Rule for the frontend
+(section 3.3).
 
 ## 14. Rate limits and capacity
 
