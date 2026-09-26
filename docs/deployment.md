@@ -4,8 +4,9 @@ This document is enough to recreate production from scratch. It covers the
 topology, every dashboard setting, environment variables, the deploy and
 migration workflow, smoke tests, and rollback.
 
-Nothing here enables Guest transfer: `GUEST_TRANSFER_ENABLED` stays `false`
-in production (see [Guest transfer gate](#16-guest-transfer-gate)).
+Guest transfer is enabled in production: `GUEST_TRANSFER_ENABLED=true`. The
+variable stays in place as a kill switch (see
+[Guest transfer gate](#16-guest-transfer-gate)).
 
 ## 1. Topology
 
@@ -306,7 +307,7 @@ private key material to the repository or to logs.
 
 | Service | State |
 |---|---|
-| `api` | Railpack with `npm ci`, Node 22, 1 replica, `PORT=8080`, private connections to PostgreSQL and Redis, custom domain `api.blendify.camilasabino.dev` **ACTIVE** on port 8080 (the generated Railway domain was removed), `/api/health` 200, `CLIENT_IP_SOURCE=railway-x-forwarded-for`, `GUEST_TRANSFER_ENABLED=false`, `CLIENT_IP_DIAGNOSTICS` not set |
+| `api` | Railpack with `npm ci`, Node 22, 1 replica, `PORT=8080`, private connections to PostgreSQL and Redis, custom domain `api.blendify.camilasabino.dev` **ACTIVE** on port 8080 (the generated Railway domain was removed), `/api/health` 200, `CLIENT_IP_SOURCE=railway-x-forwarded-for`, `GUEST_TRANSFER_ENABLED=true`, `CLIENT_IP_DIAGNOSTICS` not set |
 | `postgres` | PostgreSQL 18.6, 5 GB volume, private networking only (no public domain, no public TCP proxy), no Railway backups or PITR on Hobby; backups by manual `pg_dump` (section 7) |
 | `redis` | 512 MiB container memory limit, `maxmemory` 256 MiB, `noeviction`, RDB and AOF disabled, authenticated, private networking only (no public domain, no public TCP proxy) |
 
@@ -616,7 +617,7 @@ set in Railway service variables (sealed) and declared there with
 
 | Variable | Required | Production value |
 |---|---|---|
-| `GUEST_TRANSFER_ENABLED` | Set explicitly | `false` |
+| `GUEST_TRANSFER_ENABLED` | Set explicitly | `true` |
 
 ### 8.6 Startup validation
 
@@ -723,8 +724,6 @@ tests → remove the generated Railway domain.
 
 ## 13. Post-deploy smoke tests
 
-Do not enable Guest transfer for these tests.
-
 ### Guest (signed out, fresh browser profile)
 
 - [ ] `https://blendify.camilasabino.dev` loads; a hard reload on
@@ -735,7 +734,9 @@ Do not enable Guest transfer for these tests.
 - [ ] Generate a Mix and a Discover playlist: NDJSON progress reaches the
       result; tracks link to Spotify; cover artwork (when shown) links to
       Spotify.
-- [ ] Transfer absent: no Soundiiz card; `POST /api/transfers` → `404`.
+- [ ] Transfer present: the Soundiiz card offers `Prepare transfer`; it calls
+      `POST /api/transfers` and then shows an explicit `Continue on Soundiiz`
+      link. Nothing redirects or opens a window on its own.
 - [ ] `/app/library` redirects to Mix with the Spotify-required notice.
 - [ ] Footer "Privacy" opens `/privacy`; the contact link is
       `mailto:contacto@camilasabino.dev`.
@@ -804,7 +805,7 @@ If all anonymous callers share one identity, new connections get a fresh
 bucket, or the spoofed header changes the identity, stop: correct
 `CLIENT_IP_SOURCE` from the observed chain and repeat.
 
-### 13.1 Production validation record
+### 13.1 Production validation record (M10, Guest transfer still disabled)
 
 Full run against the live production URLs, API revision `84654c2` (the deploy
 built from that commit; `750ee9f` was correctly `SKIPPED` as a
@@ -833,7 +834,36 @@ docs/`.railway` change), frontend Worker version
 | Railway | Deployment `SUCCESS`, one production GitHub trigger, PostgreSQL and Redis private, `GUEST_TRANSFER_ENABLED=false`, `CLIENT_IP_SOURCE=railway-x-forwarded-for`, cost controls unchanged, `railway config plan` showing only the two known drifts from section 4.3 |
 
 Open item from this run: the HTTP → HTTPS Redirect Rule for the frontend
-(section 3.3).
+(section 3.3). Resolved since: `http://blendify.camilasabino.dev` answers
+`301` to the HTTPS origin.
+
+### 13.2 Guest transfer rollout record (2026-09-26)
+
+Run against the live production URLs with `GUEST_TRANSFER_ENABLED=true`. API
+deployment `8955e618` (a redeploy of the image built from `f9a884a`, so the new
+variable reached the container; the web-only commits were correctly `SKIPPED`
+by the watch patterns), frontend Worker version `6c6e5cfa` built from
+`0dc53d3`.
+
+| Area | Result |
+|---|---|
+| API | Deployment `SUCCESS`, `/api/health` 200 with `database: up`, `GUEST_TRANSFER_ENABLED=true`, `CLIENT_IP_SOURCE=railway-x-forwarded-for`, `CLIENT_IP_DIAGNOSTICS` not set, PostgreSQL and Redis private |
+| Frontend | Worker rebuilt from `origin/main` with `VITE_API_URL=https://api.blendify.camilasabino.dev`; no localhost fallback in the bundle |
+| Guest generation | Artist Mix, two seeds × 3 tracks: 201 in ≈ 8 s, 6 tracks, `transfer` non-null, one-hour expiry, HS256 with issuer `blendify` and audience `blendify:playlist-transfer`, no destination anywhere in the payload |
+| Soundiiz payload | Only the playlist title, its description, and per track the title, the artists and the ISRC. No Spotify or session identifiers |
+| `POST /api/transfers` | 201 in ≈ 0.7 s, `url` accepted by the strict validator, `trackCount` 6, 24-hour expiry, no `destination` field |
+| Browser flow | `Prepare transfer` → `POST /api/transfers` 201 → explicit `Continue on Soundiiz` link (`target=_blank`, `rel="noopener noreferrer"`). No automatic redirect, no automatic window, no console errors |
+| Soundiiz review | Correct title and description, source `Blendify`, 6 tracks with correct artists; 38 destinations offered with none preselected |
+| Real transfer | Destination chosen on Soundiiz (Spotify): all 6 of 6 tracks transferred, expected title and description, no unmatched tracks. The destination playlist is created public by Soundiiz; Blendify sends no visibility |
+| CSRF | `POST /api/transfers`: production `Origin` reaches the endpoint, missing `Origin` 403, `https://evil.example.com` 403, `https://x.camilasabino.dev` 403 |
+| Token validation | Malformed token and tampered signature → `TRANSFER_TOKEN_INVALID`; unknown body → `VALIDATION_ERROR`. Expiry, issuer, audience, algorithm and payload shape covered by `playlist-transfer-tokens.service.spec.ts` and `guest-mode.http.spec.ts` |
+| Rate limiting | The `transfer` bucket returns `429` with `Retry-After` once 10 requests in 600 s are used, without extra provider traffic |
+| Returned-URL validation | `isSafeShareUrl` rejects foreign hosts, subdomains, ports, credentials, query strings and fragments; the adapter maps an unsafe response to `TRANSFER_PROVIDER_UNAVAILABLE` and never forwards it |
+| Logs | Only `transfer.created` with `trackCount`, `acceptedTrackCount` and `durationMs`, plus `outbound_http` for the fixed `POST https://soundiiz.com/go/import-playlist`. No transfer token, share URL, request or response body, Spotify token, `Authorization` header, cookie or secret |
+| Guest regression | Mix and Discover generate normally, artist/track/genre catalog answers, a generation that never uses transfer still works, `/api/playlists` and `/api/stats` 401 for guests |
+| Spotify Mode regression | OAuth and session work, direct publication creates the Spotify playlist, Library persists it as `COMPLETED`, Stats updates its counters, the account menu still offers logout and account deletion, and no Guest transfer path appears in the authenticated UI |
+| CORS | `Access-Control-Allow-Origin` is always exactly the production origin for correct, foreign, sibling and absent `Origin`, and on preflight; never `*`, never reflected |
+| Railway drift | `railway config plan` shows only the two known drifts from section 4.3; `GUEST_TRANSFER_ENABLED` no longer appears |
 
 ## 14. Rate limits and capacity
 
@@ -868,21 +898,34 @@ Deferred: IPv6 /64 grouping, contextual Guest market.
 | Frontend | Cloudflare → Workers → `blendify-web` → Deployments → roll back, or `npx wrangler@4 rollback --config apps/web/wrangler.jsonc`. `VITE_API_URL` is baked into each build. |
 | API | Railway → API service → Deployments → redeploy/rollback the previous successful deployment. Migrations are not reverted. |
 | Database | No down migrations. Keep migrations expand-only so the previous API version still works. Restore the pre-migration dump only for a destructive failure (section 7). |
-| Feature gates / limits | Change `GUEST_TRANSFER_ENABLED` or `RATE_LIMIT_OVERRIDES` in Railway; a variable change redeploys. Emergency brake for generation: `RATE_LIMIT_OVERRIDES=generation=1/3600`. |
+| Feature gates / limits | Change `GUEST_TRANSFER_ENABLED` or `RATE_LIMIT_OVERRIDES` in Railway; a variable change redeploys. Emergency brake for external transfer: `GUEST_TRANSFER_ENABLED=false`. Emergency brake for generation: `RATE_LIMIT_OVERRIDES=generation=1/3600`. |
 
 ## 16. Guest transfer gate
 
-`GUEST_TRANSFER_ENABLED=false` is the production value. With it,
-`POST /api/transfers` returns `404` and Guest results carry
-`transfer: null`; the rest of Guest Mode is unaffected.
+`GUEST_TRANSFER_ENABLED=true` is the production value. Guest results carry a
+signed, short-lived `transfer` token and `POST /api/transfers` is reachable.
 
-Before enabling it in production:
+The variable remains the kill switch for the external integration:
 
-1. Spotify Developer Policy §III.9 review or clarification from Spotify: the
-   policy allows transfer of "the metadata of the user's playlists"; whether a
-   Guest playlist generated from catalog metadata qualifies is not explicit.
-2. Final UI/policy check of the transfer copy and attribution.
-3. A production Soundiiz smoke test with a small playlist.
+| Value | Effect |
+|---|---|
+| `true` | Guest results carry a `transfer` token; `POST /api/transfers` creates a Soundiiz import link |
+| `false` | Guest results carry `transfer: null`, the Soundiiz card disappears and `POST /api/transfers` returns `404`. Guest generation, catalog, search, Mix, Discover and all of Spotify Mode keep working |
+
+Set it to `false` in Railway to switch the Soundiiz path off without taking
+Guest playlist generation down. A variable change redeploys the API.
+
+Operational notes:
+
+- Soundiiz is an external dependency. Its public playlist-import endpoint is
+  called once per transfer, with a 10 s timeout and no retries; failures map to
+  `TRANSFER_PROVIDER_UNAVAILABLE` or `TRANSFER_PLAYLIST_REJECTED`.
+- Blendify sends only the playlist title, its description when present, and per
+  track the title, the artists and the ISRC when known. It sends no destination:
+  the destination service is chosen by the user on Soundiiz.
+- Transfer tokens, Soundiiz request and response bodies and the temporary share
+  URL must never be logged (section 11). If any of them appears in the logs,
+  set `GUEST_TRANSFER_ENABLED=false` until it is fixed.
 
 ## 17. Spotify attribution
 

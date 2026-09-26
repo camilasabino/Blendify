@@ -49,7 +49,7 @@ export default defineRailway(() => {
       SPOTIFY_CATALOG_MARKET: 'AR',
       TRUST_PROXY: '1',
       CLIENT_IP_SOURCE: 'railway-x-forwarded-for',
-      GUEST_TRANSFER_ENABLED: 'false',
+      GUEST_TRANSFER_ENABLED: 'true',
       DATABASE_URL: db.env.DATABASE_URL,
       REDIS_URL: cache.env.REDIS_URL,
       SPOTIFY_CLIENT_ID: preserve(),
