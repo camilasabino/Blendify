@@ -8,7 +8,6 @@ import {
   PRIVACY_CONTACT_EMAIL,
   PRIVACY_POLICY,
   PRIVACY_POLICY_UPDATED,
-  SPOTIFY_APPS_URL,
 } from './privacy-policy-content'
 
 const linkClass = cn(
@@ -41,7 +40,7 @@ export function PrivacyPage() {
         <LanguageSwitcher />
       </header>
       <main className={cn(shellGutter, 'flex-1 pb-16')}>
-        <article className="max-w-2xl space-y-8">
+        <article className="mx-auto w-full max-w-prose space-y-10">
           <header className="space-y-2">
             <h1 className="font-display text-3xl font-bold tracking-tight text-cream-50 sm:text-4xl">
               {policy.title}
@@ -49,37 +48,60 @@ export function PrivacyPage() {
             <p className="text-sm text-cream-400">
               {policy.updated.replace('{date}', PRIVACY_POLICY_UPDATED)}
             </p>
+            <p className="pt-2 leading-relaxed text-cream-200">{policy.intro}</p>
           </header>
-          <p className="leading-relaxed text-cream-200">{policy.intro}</p>
           {policy.sections.map((section) => (
             <section key={section.title} className="space-y-3">
               <h2 className="font-display text-xl font-semibold text-cream-50">
                 {section.title}
               </h2>
-              {section.paragraphs.map((paragraph) => (
-                <p key={paragraph} className="leading-relaxed text-cream-200">
-                  {withEmail(paragraph)}
-                </p>
-              ))}
+              {section.body.map((block, index) =>
+                typeof block === 'string' ? (
+                  <p
+                    key={`${section.title}-${index}`}
+                    className="leading-relaxed text-cream-200"
+                  >
+                    {withEmail(block)}
+                  </p>
+                ) : (
+                  <ul
+                    key={`${section.title}-${index}`}
+                    className="space-y-2 pl-5"
+                  >
+                    {block.map((item) => (
+                      <li
+                        key={item}
+                        className="list-disc leading-relaxed text-cream-200 marker:text-cream-500"
+                      >
+                        {withEmail(item)}
+                      </li>
+                    ))}
+                  </ul>
+                ),
+              )}
             </section>
           ))}
-          <ul className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-            <li>
-              <a
-                href={SPOTIFY_APPS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={linkClass}
-              >
-                {policy.revokeLink}
-              </a>
-            </li>
-            <li>
-              <a href={`mailto:${PRIVACY_CONTACT_EMAIL}`} className={linkClass}>
-                {withEmail(policy.contactLink)}
-              </a>
-            </li>
-          </ul>
+          <nav aria-label={policy.title} className="border-t border-divider pt-6">
+            <ul className="flex flex-col gap-3">
+              {policy.resources.map((resource) => (
+                <li key={resource.href}>
+                  <a
+                    href={resource.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={linkClass}
+                  >
+                    {resource.label}
+                  </a>
+                </li>
+              ))}
+              <li>
+                <a href={`mailto:${PRIVACY_CONTACT_EMAIL}`} className={linkClass}>
+                  {withEmail(policy.contactLink)}
+                </a>
+              </li>
+            </ul>
+          </nav>
         </article>
       </main>
       <Footer />
