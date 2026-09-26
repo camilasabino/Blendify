@@ -270,15 +270,24 @@ describe('account deletion', () => {
 
   it('keeps the user signed in and reports the failure', async () => {
     setAuthState(testUser)
+    let failDelete: (() => void) | undefined
+    const pending = new Promise<void>((resolve) => {
+      failDelete = resolve
+    })
     const { user } = await openConfirmation({
-      'DELETE /api/account': () =>
-        jsonResponse(
+      // Rejecting after the click settles is what a slow API looks like: the
+      // route must not drift away from the Spotify-only page it started on.
+      'DELETE /api/account': async () => {
+        await pending
+        return jsonResponse(
           { statusCode: 500, code: 'INTERNAL_ERROR', message: 'nope' },
           500,
-        ),
+        )
+      },
     })
 
     await user.click(screen.getByRole('button', { name: 'Delete my account' }))
+    failDelete?.()
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'We couldn’t delete your account.',

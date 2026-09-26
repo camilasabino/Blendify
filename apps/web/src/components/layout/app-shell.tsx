@@ -121,16 +121,17 @@ export function AppShell() {
 
   async function confirmDeleteAccount() {
     if (deleting) return
-    const startedAt = location.pathname
     setDeleting(true)
     setDeleteFailed(false)
-    leaveSpotifyOnlyRoute()
     try {
       await deleteAccount()
+      // Only the deleted session navigates, and only once it is really gone.
+      // Navigating before the request and undoing it on failure raced with the
+      // route guard's own redirect and could strand the user on /app/mix.
+      navigate('/app/mix', { replace: true, state: null })
       setDeleteOpen(false)
       forgetUserScopedQueries()
     } catch {
-      navigate(startedAt, { replace: true, state: null })
       setDeleteFailed(true)
     } finally {
       setDeleting(false)
