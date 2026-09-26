@@ -1,11 +1,23 @@
 import type { Locale } from '@/i18n/messages'
 
-export const PRIVACY_POLICY_UPDATED = '2026-09-25'
+export const PRIVACY_POLICY_UPDATED = '2026-09-26'
 export const PRIVACY_CONTACT_EMAIL = 'contacto@camilasabino.dev'
 
 export const SPOTIFY_APPS_URL = 'https://www.spotify.com/account/apps/'
 export const SPOTIFY_PRIVACY_URL = 'https://www.spotify.com/legal/privacy-policy/'
 export const LASTFM_PRIVACY_URL = 'https://www.last.fm/legal/privacy'
+
+const POLICY_DATE_SEPARATOR: Record<Locale, string> = {
+  en: '-',
+  es: '/',
+  pt: '/',
+}
+
+export function formatPolicyDate(iso: string, locale: Locale): string {
+  const [year, month, day] = iso.split('-')
+  const parts = locale === 'en' ? [month, day, year] : [day, month, year]
+  return parts.join(POLICY_DATE_SEPARATOR[locale])
+}
 
 export type PrivacyBlock = string | readonly string[]
 
@@ -64,7 +76,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'oauth_state — a cookie that lasts 10 minutes and protects the Spotify sign-in against tampering.',
             'Your language choice and your “save to library” preference are stored by your browser on your device only.',
           ],
-          'Blendify sets no advertising or tracking cookies, and it includes no analytics or tracking code.',
+          'Blendify sets no advertising cookies and runs no behavioral tracking system of its own. Site usage and page performance are measured through Cloudflare Web Analytics, which does not use cookies for that.',
         ],
       },
       {
@@ -74,7 +86,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'Spotify — catalog search, sign-in, publishing playlists and playback control. Cover art and profile images load directly from Spotify’s servers.',
             'Last.fm — receives artist, track and genre names to find similar and popular music. No account, session or device information is sent with them.',
             'Soundiiz — used by Guest playlist transfer. When that transfer is available and you choose to start it, Blendify sends Soundiiz the minimum metadata the transfer needs: the playlist title, its description when there is one, and for each track the title, the artists and the ISRC when one is known. You pick the destination service on Soundiiz; Blendify does not choose one for you and starts nothing on its own.',
-            'Infrastructure — the site is served through Cloudflare, the API, database and cache run on Railway, and fonts load from Google Fonts. These providers necessarily see the requests your browser and the API make, including IP addresses, and handle them under their own policies.',
+            'Infrastructure — the site is served through Cloudflare, the API, database and cache run on Railway, and fonts load from Google Fonts. These providers necessarily see the requests your browser and the API make, including IP addresses, and handle them under their own policies. Cloudflare also measures traffic and page performance across this domain with Cloudflare Web Analytics, which records page views and web-performance metrics such as Core Web Vitals. It runs without cookies and is not used to follow individual visitors across unrelated websites.',
           ],
           'Blendify does not sell personal information and does not use it for advertising.',
         ],
@@ -157,7 +169,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'oauth_state: cookie que dura 10 minutos y protege el inicio de sesión con Spotify contra manipulaciones.',
             'Tu idioma y tu preferencia de “guardar en la biblioteca” los almacena tu navegador, solo en tu dispositivo.',
           ],
-          'Blendify no usa cookies de publicidad ni de seguimiento, y no incluye ningún código de analítica o rastreo.',
+          'Blendify no usa cookies de publicidad ni un sistema propio de rastreo de comportamiento. El uso del sitio y el rendimiento de las páginas se miden con Cloudflare Web Analytics, que para eso no usa cookies.',
         ],
       },
       {
@@ -167,7 +179,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'Spotify: búsqueda en el catálogo, inicio de sesión, publicación de playlists y control de reproducción. Las portadas y las imágenes de perfil se cargan desde servidores de Spotify.',
             'Last.fm: recibe nombres de artistas, canciones y géneros para encontrar música similar y popular. No se envía información de cuenta, sesión ni dispositivos.',
             'Soundiiz: lo usa la transferencia de playlists en modo invitado. Cuando esa transferencia está disponible y eliges iniciarla, Blendify le envía a Soundiiz los metadatos mínimos que necesita: el título de la playlist, su descripción cuando existe y, de cada canción, el título, los artistas y el ISRC cuando se conoce. El servicio de destino lo eliges en Soundiiz; Blendify no lo elige por ti ni inicia nada por su cuenta.',
-            'Infraestructura: el sitio se sirve a través de Cloudflare, la API, la base de datos y la caché funcionan en Railway, y las fuentes se cargan desde Google Fonts. Estos proveedores ven necesariamente las solicitudes que hacen tu navegador y la API, incluidas las direcciones IP, y las tratan según sus propias políticas.',
+            'Infraestructura: el sitio se sirve a través de Cloudflare, la API, la base de datos y la caché funcionan en Railway, y las fuentes se cargan desde Google Fonts. Estos proveedores ven necesariamente las solicitudes que hacen tu navegador y la API, incluidas las direcciones IP, y las tratan según sus propias políticas. Cloudflare además mide el tráfico y el rendimiento de las páginas de este dominio con Cloudflare Web Analytics, que registra vistas de página y métricas de rendimiento web como los Core Web Vitals. Funciona sin cookies y no se usa para seguir a visitantes concretos por sitios ajenos.',
           ],
           'Blendify no vende información personal ni la usa para publicidad.',
         ],
@@ -250,7 +262,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'oauth_state: cookie que dura 10 minutos e protege o login com o Spotify contra manipulação.',
             'Seu idioma e sua preferência de “salvar na biblioteca” são guardados pelo seu navegador, somente no seu dispositivo.',
           ],
-          'O Blendify não usa cookies de publicidade nem de rastreamento e não inclui nenhum código de análise ou rastreio.',
+          'O Blendify não usa cookies de publicidade nem um sistema próprio de rastreamento de comportamento. O uso do site e o desempenho das páginas são medidos com o Cloudflare Web Analytics, que para isso não usa cookies.',
         ],
       },
       {
@@ -260,7 +272,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'Spotify: busca no catálogo, login, publicação de playlists e controle de reprodução. As capas e as imagens de perfil são carregadas dos servidores do Spotify.',
             'Last.fm: recebe nomes de artistas, músicas e gêneros para encontrar música semelhante e popular. Nenhuma informação de conta, sessão ou dispositivo é enviada.',
             'Soundiiz: usado pela transferência de playlists no modo convidado. Quando essa transferência está disponível e você escolhe iniciá-la, o Blendify envia ao Soundiiz os metadados mínimos de que ela precisa: o título da playlist, a descrição quando existe e, de cada música, o título, os artistas e o ISRC quando conhecido. Você escolhe o serviço de destino no Soundiiz; o Blendify não escolhe por você nem inicia nada sozinho.',
-            'Infraestrutura: o site é servido pela Cloudflare, a API, o banco de dados e o cache rodam na Railway, e as fontes são carregadas do Google Fonts. Esses provedores necessariamente veem as requisições que seu navegador e a API fazem, incluindo endereços IP, e as tratam conforme as próprias políticas.',
+            'Infraestrutura: o site é servido pela Cloudflare, a API, o banco de dados e o cache rodam na Railway, e as fontes são carregadas do Google Fonts. Esses provedores necessariamente veem as requisições que seu navegador e a API fazem, incluindo endereços IP, e as tratam conforme as próprias políticas. A Cloudflare também mede o tráfego e o desempenho das páginas deste domínio com o Cloudflare Web Analytics, que registra visualizações de página e métricas de desempenho web como os Core Web Vitals. Funciona sem cookies e não é usado para seguir visitantes específicos por sites não relacionados.',
           ],
           'O Blendify não vende informações pessoais e não as usa para publicidade.',
         ],

@@ -5,6 +5,7 @@ import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { useLocaleStore } from '@/i18n/use-locale'
 import { cn, focusRing, shellGutter } from '@/lib/utils'
 import {
+  formatPolicyDate,
   PRIVACY_CONTACT_EMAIL,
   PRIVACY_POLICY,
   PRIVACY_POLICY_UPDATED,
@@ -46,7 +47,10 @@ export function PrivacyPage() {
               {policy.title}
             </h1>
             <p className="text-sm text-cream-400">
-              {policy.updated.replace('{date}', PRIVACY_POLICY_UPDATED)}
+              {policy.updated.replace(
+                '{date}',
+                formatPolicyDate(PRIVACY_POLICY_UPDATED, locale),
+              )}
             </p>
             <p className="pt-2 leading-relaxed text-cream-200">{policy.intro}</p>
           </header>

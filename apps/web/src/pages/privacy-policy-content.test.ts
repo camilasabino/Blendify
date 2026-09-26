@@ -1,5 +1,12 @@
 import { LOCALES } from '@/i18n/messages'
-import { PRIVACY_POLICY, type PrivacyPolicy } from './privacy-policy-content'
+import {
+  formatPolicyDate,
+  PRIVACY_POLICY,
+  PRIVACY_POLICY_UPDATED,
+  type PrivacyPolicy,
+} from './privacy-policy-content'
+
+const SAMPLE_ISO_DATE = '2026-09-25'
 
 function shape(policy: PrivacyPolicy) {
   return policy.sections.map((section) =>
@@ -40,6 +47,8 @@ describe('PRIVACY_POLICY', () => {
       'Last.fm',
       'Soundiiz',
       'Cloudflare',
+      'Cloudflare Web Analytics',
+      'Core Web Vitals',
       'Railway',
       'Google Fonts',
     ]) {
@@ -62,5 +71,18 @@ describe('PRIVACY_POLICY', () => {
     ]) {
       expect(text).not.toContain(term)
     }
+  })
+
+  it.each([
+    ['en', '09-25-2026'],
+    ['es', '25/09/2026'],
+    ['pt', '25/09/2026'],
+  ] as const)('formats a policy date for %s', (locale, expected) => {
+    expect(formatPolicyDate(SAMPLE_ISO_DATE, locale)).toBe(expected)
+  })
+
+  it('formats the published updated date without leaking the ISO form', () => {
+    expect(PRIVACY_POLICY_UPDATED).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(formatPolicyDate(PRIVACY_POLICY_UPDATED, 'es')).not.toContain('-')
   })
 })
