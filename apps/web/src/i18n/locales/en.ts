@@ -368,6 +368,18 @@ export const en = {
     'Connect Spotify to use your Library.',
   'spotifyRequired.stats':
     'Connect Spotify to see your stats.',
+  'authError.restricted':
+    'This Spotify account isn’t authorized for Spotify-connected features in Blendify. Spotify-connected access is limited to authorized accounts, and you can keep using Blendify in Guest Mode.',
+  'authError.denied':
+    'You didn’t finish connecting Spotify. You can try again or keep using Blendify in Guest Mode.',
+  'authError.failed':
+    'We couldn’t connect to Spotify. Try again in a moment — Guest Mode keeps working in the meantime.',
+  'authError.expired':
+    'That connection attempt is no longer valid. Start it again from Connect Spotify.',
+  'authError.dismiss':
+    'Dismiss',
+  'landing.spotifyAccess':
+    'Spotify-connected features are available to authorized accounts. Guest Mode is available to everyone.',
   'spotifyRequired.dismiss':
     'Dismiss',
   'common.opensNewTab':

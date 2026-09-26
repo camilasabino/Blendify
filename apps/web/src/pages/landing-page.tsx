@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { ArrowDown, ArrowRight, Blend, Compass, Lock } from 'lucide-react'
+import { useAuthError } from '@/hooks/use-auth-error'
 import { useCapabilities } from '@/hooks/use-capabilities'
 import { buttonVariants } from '@/components/ui/button'
+import { AuthErrorNotice } from '@/components/layout/auth-error-notice'
 import { ConnectSpotifyButton } from '@/components/layout/connect-spotify-button'
 import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
@@ -19,6 +21,7 @@ export function LandingPage() {
   const capabilities = useCapabilities()
   const isAuthenticated = capabilities.mode === 'spotify'
   const showConnect = capabilities.isResolved && !isAuthenticated
+  const { error: authError, dismiss: dismissAuthError } = useAuthError()
   const t = useT()
 
   return (
@@ -48,6 +51,12 @@ export function LandingPage() {
           {showConnect ? <ConnectSpotifyButton compact /> : null}
         </div>
       </header>
+
+      {authError ? (
+        <div className={cn(shellGutter, 'relative z-20 w-full')}>
+          <AuthErrorNotice error={authError} onDismiss={dismissAuthError} />
+        </div>
+      ) : null}
 
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 pb-16 pt-4 sm:px-6 lg:flex-row lg:items-center lg:gap-16">
         <div className="max-w-xl flex-1 space-y-6">
@@ -109,6 +118,9 @@ export function LandingPage() {
                 <p className="flex items-start gap-1.5 text-sm text-cream-400">
                   <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
                   {t('landing.trust')}
+                </p>
+                <p className="max-w-md text-sm text-cream-500">
+                  {t('landing.spotifyAccess')}
                 </p>
               </div>
             )}

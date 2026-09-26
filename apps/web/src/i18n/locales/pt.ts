@@ -375,6 +375,18 @@ export const pt: Record<MessageKey, string> = {
     'Conecte o Spotify para usar sua Biblioteca.',
   'spotifyRequired.stats':
     'Conecte o Spotify para ver suas estatísticas.',
+  'authError.restricted':
+    'Esta conta do Spotify não está autorizada a usar os recursos conectados do Blendify. O acesso conectado é limitado a contas autorizadas, e você pode continuar usando o Blendify no modo convidado.',
+  'authError.denied':
+    'Você não concluiu a conexão com o Spotify. Pode tentar de novo ou continuar usando o Blendify no modo convidado.',
+  'authError.failed':
+    'Não conseguimos conectar ao Spotify. Tente de novo em instantes; enquanto isso, o modo convidado continua funcionando.',
+  'authError.expired':
+    'Essa tentativa de conexão não é mais válida. Comece de novo em Conectar Spotify.',
+  'authError.dismiss':
+    'Fechar',
+  'landing.spotifyAccess':
+    'Os recursos conectados ao Spotify estão disponíveis para contas autorizadas. O modo convidado está disponível para todos.',
   'spotifyRequired.dismiss':
     'Fechar aviso',
   'common.opensNewTab':

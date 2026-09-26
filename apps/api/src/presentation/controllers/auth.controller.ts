@@ -4,6 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import type { Response, Request } from 'express';
 import { randomBytes } from 'node:crypto';
 import { AuthService } from '../../infrastructure/auth/auth.service';
+import {
+  authErrorRedirectUrl,
+  classifyAuthorizeError,
+  classifyCallbackFailure,
+  type AuthCallbackError,
+} from '../http/auth-callback-outcome';
 import type { AuthSession, OkResponse } from '@blendify/contracts';
 
 @ApiTags('auth')
@@ -35,16 +41,24 @@ export class AuthController {
   ): Promise<void> {
     const frontend = this.config.getOrThrow<string>('FRONTEND_URL');
 
+    /** No failed attempt may leave a session or a reusable OAuth state. */
+    const fail = (outcome: AuthCallbackError): void => {
+      this.auth.clearOAuthStateCookie(res);
+      res.redirect(authErrorRedirectUrl(frontend, outcome));
+    };
+
     if (error || !code) {
-      this.logger.warn(`OAuth error: ${error ?? 'missing code'}`);
-      res.redirect(`${frontend}/?auth=error`);
+      const outcome = classifyAuthorizeError(error);
+      this.logger.warn(`Spotify authorization unsuccessful: ${outcome}`);
+      fail(outcome);
       return;
     }
 
     const storedState = req.cookies?.[AuthService.oauthStateCookieName] as
       string | undefined;
     if (!storedState || storedState !== state) {
-      res.redirect(`${frontend}/?auth=invalid_state`);
+      this.logger.warn('Spotify authorization unsuccessful: invalid_state');
+      fail('invalid_state');
       return;
     }
 
@@ -60,11 +74,15 @@ export class AuthController {
       this.auth.clearOAuthStateCookie(res);
       res.redirect(`${frontend}/app/mix`);
     } catch (err) {
-      this.logger.error(
-        'OAuth callback failed',
-        err instanceof Error ? err.stack : undefined,
-      );
-      res.redirect(`${frontend}/?auth=error`);
+      const outcome = classifyCallbackFailure(err);
+      this.logger.warn(`Spotify authorization unsuccessful: ${outcome}`);
+      if (outcome === 'connection_failed') {
+        this.logger.error(
+          'OAuth callback failed',
+          err instanceof Error ? err.stack : undefined,
+        );
+      }
+      fail(outcome);
     }
   }
 

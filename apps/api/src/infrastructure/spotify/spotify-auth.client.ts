@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AxiosInstance } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { createOutboundHttp } from '../http/outbound-http.logging';
+import { SpotifyAccountRestrictedError } from './spotify-auth.errors';
 
 @Injectable()
 export class SpotifyAuthClient {
@@ -86,14 +87,23 @@ export class SpotifyAuthClient {
     email?: string;
     imageUrl?: string;
   }> {
-    const { data } = await this.api.get<{
-      id: string;
-      display_name: string;
-      email?: string;
-      images?: { url: string }[];
-    }>('/me', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    const { data } = await this.api
+      .get<{
+        id: string;
+        display_name: string;
+        email?: string;
+        images?: { url: string }[];
+      }>('/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      .catch((error: unknown) => {
+        // A fresh access token that cannot read its own profile means Spotify
+        // refuses to serve this user, not that the token is malformed.
+        if (axios.isAxiosError(error) && error.response?.status === 403) {
+          throw new SpotifyAccountRestrictedError();
+        }
+        throw error;
+      });
 
     return {
       spotifyId: data.id,
