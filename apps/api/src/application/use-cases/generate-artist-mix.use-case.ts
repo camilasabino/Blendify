@@ -415,6 +415,9 @@ export class GenerateArtistMixUseCase {
       );
     } catch (error) {
       if (isFatalCatalogError(error)) throw error;
+      this.logger.warn(
+        `Last.fm track fetch failed for "${artist.name}": ${errorMessage(error)}`,
+      );
       return [];
     }
   }
@@ -429,4 +432,8 @@ export class GenerateArtistMixUseCase {
       track.artistName.trim().toLowerCase() === artist.name.trim().toLowerCase()
     );
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

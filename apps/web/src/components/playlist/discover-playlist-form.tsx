@@ -59,7 +59,7 @@ const TRACK_TARGETS: DiscoverTrackTarget[] = [15, 30, 50]
 
 const formSchema = z.object({
   popularity: z.enum(['popular', 'balanced', 'rarities']),
-  targetTrackCount: z.union([z.literal(15), z.literal(30), z.literal(50)]),
+  targetTrackCount: z.literal(TRACK_TARGETS),
   orderMode: z.enum(GENERATION_ORDER_MODES),
   generateCover: z.boolean(),
 })

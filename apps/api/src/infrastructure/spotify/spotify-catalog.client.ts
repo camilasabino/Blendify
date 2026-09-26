@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import axios, { type AxiosRequestConfig } from 'axios';
 import { Artist } from '../../domain/artist/artist.entity';
 import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
@@ -73,6 +74,8 @@ const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const ARTIST_CACHE_TTL_MS = 30 * 60 * 1000;
 
 export class SpotifyCatalogClient implements CatalogProviderPort {
+  private readonly logger = new Logger(SpotifyCatalogClient.name);
+
   constructor(
     private readonly api: SpotifyApiClient,
     private readonly tokens: CatalogTokenSource,
@@ -199,6 +202,9 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
       });
     } catch (error) {
       if (isFatalCatalogError(error)) throw error;
+      this.logger.warn(
+        `resolveTrack failed for "${artist}" — "${title}": ${errorMessage(error)}`,
+      );
       return null;
     }
   }
@@ -396,4 +402,8 @@ function isProviderUnavailable(error: unknown): boolean {
   if (!axios.isAxiosError(error)) return false;
   const status = error.response?.status;
   return status === undefined || status === 403 || status >= 500;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

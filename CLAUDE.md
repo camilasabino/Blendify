@@ -76,3 +76,15 @@ Git hooks (Husky + commitlint) enforce Conventional Commits and run lint on pre-
 ## Quality analysis
 
 CI sends coverage/analysis for API, web, and contracts to SonarCloud (`sonar-project.properties`). SonarCloud Automatic Analysis must stay disabled for the CI-based scan to run.
+
+## Engineering conventions
+
+Full detail: `docs/engineering/code-conventions.md` (read it for architecture, refactoring, or code-review work). The highest-signal rules for every session:
+
+- Preserve the hexagonal boundaries and the monorepo boundaries (`apps/api` ↔ `apps/web` ↔ `packages/contracts`) — no cross-app imports, no framework/Prisma/Axios/HTTP objects in `domain/`.
+- Prefer feature/domain-first organization over generic buckets; don't add to `lib/utils.ts` or similar dumping grounds — put feature logic next to the feature.
+- No comments or JSDoc by default. Add one only for a genuinely non-obvious, critical constraint (security invariant, provider/protocol quirk, documented workaround) — never to restate what the code already says.
+- Watch for oversized, multi-responsibility files/functions (rough signals: file >400–500 LOC, function >40–60 LOC, component >150–200 LOC) — but size alone isn't a violation; check for mixed responsibilities before splitting.
+- `@blendify/contracts` stays the source of truth for shared request/response/error contracts — infer types from its Zod schemas rather than hand-duplicating shapes.
+- Avoid premature abstractions; prefer a little clear duplication over an incorrect generalization.
+- Tests protect behavior/contracts, not private implementation details.

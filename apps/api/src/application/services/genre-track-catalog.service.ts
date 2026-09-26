@@ -26,6 +26,8 @@ import {
 } from '../../domain/repositories/provider-quota.port';
 import { Track } from '../../domain/track/track.entity';
 
+const SPOTIFY_VARIOUS_ARTISTS_ARTIST_ID = '0LyfQWJT6nXafLPZqxe9Of';
+
 export interface GenreTrackCatalogResult {
   tracksByGenre: Map<string, Track[]>;
   coverCandidates: Map<string, string | undefined>;
@@ -164,6 +166,9 @@ export class GenreTrackCatalogService {
       return resolved.filter((track) => !this.isJunkTrack(track));
     } catch (error) {
       if (isFatalCatalogError(error)) throw error;
+      this.logger.warn(
+        `Tag chart resolve failed for "${tag}": ${errorMessage(error)}`,
+      );
       return [];
     }
   }
@@ -319,6 +324,9 @@ export class GenreTrackCatalogService {
       return resolved;
     } catch (error) {
       if (isFatalCatalogError(error)) throw error;
+      this.logger.warn(
+        `Seed artist resolve failed for "${tag}": ${errorMessage(error)}`,
+      );
       return [];
     }
   }
@@ -372,7 +380,11 @@ export class GenreTrackCatalogService {
     return (
       artistName === 'various artists' ||
       artistName === 'various' ||
-      track.artistId.getValue() === '0LyfQWJT6nXafLPZqxe9Of'
+      track.artistId.getValue() === SPOTIFY_VARIOUS_ARTISTS_ARTIST_ID
     );
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

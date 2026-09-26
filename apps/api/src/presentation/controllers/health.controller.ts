@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Logger, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { PrismaService } from '../../infrastructure/persistence/prisma.service';
@@ -12,6 +12,8 @@ export interface HealthResponse {
 @ApiTags('health')
 @Controller('api/health')
 export class HealthController {
+  private readonly logger = new Logger(HealthController.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
@@ -22,7 +24,10 @@ export class HealthController {
     let database: 'up' | 'down' = 'up';
     try {
       await this.prisma.$queryRaw`SELECT 1`;
-    } catch {
+    } catch (error) {
+      this.logger.warn(
+        `Database health check failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       database = 'down';
     }
 

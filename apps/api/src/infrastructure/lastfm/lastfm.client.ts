@@ -88,6 +88,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const LASTFM_CACHE_TTL_MS = 7 * DAY_MS;
 /** Avoid locking in empty misses for a full week (title variants may help later). */
 const LASTFM_EMPTY_CACHE_TTL_MS = 30 * 60 * 1000;
+const LASTFM_MAX_LIMIT = 100;
+const LASTFM_TAG_ARTISTS_MAX_LIMIT = 50;
 
 @Injectable()
 export class LastFmClient implements DiscoveryCatalogPort {
@@ -129,7 +131,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
     const name = artistName.trim();
     if (!name) return [];
 
-    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safeLimit = Math.min(Math.max(limit, 1), LASTFM_MAX_LIMIT);
     const cacheKey = this.key(
       'similar-v3',
       `${name.toLowerCase()}|${safeLimit}`,
@@ -201,7 +203,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
     const track = trackName.trim();
     if (!artist || !track) return [];
 
-    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safeLimit = Math.min(Math.max(limit, 1), LASTFM_MAX_LIMIT);
     // Versioned because query-variant rules affect the recommendation set.
     const cacheKey = this.key(
       'similar-tracks-v4',
@@ -285,7 +287,10 @@ export class LastFmClient implements DiscoveryCatalogPort {
     const name = tag.trim().toLowerCase();
     if (!name) return [];
 
-    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const safeLimit = Math.min(
+      Math.max(limit, 1),
+      LASTFM_TAG_ARTISTS_MAX_LIMIT,
+    );
     const cacheKey = this.key('tag-artists', `${name}|${safeLimit}`);
 
     return this.withCache(
@@ -332,7 +337,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
     const name = tag.trim().toLowerCase();
     if (!name) return [];
 
-    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safeLimit = Math.min(Math.max(limit, 1), LASTFM_MAX_LIMIT);
     const safePage = Math.max(1, Math.floor(page));
     const cacheKey = this.key(
       'tag-tracks',
@@ -383,7 +388,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
     const name = artist.trim();
     if (!name) return [];
 
-    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safeLimit = Math.min(Math.max(limit, 1), LASTFM_MAX_LIMIT);
     const cacheKey = this.key(
       'artist-tracks',
       `${name.toLowerCase()}|${safeLimit}`,

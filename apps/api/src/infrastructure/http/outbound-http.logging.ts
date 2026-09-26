@@ -313,7 +313,7 @@ function tryParseFormUrlEncoded(
     const obj = entriesToObject(params.entries());
     if (Object.keys(obj).length > 0) return obj;
   } catch {
-    // fall through
+    return undefined;
   }
   return undefined;
 }

@@ -12,6 +12,13 @@ import { ArtistId } from '../../domain/value-objects/artist-id.vo';
 import { TrackId } from '../../domain/value-objects/track-id.vo';
 import { SpotifyApiClient } from './spotify-api.client';
 
+const ADD_TRACKS_CHUNK_SIZE = 100;
+const MAX_COVER_IMAGE_BYTES = 256 * 1024;
+const PLAYLIST_ITEMS_PAGE_SIZE = 50;
+const PLAYLIST_ITEMS_MAX_OFFSET = 200;
+const LIBRARY_PLAYLISTS_PAGE_SIZE = 50;
+const LIBRARY_PLAYLISTS_MAX_PAGES = 2;
+
 interface SpotifyImage {
   url: string;
 }
@@ -61,13 +68,12 @@ export class SpotifyPlaylistClient {
     trackUris: string[],
   ): Promise<void> {
     const token = await this.api.accessToken(this.userId);
-    const chunkSize = 100;
 
-    for (let i = 0; i < trackUris.length; i += chunkSize) {
+    for (let i = 0; i < trackUris.length; i += ADD_TRACKS_CHUNK_SIZE) {
       await this.api.request<unknown>('addTracksToPlaylist', token, {
         method: 'POST',
         url: `/playlists/${playlistId}/items`,
-        data: { uris: trackUris.slice(i, i + chunkSize) },
+        data: { uris: trackUris.slice(i, i + ADD_TRACKS_CHUNK_SIZE) },
       });
     }
   }
@@ -80,7 +86,7 @@ export class SpotifyPlaylistClient {
     const cleaned = jpegBase64.replace(/^data:image\/jpeg;base64,/i, '').trim();
     const bytes = Buffer.from(cleaned, 'base64');
     if (bytes.length === 0) throw new Error('Cover image is empty');
-    if (bytes.length > 256 * 1024) {
+    if (bytes.length > MAX_COVER_IMAGE_BYTES) {
       throw new Error('Cover image exceeds Spotify 256 KB limit');
     }
 
@@ -160,7 +166,7 @@ export class SpotifyPlaylistClient {
     const tracks: Track[] = [];
     let totalDurationMs = 0;
     let offset = 0;
-    const limit = 50;
+    const limit = PLAYLIST_ITEMS_PAGE_SIZE;
     let total: number | undefined;
     let fetched = false;
 
@@ -182,7 +188,7 @@ export class SpotifyPlaylistClient {
         if (!page.next || page.items.length === 0) break;
         if (typeof total === 'number' && offset >= total) break;
         // Bound pagination for very large playlists during library sync.
-        if (offset >= 200) break;
+        if (offset >= PLAYLIST_ITEMS_MAX_OFFSET) break;
       }
 
       if (fetched && tracks.length === 0 && (total ?? 0) > 0) {
@@ -300,6 +306,9 @@ export class SpotifyPlaylistClient {
         if (this.api.isStatus(error, 429)) {
           throw this.api.toSpotifyError(`deletePlaylist(${playlistId})`, error);
         }
+        this.logger.warn(
+          `Could not clear playlist ${playlistId} via ${endpoint}: ${errorMessage(error)}`,
+        );
       }
     }
     return false;
@@ -375,11 +384,10 @@ export class SpotifyPlaylistClient {
     const token = await this.api.accessToken(this.userId);
     const ids = new Set<string>();
     let offset = 0;
-    const limit = 50;
-    const maxPages = 2;
+    const limit = LIBRARY_PLAYLISTS_PAGE_SIZE;
 
     try {
-      for (let page = 0; page < maxPages; page++) {
+      for (let page = 0; page < LIBRARY_PLAYLISTS_MAX_PAGES; page++) {
         const data = await this.api.request<{
           items?: Array<{ id?: string } | null>;
           next?: string | null;
@@ -402,7 +410,6 @@ export class SpotifyPlaylistClient {
         this.logger.warn(
           'listLibraryPlaylistIds needs playlist-read-private — re-login after updating SPOTIFY_SCOPES',
         );
-        throw error;
       }
       throw error;
     }
