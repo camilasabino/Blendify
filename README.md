@@ -1,22 +1,21 @@
 <p align="center">
-  <img src="docs/brand/blendify-logo.svg" alt="Blendify logo" width="160" />
+  <img src="docs/brand/blendify-logo.svg" alt="Blendify logo" width="120" />
 </p>
 
 <h1 align="center">Blendify</h1>
 
 <p align="center">
-  Create Spotify mixes from artists or genres, discover related music, and manage every result from one focused workspace.
+  Turn a handful of artists, a genre, or a single song into a Spotify playlist — as a guest, or connected to your account.
 </p>
 
 <p align="center">
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5%20%2F%206-3178C6?logo=typescript&logoColor=white" />
-  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111" />
-  <img alt="NestJS" src="https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white" />
-  <img alt="Spotify" src="https://img.shields.io/badge/Spotify-Web%20API-1DB954?logo=spotify&logoColor=white" />
-  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" />
+  <a href="https://blendify.camilasabino.dev"><strong>Try it →</strong></a>
 </p>
 
 <p align="center">
+  <a href="https://github.com/camilasabino/Blendify/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/camilasabino/Blendify/actions/workflows/ci.yml/badge.svg" />
+  </a>
   <a href="https://sonarcloud.io/summary/new_code?id=camilasabino_Blendify">
     <img alt="Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=camilasabino_Blendify&metric=alert_status&token=e6a94ec79ca3faaaad1b8770dbc7eb9fbcb47a45" />
   </a>
@@ -27,34 +26,45 @@
 
 <p align="center">
   <a href="docs/media/landing.webp">
-    <img src="docs/media/landing.webp" alt="Blendify landing page" width="960" />
+    <img src="docs/media/landing.webp" alt="Blendify landing page" width="900" />
   </a>
 </p>
 
-## Overview
+## What it does
 
-Blendify is a full-stack Spotify playlist builder. It combines Spotify catalog and playback APIs with Last.fm discovery data to create four canonical playlist types:
+Blendify combines the Spotify catalog with Last.fm discovery data to build
+four kinds of playlists:
 
-- **Artist Mix** — combine up to 12 artists.
-- **Genre Mix** — build from up to 5 curated genres.
-- **Discover Artist** — explore the orbit of one artist.
-- **Discover Track** — branch out from one song.
+- **Artist Mix** — blend up to 12 artists.
+- **Genre Mix** — blend up to 5 curated genres.
+- **Discover Artist** — explore one artist's musical neighborhood.
+- **Discover Track** — branch out from a single song.
 
-Every generation has a typed, versioned recipe with real seeds, popularity preference, ordering mode, and track budget. Results can be published to Spotify, optionally stored in the Blendify Library, and reviewed later with their original recipe.
+**Guest Mode** needs no account: generate and preview a playlist, then
+optionally transfer it to Spotify or another service via
+[Soundiiz](https://soundiiz.com). **Connect Spotify** to publish playlists
+directly, control playback in-app, and keep a Library and usage Stats across
+sessions. Every generation is a typed, versioned recipe (seeds, popularity
+preference, order, track budget), so results are reproducible and reviewable.
 
-## Product highlights
+## Product tour
 
-- Spotify OAuth with server-side token storage and HTTP-only sessions.
-- Artist and track search with paste-to-resolve support.
-- Curated genre catalog and Last.fm-powered recommendations.
-- Popular, balanced, and rarities generation modes.
-- Artist, title, or random track ordering.
-- Optional generated cover artwork.
-- In-app preview and Spotify device playback.
-- Library summary/detail loading, rename, local removal, and Spotify purge.
-- Usage insights that remain independent from Library retention.
-- Accessible keyboard navigation for searches, selectors, and dialogs.
-- English, neutral Spanish, and Brazilian Portuguese interfaces.
+<p align="center">
+  <a href="docs/media/mix-artists.webp"><img src="docs/media/mix-artists.webp" alt="Mix result from artists" width="49%" /></a>
+  <a href="docs/media/mix-genres.webp"><img src="docs/media/mix-genres.webp" alt="Mix result from genres" width="49%" /></a>
+</p>
+<p align="center">
+  <a href="docs/media/discover-artist.webp"><img src="docs/media/discover-artist.webp" alt="Discover result from an artist" width="49%" /></a>
+  <a href="docs/media/discover-track.webp"><img src="docs/media/discover-track.webp" alt="Discover result from a song" width="49%" /></a>
+</p>
+<p align="center">
+  <a href="docs/media/guest-transfer.webp"><img src="docs/media/guest-transfer.webp" alt="Guest result with Soundiiz transfer" width="49%" /></a>
+  <a href="docs/media/library.webp"><img src="docs/media/library.webp" alt="Library, Spotify-connected" width="49%" /></a>
+</p>
+<p align="center">
+  <a href="docs/media/stats.webp"><img src="docs/media/stats.webp" alt="Usage stats, Spotify-connected" width="55%" /></a>
+  <a href="docs/media/mobile-landing.webp"><img src="docs/media/mobile-landing.webp" alt="Blendify on mobile" width="18%" /></a>
+</p>
 
 ## Architecture
 
@@ -70,281 +80,117 @@ Every generation has a typed, versioned recipe with real seeds, popularity prefe
                          └──────────── rate limits + Redis cache ────────┘
 ```
 
-The monorepo uses npm workspaces:
+npm workspaces monorepo:
 
 ```text
 Blendify/
 ├── apps/
-│   ├── api/                  # NestJS application
-│   │   ├── prisma/           # schema, migration, and demo seed
-│   │   └── src/
-│   │       ├── domain/       # entities, rules, value objects, and ports
-│   │       ├── application/  # use cases and application services
-│   │       ├── infrastructure/
-│   │       ├── modules/      # feature composition
-│   │       └── presentation/ # controllers, pipes, and exception filter
+│   ├── api/                  # NestJS — hexagonal (domain/application/infrastructure/presentation)
 │   └── web/                  # React SPA
 ├── packages/
-│   └── contracts/            # shared Zod schemas and inferred types
-├── docs/                     # brand and product media
+│   └── contracts/            # Shared Zod schemas + inferred types
+├── docs/                     # deployment runbook, brand and product media
 └── scripts/                  # local lifecycle helpers
 ```
 
-The API follows ports-and-adapters boundaries. Spotify is exposed through focused catalog, playlist, and playback clients behind a user-bound provider facade. Shared Zod contracts are the source of truth for HTTP requests, responses, errors, playlist recipes, and statistics.
+The API follows ports-and-adapters: Spotify is exposed through catalog,
+playlist, and playback clients behind a user-bound provider facade; domain
+logic has no framework or I/O dependencies. `@blendify/contracts` is the
+single source of truth for request/response/error shapes shared by both apps.
 
-## Technology
+## Tech stack
 
-- **Web:** React 19, Vite 8, React Router, TanStack Query, Zustand, Tailwind CSS 4, React Hook Form, Zod, Vitest, Testing Library, oxlint.
-- **API:** NestJS 11, Prisma 6, PostgreSQL 16, Redis 7, Passport, Axios, Jest, Supertest, ESLint, Prettier.
-- **External services:** Spotify Web API and Last.fm API.
-- **Tooling:** TypeScript, npm workspaces, Docker Compose.
+| | |
+|---|---|
+| **Frontend** | React 19, Vite, React Router, TanStack Query, Zustand, Tailwind CSS, React Hook Form, Zod |
+| **Backend** | NestJS 11, Prisma, PostgreSQL, Redis, Passport |
+| **Integrations** | Spotify Web API, Last.fm API, Soundiiz |
+| **Testing/quality** | Jest, Vitest, Testing Library, Playwright, ESLint/oxlint, SonarCloud |
+| **Infrastructure** | Cloudflare Workers (web), Railway (API + PostgreSQL + Redis), GitHub Actions |
 
-## Getting started
+## Local development
 
-### Requirements
-
-- Node.js 22 or newer (CI and production use Node 22, pinned in `.nvmrc`).
-- npm 10 or newer.
-- Docker Desktop or compatible PostgreSQL 16 and Redis 7 services.
-- A [Spotify Developer](https://developer.spotify.com/dashboard) application.
-- A [Last.fm API key](https://www.last.fm/api/account/create).
-
-Spotify playback control requires a Spotify Premium account. Development Mode apps must also allow-list every Spotify account that will sign in.
-
-### 1. Install and configure
+Requirements: Node 22+ (`.nvmrc`), npm 10+, Docker (PostgreSQL 16 + Redis 7),
+a [Spotify Developer app](https://developer.spotify.com/dashboard), and a
+[Last.fm API key](https://www.last.fm/api/account/create).
 
 ```bash
 npm install
-
 cp .env.example .env
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
-Set these values in `apps/api/.env`:
-
-```dotenv
-SPOTIFY_CLIENT_ID=
-SPOTIFY_CLIENT_SECRET=
-LASTFM_API_KEY=
-JWT_SECRET=replace-with-a-long-random-value
-```
-
-Use this exact Spotify redirect URI:
-
-```text
-http://127.0.0.1:3000/api/auth/spotify/callback
-```
-
-Required Spotify scopes:
-
-```text
-user-read-email user-read-private
-playlist-modify-public playlist-modify-private
-ugc-image-upload
-user-read-playback-state user-modify-playback-state
-```
-
-Use `127.0.0.1` consistently (not `localhost`): Spotify rejects `localhost` redirect URIs, and `FRONTEND_URL` must match the browser origin exactly for CORS and the origin check. Session cookies are always `Secure`; browsers treat loopback addresses as secure contexts.
-
-### 2. Start infrastructure and prepare Prisma
+Set `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `LASTFM_API_KEY`, and
+`JWT_SECRET` in `apps/api/.env`. Use
+`http://127.0.0.1:3000/api/auth/spotify/callback` as the redirect URI —
+Spotify rejects `localhost`, and origins must match exactly. Required
+scopes: `user-read-email user-read-private playlist-read-private
+playlist-modify-public playlist-modify-private ugc-image-upload
+user-read-playback-state user-modify-playback-state`.
 
 ```bash
 docker compose up -d
-npm run db:generate
-npm run db:migrate
+npm run db:generate && npm run db:migrate
+npm run dev:api    # http://127.0.0.1:3000
+npm run dev:web    # http://127.0.0.1:5173
 ```
 
-The migration history is intentionally squashed while the project remains unpublished. Reset databases created from an older schema manually; no project command performs a destructive reset implicitly.
-
-### 3. Run the applications
-
-```bash
-# Terminal 1 — API
-npm run dev:api
-
-# Terminal 2 — Web
-npm run dev:web
-```
-
-Open http://127.0.0.1:5173.
-
-- API: http://127.0.0.1:3000
-- Swagger (outside production only): http://127.0.0.1:3000/api/docs
-- Health: http://127.0.0.1:3000/api/health
-
-For a one-command local start, run `npm run start`. Lifecycle logs are written to `.blendify/logs/`.
+Or `npm run start` for a one-command local start (logs in `.blendify/logs/`).
+Playback control requires Spotify Premium; Development Mode apps must
+allow-list every account that signs in.
 
 ## Commands
 
 ```bash
-npm run dev:api          # Nest watch mode
-npm run dev:web          # Vite development server
-npm run build            # build contracts, API (with Prisma Client) and web
-npm run build:api        # contracts + Prisma Client + Nest build (Railway)
-npm run build:web        # contracts + web bundle (requires VITE_API_URL)
-npm run test             # run contract, API, and web tests
-npm run test:e2e         # run the Playwright browser suite (apps/web/e2e)
-npm run lint             # ESLint + oxlint
-npm run format:check     # verify API formatting
-
-npm run db:generate      # generate Prisma Client
-npm run db:migrate       # create/apply a local Prisma migration
-npm run docker:up        # start PostgreSQL and Redis
-npm run docker:down      # stop infrastructure
-
-npm run start            # start infrastructure and both applications
-npm run stop             # stop Blendify application processes
-npm run stop:all         # stop applications and infrastructure
-npm run restart
+npm run build        # build contracts, API, and web
+npm test             # contract, API, and web tests
+npm run test:e2e     # Playwright browser suite
+npm run lint         # ESLint + oxlint
 ```
 
-## Git hooks and commit messages
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
+(`feat:`, `fix:`, `docs:`, …), enforced by Husky + commitlint; pre-commit and
+pre-push also run lint.
 
-This repo uses [Conventional Commits](https://www.conventionalcommits.org/) via Husky + commitlint.
+## Testing and quality
 
-After `npm install`, hooks are installed automatically (`prepare` → husky):
+Jest (API), Vitest (web + contracts), and a small Playwright suite covering
+Guest bootstrap, generation, Soundiiz transfer, and Spotify auth failure
+paths. CI runs lint, tests, a full build, and a SonarCloud scan on every pull
+request and on `main`.
 
-- **pre-commit** — runs `npm run lint` and blocks the commit if lint fails.
-- **commit-msg** — requires a Conventional Commit subject (for example `feat: …`, `fix: …`, `docs: …`).
-- **pre-push** — runs lint again and validates every commit about to be pushed.
+## Deployment
 
-Examples:
+Cloudflare Workers serves the web SPA; the API runs on Railway with private
+PostgreSQL and Redis. GitHub Actions runs CI and deploys the web app;
+Railway deploys the API on its own GitHub trigger once CI passes. Full
+topology, environment variables, IaC, backups, and rollback procedures are
+documented in [`docs/deployment.md`](docs/deployment.md).
 
-```text
-feat: add discover-by-track fallbacks
-fix: encode Last.fm plus signs for similar artists
-docs: add product screenshots to the README
-chore: configure SonarCloud in CI
-```
+## External services
 
-To skip hooks locally in an emergency only: `HUSKY=0 git commit …` (not recommended).
+Spotify Web API (catalog, playback, publishing), Last.fm API (discovery
+data), and [Soundiiz](https://soundiiz.com) (Guest playlist transfer to
+Spotify or another service). Blendify credits Spotify and Last.fm wherever
+their data is shown, per each provider's terms.
 
-## Operational notes
+## Security & privacy
 
-### Spotify quota
-
-Spotify Development Mode has a strict rolling request budget. Blendify limits pressure through Redis-backed search/catalog caches, sequential resolution, lazy suggestions, typed quota errors, and opt-in Library synchronization.
-
-Generation limits:
-
-- 12 artists per Artist Mix.
-- 5 genres per Genre Mix.
-- 50 tracks per playlist.
-- `floor(50 / seedCount)` tracks per seed.
-
-### Cache and resilience
-
-Redis stores external catalog responses and uses append-only persistence in Docker Compose. If Redis is unavailable, the API falls back to an in-memory cache so temporary infrastructure failures do not take down the application.
-
-### API access
-
-Catalog and generation work without a Spotify session. Everything tied to a Spotify account requires one.
-
-| Access | Routes |
-| --- | --- |
-| Public | `GET /api/health`, `GET /api/auth/spotify`, `GET /api/auth/spotify/callback`, `GET /api/auth/me` (returns `{ "user": null }` without a session), `POST /api/auth/logout` |
-| Public, optional session | `GET /api/artists/search`, `GET /api/artists/similar`, `POST /api/artists/resolve`, `GET /api/tracks/search`, `POST /api/generate/mix`, `POST /api/generate/discover`, `POST /api/transfers` (only when `GUEST_TRANSFER_ENABLED=true`, otherwise `404`) |
-| Public, no session lookup | `GET /api/genres`, `GET /api/genres/search`, `GET /api/genres/explore` |
-| Spotify session required | `POST /api/playlists/mix`, `POST /api/playlists/discover`, `GET /api/playlists`, `GET/PATCH/DELETE /api/playlists/:id`, `POST /api/playlists/bulk`, `GET/DELETE /api/stats`, `GET /api/player/devices`, `POST /api/player/play` |
-
-- On public routes the session is only used to identify the caller for rate limiting. A missing, expired, invalid, or orphaned session counts as anonymous; it never produces a `401`. An unexpected failure while reading the session also falls back to anonymous and logs a throttled `auth.optional_session_failed` warning.
-- `POST /api/generate/mix` and `POST /api/generate/discover` accept the same bodies as their `/api/playlists/*` counterparts without `coverImageBase64` and `persistToLibrary` (unknown fields are rejected). They return the generated playlist (`name`, `description`, `generation`, `seeds`, `tracks`, optional `coverCandidateUrl`, and `transfer`) and never publish to Spotify, save to the Library, or record usage statistics. With `Accept: application/x-ndjson` they stream `progress` events (no `publishing` phase) followed by a terminal `result` or `error` event.
-- `transfer` is `{ token, expiresAt }` or `null`. It is `null` when Guest transfer is disabled or the playlist cannot be offered for transfer; generation itself still succeeded. The token is a signed, one-hour transfer token that carries only the playlist title, description, and each track's title, credited artists, and ISRC. It holds no user, session, Spotify ID, URL, or recipe data, and can be reused until it expires.
-- `POST /api/transfers` takes `{ "transferToken": "..." }` (no other fields) and returns `{ url, expiresAt, trackCount }`. Blendify sends the tokenized playlist to the public [Soundiiz Playlist Import API](https://support.soundiiz.com/hc/en-us/articles/36613501259922--API-Let-your-users-import-any-tracklist-to-Soundiiz) and returns its import link. The link opens a page hosted by Soundiiz, expires after about 24 hours, and the user picks the destination service and completes the transfer there. Blendify does not create any playlist in the destination service. Errors: `400 TRANSFER_TOKEN_INVALID`, `410 TRANSFER_TOKEN_EXPIRED` (generate the playlist again), `422 TRANSFER_PLAYLIST_REJECTED`, `503 TRANSFER_PROVIDER_UNAVAILABLE` (with `Retry-After`). Blendify never retries the Soundiiz request automatically.
-- Guest transfer is gated by `GUEST_TRANSFER_ENABLED` (default `false`). Public production enablement is pending a review of the Spotify Developer Policy (transfer of catalog-based Guest playlists to other services).
-- `POST /api/playlists/mix` and `POST /api/playlists/discover` keep their Spotify Mode meaning: generate, publish to Spotify, save to the Library when requested, and record usage statistics.
-- Mutating requests must carry an `Origin` (or `Referer`) matching `FRONTEND_URL`, and CORS only admits that origin. This protects signed-in browsers against cross-site requests; it is not an abuse control, since non-browser clients can set any header. Abuse control for public routes comes from the request protection below.
-
-### Request protection
-
-Catalog, generation, and transfer routes are protected by Redis-backed limits that work across API instances:
-
-- Rate limits per bucket, keyed by user ID when signed in and by client IP otherwise: `search` (artist and track search), `similar` (similar artists), `resolve` (artist name resolution), `generation` (`/api/playlists/mix|discover` and `/api/generate/mix|discover`), and `transfer` (`/api/transfers`, 10 per 10 minutes by default). Curated genre routes serve local data with no external provider cost and are intentionally not rate limited. Rejections return `429 RATE_LIMITED` with `Retry-After`. Defaults live in code; `RATE_LIMIT_OVERRIDES` accepts `bucket=limit/windowSeconds` entries (for example `generation=20/600,search=120/60`) and invalid values stop the API at startup.
-- Generation concurrency per client and globally (`GENERATION_CONCURRENCY_PER_CLIENT`, `GENERATION_CONCURRENCY_GLOBAL`). Permits are renewable Redis leases, released when the generation finishes or fails; a crashed process frees its permits when the lease expires. Rejections return `429 CONCURRENCY_LIMITED` or `503 CAPACITY_EXCEEDED`.
-- Request bodies default to 16 KB; Library bulk actions allow 64 KB, Spotify Mode generation (with cover upload) 512 KB, public generation (`/api/generate/*`) 32 KB, and transfer (`/api/transfers`) 64 KB. Oversized bodies return `413 PAYLOAD_TOO_LARGE`.
-
-When Redis is unavailable outside production, limits fall back to process memory. In production they never do: `search` and `similar` stay available (fail-open, with throttled warnings), while `resolve`, generation, and transfer return `503 SERVICE_UNAVAILABLE` until Redis recovers. The Redis connection reconnects automatically.
-
-Client IP comes from Express `req.ip`. `TRUST_PROXY` defaults to `false`, so forwarded headers are ignored; set a hop count or the proxy addresses/CIDRs for the deployed topology (`true` is rejected). The resolved address must be a valid IP; otherwise the socket address is used. IPv4-mapped IPv6 addresses are normalized; IPv6 clients are keyed by full address, not by /64 prefix.
-
-### Logging
-
-Outbound Spotify, Last.fm, Soundiiz, and token-refresh calls use structured JSON logging. Tokens, secrets, API keys, and sensitive query parameters are redacted before output. Soundiiz calls log only method, URL, status, and duration: never the tracklist, transfer token, or import link. `transfer.created` and `transfer.failed` events record track counts, failure category, and upstream status.
-
-### Provider attribution
-
-Spotify and Last.fm each require their own visible credit, and Blendify keeps them separate so that neither reads as a joint or endorsed product.
-
-- **Spotify.** Generated results credit Spotify for track details and cover artwork with the official monochrome logo. The brand files and their sources are recorded in [`apps/web/src/assets/spotify/SOURCE.md`](apps/web/src/assets/spotify/SOURCE.md).
-- **Last.fm.** The [Last.fm API Terms of Service](https://www.last.fm/api/tos) (clauses 2.7 and 4.2.2) require crediting Last.fm and linking back to it wherever Last.fm data is used. Blendify shows a text credit that links to Last.fm in the two places where Last.fm contributes: the similar-artist suggestions (linking to the seed artist's Last.fm catalogue page, as clause 2.7 asks for pages that display artist information) and the generated playlist result, in both Guest and Spotify Mode.
-
-No Last.fm logo or button is used. The `powered by AudioScrobbler` buttons and the Brand Guidelines that the terms point to at `http://www.last.fm/resources/` are no longer published (the page returns 404), and clause 7.1 makes any use of Last.fm marks conditional on prior written approval. Text credit is used until an official asset and approval are available.
-
-
-## Product tour
-
-### Build a mix
-
-Choose artists or genres, tune familiarity, size, order, and cover artwork, then publish the result directly to Spotify.
-
-<p align="center">
-  <a href="docs/media/mix-artists.webp">
-    <img src="docs/media/mix-artists.webp" alt="Creating an Artist Mix in Blendify" width="49%" />
-  </a>
-  <a href="docs/media/mix-genres.webp">
-    <img src="docs/media/mix-genres.webp" alt="Creating a Genre Mix in Blendify" width="49%" />
-  </a>
-</p>
-
-### Discover related music
-
-Start from an artist or a song and generate a playlist around its musical neighborhood.
-
-<p align="center">
-  <a href="docs/media/discover-artist.webp">
-    <img src="docs/media/discover-artist.webp" alt="Discovering music from an artist in Blendify" width="49%" />
-  </a>
-  <a href="docs/media/discover-track.webp">
-    <img src="docs/media/discover-track.webp" alt="Discovering music from a song in Blendify" width="49%" />
-  </a>
-</p>
-
-### Keep and understand your playlists
-
-The Library keeps generated playlists available for preview and management, while Stats summarizes the artists and genres used over time.
-
-<p align="center">
-  <a href="docs/media/library.webp">
-    <img src="docs/media/library.webp" alt="Blendify playlist Library" width="49%" />
-  </a>
-  <a href="docs/media/stats.webp">
-    <img src="docs/media/stats.webp" alt="Blendify usage statistics" width="49%" />
-  </a>
-</p>
-
-Click any screenshot to open it at full size. Media capture and optimization conventions are documented in [`docs/media/README.md`](docs/media/README.md).
-
-## Quality analysis
-
-CI sends TypeScript analysis and test coverage from the API, web app, and shared contracts to [SonarCloud](https://sonarcloud.io/summary/new_code?id=camilasabino_Blendify). The project settings live in [`sonar-project.properties`](sonar-project.properties).
-
-To enable scans, add an Actions repository secret named `SONAR_TOKEN` containing a SonarCloud analysis token. The token used by the public status badge is not the analysis token.
-
-**Required:** disable SonarCloud Automatic Analysis so CI-based scans can run (they cannot run together). In the project: **Administration → Analysis Method → turn off Automatic Analysis**.
-
-## Security
-
-- Spotify access and refresh tokens are stored only in PostgreSQL.
-- Browser authentication uses the HTTP-only `blendify_session` cookie.
-- HTTP responses use one normalized error envelope.
-- External-call logs redact credentials and secrets.
-- Environment files stay outside version control; rotate all example secrets before deployment.
+- Spotify tokens live only in PostgreSQL; the browser holds only an
+  HTTP-only, `Secure` session cookie.
+- One normalized error envelope for every API response; outbound logs redact
+  credentials and secrets.
+- Account deletion is self-service and cascades immediately.
+- See the [privacy policy](https://blendify.camilasabino.dev/privacy) and
+  [`docs/deployment.md`](docs/deployment.md) for the full security model.
 
 ## Status
 
-Blendify is pre-release software. Database and HTTP contracts may change before the first public version.
+Live in production and actively maintained. Internal APIs and data contracts
+may continue to evolve.
 
 ## License
 
-Private and unlicensed.
+All rights reserved. No open-source license is granted for reuse or
+redistribution.

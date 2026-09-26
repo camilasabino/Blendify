@@ -160,10 +160,10 @@ short SHA as the deploy message.
 | Build variable | `VITE_API_URL=https://api.blendify.camilasabino.dev` |
 | Node version | from `.nvmrc` (22) |
 
-### 3.3 HTTP → HTTPS (pending manual Cloudflare task)
+### 3.3 HTTP → HTTPS
 
-`http://blendify.camilasabino.dev/` currently answers `200` instead of
-redirecting. The intended fix is a **scoped** Redirect Rule on the zone:
+`http://blendify.camilasabino.dev/` redirects to `https://` with a `301`
+via a **scoped** Cloudflare Redirect Rule on the zone:
 
 | Field | Value |
 |---|---|
@@ -174,8 +174,9 @@ redirecting. The intended fix is a **scoped** Redirect Rule on the zone:
 
 Zone-wide "Always Use HTTPS" must stay **off**: it would change unrelated
 `camilasabino.dev` traffic. The Wrangler OAuth credentials only hold
-`zone:read`, so Redirect Rules cannot be created from the CLI; this is a
-dashboard action.
+`zone:read`, so Redirect Rules cannot be created from the CLI; this rule is a
+dashboard action and does not survive `wrangler` deploys touching DNS/zone
+settings.
 
 `VITE_API_URL` is a **build** variable, not a runtime variable: Vite compiles
 it into the bundle. A production build fails when it is missing, not an
@@ -904,66 +905,6 @@ If all anonymous callers share one identity, new connections get a fresh
 bucket, or the spoofed header changes the identity, stop: correct
 `CLIENT_IP_SOURCE` from the observed chain and repeat.
 
-### 13.1 Production validation record (M10, Guest transfer still disabled)
-
-Full run against the live production URLs, API revision `84654c2` (the deploy
-built from that commit; `750ee9f` was correctly `SKIPPED` as a
-docs/`.railway` change), frontend Worker version
-`5ad815ca-43d1-49f5-93eb-683a74d55794` built from `750ee9f`.
-
-| Area | Result |
-|---|---|
-| Frontend | `/`, `/app/mix`, `/app/discover`, `/privacy`, arbitrary routes all serve `index.html` with 200; security headers and immutable asset caching as in section 3; no horizontal overflow at 320, 390 or 1280 px; no console errors |
-| Frontend bundle | Contains `https://api.blendify.camilasabino.dev`; no localhost API fallback |
-| API | `/api/health` 200 with `database: up`; custom domain active |
-| Guest catalog | Artist search, track search, genre list and genre search all answer with Spotify `externalUrl` per item |
-| Guest generation | One Mix, two seeds × 3 tracks: NDJSON progress rendered to completion, 6 tracks, every track linked to Spotify, cover artwork linked to its own Spotify resource, recipe summary shown, `transfer: null`, no transfer CTA anywhere |
-| Guest protected pages | `/app/library` and `/app/stats` redirect to Mix with the Connect Spotify notice |
-| Spotify OAuth | Full flow through `https://api.blendify.camilasabino.dev/api/auth/spotify/callback`, landing authenticated on `/app/mix`; no redirect-URI, client or state error |
-| Session cookie | `blendify_session` on `api.blendify.camilasabino.dev` (host-only, no `Domain`), `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, 7-day expiry |
-| Spotify Mode | One Mix (5 tracks) and one Discover (15 tracks) generated and published to Spotify; both reachable by their `open.spotify.com/playlist/...` links; no Guest transfer path in the authenticated UI |
-| Library | Both new playlists listed with correct kind, track count and duration; the only artwork shown is each playlist's own Spotify playlist image (`ab67706c…` mosaic), no catalog artist or album artwork reused as a cover |
-| Stats | Loads with coherent counters; `GET /api/stats` 200; no Spotify artist photos |
-| Logout | Session cookie removed, Spotify-only navigation gone, Library and Stats back to Guest behavior, Guest Mix still usable |
-| CORS | `Access-Control-Allow-Origin` is always exactly the production origin for a correct, foreign (`https://evil.example`) or sibling (`https://x.camilasabino.dev`) `Origin` and for no `Origin`; never `*`, never reflected; preflight identical |
-| CSRF | State-changing requests: production `Origin` allowed, missing `Origin` 403, `https://evil.example` 403, `https://x.camilasabino.dev` 403 |
-| Guest transfer gate | `POST /api/transfers` with the production `Origin` → `404`; with any other or no `Origin` → `403` from the CSRF guard before the gate |
-| Client IP / rate limit | See section 5: one identity per client across new and reused connections, forged `X-Forwarded-For` and `X-Real-IP` ineffective, a single identity hash in every rejection log line |
-| Logs | No `Authorization` headers, cookies, session or Spotify tokens, transfer URLs, or provider response bodies; only `{type, method, url, status, durationMs}` for outbound calls and hashed identities for limiter events; no Redis, database, `store_unavailable` or `invalid_client_ip` events |
-| Railway | Deployment `SUCCESS`, one production GitHub trigger, PostgreSQL and Redis private, `GUEST_TRANSFER_ENABLED=false`, `CLIENT_IP_SOURCE=railway-x-forwarded-for`, cost controls unchanged, `railway config plan` showing only the two known drifts from section 4.3 |
-
-Open item from this run: the HTTP → HTTPS Redirect Rule for the frontend
-(section 3.3). Resolved since: `http://blendify.camilasabino.dev` answers
-`301` to the HTTPS origin.
-
-### 13.2 Guest transfer rollout record (2026-09-26)
-
-Run against the live production URLs with `GUEST_TRANSFER_ENABLED=true`. API
-deployment `8955e618` (a redeploy of the image built from `f9a884a`, so the new
-variable reached the container; the web-only commits were correctly `SKIPPED`
-by the watch patterns), frontend Worker version `6c6e5cfa` built from
-`0dc53d3`.
-
-| Area | Result |
-|---|---|
-| API | Deployment `SUCCESS`, `/api/health` 200 with `database: up`, `GUEST_TRANSFER_ENABLED=true`, `CLIENT_IP_SOURCE=railway-x-forwarded-for`, `CLIENT_IP_DIAGNOSTICS` not set, PostgreSQL and Redis private |
-| Frontend | Worker rebuilt from `origin/main` with `VITE_API_URL=https://api.blendify.camilasabino.dev`; no localhost fallback in the bundle |
-| Guest generation | Artist Mix, two seeds × 3 tracks: 201 in ≈ 8 s, 6 tracks, `transfer` non-null, one-hour expiry, HS256 with issuer `blendify` and audience `blendify:playlist-transfer`, no destination anywhere in the payload |
-| Soundiiz payload | Only the playlist title, its description, and per track the title, the artists and the ISRC. No Spotify or session identifiers |
-| `POST /api/transfers` | 201 in ≈ 0.7 s, `url` accepted by the strict validator, `trackCount` 6, 24-hour expiry, no `destination` field |
-| Browser flow | `Prepare transfer` → `POST /api/transfers` 201 → explicit `Continue on Soundiiz` link (`target=_blank`, `rel="noopener noreferrer"`). No automatic redirect, no automatic window, no console errors |
-| Soundiiz review | Correct title and description, source `Blendify`, 6 tracks with correct artists; 38 destinations offered with none preselected |
-| Real transfer | Destination chosen on Soundiiz (Spotify): all 6 of 6 tracks transferred, expected title and description, no unmatched tracks. The destination playlist is created public by Soundiiz; Blendify sends no visibility |
-| CSRF | `POST /api/transfers`: production `Origin` reaches the endpoint, missing `Origin` 403, `https://evil.example.com` 403, `https://x.camilasabino.dev` 403 |
-| Token validation | Malformed token and tampered signature → `TRANSFER_TOKEN_INVALID`; unknown body → `VALIDATION_ERROR`. Expiry, issuer, audience, algorithm and payload shape covered by `playlist-transfer-tokens.service.spec.ts` and `guest-mode.http.spec.ts` |
-| Rate limiting | The `transfer` bucket returns `429` with `Retry-After` once 10 requests in 600 s are used, without extra provider traffic |
-| Returned-URL validation | `isSafeShareUrl` rejects foreign hosts, subdomains, ports, credentials, query strings and fragments; the adapter maps an unsafe response to `TRANSFER_PROVIDER_UNAVAILABLE` and never forwards it |
-| Logs | Only `transfer.created` with `trackCount`, `acceptedTrackCount` and `durationMs`, plus `outbound_http` for the fixed `POST https://soundiiz.com/go/import-playlist`. No transfer token, share URL, request or response body, Spotify token, `Authorization` header, cookie or secret |
-| Guest regression | Mix and Discover generate normally, artist/track/genre catalog answers, a generation that never uses transfer still works, `/api/playlists` and `/api/stats` 401 for guests |
-| Spotify Mode regression | OAuth and session work, direct publication creates the Spotify playlist, Library persists it as `COMPLETED`, Stats updates its counters, the account menu still offers logout and account deletion, and no Guest transfer path appears in the authenticated UI |
-| CORS | `Access-Control-Allow-Origin` is always exactly the production origin for correct, foreign, sibling and absent `Origin`, and on preflight; never `*`, never reflected |
-| Railway drift | `railway config plan` shows only the two known drifts from section 4.3; `GUEST_TRANSFER_ENABLED` no longer appears |
-
 ## 14. Rate limits and capacity
 
 Production starts with the M5 defaults and one API replica:
@@ -1022,6 +963,20 @@ Operational notes:
 - Blendify sends only the playlist title, its description when present, and per
   track the title, the artists and the ISRC when known. It sends no destination:
   the destination service is chosen by the user on Soundiiz.
+- Transfer tokens are HS256-signed JWTs with issuer `blendify` and audience
+  `blendify:playlist-transfer`, carrying only the playlist/track data above (no
+  user, session, or Spotify identifier), reusable until they expire.
+- The Soundiiz import URL returned to the client is validated (`isSafeShareUrl`)
+  before it is shown: foreign hosts, subdomains, ports, credentials, query
+  strings and fragments are all rejected. An unsafe response is mapped to
+  `503 TRANSFER_PROVIDER_UNAVAILABLE` and never forwarded to the browser.
+- Blendify does not send or control the destination playlist's visibility. In
+  the validated Spotify-destination transfer, the playlist Soundiiz created
+  was public; Blendify cannot currently override that.
+- The `OriginCsrfGuard` runs before the feature gate: a request from the
+  production `Origin` when the gate is off still resolves to a clean `404`,
+  but a missing or foreign `Origin` is rejected with `403` regardless of the
+  gate's state.
 - Transfer tokens, Soundiiz request and response bodies and the temporary share
   URL must never be logged (section 11). If any of them appears in the logs,
   set `GUEST_TRANSFER_ENABLED=false` until it is fixed.

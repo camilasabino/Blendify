@@ -2,7 +2,7 @@
   "name": "blendify",
   "version": "1.0.0",
   "private": true,
-  "description": "Build Spotify playlists from your favorite artists",
+  "description": "Create and discover Spotify playlists from artists, genres, or songs, with optional Soundiiz transfer",
   "workspaces": [
     "packages/*",
     "apps/*"
