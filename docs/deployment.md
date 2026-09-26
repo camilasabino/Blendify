@@ -70,10 +70,71 @@ Security headers: `apps/web/public/_headers` (copied to `dist/_headers`):
 A full resource CSP is intentionally not set: it would need an inventory of
 Spotify image hosts, Google Fonts, and the API origin, tested end to end.
 
-### 3.1 How the live frontend is deployed (Wrangler CLI)
+### 3.1 How the live frontend is deployed (GitHub Actions + Wrangler CLI)
 
 Workers Builds is **not** connected for `blendify-web`. The production Worker
-is uploaded from a local clean checkout:
+is uploaded by CI:
+
+- `.github/workflows/ci.yml` ("CI") runs on every pull request and on every
+  push to `main`: formatting, lint, unit/integration tests (contracts, API,
+  web, each on its own runner to avoid CPU contention between suites), the
+  full build, and the deterministic Playwright suite. It never deploys.
+- `.github/workflows/deploy-web.yml` ("Deploy Web") triggers via
+  `workflow_run` once "CI" finishes on `main`, and only runs its `deploy` job
+  when that CI run's conclusion is `success`. It checks out the exact commit
+  CI tested (`workflow_run.head_sha`), runs `npm run build:web` with
+  `VITE_API_URL=https://api.blendify.camilasabino.dev`, then
+  `npx wrangler@4 deploy --config apps/web/wrangler.jsonc` using the
+  `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` repository secrets
+  (section 8.1), followed by a non-destructive HTTP smoke check against
+  `https://blendify.camilasabino.dev`. A `deploy-frontend-production`
+  concurrency group (not cancel-in-progress) keeps at most one deploy
+  in-flight and prevents an older commit from deploying after a newer one.
+  Both workflows pin official Actions to their current stable major
+  (`actions/checkout@v7`, `actions/setup-node@v7`, `actions/upload-artifact@v7`
+  as of September 2026) rather than staying on the majors an earlier draft of
+  this pipeline used.
+
+**Unverified interaction with Railway's "Wait for CI" — check on first
+rollout.** Railway's Wait for CI (section 4.9) waits for every GitHub Actions
+check suite reported against a commit SHA, ignoring only checks from other
+GitHub Apps. `deploy-web.yml` is triggered by `workflow_run` against the same
+`main` commit CI just tested, and GitHub Actions runs triggered this way are
+their own check suite on that commit. Cloudflare's and Railway's own docs do
+not state whether Railway's Wait for CI also waits on a `workflow_run`
+-triggered workflow that only appears after the triggering one completes, so
+this cannot be confirmed statically. The plausible failure mode: if
+`deploy-web.yml`'s `deploy` job actually runs (CI succeeded) and then fails
+(for example, `wrangler deploy` errors), Railway's own docs say "a workflow
+that fails skips the deployment immediately" — which, if Railway is indeed
+tracking this second check suite, would also skip the Railway API deploy for
+that commit even though the API itself was fine. A skipped `deploy` job (CI
+failed, so `deploy-web.yml`'s job condition is false) is safe either way,
+since Railway's docs say a skipped/neutral workflow never blocks. **Action
+item for the first real push to `main` after this pipeline ships:** watch
+whether Railway's deployment clears as soon as "CI" succeeds, or additionally
+waits on "Deploy Web". Do not change Wait for CI or move the Railway trigger
+into GitHub Actions to preempt this — confirm the actual behavior first.
+
+**"CI" concurrency on `main` is per-commit, not shared.** PR runs use
+`group: ci-CI-<PR number>` with `cancel-in-progress: true` (a new push to the
+same PR cancels its own superseded run). Pushes to `main` use
+`group: ci-CI-main-<commit sha>` with `cancel-in-progress: false` — every
+commit on `main` gets its own group, so pushing a second commit never cancels
+the first commit's still-running "CI". Railway's own docs warn that a
+mandatory check workflow sitting in a concurrency group that cancels queued
+runs can get cancelled and (if another workflow on that same commit still
+succeeded) let a deployment through without it; keeping each `main` commit in
+its own group removes that risk entirely for "CI" and, by extension, for
+"Deploy Web".
+
+**Branch protection is not configured yet.** `main` currently has no required
+status checks. After the first successful "CI" run on `main` (so the final,
+stable job names exist as real checks — `quality`, `test-contracts`,
+`test-api`, `test-web`, `e2e`, `sonar`), configure required status checks on
+`main` using those exact job names. Not done as part of this change.
+
+Manual deploy from a local clean checkout is still available as a fallback:
 
 ```sh
 nvm use                      # Node 22 from .nvmrc
@@ -84,11 +145,7 @@ npx wrangler@4 deploy --config apps/web/wrangler.jsonc
 
 The uploaded version records `source: wrangler` and
 `workers/triggered_by: upload` in its Cloudflare metadata, with the commit
-short SHA as the deploy message. There is no push-to-deploy for the SPA:
-every frontend release is a deliberate manual deploy.
-
-Standardizing this as GitHub Actions + Wrangler across the author's projects
-is a follow-up, not part of this milestone.
+short SHA as the deploy message.
 
 ### 3.2 Workers Builds (not active; reference for a future switch)
 
@@ -581,6 +638,40 @@ set in Railway service variables (sealed) and declared there with
 |---|---|---|---|
 | `VITE_API_URL` | Yes (build fails otherwise) | No, public | `https://api.blendify.camilasabino.dev` |
 
+### 8.1.1 GitHub Actions secrets and variables (repository level)
+
+| Name | Kind | Required for | Notes |
+|---|---|---|---|
+| `SONAR_TOKEN` | Secret | `ci.yml` sonar job | Already configured |
+| `CLOUDFLARE_API_TOKEN` | Secret | `deploy-web.yml` | Scoped token, **not** account-wide (see below) |
+| `CLOUDFLARE_ACCOUNT_ID` | Repository **variable** (`vars`, not `secrets`) | `deploy-web.yml` | Not a credential — it grants no access by itself, it just tells Wrangler which account to target. Kept out of `wrangler.jsonc` only so the workflow stays copy-pasteable |
+
+Creating `CLOUDFLARE_API_TOKEN` (Cloudflare dashboard → **Manage Account** →
+**Account API Tokens** → **Create Token** → custom token):
+
+- Scope: **Specified Workers** → select `blendify-web` only (Cloudflare's
+  granular Workers authorization, GA September 2026 — not the older
+  account-wide "Workers Scripts" permission group).
+- Role: **Editor** — allows reading, updating, deploying and renaming an
+  existing Worker (script content, settings, versions, deployments); cannot
+  create or delete Workers, cannot touch other Workers on the account.
+- No Zone / `Workers Routes` permission is needed: the custom domain
+  (`blendify.camilasabino.dev`) is already configured in the Cloudflare
+  dashboard, and per Cloudflare's docs, "after a Route or Custom Domain is
+  configured, you can deploy new Worker versions with only `Editor` access,
+  as long as the deployment does not add, update, or remove that connection."
+  `deploy-web.yml` only runs `wrangler deploy` with the existing
+  `wrangler.jsonc`; it never changes routes or the custom domain, so `Editor`
+  scoped to this one Worker is the complete minimum.
+- This intentionally supersedes the account-wide `Workers Scripts: Edit` +
+  zone `Workers Routes: Edit` token described in an earlier draft of this
+  document — that was the pre-granular-authorization model and grants far
+  more than this pipeline needs.
+
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are only referenced by the
+`deploy` job in `deploy-web.yml`, which never runs for `pull_request` events —
+PR runs only exercise `ci.yml`, which has no access to either.
+
 ### 8.2 API non-secret configuration (Railway)
 
 | Variable | Required | Production value / notes |
@@ -709,13 +800,20 @@ share URLs, full tracklists, or secrets.
 2. If `.railway/railway.ts` changed: `railway config plan`, review it
    against the known drift in section 4.3, then `railway config apply` only
    if nothing applied outside IaC would be removed.
-3. Railway's GitHub trigger (section 4.9) waits for the GitHub check suites,
-   then builds, runs the pre-deploy migration, and switches traffic after
-   `/api/health` returns 200. A commit outside the API watch patterns is
-   recorded as `SKIPPED`.
-4. Deploy the SPA manually with Wrangler (section 3.1). Workers Builds is not
-   connected, so a merge alone does not ship the frontend.
-5. Run the smoke tests (section 13).
+3. Two things happen off the same "CI" check suites, independently and in no
+   required order relative to each other:
+   - Railway's GitHub trigger (section 4.9) waits for the GitHub check
+     suites, then builds, runs the pre-deploy migration, and switches traffic
+     after `/api/health` returns 200. A commit outside the API watch patterns
+     is recorded as `SKIPPED`.
+   - GitHub Actions' `deploy-web.yml` (section 3.1) waits for the "CI"
+     workflow run on `main` to conclude, and deploys the SPA with Wrangler
+     only if it succeeded.
+   Neither waits on the other: the frontend and the API are independent
+   deployables, and GitHub Actions never waits on a Railway deployment
+   (Railway's own status is not surfaced as a GitHub check, so doing so would
+   risk an ordering cycle).
+4. Run the smoke tests (section 13).
 
 First deploy order: IaC apply (section 4.4) → secrets (dashboard), Redis
 settings and PostgreSQL volume size (section 4.2) → first API deploy → API custom
