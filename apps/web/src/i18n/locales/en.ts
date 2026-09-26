@@ -378,6 +378,8 @@ export const en = {
     'Changing these settings creates a new playlist that replaces the one shown here.',
   'guestResult.temporary':
     'This playlist is temporary. It will be lost if you leave this page or refresh it.',
+  'attribution.lastfm':
+    'Music recommendations powered by',
   'guestResult.attribution':
     'Track details from',
   'guestResult.attributionWithArtwork':

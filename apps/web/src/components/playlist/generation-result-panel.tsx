@@ -15,6 +15,7 @@ import type {
   GenerationProgress,
   PlaylistDetail,
 } from '@blendify/contracts'
+import { LastFmAttribution } from '@/components/brand/lastfm-attribution'
 import { SpotifyLogo } from '@/components/brand/spotify-mark'
 import { CoverErrorNotice } from '@/components/playlist/generation-form-shared'
 import { GeneratedTrackList } from '@/components/playlist/generated-track-list'
@@ -337,6 +338,7 @@ function ReadyResult({
           onAdjust={onAdjust}
           onCreateAnother={onCreateAnother}
         />
+        <LastFmAttribution />
       </div>
       <PlaylistPreview
         mode="full"
@@ -451,6 +453,7 @@ function GuestReadyResult({
           onAdjust={onAdjust}
           onCreateAnother={onCreateAnother}
         />
+        <LastFmAttribution />
       </div>
       <GeneratedTrackList tracks={playlist.tracks} />
     </div>

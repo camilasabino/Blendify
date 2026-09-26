@@ -271,6 +271,16 @@ Client IP comes from Express `req.ip`. `TRUST_PROXY` defaults to `false`, so for
 
 Outbound Spotify, Last.fm, Soundiiz, and token-refresh calls use structured JSON logging. Tokens, secrets, API keys, and sensitive query parameters are redacted before output. Soundiiz calls log only method, URL, status, and duration: never the tracklist, transfer token, or import link. `transfer.created` and `transfer.failed` events record track counts, failure category, and upstream status.
 
+### Provider attribution
+
+Spotify and Last.fm each require their own visible credit, and Blendify keeps them separate so that neither reads as a joint or endorsed product.
+
+- **Spotify.** Generated results credit Spotify for track details and cover artwork with the official monochrome logo. The brand files and their sources are recorded in [`apps/web/src/assets/spotify/SOURCE.md`](apps/web/src/assets/spotify/SOURCE.md).
+- **Last.fm.** The [Last.fm API Terms of Service](https://www.last.fm/api/tos) (clauses 2.7 and 4.2.2) require crediting Last.fm and linking back to it wherever Last.fm data is used. Blendify shows a text credit that links to Last.fm in the two places where Last.fm contributes: the similar-artist suggestions (linking to the seed artist's Last.fm catalogue page, as clause 2.7 asks for pages that display artist information) and the generated playlist result, in both Guest and Spotify Mode.
+
+No Last.fm logo or button is used. The `powered by AudioScrobbler` buttons and the Brand Guidelines that the terms point to at `http://www.last.fm/resources/` are no longer published (the page returns 404), and clause 7.1 makes any use of Last.fm marks conditional on prior written approval. Text credit is used until an official asset and approval are available.
+
+
 ## Product tour
 
 ### Build a mix

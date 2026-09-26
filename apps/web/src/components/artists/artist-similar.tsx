@@ -7,11 +7,13 @@ import {
   type Artist,
   type SimilarArtistSuggestion,
 } from '@/lib/api'
+import { LastFmAttribution } from '@/components/brand/lastfm-attribution'
 import { SeedChip } from '@/components/ui/chip'
 import { FieldError } from '@/components/ui/feedback'
 import { Spinner } from '@/components/ui/spinner'
 import { useSuggestionSeed } from '@/hooks/use-suggestion-seed'
 import { useT } from '@/i18n/use-t'
+import { lastFmArtistUrl } from '@/lib/lastfm'
 import { cn, focusRing, normalizeArtistName } from '@/lib/utils'
 
 const PAGE_SIZE = 8
@@ -296,6 +298,11 @@ export function ArtistSimilarSuggestions({
           onLoadMore={() => setPage((p) => p + 1)}
         />
       ) : null}
+
+      <LastFmAttribution
+        href={lastFmArtistUrl(seed.name)}
+        className="border-t border-divider pt-3"
+      />
     </div>
   )
 }

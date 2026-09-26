@@ -390,6 +390,8 @@ export const es: Record<MessageKey, string> = {
     'Si cambias esta configuración, se crea una playlist nueva que reemplaza la que ves aquí.',
   'guestResult.temporary':
     'Esta playlist es temporal. Se perderá si sales de esta página o la recargas.',
+  'attribution.lastfm':
+    'Recomendaciones musicales con tecnología de',
   'guestResult.attribution':
     'Datos de las canciones de',
   'guestResult.attributionWithArtwork':

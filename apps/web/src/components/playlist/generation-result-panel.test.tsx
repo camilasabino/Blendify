@@ -129,6 +129,20 @@ describe('GenerationResultPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(props.onRetry).toHaveBeenCalledOnce()
   })
+
+  it('credits Last.fm once next to the published playlist', () => {
+    renderPanel({
+      result: { mode: 'spotify', playlist: readyPlaylist },
+      requestedTrackCount: 10,
+    })
+
+    const credits = screen.getAllByRole('link', { name: /Last\.fm/ })
+    expect(credits).toHaveLength(1)
+    expect(credits[0]).toHaveAttribute('href', 'https://www.last.fm')
+    expect(
+      screen.getByText(/Music recommendations powered by/),
+    ).toBeVisible()
+  })
 })
 
 describe('GenerationResultPanel in Guest Mode', () => {
@@ -159,6 +173,16 @@ describe('GenerationResultPanel in Guest Mode', () => {
         'This playlist is temporary. It will be lost if you leave this page or refresh it.',
       ),
     ).toBeVisible()
+  })
+
+  it('credits Last.fm alongside the Spotify track credit', () => {
+    renderGuest()
+
+    const credits = screen.getAllByRole('link', { name: /Last\.fm/ })
+    expect(credits).toHaveLength(1)
+    expect(credits[0]).toHaveAttribute('href', 'https://www.last.fm')
+    expect(screen.getByText('Track details from')).toBeVisible()
+    expect(screen.getByRole('img', { name: 'Spotify' })).toBeVisible()
   })
 
   it('links each track back to Spotify only when it has a Spotify URL', () => {
