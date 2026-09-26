@@ -13,7 +13,10 @@ export default defineRailway(() => {
   const cache = redis('redis')
 
   const api = service('api', {
-    source: github('camilasabino/Blendify', { branch: 'main' }),
+    source: github('camilasabino/Blendify', {
+      branch: 'main',
+      checkSuites: true,
+    }),
     build: {
       builder: 'RAILPACK',
       buildCommand: 'npm run build:api',
