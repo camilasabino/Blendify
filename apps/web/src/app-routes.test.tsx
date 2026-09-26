@@ -5,11 +5,13 @@ import App from '@/App'
 import { api } from '@/lib/api'
 import {
   jsonResponse,
+  pendingNdjsonResponse,
   renderWithProviders,
   setAuthState,
   stubApi,
   testUser,
 } from '@/test/app-harness'
+import { spotifyJazzPlaylist } from '@/test/playlist-fixtures'
 
 function LocationProbe() {
   const location = useLocation()
@@ -345,8 +347,8 @@ describe('Spotify Mode routing', () => {
     expect(screen.getByTestId('location')).toHaveTextContent(route)
   })
 
-  it.each(['/app/library', '/app/mix'])(
-    'logs out from %s into a usable Guest Mix',
+  it.each(['/app/library', '/app/stats', '/app/mix', '/app/discover'])(
+    'logs out from %s into the Guest landing page',
     async (route) => {
       const user = userEvent.setup()
       const { calls } = stubApi({
@@ -359,18 +361,14 @@ describe('Spotify Mode routing', () => {
       )
       await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
 
+      expect(screen.getByTestId('location')).toHaveTextContent('/')
       expect(
-        await screen.findByRole('button', { name: 'Connect Spotify' }),
+        await screen.findByRole('link', { name: 'Try Blendify' }),
       ).toBeVisible()
-      expect(screen.getByTestId('location')).toHaveTextContent('/app/mix')
       expect(
-        screen.getByRole('heading', { name: 'Create your mix' }),
-      ).toBeVisible()
-      expect(screen.queryByText('Connect Spotify to use your Library.')).toBeNull()
-      expect(screen.queryByRole('link', { name: 'Library' })).toBeNull()
-      expect(
-        screen.getByRole('button', { name: 'Generate playlist' }),
-      ).toBeInTheDocument()
+        screen.queryByRole('button', { name: 'Account menu: Camila' }),
+      ).toBeNull()
+      expect(screen.queryByRole('heading', { name: 'Create your mix' })).toBeNull()
       await waitFor(() =>
         expect(
           calls.filter((call) => call.url === '/api/auth/logout'),
@@ -378,4 +376,42 @@ describe('Spotify Mode routing', () => {
       )
     },
   )
+
+  it('aborts an in-flight generation on logout and ignores its late result', async () => {
+    const user = userEvent.setup()
+    const pending = pendingNdjsonResponse()
+    stubApi({
+      'GET /api/genres': () =>
+        jsonResponse({ genres: [{ id: 'jazz', name: 'Jazz' }] }),
+      'POST /api/playlists/mix': () => pending.response,
+      'POST /api/auth/logout': () => jsonResponse({ ok: true }),
+    })
+    const { queryClient } = renderApp('/app/mix')
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+
+    await user.click(screen.getByRole('radio', { name: 'Genres' }))
+    await user.click(await screen.findByRole('button', { name: /Jazz/ }))
+    await user.click(screen.getByRole('button', { name: 'Create playlist' }))
+    await screen.findByText('Creating your playlist')
+
+    await user.click(
+      screen.getByRole('button', { name: 'Account menu: Camila' }),
+    )
+    await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/')
+    await screen.findByRole('link', { name: 'Try Blendify' })
+
+    // The generation resolves after logout already completed; its result
+    // must not resurrect the authenticated UI or update stale caches.
+    pending.push({ type: 'result', playlist: spotifyJazzPlaylist })
+    pending.close()
+    await Promise.resolve()
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/')
+    expect(
+      screen.queryByRole('button', { name: 'Account menu: Camila' }),
+    ).toBeNull()
+    expect(invalidateSpy).not.toHaveBeenCalled()
+  })
 })

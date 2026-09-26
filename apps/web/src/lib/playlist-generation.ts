@@ -22,6 +22,7 @@ export type GenerationRun<TRequest> = {
   request: TRequest
   publication: SpotifyPublication
   onProgress?: GenerationProgressHandler
+  signal?: AbortSignal
 }
 
 export async function runMixGeneration({
@@ -29,15 +30,16 @@ export async function runMixGeneration({
   request,
   publication,
   onProgress,
+  signal,
 }: GenerationRun<GenerateMixRequest>): Promise<GenerationOutcome> {
   if (mode === 'spotify') {
     const playlist = await api.createMix(
       { ...request, ...publication },
-      { onProgress },
+      { onProgress, signal },
     )
     return { mode, playlist }
   }
-  const playlist = await api.generateMix(request, { onProgress })
+  const playlist = await api.generateMix(request, { onProgress, signal })
   return { mode, playlist }
 }
 
@@ -46,15 +48,16 @@ export async function runDiscoverGeneration({
   request,
   publication,
   onProgress,
+  signal,
 }: GenerationRun<GenerateDiscoverRequest>): Promise<GenerationOutcome> {
   if (mode === 'spotify') {
     const playlist = await api.createDiscover(
       { ...request, ...publication },
-      { onProgress },
+      { onProgress, signal },
     )
     return { mode, playlist }
   }
-  const playlist = await api.generateDiscover(request, { onProgress })
+  const playlist = await api.generateDiscover(request, { onProgress, signal })
   return { mode, playlist }
 }
 

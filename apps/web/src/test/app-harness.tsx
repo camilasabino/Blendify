@@ -15,7 +15,10 @@ export const testUser: User = {
 
 export type FetchCall = { url: string; method: string; body: unknown }
 
-type RouteHandler = (call: FetchCall) => Response | Promise<Response>
+type RouteHandler = (
+  call: FetchCall,
+  signal?: AbortSignal,
+) => Response | Promise<Response>
 
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -29,6 +32,40 @@ export function ndjsonResponse(...events: unknown[]): Response {
     `${events.map((event) => JSON.stringify(event)).join('\n')}\n`,
     { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } },
   )
+}
+
+export type PendingNdjsonStream = {
+  response: Response
+  signal?: AbortSignal
+  push: (event: unknown) => void
+  close: () => void
+}
+
+/**
+ * An NDJSON response whose body the test controls chunk-by-chunk, so a
+ * generation can be left "in flight" and later resolved or aborted on demand.
+ */
+export function pendingNdjsonResponse(signal?: AbortSignal): PendingNdjsonStream {
+  let controller: ReadableStreamDefaultController<Uint8Array>
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream<Uint8Array>({
+    start(c) {
+      controller = c
+    },
+  })
+  signal?.addEventListener('abort', () => {
+    controller.error(new DOMException('Aborted', 'AbortError'))
+  })
+  const response = new Response(stream, {
+    status: 200,
+    headers: { 'Content-Type': 'application/x-ndjson' },
+  })
+  return {
+    response,
+    signal,
+    push: (event) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`)),
+    close: () => controller.close(),
+  }
 }
 
 export function stubApi(routes: Record<string, RouteHandler>) {
@@ -49,7 +86,7 @@ export function stubApi(routes: Record<string, RouteHandler>) {
         404,
       )
     }
-    return handler(call)
+    return handler(call, init?.signal ?? undefined)
   })
   vi.stubGlobal('fetch', fetchMock)
   return { calls, fetchMock }

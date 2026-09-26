@@ -117,13 +117,17 @@ const GUEST_GENERATION: GenerationContract<GeneratedPlaylistDto> = {
   result: GeneratedPlaylistSchema,
 }
 
-type GenerationOptions = { onProgress?: GenerationProgressHandler }
+type GenerationOptions = {
+  onProgress?: GenerationProgressHandler
+  signal?: AbortSignal
+}
 
 async function requestGeneration<T>(
   path: string,
   body: unknown,
   contract: GenerationContract<T>,
   onProgress?: GenerationProgressHandler,
+  signal?: AbortSignal,
 ): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
@@ -133,6 +137,7 @@ async function requestGeneration<T>(
       Accept: 'application/x-ndjson',
     },
     body: JSON.stringify(body),
+    signal,
   })
 
   const contentType = response.headers.get('content-type') ?? ''
@@ -219,6 +224,7 @@ export const api = {
       input,
       SPOTIFY_GENERATION,
       options?.onProgress,
+      options?.signal,
     ),
 
   createDiscover: (input: CreateDiscoverRequest, options?: GenerationOptions) =>
@@ -227,6 +233,7 @@ export const api = {
       input,
       SPOTIFY_GENERATION,
       options?.onProgress,
+      options?.signal,
     ),
 
   generateMix: (input: GenerateMixRequest, options?: GenerationOptions) =>
@@ -235,6 +242,7 @@ export const api = {
       input,
       GUEST_GENERATION,
       options?.onProgress,
+      options?.signal,
     ),
 
   generateDiscover: (
@@ -246,6 +254,7 @@ export const api = {
       input,
       GUEST_GENERATION,
       options?.onProgress,
+      options?.signal,
     ),
 
   createTransfer: async (

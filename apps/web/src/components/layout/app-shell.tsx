@@ -18,6 +18,7 @@ import { readSpotifyRequiredState } from '@/lib/spotify-required'
 import { SpotifyRequiredNotice } from '@/components/layout/spotify-required-notice'
 import { Footer } from '@/components/layout/footer'
 import { ConfirmDialog } from '@/components/ui/dialog'
+import { useGenerationStore } from '@/stores/generation-store'
 import { useT } from '@/i18n/use-t'
 import type { MessageKey } from '@/i18n/messages'
 import type { SpotifyOnlyCapability } from '@/lib/capabilities'
@@ -89,23 +90,21 @@ export function AppShell() {
       ? readSpotifyRequiredState(location.state)
       : null
 
-  function leaveSpotifyOnlyRoute() {
-    const onSpotifyOnlyRoute = NAV_ITEMS.some(
-      (item) => item.requires && location.pathname.startsWith(item.to),
-    )
-    if (onSpotifyOnlyRoute) navigate('/app/mix', { replace: true })
-  }
-
   function forgetUserScopedQueries() {
     for (const queryKey of USER_SCOPED_QUERY_KEYS) {
+      queryClient.cancelQueries({ queryKey })
       queryClient.removeQueries({ queryKey })
     }
   }
 
   async function logOut() {
-    leaveSpotifyOnlyRoute()
-    await logout()
-    forgetUserScopedQueries()
+    useGenerationStore.getState().cancelActive()
+    navigate('/', { replace: true })
+    try {
+      await logout()
+    } finally {
+      forgetUserScopedQueries()
+    }
   }
 
   function openDeleteAccount() {

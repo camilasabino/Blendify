@@ -51,6 +51,7 @@ import {
   type GenerationRun,
 } from '@/lib/playlist-generation'
 import { useGenerationSettingsCollapse } from '@/hooks/use-generation-settings-collapse'
+import { isCurrentGeneration, useGenerationStore } from '@/stores/generation-store'
 
 type SeedMode = 'artist' | 'track'
 
@@ -203,12 +204,21 @@ export function DiscoverPlaylistForm() {
   )
 
   const discoverMutation = useMutation({
-    mutationFn: (run: GenerationRun<GenerateDiscoverRequest>) =>
-      runDiscoverGeneration({ ...run, onProgress: setProgress }),
+    mutationFn: (
+      run: GenerationRun<GenerateDiscoverRequest> & { epoch: number },
+    ) =>
+      runDiscoverGeneration({
+        ...run,
+        onProgress: (p) => {
+          if (isCurrentGeneration(run.epoch)) setProgress(p)
+        },
+      }),
     onMutate: () => {
       setProgress(null)
     },
-    onSuccess: (outcome) => {
+    onSuccess: (outcome, run) => {
+      useGenerationStore.getState().finish(run.epoch)
+      if (!isCurrentGeneration(run.epoch)) return
       setResult(outcome)
       setProgress(null)
       if (outcome.mode === 'spotify') {
@@ -216,7 +226,9 @@ export function DiscoverPlaylistForm() {
         void queryClient.invalidateQueries({ queryKey: ['playlists'] })
       }
     },
-    onError: () => {
+    onError: (_error, run) => {
+      useGenerationStore.getState().finish(run.epoch)
+      if (!isCurrentGeneration(run.epoch)) return
       setProgress(null)
     },
   })
@@ -337,6 +349,7 @@ export function DiscoverPlaylistForm() {
         : undefined
     }
 
+    const { epoch, signal } = useGenerationStore.getState().start()
     discoverMutation.mutate({
       mode: generationMode,
       request,
@@ -344,6 +357,8 @@ export function DiscoverPlaylistForm() {
         coverImageBase64,
         persistToLibrary: readPersistToLibraryPreference(),
       },
+      epoch,
+      signal,
     })
   }
 

@@ -72,6 +72,7 @@ import {
   type GenerationRun,
 } from '@/lib/playlist-generation'
 import { useGenerationSettingsCollapse } from '@/hooks/use-generation-settings-collapse'
+import { isCurrentGeneration, useGenerationStore } from '@/stores/generation-store'
 
 const DEFAULT_TRACKS_PER_ARTIST = 10
 const DEFAULT_TRACKS_PER_GENRE = 25
@@ -381,12 +382,19 @@ export function MixPlaylistForm() {
   )
 
   const createMutation = useMutation({
-    mutationFn: (run: GenerationRun<GenerateMixRequest>) =>
-      runMixGeneration({ ...run, onProgress: setProgress }),
+    mutationFn: (run: GenerationRun<GenerateMixRequest> & { epoch: number }) =>
+      runMixGeneration({
+        ...run,
+        onProgress: (p) => {
+          if (isCurrentGeneration(run.epoch)) setProgress(p)
+        },
+      }),
     onMutate: () => {
       setProgress(null)
     },
-    onSuccess: (outcome) => {
+    onSuccess: (outcome, run) => {
+      useGenerationStore.getState().finish(run.epoch)
+      if (!isCurrentGeneration(run.epoch)) return
       setResult(outcome)
       setProgress(null)
       if (outcome.mode === 'spotify') {
@@ -394,7 +402,9 @@ export function MixPlaylistForm() {
         void queryClient.invalidateQueries({ queryKey: ['playlists'] })
       }
     },
-    onError: () => {
+    onError: (_error, run) => {
+      useGenerationStore.getState().finish(run.epoch)
+      if (!isCurrentGeneration(run.epoch)) return
       setProgress(null)
     },
   })
@@ -545,6 +555,7 @@ export function MixPlaylistForm() {
               orderMode: values.orderMode,
             }
 
+      const { epoch, signal } = useGenerationStore.getState().start()
       createMutation.mutate({
         mode: generationMode,
         request,
@@ -552,6 +563,8 @@ export function MixPlaylistForm() {
           coverImageBase64,
           persistToLibrary: readPersistToLibraryPreference(),
         },
+        epoch,
+        signal,
       })
     } finally {
       setIsPreparing(false)
