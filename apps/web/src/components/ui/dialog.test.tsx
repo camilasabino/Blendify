@@ -108,6 +108,44 @@ describe('ConfirmDialog while busy', () => {
     expect(dialog).toHaveAttribute('open')
   })
 
+  it('survives dismissibility changes while it stays mounted', () => {
+    const onCancel = vi.fn()
+    const view = (busy: boolean) => (
+      <ConfirmDialog
+        open
+        title="Remove playlist?"
+        description="This cannot be undone."
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        danger
+        busy={busy}
+        onConfirm={vi.fn()}
+        onCancel={onCancel}
+      />
+    )
+    const { rerender } = render(view(false))
+    const dialog = document.querySelector('dialog')!
+    expect(dialog).toHaveAttribute('closedby', 'closerequest')
+
+    rerender(view(true))
+
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(dialog).toHaveAttribute('open')
+    expect(dialog).toHaveAttribute('closedby', 'none')
+
+    const cancel = new Event('cancel', { cancelable: true })
+    fireEvent(dialog, cancel)
+    expect(cancel.defaultPrevented).toBe(true)
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(dialog).toHaveAttribute('open')
+
+    rerender(view(false))
+
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(dialog).toHaveAttribute('open')
+    expect(dialog).toHaveAttribute('closedby', 'closerequest')
+  })
+
   it('lets Escape dismiss the dialog when it is not busy', () => {
     const { dialog, onCancel } = renderBusy(false)
 

@@ -5,6 +5,16 @@ export const pt: Record<MessageKey, string> = {
   'brand.description':
     'Misture artistas ou gêneros, ou comece por um artista ou uma música. O Blendify monta a playlist; conecte o Spotify para salvá-la na sua conta.',
   'nav.logOut': 'Sair',
+  'nav.deleteAccount': 'Excluir conta',
+  'account.delete.title': 'Excluir sua conta do Blendify?',
+  'account.delete.body':
+    'Isso remove sua conta do Blendify do serviço: seu perfil, os tokens do Spotify guardados para você, sua biblioteca do Blendify e suas estatísticas de uso. Não é possível desfazer.',
+  'account.delete.spotifyNote':
+    'Sua conta do Spotify não é afetada e as playlists já publicadas continuam no Spotify. O Blendify mantém o acesso que você concedeu até você removê-lo nas configurações da sua conta do Spotify.',
+  'account.delete.confirm': 'Excluir minha conta',
+  'account.delete.working': 'Excluindo sua conta…',
+  'account.delete.error':
+    'Não conseguimos excluir sua conta. Nada foi excluído; tente novamente.',
   'nav.account': 'Menu da conta',
   'nav.create': 'Misturar',
   'nav.discover': 'Descobrir',

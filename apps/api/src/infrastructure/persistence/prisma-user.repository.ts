@@ -69,6 +69,11 @@ export class PrismaUserRepository implements UserRepositoryPort {
     return row ? this.toDomain(row) : null;
   }
 
+  async deleteById(id: string): Promise<boolean> {
+    const { count } = await this.prisma.user.deleteMany({ where: { id } });
+    return count > 0;
+  }
+
   async findCredentialsById(id: string): Promise<PersistableUser | null> {
     const row = await this.prisma.user.findUnique({ where: { id } });
     if (!row) return null;

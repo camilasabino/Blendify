@@ -23,7 +23,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
     title: 'Privacy Policy',
     updated: 'Last updated: {date}',
     intro:
-      'Blendify is a personal portfolio project by Camila Sabino that builds playlists from Spotify catalog data and Last.fm recommendations. This page describes what Blendify actually stores and shares.',
+      'Blendify is an application for discovering music and building playlists from Spotify catalog data and Last.fm recommendations. This page describes what Blendify actually stores and shares.',
     sections: [
       {
         title: 'Using Blendify without a Spotify account',
@@ -57,7 +57,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         title: 'Your choices',
         paragraphs: [
           'Logging out removes the session cookie from your browser; it does not delete data stored on the server. You can delete playlists from your Blendify library at any time, and you can revoke Blendify’s access to your Spotify account from your Spotify account settings.',
-          'To have your Blendify account data deleted (profile, tokens, library and usage data), or for any privacy question, email {email}. For deletion requests, we may ask you to contact us from the email address associated with your Spotify account or otherwise verify that you own the account. Deleting the account removes all of it together, and you will get a confirmation by email.',
+          'You can delete your Blendify account yourself from the account menu in the app. Deleting it removes your profile, the Spotify tokens stored for you, your Blendify library and your usage statistics from the running service, and ends your session. It does not delete your Spotify account, does not remove playlists already published there, and does not revoke Blendify’s access to Spotify automatically: remove it from your Spotify account settings. For any privacy question, email {email}.',
         ],
       },
     ],
@@ -68,7 +68,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
     title: 'Política de privacidad',
     updated: 'Última actualización: {date}',
     intro:
-      'Blendify es un proyecto personal de portfolio de Camila Sabino que crea playlists a partir de datos del catálogo de Spotify y recomendaciones de Last.fm. Esta página describe qué guarda y comparte Blendify realmente.',
+      'Blendify es una aplicación para descubrir música y crear playlists a partir de datos del catálogo de Spotify y recomendaciones de Last.fm. Esta página describe qué guarda y comparte Blendify realmente.',
     sections: [
       {
         title: 'Usar Blendify sin una cuenta de Spotify',
@@ -102,7 +102,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         title: 'Tus opciones',
         paragraphs: [
           'Cerrar sesión elimina la cookie de sesión de tu navegador; no borra los datos guardados en el servidor. Puedes eliminar playlists de tu biblioteca de Blendify en cualquier momento y revocar el acceso de Blendify a tu cuenta desde la configuración de tu cuenta de Spotify.',
-          'Para que se eliminen los datos de tu cuenta de Blendify (perfil, tokens, biblioteca y datos de uso), o por cualquier consulta de privacidad, escribe a {email}. Para pedidos de eliminación, podemos pedirte que nos escribas desde el email asociado a tu cuenta de Spotify o que verifiques de otra forma que la cuenta es tuya. Eliminar la cuenta borra todo en conjunto y recibirás una confirmación por email.',
+          'Puedes eliminar tu cuenta de Blendify desde el menú de cuenta en la aplicación. Al eliminarla se borran del servicio en funcionamiento tu perfil, los tokens de Spotify guardados para ti, tu biblioteca de Blendify y tus estadísticas de uso, y se cierra tu sesión. No elimina tu cuenta de Spotify, no borra las playlists ya publicadas allí y no revoca automáticamente el acceso de Blendify a Spotify: quítalo desde la configuración de tu cuenta de Spotify. Por cualquier consulta de privacidad, escribe a {email}.',
         ],
       },
     ],
@@ -113,7 +113,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
     title: 'Política de privacidade',
     updated: 'Última atualização: {date}',
     intro:
-      'Blendify é um projeto pessoal de portfólio de Camila Sabino que cria playlists a partir de dados do catálogo do Spotify e recomendações do Last.fm. Esta página descreve o que o Blendify realmente armazena e compartilha.',
+      'Blendify é uma aplicação para descobrir música e criar playlists a partir de dados do catálogo do Spotify e recomendações do Last.fm. Esta página descreve o que o Blendify realmente armazena e compartilha.',
     sections: [
       {
         title: 'Usar o Blendify sem uma conta do Spotify',
@@ -147,7 +147,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         title: 'Suas escolhas',
         paragraphs: [
           'Sair remove o cookie de sessão do seu navegador; isso não apaga os dados armazenados no servidor. Você pode excluir playlists da sua biblioteca do Blendify a qualquer momento e revogar o acesso do Blendify à sua conta nas configurações da sua conta do Spotify.',
-          'Para excluir os dados da sua conta do Blendify (perfil, tokens, biblioteca e dados de uso), ou para qualquer dúvida sobre privacidade, envie um e-mail para {email}. Para pedidos de exclusão, podemos pedir que você entre em contato a partir do e-mail associado à sua conta do Spotify ou que confirme de outra forma que a conta é sua. Excluir a conta remove tudo em conjunto, e você receberá uma confirmação por e-mail.',
+          'Você pode excluir sua conta do Blendify pelo menu de conta no aplicativo. Ao excluí-la, seu perfil, os tokens do Spotify guardados para você, sua biblioteca do Blendify e suas estatísticas de uso são removidos do serviço em funcionamento, e sua sessão é encerrada. Isso não exclui sua conta do Spotify, não remove as playlists já publicadas nela e não revoga automaticamente o acesso do Blendify ao Spotify: remova-o nas configurações da sua conta do Spotify. Para qualquer dúvida sobre privacidade, envie um e-mail para {email}.',
         ],
       },
     ],

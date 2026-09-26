@@ -20,6 +20,8 @@ export interface UserRepositoryPort {
 
   findBySpotifyId(spotifyId: string): Promise<User | null>;
 
+  deleteById(id: string): Promise<boolean>;
+
   upsertWithTokens(data: PersistableUser): Promise<User>;
 
   findCredentialsById(id: string): Promise<PersistableUser | null>;

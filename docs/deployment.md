@@ -919,10 +919,32 @@ Search-result links sit next to (not inside) the `role="option"` element, are
 reachable with Tab while the list is open, and activating them never selects
 the option.
 
-## 18. Data deletion requests
+<a id="18-data-deletion-requests"></a>
 
-Contact: `contacto@camilasabino.dev` (published on `/privacy`). There is no
-self-service deletion; handle requests manually.
+## 18. Account deletion
+
+Deletion is self-service. A user signed in with Spotify opens the account menu,
+chooses **Delete account**, confirms the destructive dialog, and the API
+handles the rest:
+
+`DELETE /api/account` (authenticated, Origin-checked) deletes the `users` row
+for the session owner in a single statement. The foreign-key cascades remove
+playlists, seed usage and usage stats in the same transaction, the
+`blendify_session` cookie is cleared, and the browser returns to Guest mode. No
+developer action is required, and the published contact address is only for
+privacy questions, not for routine deletions.
+
+Operational notes:
+
+- The API logs `{"event":"account.deleted"}` and nothing else about the
+  account; there is no identifier to correlate afterwards, by design.
+- Deletion is irreversible and there is no soft delete. A user who signs in
+  again gets a new, empty account.
+- Deleted data still exists in any earlier manual `pg_dump` (section 7). Delete
+  or rotate dumps that contain the account.
+- Restoring a backup during incident recovery resurrects accounts deleted after
+  the dump was taken. After such a restore, re-check any deletion the user
+  reported between the dump and the incident.
 
 Account model (`apps/api/prisma/schema.prisma`):
 
@@ -937,7 +959,11 @@ Guest usage stores nothing in PostgreSQL. Redis holds only catalog cache and
 short-lived rate-limit/concurrency keys (at most about 10 minutes); logs hold
 only hashed identities.
 
-Procedure:
+### Manual fallback (exceptional support only)
+
+Use the SQL procedure below only when the self-service flow cannot be used —
+for example the user has lost access to their Spotify account, or the frontend
+is down during an incident. It is not the normal workflow.
 
 1. **Verify the requester.** The request must come from the email address
    stored on the account (`users.email`, the Spotify account email). If there
@@ -973,8 +999,9 @@ Procedure:
    ```
 
 5. **Sessions:** an existing `blendify_session` JWT for the deleted user stays
-   valid for up to 7 days but resolves to no user, so the browser is treated
-   as Guest. Signing in again creates a new, empty account.
+   signature-valid for up to 7 days, but every authenticated request resolves
+   the user from PostgreSQL, so it authorizes nothing and the browser is
+   treated as Guest. Signing in again creates a new, empty account.
 6. **Spotify authorization** is revoked separately by the user at
    `https://www.spotify.com/account/apps/` (Blendify's stored tokens are
    already deleted in step 3). Playlists Blendify published remain in the

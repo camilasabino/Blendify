@@ -3,6 +3,16 @@ export const en = {
   'brand.description':
     'Mix artists or genres, or start from a single artist or song. Blendify builds the playlist; connect Spotify to save it to your account.',
   'nav.logOut': 'Log out',
+  'nav.deleteAccount': 'Delete account',
+  'account.delete.title': 'Delete your Blendify account?',
+  'account.delete.body':
+    'This removes your Blendify account from the service: your profile, the Spotify tokens stored for you, your Blendify library and your usage stats. You cannot undo it.',
+  'account.delete.spotifyNote':
+    'Your Spotify account is not affected, and playlists already published stay in Spotify. Blendify keeps the access you granted until you remove it from your Spotify account settings.',
+  'account.delete.confirm': 'Delete my account',
+  'account.delete.working': 'Deleting your account…',
+  'account.delete.error':
+    'We couldn’t delete your account. Nothing was deleted — please try again.',
   'nav.account': 'Account menu',
   'nav.create': 'Mix',
   'nav.discover': 'Discover',

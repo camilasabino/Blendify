@@ -182,6 +182,114 @@ describe('Guest routing', () => {
   })
 })
 
+describe('account deletion', () => {
+  async function openConfirmation(
+    routes: Parameters<typeof stubApi>[0] = {},
+    route = '/app/library',
+  ) {
+    const user = userEvent.setup()
+    const { calls } = stubApi(routes)
+    renderApp(route)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Account menu: Camila' }),
+    )
+    await user.click(screen.getByRole('menuitem', { name: 'Delete account' }))
+    await screen.findByRole('heading', {
+      name: 'Delete your Blendify account?',
+    })
+    return { user, calls }
+  }
+
+  it('offers the action only while authenticated', async () => {
+    setAuthState(null)
+    stubApi({})
+    renderApp('/app/mix')
+
+    await screen.findByRole('button', { name: 'Connect Spotify' })
+    expect(
+      screen.queryByRole('button', { name: /Account menu/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('explains the consequences and leaves everything untouched on Cancel', async () => {
+    setAuthState(testUser)
+    const { user, calls } = await openConfirmation()
+
+    expect(
+      screen.getByText(/Your Spotify account is not affected/),
+    ).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(
+      screen.queryByRole('heading', { name: 'Delete your Blendify account?' }),
+    ).not.toBeInTheDocument()
+    expect(calls.filter((call) => call.url === '/api/account')).toHaveLength(0)
+    expect(
+      screen.getByRole('button', { name: 'Account menu: Camila' }),
+    ).toBeVisible()
+  })
+
+  it('deletes the account once and returns the app to Guest mode', async () => {
+    setAuthState(testUser)
+    let resolveDelete: (() => void) | undefined
+    const pending = new Promise<void>((resolve) => {
+      resolveDelete = resolve
+    })
+    const { user, calls } = await openConfirmation({
+      'DELETE /api/account': async () => {
+        await pending
+        return jsonResponse({ ok: true })
+      },
+    })
+
+    const confirm = screen.getByRole('button', { name: 'Delete my account' })
+    await user.click(confirm)
+    expect(confirm).toBeDisabled()
+    await user.click(confirm)
+    resolveDelete?.()
+
+    expect(
+      await screen.findByRole('button', { name: 'Connect Spotify' }),
+    ).toBeVisible()
+    const deleteCalls = calls.filter((call) => call.url === '/api/account')
+    expect(deleteCalls).toHaveLength(1)
+    expect(deleteCalls[0].method).toBe('DELETE')
+    expect(deleteCalls[0].body).toBeUndefined()
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/app/mix'),
+    )
+    expect(screen.queryByText('Connect Spotify to use your Library.')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Library' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Stats' })).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Account menu: Camila' }),
+    ).toBeNull()
+  })
+
+  it('keeps the user signed in and reports the failure', async () => {
+    setAuthState(testUser)
+    const { user } = await openConfirmation({
+      'DELETE /api/account': () =>
+        jsonResponse(
+          { statusCode: 500, code: 'INTERNAL_ERROR', message: 'nope' },
+          500,
+        ),
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'We couldn’t delete your account.',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Account menu: Camila' }),
+    ).toBeVisible()
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/library')
+  })
+})
+
 describe('Spotify Mode routing', () => {
   beforeEach(() => {
     setAuthState(testUser)

@@ -124,6 +124,12 @@ export function useAuth() {
     }
   }, [clear])
 
+  const deleteAccount = useCallback(async () => {
+    await api.deleteAccount()
+    needsRetry = false
+    clear()
+  }, [clear])
+
   return {
     user,
     isLoading,
@@ -131,6 +137,7 @@ export function useAuth() {
     isAuthenticated: Boolean(user),
     login,
     logout,
+    deleteAccount,
     refresh: refreshSession,
   }
 }

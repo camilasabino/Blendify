@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -16,6 +17,7 @@ import { ConnectSpotifyButton } from '@/components/layout/connect-spotify-button
 import { readSpotifyRequiredState } from '@/lib/spotify-required'
 import { SpotifyRequiredNotice } from '@/components/layout/spotify-required-notice'
 import { Footer } from '@/components/layout/footer'
+import { ConfirmDialog } from '@/components/ui/dialog'
 import { useT } from '@/i18n/use-t'
 import type { MessageKey } from '@/i18n/messages'
 import type { SpotifyOnlyCapability } from '@/lib/capabilities'
@@ -70,7 +72,10 @@ const tabLinkClass = ({ isActive }: { isActive: boolean }) =>
   )
 
 export function AppShell() {
-  const { user, logout } = useAuth()
+  const { user, logout, deleteAccount } = useAuth()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteFailed, setDeleteFailed] = useState(false)
   const capabilities = useCapabilities()
   const location = useLocation()
   const navigate = useNavigate()
@@ -84,14 +89,51 @@ export function AppShell() {
       ? readSpotifyRequiredState(location.state)
       : null
 
-  async function logOut() {
+  function leaveSpotifyOnlyRoute() {
     const onSpotifyOnlyRoute = NAV_ITEMS.some(
       (item) => item.requires && location.pathname.startsWith(item.to),
     )
     if (onSpotifyOnlyRoute) navigate('/app/mix', { replace: true })
-    await logout()
+  }
+
+  function forgetUserScopedQueries() {
     for (const queryKey of USER_SCOPED_QUERY_KEYS) {
       queryClient.removeQueries({ queryKey })
+    }
+  }
+
+  async function logOut() {
+    leaveSpotifyOnlyRoute()
+    await logout()
+    forgetUserScopedQueries()
+  }
+
+  function openDeleteAccount() {
+    setDeleteFailed(false)
+    setDeleteOpen(true)
+  }
+
+  function cancelDeleteAccount() {
+    if (deleting) return
+    setDeleteOpen(false)
+    setDeleteFailed(false)
+  }
+
+  async function confirmDeleteAccount() {
+    if (deleting) return
+    const startedAt = location.pathname
+    setDeleting(true)
+    setDeleteFailed(false)
+    leaveSpotifyOnlyRoute()
+    try {
+      await deleteAccount()
+      setDeleteOpen(false)
+      forgetUserScopedQueries()
+    } catch {
+      navigate(startedAt, { replace: true, state: null })
+      setDeleteFailed(true)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -149,6 +191,7 @@ export function AppShell() {
                   displayName={user?.displayName}
                   imageUrl={user?.imageUrl}
                   onLogOut={() => void logOut()}
+                  onDeleteAccount={openDeleteAccount}
                 />
               </>
             ) : null}
@@ -185,6 +228,21 @@ export function AppShell() {
       </main>
 
       <Footer />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title={t('account.delete.title')}
+        description={t('account.delete.body')}
+        details={t('account.delete.spotifyNote')}
+        error={deleteFailed ? t('account.delete.error') : null}
+        confirmLabel={t('account.delete.confirm')}
+        cancelLabel={t('common.cancel')}
+        workingLabel={t('account.delete.working')}
+        danger
+        busy={deleting}
+        onCancel={cancelDeleteAccount}
+        onConfirm={() => void confirmDeleteAccount()}
+      />
     </div>
   )
 }

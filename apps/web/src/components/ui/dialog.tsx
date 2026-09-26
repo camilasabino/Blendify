@@ -43,7 +43,6 @@ function Dialog({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null
-    dialog.setAttribute('closedby', dismissible ? 'closerequest' : 'none')
     if (!dialog.open) dialog.showModal()
     const frame = window.requestAnimationFrame(() => {
       const target =
@@ -57,7 +56,13 @@ function Dialog({
       if (dialog.open) dialog.close()
       if (trigger?.isConnected) trigger.focus()
     }
-  }, [open, initialFocusRef, dismissible])
+  }, [open, initialFocusRef])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog || !open) return
+    dialog.setAttribute('closedby', dismissible ? 'closerequest' : 'none')
+  }, [open, dismissible])
 
   return createPortal(
     <dialog
@@ -99,6 +104,8 @@ export type ConfirmDialogProps = Readonly<{
   open: boolean
   title: string
   description: string
+  details?: string
+  error?: string | null
   confirmLabel: string
   cancelLabel?: string
   workingLabel?: string
@@ -112,6 +119,8 @@ export function ConfirmDialog({
   open,
   title,
   description,
+  details,
+  error,
   confirmLabel,
   cancelLabel,
   workingLabel,
@@ -135,6 +144,14 @@ export function ConfirmDialog({
       title={title}
     >
       <p className="text-sm leading-relaxed text-cream-300">{description}</p>
+      {details ? (
+        <p className="mt-2 text-sm leading-relaxed text-cream-400">{details}</p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="mt-3 text-sm leading-relaxed text-danger">
+          {error}
+        </p>
+      ) : null}
       {busy && workingLabel ? (
         <output
           className="mt-3 flex items-center gap-2 text-sm text-accent-fg"

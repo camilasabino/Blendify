@@ -1,5 +1,5 @@
 import { useEffect, useId, type KeyboardEvent } from 'react'
-import { LogOut, Music2 } from 'lucide-react'
+import { LogOut, Music2, Trash2 } from 'lucide-react'
 import { SpotifyIcon } from '@/components/brand/spotify-mark'
 import { usePopover, popoverSurfaceClass } from '@/hooks/use-popover'
 import { useT } from '@/i18n/use-t'
@@ -9,12 +9,14 @@ type AccountMenuProps = Readonly<{
   displayName?: string
   imageUrl?: string | null
   onLogOut: () => void
+  onDeleteAccount: () => void
 }>
 
 export function AccountMenu({
   displayName,
   imageUrl,
   onLogOut,
+  onDeleteAccount,
 }: AccountMenuProps) {
   const t = useT()
   const menuId = useId()
@@ -38,6 +40,11 @@ export function AccountMenu({
   function logOut() {
     popover.close(false)
     onLogOut()
+  }
+
+  function deleteAccount() {
+    popover.close(false)
+    onDeleteAccount()
   }
 
   return (
@@ -107,6 +114,17 @@ export function AccountMenu({
           >
             <LogOut aria-hidden className="size-4 text-cream-400" />
             {t('nav.logOut')}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            data-popover-item
+            onClick={deleteAccount}
+            className="mt-1 flex w-full items-center gap-2.5 border-t border-divider px-3 py-2 text-left text-sm text-danger transition-colors first:mt-0 hover:bg-hover focus-visible:bg-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+          >
+            <Trash2 aria-hidden className="size-4" />
+            {t('nav.deleteAccount')}
           </button>
         </div>
       ) : null}

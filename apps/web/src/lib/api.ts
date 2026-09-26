@@ -169,6 +169,9 @@ export const api = {
 
   logout: () => request<OkResponse>('/api/auth/logout', { method: 'POST' }),
 
+  deleteAccount: () =>
+    request<OkResponse>('/api/account', { method: 'DELETE' }),
+
   loginUrl: () => `${API_BASE}/api/auth/spotify`,
 
   searchArtists: (q: string) =>

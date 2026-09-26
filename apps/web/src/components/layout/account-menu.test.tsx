@@ -4,13 +4,14 @@ import { MemoryRouter } from 'react-router-dom'
 import { useLocaleStore } from '@/i18n/use-locale'
 import { AccountMenu } from './account-menu'
 
-function renderMenu(onLogOut = vi.fn()) {
+function renderMenu(onLogOut = vi.fn(), onDeleteAccount = vi.fn()) {
   render(
     <MemoryRouter>
       <AccountMenu
         displayName="camila"
         imageUrl="https://example.com/avatar.jpg"
         onLogOut={onLogOut}
+        onDeleteAccount={onDeleteAccount}
       />
       <button type="button">Outside</button>
     </MemoryRouter>,
@@ -18,6 +19,7 @@ function renderMenu(onLogOut = vi.fn()) {
   return {
     trigger: screen.getByRole('button', { name: 'Account menu: camila' }),
     onLogOut,
+    onDeleteAccount,
   }
 }
 
@@ -37,7 +39,9 @@ describe('AccountMenu', () => {
       'camila',
     )
     expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus()
-    expect(screen.getAllByRole('menuitem')).toHaveLength(1)
+    expect(
+      screen.getAllByRole('menuitem').map((item) => item.textContent),
+    ).toEqual(['Log out', 'Delete account'])
   })
 
   it('logs out through the provided handler', async () => {
@@ -48,6 +52,17 @@ describe('AccountMenu', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
 
     expect(onLogOut).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('asks the shell to start account deletion', async () => {
+    const user = userEvent.setup()
+    const { trigger, onDeleteAccount } = renderMenu()
+
+    await user.click(trigger)
+    await user.click(screen.getByRole('menuitem', { name: 'Delete account' }))
+
+    expect(onDeleteAccount).toHaveBeenCalledOnce()
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
