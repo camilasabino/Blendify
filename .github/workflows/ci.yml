@@ -43,6 +43,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run prisma:generate -w @blendify/api
       - run: npm run format:check
       - run: npm run lint
       - run: npm run build
