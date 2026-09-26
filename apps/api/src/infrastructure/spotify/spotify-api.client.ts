@@ -7,7 +7,10 @@ import axios, {
 } from 'axios';
 import { BusinessRuleError } from '../../domain/errors/business-rule.error';
 import { SpotifyTokenService } from '../auth/spotify-token.service';
-import { attachOutboundHttpLogging } from '../http/outbound-http.logging';
+import {
+  attachOutboundHttpLogging,
+  type OutboundHttpLoggingOptions,
+} from '../http/outbound-http.logging';
 import { createSpotifyQuotaError } from './spotify-quota-error';
 import { attachSpotifyRateLimit } from './spotify-rate-limit';
 
@@ -19,12 +22,15 @@ export class SpotifyApiClient {
   private readonly logger = new Logger(SpotifyApiClient.name);
   private readonly api: AxiosInstance;
 
-  constructor(private readonly tokenService: SpotifyTokenService) {
+  constructor(
+    private readonly tokenService: SpotifyTokenService,
+    loggingOptions?: OutboundHttpLoggingOptions,
+  ) {
     this.api = axios.create({
       baseURL: 'https://api.spotify.com/v1',
       timeout: 20_000,
     });
-    attachOutboundHttpLogging(this.api);
+    attachOutboundHttpLogging(this.api, loggingOptions);
     attachSpotifyRateLimit(this.api, this.logger);
   }
 

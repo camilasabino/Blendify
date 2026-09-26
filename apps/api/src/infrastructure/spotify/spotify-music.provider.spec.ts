@@ -1,5 +1,6 @@
 import type { ConfigService } from '@nestjs/config';
 import type { SpotifyTokenService } from '../auth/spotify-token.service';
+import { SpotifyApiClient } from './spotify-api.client';
 import type { SpotifyAppTokenProvider } from './spotify-app-token.provider';
 import { SpotifyMusicProvider } from './spotify-music.provider';
 
@@ -15,14 +16,17 @@ jest.mock('./spotify-api.client', () => ({
   })),
 }));
 
-function createProvider(defaultMarket?: string) {
+function createProvider(defaultMarket?: string, nodeEnv?: string) {
   const appTokens = {
     getAccessToken: jest.fn(() => Promise.resolve('app-token')),
     invalidate: jest.fn(),
   };
+  const env: Record<string, string | undefined> = {
+    SPOTIFY_CATALOG_MARKET: defaultMarket,
+    NODE_ENV: nodeEnv,
+  };
   const config = {
-    get: (key: string) =>
-      key === 'SPOTIFY_CATALOG_MARKET' ? defaultMarket : undefined,
+    get: (key: string) => env[key],
   } as unknown as ConfigService;
   const provider = new SpotifyMusicProvider(
     {} as SpotifyTokenService,
@@ -77,5 +81,25 @@ describe('SpotifyMusicProvider', () => {
 
     expect(userProvider).not.toHaveProperty('searchArtists');
     expect(typeof userProvider.createPlaylist).toBe('function');
+  });
+
+  it('does not log Spotify response bodies in production', () => {
+    jest.mocked(SpotifyApiClient).mockClear();
+
+    createProvider('AR', 'production');
+
+    expect(jest.mocked(SpotifyApiClient).mock.calls[0][1]).toEqual({
+      logBodies: false,
+    });
+  });
+
+  it('keeps Spotify response bodies outside production', () => {
+    jest.mocked(SpotifyApiClient).mockClear();
+
+    createProvider('AR', 'development');
+
+    expect(jest.mocked(SpotifyApiClient).mock.calls[0][1]).toEqual({
+      logBodies: true,
+    });
   });
 });

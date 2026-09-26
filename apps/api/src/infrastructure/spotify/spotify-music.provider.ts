@@ -36,7 +36,9 @@ export class SpotifyMusicProvider
     config: ConfigService,
     @Optional() private readonly cache?: RedisCacheService,
   ) {
-    this.api = new SpotifyApiClient(tokenService);
+    this.api = new SpotifyApiClient(tokenService, {
+      logBodies: config.get<string>('NODE_ENV') !== 'production',
+    });
     this.configuredMarket = parseConfiguredMarket(
       config.get<string>('SPOTIFY_CATALOG_MARKET'),
     );
