@@ -128,11 +128,12 @@ succeeded) let a deployment through without it; keeping each `main` commit in
 its own group removes that risk entirely for "CI" and, by extension, for
 "Deploy Web".
 
-**Branch protection is not configured yet.** `main` currently has no required
-status checks. After the first successful "CI" run on `main` (so the final,
-stable job names exist as real checks — `quality`, `test-contracts`,
-`test-api`, `test-web`, `e2e`, `sonar`), configure required status checks on
-`main` using those exact job names. Not done as part of this change.
+**Branch protection.** `main` is covered by a repository ruleset ("main
+required checks") requiring `quality`, `test-contracts`, `test-api`,
+`test-web`, `e2e`, and `sonar` to pass before a pull request can merge.
+`commitlint` (PR-only) and `Deploy Web` (downstream of CI) are intentionally
+not required checks, and Railway's own deploy is not a GitHub merge check.
+Direct pushes to `main` remain allowed; no PR-review count is required.
 
 Manual deploy from a local clean checkout is still available as a fallback:
 
