@@ -21,6 +21,7 @@
     "pretest:api": "npm run build:contracts",
     "test:api": "npm run test -w @blendify/api",
     "test:web": "npm run test -w @blendify/web",
+    "test:e2e": "npm run test:e2e -w @blendify/web",
     "sonar:coverage": "node scripts/merge-sonar-coverage.mjs",
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",

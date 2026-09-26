@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["@playwright/test"],
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "baseUrl": "..",
+    "paths": {
+      "@blendify/contracts": ["../../packages/contracts/src/index.ts"]
+    }
+  },
+  "include": ["."]
+}

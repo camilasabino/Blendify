@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { loadEnv } from 'vite'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { assertProductionApiUrl } from './config/api-url.ts'
@@ -29,6 +29,8 @@ export default defineConfig(({ command, mode }) => {
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./src/test/setup.ts'],
+      // Playwright owns e2e/**: it runs in a real browser, not jsdom.
+      exclude: [...configDefaults.exclude, 'e2e/**'],
     },
   }
 })

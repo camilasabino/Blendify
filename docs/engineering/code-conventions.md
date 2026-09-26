@@ -196,6 +196,16 @@ rather than an arbitrary choice.
   rules), not private implementation details — keep doing that.
 - Regression-test real bugs; don't add tests that just restate the
   implementation.
+- `apps/web/e2e` holds a small Playwright Test browser suite (`npm run
+  test:e2e`) covering the handful of journeys that only a real browser can
+  protect: Guest bootstrap, a full generation flow, the Soundiiz transfer CTA,
+  authenticated navigation, logout (including logout during an active
+  generation), and Spotify OAuth failure feedback. It mocks Blendify's own API
+  at the browser boundary via Playwright routing (`apps/web/e2e/fixtures`) —
+  never real Spotify, Last.fm, or Soundiiz — and runs against Chromium only
+  for now. It is not wired into CI yet. Failure artifacts (trace, screenshot)
+  land in `apps/web/test-results/` and `apps/web/playwright-report/`, both
+  gitignored.
 
 ## Key smells to keep watching for
 

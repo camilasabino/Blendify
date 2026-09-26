@@ -184,6 +184,7 @@ npm run build            # build contracts, API (with Prisma Client) and web
 npm run build:api        # contracts + Prisma Client + Nest build (Railway)
 npm run build:web        # contracts + web bundle (requires VITE_API_URL)
 npm run test             # run contract, API, and web tests
+npm run test:e2e         # run the Playwright browser suite (apps/web/e2e)
 npm run lint             # ESLint + oxlint
 npm run format:check     # verify API formatting
 
