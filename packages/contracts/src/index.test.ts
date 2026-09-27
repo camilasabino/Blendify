@@ -10,6 +10,8 @@ import {
   GeneratedPlaylistSchema,
   GeneratedPlaylistStreamEventSchema,
   GenerationStreamEventSchema,
+  DeletePlaylistQuerySchema,
+  LibrarySyncResultSchema,
   MAX_ARTISTS,
   PlaylistDetailSchema,
   PlaylistLibraryQuerySchema,
@@ -101,12 +103,15 @@ describe('playlist contracts', () => {
     ).toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 
-  it('parses library query parameters without accepting arbitrary booleans', () => {
+  it('parses library query parameters with numeric coercion', () => {
     expect(
-      PlaylistLibraryQuerySchema.parse({ sync: 'true', limit: '10' }),
-    ).toMatchObject({ sync: true, limit: 10, offset: 0 });
+      PlaylistLibraryQuerySchema.parse({ limit: '10' }),
+    ).toMatchObject({ limit: 10, offset: 0 });
+  });
+
+  it('rejects arbitrary booleans on query boolean fields', () => {
     expect(() =>
-      PlaylistLibraryQuerySchema.parse({ sync: 'sometimes' }),
+      DeletePlaylistQuerySchema.parse({ fromSpotify: 'sometimes' }),
     ).toThrow();
   });
 
@@ -444,5 +449,14 @@ describe('transfer contracts', () => {
       PlaylistTransferSchema.safeParse({ ...transfer, url: 'not a url' })
         .success,
     ).toBe(false);
+  });
+
+  it('requires checkedCount and removedCount on a library sync result', () => {
+    expect(() =>
+      LibrarySyncResultSchema.parse({ checkedCount: 5 }),
+    ).toThrow();
+    expect(
+      LibrarySyncResultSchema.parse({ checkedCount: 5, removedCount: 2 }),
+    ).toEqual({ checkedCount: 5, removedCount: 2 });
   });
 });

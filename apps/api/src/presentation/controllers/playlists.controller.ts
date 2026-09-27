@@ -30,6 +30,7 @@ import {
   type SpotifyPlaylistRequest,
 } from '../../application/use-cases/create-spotify-playlist.use-case';
 import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
+import { SyncLibraryUseCase } from '../../application/use-cases/sync-library.use-case';
 import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
 import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
 import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
@@ -58,6 +59,7 @@ export class PlaylistsController {
   constructor(
     private readonly createPlaylist: CreateSpotifyPlaylistUseCase,
     private readonly library: ListLibraryPlaylistsUseCase,
+    private readonly sync: SyncLibraryUseCase,
     private readonly detail: GetPlaylistDetailUseCase,
     private readonly rename: RenamePlaylistUseCase,
     private readonly remove: RemovePlaylistFromLibraryUseCase,
@@ -109,11 +111,18 @@ export class PlaylistsController {
     query: PlaylistLibraryQuery,
   ) {
     return this.library.execute(user.id, {
-      sync: query.sync,
       limit: query.limit,
       offset: query.offset,
       q: query.q,
     });
+  }
+
+  @Post('sync')
+  @ApiOperation({
+    summary: 'Reconcile the entire Blendify Library against Spotify',
+  })
+  syncLibrary(@CurrentUser() user: User) {
+    return this.sync.execute(user.id);
   }
 
   @Post('bulk')

@@ -1,6 +1,9 @@
 import type {
   GeneratedPlaylistDto,
+  LibrarySyncResult,
   PlaylistDetail,
+  PlaylistLibraryPage,
+  PlaylistSummary,
   TrackDto,
 } from '@blendify/contracts'
 
@@ -36,6 +39,38 @@ export const guestJazzPlaylist: GeneratedPlaylistDto = {
   seeds: [{ type: 'genre', id: 'jazz', name: 'Jazz' }],
   tracks: [jazzTrack],
   transfer: null,
+}
+
+export const activePlaylist: PlaylistSummary = {
+  id: 'playlist-1',
+  name: 'Evening mix',
+  description: '',
+  kind: 'artist_mix',
+  seeds: [{ type: 'artist', id: 'artist-1', name: 'Sade' }],
+  seedCount: 1,
+  trackCount: 10,
+  totalDurationMs: 2_400_000,
+  spotifyUrl: 'https://open.spotify.com/playlist/playlist-1',
+  spotifyId: 'playlist-1',
+  status: 'COMPLETED',
+  missingOnSpotify: false,
+  imageUrl: null,
+  createdAt: '2026-09-25T12:00:00.000Z',
+  updatedAt: '2026-09-25T12:00:00.000Z',
+}
+
+export const emptyLibraryPage: PlaylistLibraryPage = {
+  playlists: [],
+  total: 0,
+  limit: 10,
+  offset: 0,
+  activeCount: 0,
+  deletedCount: 0,
+}
+
+export const cleanSyncResult: LibrarySyncResult = {
+  checkedCount: 1,
+  removedCount: 0,
 }
 
 export const spotifyJazzPlaylist: PlaylistDetail = {

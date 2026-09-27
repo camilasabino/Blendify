@@ -76,3 +76,106 @@ describe('SpotifyPlaylistClient.getPlaylistSnapshot', () => {
     expect(track.externalUrl).toBeUndefined();
   });
 });
+
+describe('SpotifyPlaylistClient.getPlaylistSnapshot error handling', () => {
+  function createFailingApi(status: number) {
+    const error = Object.assign(new Error(`status ${status}`), { status });
+    const raw = jest.fn(() => Promise.reject(error));
+    return {
+      raw,
+      accessToken: jest.fn(() => Promise.resolve('user-token')),
+      isStatus: (err: unknown, ...statuses: number[]) =>
+        statuses.includes((err as { status: number }).status),
+      toSpotifyError: (_operation: string, err: unknown) =>
+        new Error(`spotify error: ${(err as { status: number }).status}`),
+    } as unknown as SpotifyApiClient;
+  }
+
+  it('returns null on a 404 (confirmed gone)', async () => {
+    const api = createFailingApi(404);
+    const snapshot = await new SpotifyPlaylistClient(
+      'user-1',
+      api,
+    ).getPlaylistSnapshot('playlist-1');
+
+    expect(snapshot).toBeNull();
+  });
+
+  it('throws on a 403 instead of treating it as gone', async () => {
+    const api = createFailingApi(403);
+
+    await expect(
+      new SpotifyPlaylistClient('user-1', api).getPlaylistSnapshot(
+        'playlist-1',
+      ),
+    ).rejects.toThrow('spotify error: 403');
+  });
+});
+
+describe('SpotifyPlaylistClient.listLibraryPlaylistIds', () => {
+  function createPaginatedApi(totalPlaylists: number, pageSize: number) {
+    const raw = jest.fn(
+      (_token: string, config: { params?: { offset?: number } }) => {
+        const offset = config.params?.offset ?? 0;
+        const remaining = Math.max(totalPlaylists - offset, 0);
+        const items = Array.from(
+          { length: Math.min(pageSize, remaining) },
+          (_, i) => ({ id: `playlist-${offset + i}` }),
+        );
+        const nextOffset = offset + items.length;
+        return Promise.resolve({
+          data: {
+            items,
+            total: totalPlaylists,
+            next: nextOffset < totalPlaylists ? `offset=${nextOffset}` : null,
+          },
+        });
+      },
+    );
+    return {
+      raw,
+      request: async (
+        _operation: string,
+        token: string,
+        config: { params?: { offset?: number } },
+      ) => (await raw(token, config)).data,
+      accessToken: jest.fn(() => Promise.resolve('user-token')),
+      isStatus: () => false,
+      toSpotifyError: (_operation: string, error: unknown) => error,
+    } as unknown as SpotifyApiClient;
+  }
+
+  it('paginates past the first page and includes a playlist that only appears later', async () => {
+    const api = createPaginatedApi(120, 50);
+    const client = new SpotifyPlaylistClient('user-1', api);
+
+    const ids = await client.listLibraryPlaylistIds();
+
+    expect(ids.size).toBe(120);
+    expect(ids.has('playlist-0')).toBe(true);
+    expect(ids.has('playlist-119')).toBe(true);
+  });
+
+  it('throws instead of returning a partial set when the page cap is hit with more data remaining', async () => {
+    const raw = jest.fn((_token: string, _config: unknown) =>
+      Promise.resolve({
+        data: {
+          items: [{ id: 'playlist-x' }],
+          total: 100_000,
+          next: 'offset=50',
+        },
+      }),
+    );
+    const api = {
+      raw,
+      request: async (_operation: string, token: string, config: unknown) =>
+        (await raw(token, config)).data,
+      accessToken: jest.fn(() => Promise.resolve('user-token')),
+      isStatus: () => false,
+      toSpotifyError: (_operation: string, error: unknown) => error,
+    } as unknown as SpotifyApiClient;
+    const client = new SpotifyPlaylistClient('user-1', api);
+
+    await expect(client.listLibraryPlaylistIds()).rejects.toThrow();
+  });
+});

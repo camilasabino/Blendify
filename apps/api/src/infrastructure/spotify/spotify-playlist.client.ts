@@ -17,7 +17,11 @@ const MAX_COVER_IMAGE_BYTES = 256 * 1024;
 const PLAYLIST_ITEMS_PAGE_SIZE = 50;
 const PLAYLIST_ITEMS_MAX_OFFSET = 200;
 const LIBRARY_PLAYLISTS_PAGE_SIZE = 50;
-const LIBRARY_PLAYLISTS_MAX_PAGES = 2;
+// Not a business limit — the loop below stops on `next`/`total` (~10k
+// playlists of headroom). If Spotify never signals completion within this
+// many pages, listLibraryPlaylistIds throws rather than return a partial
+// set — a caller must never treat "hit the cap" as "here is everything".
+const LIBRARY_PLAYLISTS_MAX_PAGES = 200;
 
 interface SpotifyImage {
   url: string;
@@ -146,7 +150,11 @@ export class SpotifyPlaylistClient {
         tracks: applyTracks ? items.tracks.slice(0, MAX_TRACKS) : undefined,
       };
     } catch (error) {
-      if (this.api.isStatus(error, 403, 404)) return null;
+      // Only 404 is authoritative evidence the playlist is gone. A 403
+      // means "can't access it right now" (revoked scope, auth issue) —
+      // treating that as deletion would erase Library rows on a permission
+      // problem instead of surfacing it as a sync failure.
+      if (this.api.isStatus(error, 404)) return null;
       throw this.api.toSpotifyError(
         `getPlaylistSnapshot(${playlistId})`,
         error,
@@ -401,10 +409,16 @@ export class SpotifyPlaylistClient {
           if (item?.id) ids.add(item.id);
         }
         offset += limit;
-        if (!data.next || (data.items?.length ?? 0) === 0) break;
-        if (typeof data.total === 'number' && offset >= data.total) break;
+        if (!data.next || (data.items?.length ?? 0) === 0) return ids;
+        if (typeof data.total === 'number' && offset >= data.total) {
+          return ids;
+        }
       }
-      return ids;
+      // Spotify still reports more pages past our safety cap — returning a
+      // partial set here would make every playlist beyond it look deleted.
+      throw new Error(
+        `listLibraryPlaylistIds exceeded ${LIBRARY_PLAYLISTS_MAX_PAGES} pages without Spotify signaling completion`,
+      );
     } catch (error) {
       if (this.api.isStatus(error, 403)) {
         this.logger.warn(

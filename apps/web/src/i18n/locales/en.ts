@@ -249,6 +249,11 @@ export const en = {
   'library.refresh': 'Sync with Spotify',
   'library.refreshError':
     'Sync didn’t finish. Check your connection and try again in a bit.',
+  'library.refreshSuccess': 'Library synced with Spotify.',
+  'library.refreshSuccessOne':
+    'Library synced with Spotify. 1 playlist removed because it no longer exists on Spotify.',
+  'library.refreshSuccessMany':
+    'Library synced with Spotify. {count} playlists removed because they no longer exist on Spotify.',
   'library.searchPlaceholder': 'Search playlists…',
   'library.clearSearch': 'Clear search',
   'library.searchEmptyTitle': 'No results',

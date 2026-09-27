@@ -7,6 +7,7 @@ import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/re
 import { CreateSpotifyPlaylistUseCase } from '../../application/use-cases/create-spotify-playlist.use-case';
 import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
 import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
+import { SyncLibraryUseCase } from '../../application/use-cases/sync-library.use-case';
 import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
 import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
 import { GlobalExceptionFilter } from '../filters/global-exception.filter';
@@ -17,6 +18,7 @@ describe('PlaylistsController contracts', () => {
   let app: INestApplication;
   const createPlaylist = { execute: jest.fn() };
   const library = { execute: jest.fn() };
+  const sync = { execute: jest.fn() };
   const detail = { execute: jest.fn() };
   const rename = { execute: jest.fn() };
   const remove = { execute: jest.fn() };
@@ -28,6 +30,7 @@ describe('PlaylistsController contracts', () => {
       providers: [
         { provide: CreateSpotifyPlaylistUseCase, useValue: createPlaylist },
         { provide: ListLibraryPlaylistsUseCase, useValue: library },
+        { provide: SyncLibraryUseCase, useValue: sync },
         { provide: GetPlaylistDetailUseCase, useValue: detail },
         { provide: RenamePlaylistUseCase, useValue: rename },
         { provide: RemovePlaylistFromLibraryUseCase, useValue: remove },
@@ -180,15 +183,23 @@ describe('PlaylistsController contracts', () => {
     library.execute.mockResolvedValue(page);
 
     await request(httpServer())
-      .get('/api/playlists?limit=10&offset=20&sync=true')
+      .get('/api/playlists?limit=10&offset=20')
       .expect(200, page);
 
     expect(library.execute).toHaveBeenCalledWith('user-1', {
       limit: 10,
       offset: 20,
-      sync: true,
       q: undefined,
     });
+  });
+
+  it('delegates a global Library sync to the sync use case', async () => {
+    const result = { checkedCount: 12, removedCount: 2 };
+    sync.execute.mockResolvedValue(result);
+
+    await request(httpServer()).post('/api/playlists/sync').expect(201, result);
+
+    expect(sync.execute).toHaveBeenCalledWith('user-1');
   });
 
   it('serves playlist detail separately from library summaries', async () => {

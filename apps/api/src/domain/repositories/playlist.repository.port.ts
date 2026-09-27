@@ -42,4 +42,6 @@ export interface PlaylistRepositoryPort {
   ): Promise<{ total: number; active: number; deleted: number }>;
 
   delete(id: string): Promise<void>;
+
+  deleteMany(userId: string, ids: string[]): Promise<void>;
 }

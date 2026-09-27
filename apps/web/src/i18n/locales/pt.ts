@@ -258,6 +258,11 @@ export const pt: Record<MessageKey, string> = {
   'library.refresh': 'Sincronizar com Spotify',
   'library.refreshError':
     'A sincronização não terminou. Verifique sua conexão e tente de novo em breve.',
+  'library.refreshSuccess': 'Biblioteca sincronizada com Spotify.',
+  'library.refreshSuccessOne':
+    'Biblioteca sincronizada com Spotify. 1 playlist foi removida porque não existe mais no Spotify.',
+  'library.refreshSuccessMany':
+    'Biblioteca sincronizada com Spotify. {count} playlists foram removidas porque não existem mais no Spotify.',
   'library.searchPlaceholder': 'Buscar playlists…',
   'library.clearSearch': 'Limpar busca',
   'library.searchEmptyTitle': 'Sem resultados',

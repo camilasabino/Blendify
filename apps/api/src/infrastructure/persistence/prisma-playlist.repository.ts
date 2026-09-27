@@ -147,6 +147,13 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
     await this.prisma.playlist.delete({ where: { id } });
   }
 
+  async deleteMany(userId: string, ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.prisma.playlist.deleteMany({
+      where: { userId, id: { in: ids } },
+    });
+  }
+
   private libraryWhere(
     userId: string,
     filter: PlaylistLibraryFilter,

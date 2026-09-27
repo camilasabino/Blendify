@@ -17,6 +17,7 @@ import { GenerateGenreMixUseCase } from '../../application/use-cases/generate-ge
 import { GeneratePlaylistUseCase } from '../../application/use-cases/generate-playlist.use-case';
 import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
 import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
+import { SyncLibraryUseCase } from '../../application/use-cases/sync-library.use-case';
 import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
 import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
 import { Artist } from '../../domain/artist/artist.entity';
@@ -215,6 +216,7 @@ async function createApp(world: World): Promise<INestApplication> {
       { provide: USAGE_STATS_REPOSITORY, useValue: world.usageStats },
       { provide: PLAYLIST_REPOSITORY, useValue: world.playlists },
       { provide: ListLibraryPlaylistsUseCase, useValue: unused },
+      { provide: SyncLibraryUseCase, useValue: unused },
       { provide: GetPlaylistDetailUseCase, useValue: unused },
       { provide: RenamePlaylistUseCase, useValue: unused },
       { provide: RemovePlaylistFromLibraryUseCase, useValue: unused },

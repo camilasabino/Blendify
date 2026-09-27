@@ -29,6 +29,7 @@ import { GetUserStatsUseCase } from '../../application/use-cases/get-user-stats.
 import { CreatePlaylistTransferUseCase } from '../../application/use-cases/create-playlist-transfer.use-case';
 import { PlaylistTransferTokens } from '../../application/services/playlist-transfer-tokens.service';
 import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
+import { SyncLibraryUseCase } from '../../application/use-cases/sync-library.use-case';
 import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
 import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
 import { ResetUserStatsUseCase } from '../../application/use-cases/reset-user-stats.use-case';
@@ -215,6 +216,7 @@ function createWorld() {
     },
     searchTracks: { execute: jest.fn(() => Promise.resolve([])) },
     library: { execute: jest.fn() },
+    sync: { execute: jest.fn() },
     detail: { execute: jest.fn() },
     rename: { execute: jest.fn() },
     remove: { execute: jest.fn() },
@@ -294,6 +296,7 @@ async function createApp(
       { provide: SearchArtistsUseCase, useValue: world.searchArtists },
       { provide: SearchTracksUseCase, useValue: world.searchTracks },
       { provide: ListLibraryPlaylistsUseCase, useValue: world.library },
+      { provide: SyncLibraryUseCase, useValue: world.sync },
       { provide: GetPlaylistDetailUseCase, useValue: world.detail },
       { provide: RenamePlaylistUseCase, useValue: world.rename },
       { provide: RemovePlaylistFromLibraryUseCase, useValue: world.remove },

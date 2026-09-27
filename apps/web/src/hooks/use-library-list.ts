@@ -10,6 +10,8 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import type { PendingLibraryConfirm } from '@/components/playlist/library-types'
 import {
   buildConfirmCopy,
+  buildSyncSummary,
+  pendingReferencesRemovedPlaylist,
   toggleIdInSet,
   visibleSelectionState,
 } from '@/components/playlist/library-list-helpers'
@@ -28,13 +30,15 @@ export function useLibraryList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [refreshSummary, setRefreshSummary] = useState<string | null>(null)
+
+  const libraryQueryKey = ['playlists', 'library', debouncedSearch] as const
 
   const libraryQuery = useInfiniteQuery({
-    queryKey: ['playlists', 'library', debouncedSearch],
+    queryKey: libraryQueryKey,
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       api.listPlaylists({
-        sync: false,
         limit: PAGE_SIZE,
         offset: pageParam,
         q: debouncedSearch || undefined,
@@ -115,18 +119,22 @@ export function useLibraryList() {
     if (refreshing) return
     setRefreshing(true)
     setRefreshError(null)
+    setRefreshSummary(null)
     try {
-      const pageCount = libraryQuery.data?.pages.length ?? 1
-      for (let page = 0; page < pageCount; page += 1) {
-        await api.listPlaylists({
-          sync: true,
-          limit: PAGE_SIZE,
-          offset: page * PAGE_SIZE,
-          q: debouncedSearch || undefined,
-        })
-      }
-      await libraryQuery.refetch()
+      const result = await api.syncLibrary()
+      await queryClient.resetQueries({ queryKey: libraryQueryKey })
+      const visibleIds = new Set(
+        (queryClient.getQueryData(libraryQueryKey) as typeof libraryQuery.data)
+          ?.pages.flatMap((page) => page.playlists.map((p) => p.id)) ?? [],
+      )
+      setSelectedIds(
+        (current) => new Set([...current].filter((id) => visibleIds.has(id))),
+      )
+      setPending((current) =>
+        pendingReferencesRemovedPlaylist(current, visibleIds) ? null : current,
+      )
       void queryClient.invalidateQueries({ queryKey: ['playlists', 'detail'] })
+      setRefreshSummary(buildSyncSummary(result.removedCount ?? 0, t))
     } catch (error) {
       // Keep any partial sync that already landed in the DB.
       await libraryQuery.refetch()
@@ -181,6 +189,7 @@ export function useLibraryList() {
     selectedIds,
     refreshing,
     refreshError,
+    refreshSummary,
     libraryQuery,
     playlists,
     total,

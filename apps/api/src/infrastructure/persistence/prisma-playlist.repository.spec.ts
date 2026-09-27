@@ -134,3 +134,37 @@ describe('PrismaPlaylistRepository track metadata', () => {
     expect(track.externalUrl).toBe('https://open.spotify.com/track/track-1');
   });
 });
+
+describe('PrismaPlaylistRepository.deleteMany', () => {
+  it('deletes only the given ids scoped to the given user in one statement', async () => {
+    const prisma = {
+      playlist: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 2 }),
+      },
+    };
+    const repository = new PrismaPlaylistRepository(
+      prisma as unknown as PrismaService,
+    );
+
+    await repository.deleteMany('user-1', ['playlist-1', 'playlist-2']);
+
+    expect(prisma.playlist.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', id: { in: ['playlist-1', 'playlist-2'] } },
+    });
+  });
+
+  it('does not call the database when there are no ids to delete', async () => {
+    const prisma = {
+      playlist: {
+        deleteMany: jest.fn(),
+      },
+    };
+    const repository = new PrismaPlaylistRepository(
+      prisma as unknown as PrismaService,
+    );
+
+    await repository.deleteMany('user-1', []);
+
+    expect(prisma.playlist.deleteMany).not.toHaveBeenCalled();
+  });
+});

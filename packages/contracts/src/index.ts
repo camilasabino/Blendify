@@ -236,7 +236,6 @@ const QueryBooleanSchema = z.preprocess(
 );
 
 export const PlaylistLibraryQuerySchema = z.object({
-  sync: QueryBooleanSchema.default(false),
   limit: z.coerce.number().int().min(1).max(50).default(5),
   offset: z.coerce.number().int().nonnegative().default(0),
   q: z.string().trim().max(100).optional(),
@@ -342,6 +341,11 @@ export const BulkLibraryResultSchema = z.object({
   failed: z.number().int().nonnegative(),
 });
 
+export const LibrarySyncResultSchema = z.object({
+  checkedCount: z.number().int().nonnegative(),
+  removedCount: z.number().int().nonnegative(),
+});
+
 export const RankedSeedUsageSchema = z.object({
   seedKey: z.string(),
   name: z.string(),
@@ -434,6 +438,7 @@ export type CreateTransferRequest = z.infer<typeof CreateTransferRequestSchema>;
 export type PlaylistTransferDto = z.infer<typeof PlaylistTransferSchema>;
 export type PlaylistLibraryPage = z.infer<typeof PlaylistLibraryPageSchema>;
 export type BulkLibraryResult = z.infer<typeof BulkLibraryResultSchema>;
+export type LibrarySyncResult = z.infer<typeof LibrarySyncResultSchema>;
 export type PlaylistLibraryQuery = z.infer<
   typeof PlaylistLibraryQuerySchema
 >;

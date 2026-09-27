@@ -289,6 +289,16 @@ export function LibraryList() {
         />
       ) : null}
 
+      {!list.refreshError && list.refreshSummary ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-card border border-divider bg-card px-4 py-3 text-sm text-cream-200"
+        >
+          {list.refreshSummary}
+        </p>
+      ) : null}
+
       {list.selecting && list.playlists.length ? (
         <LibrarySelectionBar
           selectedPlaylists={list.selectedPlaylists}

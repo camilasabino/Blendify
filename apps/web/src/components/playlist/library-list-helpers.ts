@@ -141,3 +141,20 @@ export function toBulkPending({
     count: playlists.length,
   }
 }
+
+export function buildSyncSummary(removedCount: number, t: Translate): string {
+  if (removedCount === 0) return t('library.refreshSuccess')
+  if (removedCount === 1) return t('library.refreshSuccessOne')
+  return t('library.refreshSuccessMany', { count: removedCount })
+}
+
+export function pendingReferencesRemovedPlaylist(
+  pending: PendingLibraryConfirm | null,
+  visibleIds: Set<string>,
+): boolean {
+  if (!pending || pending.kind === 'alert') return false
+  if (pending.kind === 'bulk') {
+    return pending.playlistIds.some((id) => !visibleIds.has(id))
+  }
+  return !visibleIds.has(pending.playlist.id)
+}

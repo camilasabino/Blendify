@@ -14,6 +14,7 @@ import {
   type GeneratedPlaylistDto,
   type GenreDto,
   type GenerationProgress,
+  type LibrarySyncResult,
   type OkResponse,
   type PlaybackDeviceDto,
   type PlaylistDetail,
@@ -312,14 +313,12 @@ export const api = {
 
   listPlaylists: (
     options: {
-      sync?: boolean
       limit?: number
       offset?: number
       q?: string
     } = {},
   ) => {
     const params = new URLSearchParams()
-    if (options.sync) params.set('sync', 'true')
     if (options.limit != null) params.set('limit', String(options.limit))
     if (options.offset != null) params.set('offset', String(options.offset))
     if (options.q?.trim()) params.set('q', options.q.trim())
@@ -327,6 +326,9 @@ export const api = {
     const path = query ? `/api/playlists?${query}` : '/api/playlists'
     return request<PlaylistLibraryPage>(path)
   },
+
+  syncLibrary: () =>
+    request<LibrarySyncResult>('/api/playlists/sync', { method: 'POST' }),
 
   getPlaylist: (id: string) =>
     request<PlaylistDetail>(`/api/playlists/${encodeURIComponent(id)}`),
