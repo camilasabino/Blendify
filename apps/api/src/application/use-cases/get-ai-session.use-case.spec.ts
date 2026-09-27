@@ -112,6 +112,7 @@ describe('GetAiSessionUseCase', () => {
             code: 'SPOTIFY_RATE_LIMITED',
             category: 'provider_rate_limited',
             retryAfterSeconds: 30,
+            seedNotFound: null,
           },
         },
       }),

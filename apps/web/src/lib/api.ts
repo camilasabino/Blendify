@@ -1,11 +1,16 @@
 import {
+  AiGenerationSchema,
+  AiGenerationStreamEventSchema,
   AiSessionSchema,
+  AiSessionStateSchema,
   GeneratedPlaylistSchema,
   GeneratedPlaylistStreamEventSchema,
   GenerationStreamEventSchema,
   PlaylistDetailSchema,
   PlaylistTransferSchema,
+  type AiGenerationDto,
   type AiSessionDto,
+  type AiSessionStateDto,
   type ArtistDto,
   type BulkLibraryAction,
   type BulkLibraryResult,
@@ -47,6 +52,8 @@ import {
 
 export type User = UserDto
 export type AiSession = AiSessionDto
+export type AiSessionState = AiSessionStateDto
+export type AiGeneration = AiGenerationDto
 export type Artist = ArtistDto
 export type CuratedGenre = GenreDto
 export type {
@@ -124,6 +131,19 @@ async function requestAiSession(
   return parsed.data
 }
 
+async function requestAiSessionState(path: string): Promise<AiSessionState> {
+  const parsed = AiSessionStateSchema.safeParse(await request<unknown>(path))
+  if (!parsed.success) {
+    throw new ApiError('Invalid Create with AI response', 502)
+  }
+  return parsed.data
+}
+
+const AI_GENERATION: GenerationContract<AiGeneration> = {
+  events: AiGenerationStreamEventSchema,
+  result: AiGenerationSchema,
+}
+
 const SPOTIFY_GENERATION: GenerationContract<PlaylistDetail> = {
   events: GenerationStreamEventSchema,
   result: PlaylistDetailSchema,
@@ -150,10 +170,10 @@ async function requestGeneration<T>(
     method: 'POST',
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       Accept: 'application/x-ndjson',
     },
-    body: JSON.stringify(body),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
     signal,
   })
 
@@ -401,5 +421,17 @@ export const api = {
     requestAiSession(
       `/api/ai/sessions/${encodeURIComponent(sessionId)}/clarification`,
       { optionId },
+    ),
+
+  getAiSession: (sessionId: string) =>
+    requestAiSessionState(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
+
+  generateAiPlaylist: (sessionId: string, options: GenerationOptions = {}) =>
+    requestGeneration(
+      `/api/ai/sessions/${encodeURIComponent(sessionId)}/generate`,
+      undefined,
+      AI_GENERATION,
+      options.onProgress,
+      options.signal,
     ),
 }

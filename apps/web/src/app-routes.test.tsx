@@ -391,6 +391,32 @@ describe('Spotify Mode routing', () => {
     },
   )
 
+  it('forgets the Create with AI session on logout', async () => {
+    const user = userEvent.setup()
+    sessionStorage.setItem(
+      'blendify.aiSession',
+      JSON.stringify({
+        sessionId: 'session-token',
+        prompt: 'Music like Björk',
+        playlistTitle: 'My run',
+      }),
+    )
+    stubApi({
+      'GET /api/ai/sessions/session-token': () =>
+        jsonResponse({ statusCode: 500, code: 'INTERNAL_ERROR', message: 'Error' }, 500),
+      'POST /api/auth/logout': () => jsonResponse({ ok: true }),
+    })
+    renderApp('/app/ai')
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Account menu: Camila' }),
+    )
+    await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
+
+    await screen.findByRole('link', { name: 'Try Blendify' })
+    expect(sessionStorage.getItem('blendify.aiSession')).toBeNull()
+  })
+
   it('aborts an in-flight generation on logout and ignores its late result', async () => {
     const user = userEvent.setup()
     const pending = pendingNdjsonResponse()

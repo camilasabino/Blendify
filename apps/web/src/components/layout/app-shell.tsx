@@ -8,6 +8,7 @@ import {
   Library,
   Sparkles,
 } from 'lucide-react'
+import { AI_SESSION_QUERY_KEY } from '@/hooks/use-ai-session'
 import { useAuth } from '@/hooks/use-auth'
 import { useCapabilities } from '@/hooks/use-capabilities'
 import { LanguageSwitcher } from '@/components/layout/language-switcher'
@@ -17,6 +18,7 @@ import { AccountMenu } from '@/components/layout/account-menu'
 import { ConnectSpotifyButton } from '@/components/layout/connect-spotify-button'
 import { readSpotifyRequiredState } from '@/lib/spotify-required'
 import { isAiCreationEnabled } from '@/lib/ai-creation'
+import { clearStoredAiSession } from '@/lib/ai-session-storage'
 import { SpotifyRequiredNotice } from '@/components/layout/spotify-required-notice'
 import { Footer } from '@/components/layout/footer'
 import { ConfirmDialog } from '@/components/ui/dialog'
@@ -63,6 +65,7 @@ const USER_SCOPED_QUERY_KEYS = [
   ['playlists'],
   ['usage-stats'],
   ['playback-devices'],
+  [AI_SESSION_QUERY_KEY],
 ] as const
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -102,6 +105,7 @@ export function AppShell() {
       : null
 
   function forgetUserScopedQueries() {
+    clearStoredAiSession()
     for (const queryKey of USER_SCOPED_QUERY_KEYS) {
       queryClient.cancelQueries({ queryKey })
       queryClient.removeQueries({ queryKey })

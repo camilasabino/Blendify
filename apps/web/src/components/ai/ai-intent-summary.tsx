@@ -1,7 +1,7 @@
 import type { ReactNode, RefObject } from 'react'
 import type { AiIntentSummary as AiIntentSummaryDto } from '@blendify/contracts'
-import { Button } from '@/components/ui/button'
 import { useT } from '@/i18n/use-t'
+import { cn } from '@/lib/utils'
 import {
   CATEGORY_LABEL_KEYS,
   MOOD_LABEL_KEYS,
@@ -11,16 +11,19 @@ import {
 
 type AiIntentSummaryProps = Readonly<{
   intent: AiIntentSummaryDto
-  headingRef: RefObject<HTMLHeadingElement | null>
-  onStartOver: () => void
+  variant?: 'review' | 'context'
+  headingRef?: RefObject<HTMLHeadingElement | null>
+  footer?: ReactNode
 }>
 
 export function AiIntentSummary({
   intent,
+  variant = 'review',
   headingRef,
-  onStartOver,
+  footer,
 }: AiIntentSummaryProps) {
   const t = useT()
+  const isContext = variant === 'context'
   const excludedTracks = intent.excludeTracks.map((track) =>
     track.artist ? t('ai.summary.trackBy', { title: track.title, artist: track.artist }) : track.title,
   )
@@ -40,21 +43,29 @@ export function AiIntentSummary({
   return (
     <section
       aria-labelledby="ai-summary-title"
-      className="space-y-5 rounded-panel border border-divider bg-panel p-5 sm:p-6"
+      className={cn(
+        'rounded-panel border border-divider',
+        isContext ? 'space-y-4 p-4 sm:p-5' : 'space-y-5 bg-panel p-5 sm:p-6',
+      )}
     >
       <header className="space-y-1">
         <h2
           id="ai-summary-title"
           ref={headingRef}
           tabIndex={-1}
-          className="font-display text-lg font-semibold tracking-tight text-cream-50 outline-none"
+          className={cn(
+            'font-display font-semibold tracking-tight outline-none',
+            isContext ? 'text-base text-cream-200' : 'text-lg text-cream-50',
+          )}
         >
           {t('ai.summary.title')}
         </h2>
-        <p className="text-sm text-cream-400">{t('ai.summary.subtitle')}</p>
+        <p className="text-sm text-cream-400">
+          {t(isContext ? 'ai.summary.contextSubtitle' : 'ai.summary.subtitle')}
+        </p>
       </header>
 
-      <dl className="grid gap-4 sm:grid-cols-2">
+      <dl className={cn('grid sm:grid-cols-2', isContext ? 'grid-cols-2 gap-3' : 'gap-4')}>
         {basedOn ? (
           <SummaryItem label={t('ai.summary.basedOn')}>{basedOn}</SummaryItem>
         ) : null}
@@ -100,9 +111,7 @@ export function AiIntentSummary({
         </div>
       ) : null}
 
-      <Button variant="ghost" onClick={onStartOver}>
-        {t('ai.startOver')}
-      </Button>
+      {footer}
     </section>
   )
 }

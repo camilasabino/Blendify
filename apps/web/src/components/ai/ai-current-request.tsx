@@ -1,12 +1,14 @@
+import type { RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/i18n/use-t'
 
 type AiCurrentRequestProps = Readonly<{
   prompt: string
   onEdit: () => void
+  editButtonRef?: RefObject<HTMLButtonElement | null>
 }>
 
-export function AiCurrentRequest({ prompt, onEdit }: AiCurrentRequestProps) {
+export function AiCurrentRequest({ prompt, onEdit, editButtonRef }: AiCurrentRequestProps) {
   const t = useT()
 
   return (
@@ -21,7 +23,7 @@ export function AiCurrentRequest({ prompt, onEdit }: AiCurrentRequestProps) {
           </h2>
           <p className="break-words text-sm text-cream-50">“{prompt}”</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={onEdit}>
+        <Button ref={editButtonRef} variant="secondary" size="sm" onClick={onEdit}>
           {t('ai.editRequest')}
         </Button>
       </div>

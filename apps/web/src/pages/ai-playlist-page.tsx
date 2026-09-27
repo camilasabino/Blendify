@@ -1,51 +1,121 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { AiClarification } from '@/components/ai/ai-clarification'
 import { aiErrorMessage } from '@/components/ai/ai-copy'
 import { AiCurrentRequest } from '@/components/ai/ai-current-request'
+import { AiGeneratedPlaylist } from '@/components/ai/ai-generated-playlist'
+import { generationRequestErrorMessage } from '@/components/ai/ai-generation-copy'
+import { AiGenerationFailure } from '@/components/ai/ai-generation-failure'
+import { AiGenerationProgress } from '@/components/ai/ai-generation-progress'
 import { AiIntentSummary } from '@/components/ai/ai-intent-summary'
 import { AiPromptForm } from '@/components/ai/ai-prompt-form'
+import { AiReviewActions } from '@/components/ai/ai-review-actions'
 import { ErrorState } from '@/components/ui/feedback'
 import { FormSection } from '@/components/ui/form-section'
 import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
-import { useAiSession } from '@/hooks/use-ai-session'
+import { LoadingState } from '@/components/ui/spinner'
+import { useAiSession, type AiFlowPhase, type AiFlowState } from '@/hooks/use-ai-session'
 import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useT } from '@/i18n/use-t'
+
+type FocusTargets = Readonly<{
+  textarea: RefObject<HTMLTextAreaElement | null>
+  clarification: RefObject<HTMLHeadingElement | null>
+  summary: RefObject<HTMLHeadingElement | null>
+  progress: RefObject<HTMLHeadingElement | null>
+  result: RefObject<HTMLHeadingElement | null>
+  failure: RefObject<HTMLHeadingElement | null>
+}>
+
+function focusTarget(
+  phase: AiFlowPhase,
+  targets: FocusTargets,
+): RefObject<HTMLElement | null> | null {
+  switch (phase) {
+    case 'composing':
+      return targets.textarea
+    case 'clarifying':
+      return targets.clarification
+    case 'reviewed':
+      return targets.summary
+    case 'generating':
+      return targets.progress
+    case 'generated':
+      return targets.result
+    case 'generation_failed':
+      return targets.failure
+    case 'restoring':
+    case 'interpreting':
+      return null
+  }
+}
+
+function useFocusOnPhaseChange(phase: AiFlowPhase, targets: FocusTargets) {
+  const previousPhase = useRef<AiFlowPhase | null>(null)
+
+  useEffect(() => {
+    const previous = previousPhase.current
+    previousPhase.current = phase
+    if (previous === null || previous === 'restoring' || previous === phase) {
+      return
+    }
+    focusTarget(phase, targets)?.current?.focus()
+  }, [phase, targets])
+}
+
+function hasReviewedIntent(flow: AiFlowState): flow is Extract<AiFlowState, { intent: unknown }> {
+  return 'intent' in flow
+}
 
 export function AiPlaylistPage() {
   const t = useT()
   useDocumentTitle(t('nav.ai'))
-  const [prompt, setPrompt] = useState('')
-  const [submittedPrompt, setSubmittedPrompt] = useState('')
+  const {
+    flow,
+    submittedPrompt,
+    playlistTitle,
+    renamePlaylist,
+    submit,
+    choose,
+    generate,
+    checkStatus,
+    reset,
+  } = useAiSession()
+  const [prompt, setPrompt] = useState(submittedPrompt)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const { session, error, isPending, submit, choose, reset } = useAiSession()
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const clarificationRef = useRef<HTMLHeadingElement>(null)
-  const summaryRef = useRef<HTMLHeadingElement>(null)
+  const editButtonRef = useRef<HTMLButtonElement>(null)
+  const targets = useRef<FocusTargets>({
+    textarea: { current: null },
+    clarification: { current: null },
+    summary: { current: null },
+    progress: { current: null },
+    result: { current: null },
+    failure: { current: null },
+  }).current
 
-  const readyIntent = session?.status === 'ready' ? session.intent : null
-  const isCompact = readyIntent !== null && !isEditing
-
-  useEffect(() => {
-    if (!session) {
-      return
-    }
-    const heading = session.status === 'ready' ? summaryRef : clarificationRef
-    heading.current?.focus()
-  }, [session])
-
-  useEffect(() => {
-    if (error) {
-      textareaRef.current?.focus()
-    }
-  }, [error])
+  useFocusOnPhaseChange(flow.phase, targets)
 
   useEffect(() => {
     if (isEditing) {
-      textareaRef.current?.focus()
+      targets.textarea.current?.focus()
     }
-  }, [isEditing])
+  }, [isEditing, targets])
+
+  const reviewed = hasReviewedIntent(flow) ? flow : null
+  const isCompact = reviewed !== null && !isEditing
+  const isInterpreting =
+    flow.phase === 'interpreting' || (flow.phase === 'clarifying' && flow.isAnswering)
+  let requestError: unknown = null
+  if (flow.phase === 'composing') {
+    requestError = flow.error
+  } else if (flow.phase === 'clarifying') {
+    requestError = flow.error
+  }
+  const requestErrorMessage =
+    flow.phase === 'composing' && flow.restoreFailed
+      ? t('ai.error.restoreFailed')
+      : aiErrorMessage(requestError, t)
 
   function changePrompt(next: string) {
     setPrompt(next)
@@ -56,26 +126,32 @@ export function AiPlaylistPage() {
     const trimmed = prompt.trim()
     if (!trimmed) {
       setValidationError(t('ai.promptRequired'))
-      textareaRef.current?.focus()
+      targets.textarea.current?.focus()
       return
     }
 
     setValidationError(null)
     setIsEditing(false)
-    setSubmittedPrompt(trimmed)
     submit(trimmed)
   }
 
   function editRequest() {
+    setPrompt(submittedPrompt)
     setIsEditing(true)
+  }
+
+  function cancelEdit() {
+    setPrompt(submittedPrompt)
+    setValidationError(null)
+    setIsEditing(false)
+    window.requestAnimationFrame(() => editButtonRef.current?.focus())
   }
 
   function startOver() {
     reset()
     setPrompt('')
-    setSubmittedPrompt('')
     setValidationError(null)
-    setIsEditing(true)
+    setIsEditing(false)
   }
 
   return (
@@ -83,48 +159,99 @@ export function AiPlaylistPage() {
       <PageHeader
         eyebrow={t('ai.eyebrow')}
         title={t('ai.title')}
-        description={isCompact ? undefined : t('ai.subtitle')}
+        description={isCompact || flow.phase === 'restoring' ? undefined : t('ai.subtitle')}
       />
 
+      {flow.phase === 'restoring' ? <LoadingState label={t('ai.restoring')} /> : null}
+
       {isCompact ? (
-        <AiCurrentRequest prompt={submittedPrompt} onEdit={editRequest} />
-      ) : (
+        <AiCurrentRequest
+          prompt={submittedPrompt}
+          onEdit={editRequest}
+          editButtonRef={editButtonRef}
+        />
+      ) : null}
+
+      {!isCompact && flow.phase !== 'restoring' ? (
         <FormSection accent="amber" title={t('ai.requestTitle')}>
           <AiPromptForm
             prompt={prompt}
             onPromptChange={changePrompt}
             onSubmit={submitPrompt}
-            isPending={isPending}
+            isPending={isInterpreting}
             validationError={validationError}
-            textareaRef={textareaRef}
+            textareaRef={targets.textarea}
+            onCancel={isEditing ? cancelEdit : undefined}
           />
         </FormSection>
-      )}
+      ) : null}
 
       <p role="status" className="sr-only">
-        {isPending ? t('ai.interpreting') : ''}
+        {isInterpreting ? t('ai.interpreting') : ''}
       </p>
 
-      {error && !isPending ? (
+      {requestError && !isInterpreting ? (
         <div role="alert">
-          <ErrorState message={aiErrorMessage(error, t)} />
+          <ErrorState message={requestErrorMessage} />
         </div>
       ) : null}
 
-      {session?.clarification ? (
+      {flow.phase === 'clarifying' ? (
         <AiClarification
-          clarification={session.clarification}
-          isPending={isPending}
+          clarification={flow.clarification}
+          isPending={flow.isAnswering}
           onChoose={choose}
-          headingRef={clarificationRef}
+          headingRef={targets.clarification}
         />
       ) : null}
 
-      {readyIntent && !isEditing ? (
-        <AiIntentSummary
-          intent={readyIntent}
-          headingRef={summaryRef}
+      {isCompact && flow.phase === 'generating' ? (
+        <AiGenerationProgress
+          progress={flow.progress}
+          isStalled={flow.isStalled}
+          onCheckAgain={checkStatus}
+          headingRef={targets.progress}
+        />
+      ) : null}
+
+      {isCompact && flow.phase === 'generated' ? (
+        <AiGeneratedPlaylist
+          intent={flow.intent}
+          result={flow.result}
+          title={playlistTitle}
+          onTitleChange={renamePlaylist}
+          headingRef={targets.result}
           onStartOver={startOver}
+        />
+      ) : null}
+
+      {isCompact && flow.phase === 'generation_failed' ? (
+        <AiGenerationFailure
+          failure={flow.failure}
+          liveError={flow.liveError}
+          headingRef={targets.failure}
+          onEdit={editRequest}
+          onRetry={generate}
+          onStartOver={startOver}
+        />
+      ) : null}
+
+      {reviewed && isCompact ? (
+        <AiIntentSummary
+          intent={reviewed.intent}
+          variant={flow.phase === 'generated' ? 'context' : 'review'}
+          headingRef={targets.summary}
+          footer={
+            flow.phase === 'reviewed' ? (
+              <AiReviewActions
+                requestError={
+                  flow.requestError ? generationRequestErrorMessage(flow.requestError, t) : null
+                }
+                onCreate={generate}
+                onStartOver={startOver}
+              />
+            ) : null
+          }
         />
       ) : null}
     </PageContainer>

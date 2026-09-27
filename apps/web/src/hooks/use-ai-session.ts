@@ -1,46 +1,362 @@
-import { useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
-import { api, type AiSession } from '@/lib/api'
+import { useCallback, useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type {
+  AiClarification,
+  AiGenerationFailureDto,
+  AiIntentSummary,
+  GenerationProgress,
+} from '@blendify/contracts'
+import {
+  api,
+  ApiError,
+  type AiGeneration,
+  type AiSession,
+  type AiSessionState,
+} from '@/lib/api'
+import {
+  clearStoredAiSession,
+  readStoredAiSession,
+  writeStoredAiSession,
+  type StoredAiSession,
+} from '@/lib/ai-session-storage'
+import { isCurrentGeneration, useGenerationStore } from '@/stores/generation-store'
+
+const STATUS_CHECK_INTERVAL_MS = 3_000
+const MAX_STATUS_CHECKS = 60
+
+export const AI_SESSION_QUERY_KEY = 'ai-session'
+
+export type AiGeneratedExecution = Extract<
+  NonNullable<AiSessionState['execution']>,
+  { status: 'generated' }
+>
+
+export type AiFlowState =
+  | { phase: 'composing'; error: unknown; restoreFailed: boolean }
+  | { phase: 'restoring' }
+  | { phase: 'interpreting' }
+  | {
+      phase: 'clarifying'
+      clarification: AiClarification
+      isAnswering: boolean
+      error: unknown
+    }
+  | { phase: 'reviewed'; intent: AiIntentSummary; requestError: unknown }
+  | {
+      phase: 'generating'
+      intent: AiIntentSummary
+      progress: GenerationProgress | null
+      isStreaming: boolean
+      isStalled: boolean
+    }
+  | { phase: 'generated'; intent: AiIntentSummary; result: AiGeneratedExecution }
+  | {
+      phase: 'generation_failed'
+      intent: AiIntentSummary
+      failure: AiGenerationFailureDto
+      liveError: unknown
+    }
+
+export type AiFlowPhase = AiFlowState['phase']
+
+type GenerationRun = { sessionId: string; epoch: number; signal: AbortSignal }
+
+function aiSessionQueryKey(sessionId: string | null) {
+  return [AI_SESSION_QUERY_KEY, sessionId] as const
+}
+
+function reviewedState(session: AiSession): AiSessionState {
+  return { ...session, execution: null }
+}
+
+function generatedState(generation: AiGeneration): AiSessionState {
+  return {
+    sessionId: generation.sessionId,
+    expiresAt: generation.expiresAt,
+    status: 'ready',
+    intent: generation.intent,
+    clarification: null,
+    execution: {
+      status: 'generated',
+      playlist: generation.playlist,
+      trackCount: generation.trackCount,
+      durationMs: generation.durationMs,
+      unmetConstraints: generation.unmetConstraints,
+    },
+  }
+}
+
+function isSessionNotFound(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'AI_SESSION_NOT_FOUND'
+}
+
+function sessionFlowState(
+  session: AiSessionState,
+  context: {
+    isAnswering: boolean
+    answerError: unknown
+    progress: GenerationProgress | null
+    isStreaming: boolean
+    statusChecks: number
+    generationError: unknown
+  },
+): AiFlowState {
+  if (session.clarification) {
+    return {
+      phase: 'clarifying',
+      clarification: session.clarification,
+      isAnswering: context.isAnswering,
+      error: context.answerError,
+    }
+  }
+  if (!session.intent) {
+    return { phase: 'composing', error: null, restoreFailed: false }
+  }
+
+  const intent = session.intent
+  switch (session.execution?.status) {
+    case undefined:
+      return { phase: 'reviewed', intent, requestError: context.generationError }
+    case 'generating':
+      return {
+        phase: 'generating',
+        intent,
+        progress: context.isStreaming ? context.progress : null,
+        isStreaming: context.isStreaming,
+        isStalled: !context.isStreaming && context.statusChecks >= MAX_STATUS_CHECKS,
+      }
+    case 'generated':
+      return { phase: 'generated', intent, result: session.execution }
+    case 'generation_failed':
+      return {
+        phase: 'generation_failed',
+        intent,
+        failure: session.execution.error,
+        liveError: context.generationError,
+      }
+  }
+}
 
 export function useAiSession() {
-  const [session, setSession] = useState<AiSession | null>(null)
+  const queryClient = useQueryClient()
+  const [stored, setStored] = useState<StoredAiSession | null>(readStoredAiSession)
+  const [composeError, setComposeError] = useState<unknown>(null)
+  const [progress, setProgress] = useState<GenerationProgress | null>(null)
+  const [generationError, setGenerationError] = useState<unknown>(null)
+  const [statusChecks, setStatusChecks] = useState(0)
+  const sessionId = stored?.sessionId ?? null
+
+  const sessionQuery = useQuery({
+    queryKey: aiSessionQueryKey(sessionId),
+    queryFn: () => api.getAiSession(sessionId ?? ''),
+    enabled: sessionId !== null,
+    staleTime: Infinity,
+    refetchOnMount: 'always',
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+
+  const remember = useCallback(
+    (next: StoredAiSession | null) => {
+      if (next) {
+        writeStoredAiSession(next)
+      } else {
+        clearStoredAiSession()
+      }
+      setStored(next)
+    },
+    [],
+  )
+
+  const cancelStream = useCallback(() => {
+    useGenerationStore.getState().cancelActive()
+  }, [])
+
+  const expire = useCallback(
+    (error: unknown) => {
+      if (sessionId) {
+        queryClient.removeQueries({ queryKey: aiSessionQueryKey(sessionId) })
+      }
+      remember(null)
+      setComposeError(error)
+    },
+    [queryClient, remember, sessionId],
+  )
 
   const interpret = useMutation({
     mutationFn: (prompt: string) => api.createAiSession(prompt),
-    onSuccess: setSession,
+    onSuccess: (session, prompt) => {
+      queryClient.setQueryData(aiSessionQueryKey(session.sessionId), reviewedState(session))
+      remember({ sessionId: session.sessionId, prompt, playlistTitle: null })
+    },
+    onError: setComposeError,
   })
 
   const clarify = useMutation({
-    mutationFn: ({ sessionId, optionId }: { sessionId: string; optionId: string }) =>
-      api.answerAiClarification(sessionId, optionId),
-    onSuccess: setSession,
+    mutationFn: ({ sessionId: id, optionId }: { sessionId: string; optionId: string }) =>
+      api.answerAiClarification(id, optionId),
+    onSuccess: (session) => {
+      queryClient.setQueryData(aiSessionQueryKey(session.sessionId), reviewedState(session))
+    },
+    onError: (error) => {
+      if (isSessionNotFound(error)) {
+        expire(error)
+      }
+    },
   })
 
-  const isPending = interpret.isPending || clarify.isPending
-  const error = interpret.error ?? clarify.error
+  const generation = useMutation({
+    mutationFn: (run: GenerationRun) =>
+      api.generateAiPlaylist(run.sessionId, {
+        signal: run.signal,
+        onProgress: (next) => {
+          if (isCurrentGeneration(run.epoch)) {
+            setProgress(next)
+          }
+        },
+      }),
+    onMutate: (run) => {
+      setProgress(null)
+      setGenerationError(null)
+      setStatusChecks(0)
+      queryClient.setQueryData<AiSessionState>(aiSessionQueryKey(run.sessionId), (current) =>
+        current ? { ...current, execution: { status: 'generating' } } : current,
+      )
+    },
+    onSuccess: (result, run) => {
+      useGenerationStore.getState().finish(run.epoch)
+      queryClient.setQueryData(aiSessionQueryKey(run.sessionId), generatedState(result))
+    },
+    onError: (error, run) => {
+      useGenerationStore.getState().finish(run.epoch)
+      if (isCurrentGeneration(run.epoch) && isSessionNotFound(error)) {
+        expire(error)
+        return
+      }
+      if (isCurrentGeneration(run.epoch)) {
+        setGenerationError(error)
+      }
+      void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(run.sessionId) })
+    },
+  })
 
-  function submit(prompt: string) {
-    if (isPending) {
+  const session = sessionQuery.data ?? null
+  const isStreaming = generation.isPending
+  const isWaitingForGeneration =
+    session?.execution?.status === 'generating' && !isStreaming
+
+  useEffect(() => {
+    if (sessionQuery.error && isSessionNotFound(sessionQuery.error)) {
+      expire(sessionQuery.error)
+    }
+  }, [expire, sessionQuery.error])
+
+  const { refetch } = sessionQuery
+  useEffect(() => {
+    if (!isWaitingForGeneration || statusChecks >= MAX_STATUS_CHECKS) {
       return
     }
+    const timer = window.setTimeout(() => {
+      void refetch().finally(() => setStatusChecks((count) => count + 1))
+    }, STATUS_CHECK_INTERVAL_MS)
+    return () => window.clearTimeout(timer)
+  }, [isWaitingForGeneration, refetch, statusChecks])
+
+  function flowState(): AiFlowState {
+    if (interpret.isPending) {
+      return { phase: 'interpreting' }
+    }
+    if (!sessionId) {
+      return { phase: 'composing', error: composeError, restoreFailed: false }
+    }
+    if (!session) {
+      if (sessionQuery.isError) {
+        return {
+          phase: 'composing',
+          error: sessionQuery.error,
+          restoreFailed: !isSessionNotFound(sessionQuery.error),
+        }
+      }
+      return { phase: 'restoring' }
+    }
+    return sessionFlowState(session, {
+      isAnswering: clarify.isPending,
+      answerError: clarify.error,
+      progress,
+      isStreaming,
+      statusChecks,
+      generationError,
+    })
+  }
+
+  function clearGeneration() {
+    if (generation.isPending) {
+      cancelStream()
+    }
+    generation.reset()
+    setProgress(null)
+    setGenerationError(null)
+    setStatusChecks(0)
+  }
+
+  function submit(prompt: string) {
+    if (interpret.isPending) {
+      return
+    }
+    clearGeneration()
     clarify.reset()
-    setSession(null)
+    setComposeError(null)
+    remember(null)
     interpret.mutate(prompt)
   }
 
   function choose(optionId: string) {
-    if (isPending || !session) {
+    if (clarify.isPending || !sessionId) {
       return
     }
-    interpret.reset()
-    clarify.mutate({ sessionId: session.sessionId, optionId })
+    clarify.mutate({ sessionId, optionId })
+  }
+
+  function generate() {
+    if (generation.isPending || !sessionId) {
+      return
+    }
+    const { epoch, signal } = useGenerationStore.getState().start()
+    generation.mutate({ sessionId, epoch, signal })
+  }
+
+  function checkStatus() {
+    setStatusChecks(0)
+    void refetch()
+  }
+
+  function renamePlaylist(playlistTitle: string | null) {
+    if (stored) {
+      remember({ ...stored, playlistTitle })
+    }
   }
 
   function reset() {
+    clearGeneration()
     interpret.reset()
     clarify.reset()
-    setSession(null)
+    setComposeError(null)
+    if (sessionId) {
+      queryClient.removeQueries({ queryKey: aiSessionQueryKey(sessionId) })
+    }
+    remember(null)
   }
 
-  return { session, error, isPending, submit, choose, reset }
+  return {
+    flow: flowState(),
+    submittedPrompt: stored?.prompt ?? '',
+    playlistTitle: stored?.playlistTitle ?? null,
+    renamePlaylist,
+    submit,
+    choose,
+    generate,
+    checkStatus,
+    reset,
+  }
 }

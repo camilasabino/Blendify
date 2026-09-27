@@ -68,7 +68,12 @@ function sessionCalls(calls: FetchCall[]) {
   return calls.filter((call) => call.url.startsWith('/api/ai/sessions'))
 }
 
+beforeEach(() => {
+  sessionStorage.clear()
+})
+
 afterEach(() => {
+  sessionStorage.clear()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -148,7 +153,14 @@ describe('Create with AI page', () => {
     expect(within(summary).getByText(/rainy afternoon/)).toBeVisible()
     expect(within(summary).queryByRole('button', { name: 'Edit request' })).toBeNull()
     expect(within(summary).getByRole('button', { name: 'Start over' })).toBeEnabled()
-    expectNoGenerationAction()
+    expect(within(summary).getByRole('button', { name: 'Create playlist' })).toBeEnabled()
+    expect(
+      within(summary).getByText('Blendify will create a preview of your playlist.'),
+    ).toBeVisible()
+    expect(
+      within(summary).getByText('Check these settings. Edit your request if something is off.'),
+    ).toBeVisible()
+    expect(sessionCalls(calls)).toHaveLength(1)
 
     expect(queryPromptField()).toBeNull()
     expect(screen.queryByRole('button', { name: 'Music similar to Björk' })).toBeNull()
@@ -200,7 +212,7 @@ describe('Create with AI page', () => {
     expect(within(summary).getByText('Happy')).toBeVisible()
     expect(within(summary).getByText('About 60 min')).toBeVisible()
     expect(within(summary).getByText(/to dance at a party/)).toBeVisible()
-    expectNoGenerationAction()
+    expect(within(summary).getByRole('button', { name: 'Create playlist' })).toBeEnabled()
   })
 
   it.each([
@@ -246,6 +258,10 @@ describe('Create with AI page', () => {
     })
     renderPage()
 
+    expect(screen.getByText('Press Ctrl+Enter or ⌘+Enter to submit.')).toHaveClass(
+      'max-sm:hidden',
+      'pointer-coarse:hidden',
+    )
     await user.type(promptField(), 'Radiohead{Enter}deep cuts')
     expect(sessionCalls(calls)).toEqual([])
 

@@ -56,6 +56,7 @@ function toExecution(execution: AiSessionExecution): AiSessionExecutionDto {
           code: execution.failure.code,
           category: execution.failure.category,
           retryAfterSeconds: execution.failure.retryAfterSeconds,
+          seedNotFound: execution.failure.seedNotFound,
         },
       };
   }

@@ -12,7 +12,8 @@
     "test:cov": "vitest run --coverage --coverage.reporter=text --coverage.reporter=lcov",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "visual:ai": "playwright test -c playwright.visual.config.ts"
   },
   "dependencies": {
     "@blendify/contracts": "^0.0.0",

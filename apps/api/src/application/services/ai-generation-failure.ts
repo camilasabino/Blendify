@@ -1,3 +1,4 @@
+import { MAX_ARTISTS } from '@blendify/contracts';
 import type { AiGenerationFailure } from '@/domain/ai/ai-session';
 import { AiGenerationError } from '@/domain/errors/ai-generation.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
@@ -19,7 +20,13 @@ export function describeAiGenerationFailure(
   error: unknown,
 ): AiGenerationFailure {
   if (error instanceof AiGenerationError) {
-    return failure(error.code, 'seed_not_found');
+    return {
+      ...failure(error.code, 'seed_not_found'),
+      seedNotFound: {
+        seedType: error.details.seedType,
+        names: error.details.names.slice(0, MAX_ARTISTS),
+      },
+    };
   }
   if (error instanceof CatalogUnavailableError) {
     return failure(error.code, 'provider_unavailable');
@@ -48,7 +55,7 @@ function failure(
   category: AiGenerationFailure['category'],
   retryAfter: number | null = null,
 ): AiGenerationFailure {
-  return { code, category, retryAfterSeconds: retryAfter };
+  return { code, category, retryAfterSeconds: retryAfter, seedNotFound: null };
 }
 
 function retryAfterSeconds(

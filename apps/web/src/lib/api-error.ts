@@ -63,19 +63,30 @@ export function isSpotifyRateLimited(error: unknown): boolean {
   )
 }
 
+export function formatWaitLabel(
+  t: Translate,
+  seconds: number | null | undefined,
+): string | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) {
+    return null
+  }
+  if (seconds < 90) {
+    return t('errors.wait.seconds', { n: Math.ceil(seconds) })
+  }
+  if (seconds < 3600) {
+    return t('errors.wait.minutes', { n: Math.ceil(seconds / 60) })
+  }
+  return t('errors.wait.hours', { n: Math.ceil(seconds / 3600) })
+}
+
 function formatRetryWaitLabel(
   t: Translate,
   seconds: number | null | undefined,
   quotaExceeded: boolean,
 ): string {
-  if (seconds != null && Number.isFinite(seconds) && seconds > 0) {
-    if (seconds < 90) {
-      return t('errors.wait.seconds', { n: Math.ceil(seconds) })
-    }
-    if (seconds < 3600) {
-      return t('errors.wait.minutes', { n: Math.ceil(seconds / 60) })
-    }
-    return t('errors.wait.hours', { n: Math.ceil(seconds / 3600) })
+  const wait = formatWaitLabel(t, seconds)
+  if (wait) {
+    return wait
   }
   return quotaExceeded
     ? t('errors.wait.severalHours')

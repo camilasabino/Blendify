@@ -423,6 +423,7 @@ describe('GenerateAiPlaylistUseCase', () => {
         code: 'AI_SEED_NOT_FOUND',
         category: 'seed_not_found',
         retryAfterSeconds: null,
+        seedNotFound: { seedType: 'artist', names: ['Radiohed'] },
       },
     });
     expect(world.stored.get(TOKEN)?.clarification).toBeNull();

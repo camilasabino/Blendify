@@ -328,6 +328,19 @@ describe('AI session state contract', () => {
             code: 'SPOTIFY_RATE_LIMITED',
             category: 'provider_rate_limited',
             retryAfterSeconds: 30,
+            seedNotFound: null,
+          },
+        },
+      },
+      {
+        ...READY_SESSION,
+        execution: {
+          status: 'generation_failed',
+          error: {
+            code: 'AI_SEED_NOT_FOUND',
+            category: 'seed_not_found',
+            retryAfterSeconds: null,
+            seedNotFound: { seedType: 'artist', names: ['Radiohed'] },
           },
         },
       },
@@ -343,7 +356,43 @@ describe('AI session state contract', () => {
       { status: 'generated', ...outcome, executionPlan: {} },
       {
         status: 'generation_failed',
-        error: { code: 'X', category: 'provider_raw', retryAfterSeconds: null },
+        error: {
+          code: 'X',
+          category: 'provider_raw',
+          retryAfterSeconds: null,
+          seedNotFound: null,
+        },
+      },
+      {
+        status: 'generation_failed',
+        error: {
+          code: 'CATALOG_UNAVAILABLE',
+          category: 'provider_unavailable',
+          retryAfterSeconds: null,
+          seedNotFound: { seedType: 'artist', names: ['Radiohead'] },
+        },
+      },
+      {
+        status: 'generation_failed',
+        error: {
+          code: 'AI_SEED_NOT_FOUND',
+          category: 'seed_not_found',
+          retryAfterSeconds: null,
+          seedNotFound: {
+            seedType: 'artist',
+            names: ['Radiohed'],
+            providerIds: ['spotify:artist:1'],
+          },
+        },
+      },
+      {
+        status: 'generation_failed',
+        error: {
+          code: 'AI_SEED_NOT_FOUND',
+          category: 'seed_not_found',
+          retryAfterSeconds: null,
+          seedNotFound: { seedType: 'artist', names: [] },
+        },
       },
       {
         status: 'generation_failed',
@@ -351,6 +400,7 @@ describe('AI session state contract', () => {
           code: 'X',
           category: 'failed',
           retryAfterSeconds: null,
+          seedNotFound: null,
           providerPayload: {},
         },
       },

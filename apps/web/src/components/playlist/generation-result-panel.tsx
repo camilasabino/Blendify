@@ -19,6 +19,11 @@ import { LastFmAttribution } from '@/components/brand/lastfm-attribution'
 import { SpotifyLogo } from '@/components/brand/spotify-mark'
 import { CoverErrorNotice } from '@/components/playlist/generation-form-shared'
 import { GeneratedTrackList } from '@/components/playlist/generated-track-list'
+import {
+  guestArtwork,
+  phaseMessageKey,
+  type GuestArtwork,
+} from '@/components/playlist/generation-result-helpers'
 import { PlaylistPreview } from '@/components/playlist/playlist-preview'
 import { TransferAction } from '@/components/playlist/transfer-action'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -37,20 +42,7 @@ import {
   cn,
   focusRing,
   formatListeningTime,
-  toSafeHttpsUrl,
-  toSpotifyUrl,
 } from '@/lib/utils'
-
-function phaseMessageKey(phase: GenerationProgress['phase']): MessageKey {
-  switch (phase) {
-    case 'resolving_seeds':
-      return 'create.progressResolving'
-    case 'matching_tracks':
-      return 'create.progressMatching'
-    case 'publishing':
-      return 'create.progressPublishing'
-  }
-}
 
 function etaMessage(
   seconds: number | null | undefined,
@@ -84,7 +76,7 @@ function progressAnnouncement(
   return `${t(phaseMessageKey(progress.phase))}, ${count}`
 }
 
-function GenerationProgressBar({
+export function GenerationProgressBar({
   progress,
   progressLabel,
 }: Readonly<{
@@ -358,17 +350,7 @@ function ReadyResult({
   )
 }
 
-type GuestArtwork = Readonly<{ imageUrl: string; spotifyUrl: string }>
-
-function guestArtwork(
-  artwork: GeneratedPlaylistDto['coverArtwork'],
-): GuestArtwork | null {
-  const imageUrl = toSafeHttpsUrl(artwork?.imageUrl)
-  const spotifyUrl = toSpotifyUrl(artwork?.spotifyUrl)
-  return imageUrl && spotifyUrl ? { imageUrl, spotifyUrl } : null
-}
-
-function GuestCover({ artwork }: Readonly<{ artwork: GuestArtwork | null }>) {
+export function GuestCover({ artwork }: Readonly<{ artwork: GuestArtwork | null }>) {
   const t = useT()
   if (artwork) {
     return (

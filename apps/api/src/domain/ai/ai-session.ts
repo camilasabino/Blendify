@@ -2,18 +2,20 @@ import type {
   AiGeneratedPlaylist,
   AiGenerationFailureCategory,
   AiGenerationUnmetConstraint,
+  AiSeedNotFound,
   PlaylistGeneration,
 } from '@blendify/contracts';
 import type { AiIntent, AiIntentClarification } from './ai-intent';
 import { findIntentClarification } from './ai-intent-rules';
 
-export const AI_SESSION_RECORD_VERSION = 3;
+export const AI_SESSION_RECORD_VERSION = 4;
 export const AI_GENERATION_INTERRUPTED_CODE = 'AI_GENERATION_INTERRUPTED';
 
 export interface AiGenerationFailure {
   code: string;
   category: AiGenerationFailureCategory;
   retryAfterSeconds: number | null;
+  seedNotFound: AiSeedNotFound | null;
 }
 
 export interface AiGenerationResult {
@@ -138,6 +140,7 @@ export function withGenerationInterrupted(
       code: AI_GENERATION_INTERRUPTED_CODE,
       category: 'failed',
       retryAfterSeconds: null,
+      seedNotFound: null,
     },
     now,
   );

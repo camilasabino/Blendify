@@ -23,6 +23,7 @@ type AiPromptFormProps = Readonly<{
   isPending: boolean
   validationError: string | null
   textareaRef: RefObject<HTMLTextAreaElement | null>
+  onCancel?: () => void
 }>
 
 export function AiPromptForm({
@@ -32,6 +33,7 @@ export function AiPromptForm({
   isPending,
   validationError,
   textareaRef,
+  onCancel,
 }: AiPromptFormProps) {
   const t = useT()
   const promptId = useId()
@@ -72,7 +74,7 @@ export function AiPromptForm({
           aria-invalid={validationError ? true : undefined}
           aria-describedby={validationError ? `${errorId} ${hintId}` : hintId}
         />
-        <p id={hintId} className="text-xs text-cream-400">
+        <p id={hintId} className="text-xs text-cream-400 max-sm:hidden pointer-coarse:hidden">
           {t('ai.promptHint')}
         </p>
         <FieldError>
@@ -93,15 +95,22 @@ export function AiPromptForm({
         </ul>
       </div>
 
-      <Button
-        type="submit"
-        size="lg"
-        className="w-full sm:w-auto"
-        loading={isPending}
-      >
-        {!isPending ? <Sparkles aria-hidden className="size-4" /> : null}
-        {isPending ? t('ai.submitting') : t('ai.submit')}
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full sm:w-auto"
+          loading={isPending}
+        >
+          {!isPending ? <Sparkles aria-hidden className="size-4" /> : null}
+          {isPending ? t('ai.submitting') : t('ai.submit')}
+        </Button>
+        {onCancel && !isPending ? (
+          <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onCancel}>
+            {t('ai.cancelEdit')}
+          </Button>
+        ) : null}
+      </div>
     </form>
   )
 }

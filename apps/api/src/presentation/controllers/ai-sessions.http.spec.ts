@@ -826,6 +826,34 @@ describe('Create with AI sessions over HTTP', () => {
     });
   });
 
+  it('restores a missing seed with only the user-authored names', async () => {
+    useWorkingProviders();
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({ artists: ['Radiohed', 'Interpol'] }),
+    );
+    const created = await createSession().expect(201);
+    const sessionId = (created.body as AiSessionDto).sessionId;
+    await generate(sessionId).expect(422);
+    world.catalogFactory.forMarket.mockClear();
+
+    const response = await readSession(sessionId).expect(200);
+
+    const execution = AiSessionStateSchema.parse(response.body).execution;
+    expect(execution).toEqual({
+      status: 'generation_failed',
+      error: {
+        code: 'AI_SEED_NOT_FOUND',
+        category: 'seed_not_found',
+        retryAfterSeconds: null,
+        seedNotFound: { seedType: 'artist', names: ['Radiohed'] },
+      },
+    });
+    expect(JSON.stringify(execution)).not.toMatch(
+      /Interpol|spotify|"id"|imageUrl/,
+    );
+    expectNoReadSideEffects(1);
+  });
+
   it('keeps the Spotify quota category and Retry-After for generation', async () => {
     const created = await createSession().expect(201);
 
@@ -940,6 +968,7 @@ describe('Create with AI sessions over HTTP', () => {
         code: 'SPOTIFY_QUOTA_EXCEEDED',
         category: 'provider_rate_limited',
         retryAfterSeconds: 3_600,
+        seedNotFound: null,
       },
     });
     expectNoReadSideEffects(1);
@@ -975,6 +1004,7 @@ describe('Create with AI sessions over HTTP', () => {
         code: 'AI_GENERATION_INTERRUPTED',
         category: 'failed',
         retryAfterSeconds: null,
+        seedNotFound: null,
       },
     });
     expect(interrupted.text).not.toMatch(/attempt|lease|startedAt|failedAt/);

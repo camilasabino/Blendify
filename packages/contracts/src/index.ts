@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const MAX_ARTISTS = 12;
 export const MAX_GENRES = 5;
+export const PLAYLIST_NAME_MAX_LENGTH = 100;
 export const MAX_TRACKS = 50;
 export const TRANSFER_TOKEN_MAX_LENGTH = 48_000;
 
@@ -150,7 +151,7 @@ export const PlaylistGenerationSchema = z.discriminatedUnion('kind', [
 ]);
 
 const PlaylistMetadataSchema = z.object({
-  name: z.string().max(100).default(''),
+  name: z.string().max(PLAYLIST_NAME_MAX_LENGTH).default(''),
   description: z.string().max(300).default(''),
   coverImageBase64: z.string().min(1).max(400_000).optional(),
   persistToLibrary: z.boolean().default(true),
@@ -217,7 +218,7 @@ export const GenerateDiscoverRequestSchema = z.discriminatedUnion('kind', [
 ]);
 
 export const RenamePlaylistRequestSchema = z.object({
-  name: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1).max(PLAYLIST_NAME_MAX_LENGTH),
 }).strict();
 
 export const BulkLibraryRequestSchema = z.object({
@@ -580,11 +581,28 @@ export const AiGenerationSchema = z.strictObject({
   ...aiGenerationOutcomeShape,
 });
 
-export const AiGenerationFailureSchema = z.strictObject({
-  code: z.string().min(1),
-  category: z.enum(AI_GENERATION_FAILURE_CATEGORIES),
-  retryAfterSeconds: z.number().nonnegative().nullable(),
+export const AI_SEED_NOT_FOUND_NAME_MAX_LENGTH = 403;
+
+export const AiSeedNotFoundSchema = z.strictObject({
+  seedType: AiSeedTypeSchema,
+  names: z
+    .array(z.string().min(1).max(AI_SEED_NOT_FOUND_NAME_MAX_LENGTH))
+    .min(1)
+    .max(MAX_ARTISTS),
 });
+
+export const AiGenerationFailureSchema = z
+  .strictObject({
+    code: z.string().min(1),
+    category: z.enum(AI_GENERATION_FAILURE_CATEGORIES),
+    retryAfterSeconds: z.number().nonnegative().nullable(),
+    seedNotFound: AiSeedNotFoundSchema.nullable(),
+  })
+  .refine(
+    (failure) =>
+      failure.seedNotFound === null || failure.category === 'seed_not_found',
+    { path: ['seedNotFound'] },
+  );
 
 export const AiSessionExecutionSchema = z.discriminatedUnion('status', [
   z.strictObject({ status: z.literal('generating') }),
@@ -685,6 +703,7 @@ export type AiGenerationUnmetConstraint = z.infer<
 export type AiGenerationDto = z.infer<typeof AiGenerationSchema>;
 export type AiGenerationFailureCategory =
   (typeof AI_GENERATION_FAILURE_CATEGORIES)[number];
+export type AiSeedNotFound = z.infer<typeof AiSeedNotFoundSchema>;
 export type AiGenerationFailureDto = z.infer<typeof AiGenerationFailureSchema>;
 export type AiSessionExecutionDto = z.infer<typeof AiSessionExecutionSchema>;
 export type AiSessionStateDto = z.infer<typeof AiSessionStateSchema>;

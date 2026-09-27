@@ -1,0 +1,159 @@
+import type {
+  AiClarification,
+  AiGenerationFailureDto,
+  AiGenerationUnmetConstraint,
+  AiIntentSummary,
+  AiSessionStateDto,
+  TrackDto,
+} from '@blendify/contracts'
+
+export const AI_REVIEW_SESSION_ID = 'visual-review-session'
+export const AI_REVIEW_PROMPT =
+  'About an hour of happy deep cuts from Radiohead and Interpol, 30 songs, no Coldplay, for a long run'
+export const AI_REVIEW_COVER_URL = 'https://artwork.blendify.test/cover.svg'
+
+const EXPIRES_AT = '2099-01-01T00:00:00.000Z'
+const TRACK_TITLES = [
+  'Paper Satellites',
+  'Glass Harbour',
+  'Northbound Static',
+  'The Quiet Engine',
+  'Lanterns Over Tin',
+  'Midnight Cartography',
+  'Signal and Salt',
+  'A Long Way to Blue',
+  'Copper Weather',
+  'Hollow Parade',
+]
+const SYNTHETIC_ARTISTS = ['The Lantern Cartel', 'Mira Vale', 'Northern Arcade']
+
+export const reviewIntent: AiIntentSummary = {
+  kind: 'artist_mix',
+  artists: ['Radiohead', 'Interpol'],
+  genres: [],
+  seedTrack: null,
+  targetTrackCount: 30,
+  targetDurationMinutes: 60,
+  mood: 'happy',
+  popularity: 'rarities',
+  orderMode: null,
+  excludeArtists: ['Coldplay'],
+  excludeTracks: [],
+  unmetConstraints: [],
+}
+
+export const unsupportedIntent: AiIntentSummary = {
+  ...reviewIntent,
+  unmetConstraints: [
+    { category: 'activity', userText: 'for a long run' },
+    { category: 'era', userText: 'from the early 2000s' },
+  ],
+}
+
+export const clarification: AiClarification = {
+  reason: 'too_many_seeds',
+  seedType: 'artist',
+  limit: 1,
+  names: ['Radiohead', 'Interpol'],
+  unsupportedConstraints: [],
+  options: [
+    { id: 'keep_seed:artist:0', type: 'keep_seed', seedType: 'artist', label: 'Radiohead' },
+    { id: 'keep_seed:artist:1', type: 'keep_seed', seedType: 'artist', label: 'Interpol' },
+    { id: 'set_kind:artist_mix', type: 'set_kind', kind: 'artist_mix' },
+  ],
+}
+
+function syntheticTrack(index: number): TrackDto {
+  const artist = SYNTHETIC_ARTISTS[index % SYNTHETIC_ARTISTS.length]
+  const title = TRACK_TITLES[index % TRACK_TITLES.length]
+  return {
+    id: `visual-track-${index}`,
+    name: index < TRACK_TITLES.length ? title : `${title} (Reprise ${index})`,
+    artistId: `visual-artist-${index % SYNTHETIC_ARTISTS.length}`,
+    artistName: artist,
+    artists: [{ name: artist }],
+    albumName: 'Synthetic Sessions',
+    durationMs: 150_000 + (index % 5) * 17_000,
+    popularity: 30,
+    uri: `visual:track:${index}`,
+  }
+}
+
+function state(
+  intent: AiIntentSummary,
+  execution: AiSessionStateDto['execution'],
+): AiSessionStateDto {
+  return {
+    sessionId: AI_REVIEW_SESSION_ID,
+    expiresAt: EXPIRES_AT,
+    status: 'ready',
+    intent,
+    clarification: null,
+    execution,
+  }
+}
+
+export function clarificationState(): AiSessionStateDto {
+  return {
+    sessionId: AI_REVIEW_SESSION_ID,
+    expiresAt: EXPIRES_AT,
+    status: 'needs_clarification',
+    intent: null,
+    clarification,
+    execution: null,
+  }
+}
+
+export function reviewedState(intent: AiIntentSummary = reviewIntent): AiSessionStateDto {
+  return state(intent, null)
+}
+
+export function generatingState(): AiSessionStateDto {
+  return state(reviewIntent, { status: 'generating' })
+}
+
+export function generatedState(
+  options: {
+    trackCount?: number
+    requestedTrackCount?: number | null
+    requestedMinutes?: number | null
+    unmetConstraints?: AiGenerationUnmetConstraint[]
+    withArtwork?: boolean
+  } = {},
+): AiSessionStateDto {
+  const tracks = Array.from({ length: options.trackCount ?? 20 }, (_, index) =>
+    syntheticTrack(index),
+  )
+  const intent: AiIntentSummary = {
+    ...unsupportedIntent,
+    targetTrackCount: options.requestedTrackCount ?? null,
+    targetDurationMinutes: options.requestedMinutes ?? null,
+  }
+  return state(intent, {
+    status: 'generated',
+    playlist: {
+      name: 'Blendify · Mix · Radiohead + Interpol',
+      description: 'Made with Blendify from Radiohead and Interpol.',
+      seeds: [
+        { type: 'artist', id: 'visual-seed-1', name: 'Radiohead' },
+        { type: 'artist', id: 'visual-seed-2', name: 'Interpol' },
+      ],
+      tracks,
+      ...(options.withArtwork
+        ? {
+            coverArtwork: {
+              imageUrl: AI_REVIEW_COVER_URL,
+              spotifyUrl: 'https://open.spotify.com/album/visual-review',
+            },
+          }
+        : {}),
+    },
+    trackCount: tracks.length,
+    durationMs: tracks.reduce((total, track) => total + track.durationMs, 0),
+    unmetConstraints: options.unmetConstraints ?? [],
+  })
+}
+
+export function failedState(error: AiGenerationFailureDto): AiSessionStateDto {
+  return state(reviewIntent, { status: 'generation_failed', error })
+}
