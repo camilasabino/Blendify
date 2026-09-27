@@ -1,8 +1,8 @@
 import { PlaylistGenerationService } from './playlist-generation.service';
-import { Track } from '../track/track.entity';
-import { TrackId } from '../value-objects/track-id.vo';
-import { ArtistId } from '../value-objects/artist-id.vo';
-import { MAX_TRACKS } from '../constants';
+import { Track } from '@/domain/track/track.entity';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { MAX_TRACKS } from '@/domain/constants';
 import { TrackOrderMode } from '@blendify/contracts';
 
 function simpleTracks(artistId: string, names: string[]): Track[] {

@@ -2,8 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   PLAYLIST_REPOSITORY,
   PlaylistRepositoryPort,
-} from '../../domain/repositories/playlist.repository.port';
-import { toPlaylistSummary } from '../dto/playlist-response.dto';
+} from '@/domain/repositories/playlist.repository.port';
+import { toPlaylistSummary } from '@/application/dto/playlist-response.dto';
 import type { PlaylistLibraryPage } from '@blendify/contracts';
 
 @Injectable()

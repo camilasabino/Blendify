@@ -1,9 +1,9 @@
 import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
 import type { Playlist as PlaylistModel } from '@prisma/client';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import { Track } from '../../domain/track/track.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import { PrismaPlaylistRepository } from './prisma-playlist.repository';
 import type { PrismaService } from './prisma.service';
 

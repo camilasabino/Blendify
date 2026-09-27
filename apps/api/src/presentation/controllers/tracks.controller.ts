@@ -1,10 +1,10 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { OptionalJwtAuthGuard } from '../../infrastructure/auth/optional-jwt-auth.guard';
-import { SearchTracksUseCase } from '../../application/use-cases/search-tracks.use-case';
+import { OptionalJwtAuthGuard } from '@/infrastructure/auth/optional-jwt-auth.guard';
+import { SearchTracksUseCase } from '@/application/use-cases/search-tracks.use-case';
 import { SearchQuerySchema, type SearchQuery } from '@blendify/contracts';
-import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
-import { RateLimit } from '../request-limits/rate-limit.guard';
+import { ZodValidationPipe } from '@/presentation/pipes/zod-validation.pipe';
+import { RateLimit } from '@/presentation/request-limits/rate-limit.guard';
 
 @ApiTags('tracks')
 @UseGuards(OptionalJwtAuthGuard)

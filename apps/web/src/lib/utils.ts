@@ -16,7 +16,9 @@ export const focusWithinRing =
   'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus'
 
 export function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return '0:00'
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return '0:00'
+  }
   const totalSeconds = Math.round(ms / 1000)
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
@@ -32,7 +34,9 @@ export function formatListeningTime(ms: number): string {
     Number.isFinite(ms) && ms > 0 ? Math.max(1, Math.round(ms / 60_000)) : 0
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
-  if (hours === 0) return `${totalMinutes} min`
+  if (hours === 0) {
+    return `${totalMinutes} min`
+  }
   return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`
 }
 
@@ -42,7 +46,9 @@ export function formatShortDate(
   now: Date = new Date(),
 ): string {
   const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) {
+    return '—'
+  }
   const localeTag = locale === 'pt' ? 'pt-BR' : locale
   const sameYear = date.getFullYear() === now.getFullYear()
   return new Intl.DateTimeFormat(localeTag ?? undefined, {
@@ -74,12 +80,16 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 export const PLAYLIST_TRACK_CAP = 50
 
 export function maxTracksPerArtist(artistCount: number): number {
-  if (artistCount <= 0) return PLAYLIST_TRACK_CAP
+  if (artistCount <= 0) {
+    return PLAYLIST_TRACK_CAP
+  }
   return Math.floor(PLAYLIST_TRACK_CAP / artistCount)
 }
 
 export function maxTracksPerGenre(genreCount: number): number {
-  if (genreCount <= 0) return PLAYLIST_TRACK_CAP
+  if (genreCount <= 0) {
+    return PLAYLIST_TRACK_CAP
+  }
   return Math.floor(PLAYLIST_TRACK_CAP / genreCount)
 }
 
@@ -94,7 +104,9 @@ export function estimateTrackCount(
 
 export function formatDateTime(iso: string, locale?: string): string {
   const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) {
+    return '—'
+  }
   const localeTag = locale === 'pt' ? 'pt-BR' : locale
   return new Intl.DateTimeFormat(localeTag ?? undefined, {
     month: 'short',
@@ -105,7 +117,9 @@ export function formatDateTime(iso: string, locale?: string): string {
 }
 
 export function toSafeHttpsUrl(value: string | null | undefined): string | null {
-  if (!value) return null
+  if (!value) {
+    return null
+  }
   try {
     const url = new URL(value)
     return url.protocol === 'https:' ? url.href : null
@@ -116,7 +130,9 @@ export function toSafeHttpsUrl(value: string | null | undefined): string | null 
 
 export function toSpotifyUrl(value: string | null | undefined): string | null {
   const safe = toSafeHttpsUrl(value)
-  if (!safe) return null
+  if (!safe) {
+    return null
+  }
   return new URL(safe).hostname === 'open.spotify.com' ? safe : null
 }
 

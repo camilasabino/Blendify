@@ -1,5 +1,5 @@
 import type { Provider } from '@nestjs/common';
-import { MemoryRequestLimitStore } from '../../infrastructure/request-limits/memory-request-limit.store';
+import { MemoryRequestLimitStore } from '@/infrastructure/request-limits/memory-request-limit.store';
 import { GenerationConcurrencyInterceptor } from './generation-concurrency.interceptor';
 import { RateLimitGuard } from './rate-limit.guard';
 import { RequestLimiter } from './request-limiter';

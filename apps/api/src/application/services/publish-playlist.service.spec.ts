@@ -1,10 +1,10 @@
 import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
-import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
-import type { PlaylistRepositoryPort } from '../../domain/repositories/playlist.repository.port';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import { Track } from '../../domain/track/track.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
+import type { MusicProviderPort } from '@/domain/repositories/music-provider.port';
+import type { PlaylistRepositoryPort } from '@/domain/repositories/playlist.repository.port';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import { PublishPlaylistService } from './publish-playlist.service';
 
 function makePlaylist(): Playlist {

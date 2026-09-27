@@ -1,4 +1,4 @@
-import type { TransferPlaylist } from '../transfer/transfer-playlist';
+import type { TransferPlaylist } from '@/domain/transfer/transfer-playlist';
 
 export const PLAYLIST_TRANSFER_GATEWAY = 'PLAYLIST_TRANSFER_GATEWAY' as const;
 

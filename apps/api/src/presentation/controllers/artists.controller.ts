@@ -1,15 +1,15 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import { OptionalJwtAuthGuard } from '../../infrastructure/auth/optional-jwt-auth.guard';
-import { SearchArtistsUseCase } from '../../application/use-cases/search-artists.use-case';
-import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
+import { OptionalJwtAuthGuard } from '@/infrastructure/auth/optional-jwt-auth.guard';
+import { SearchArtistsUseCase } from '@/application/use-cases/search-artists.use-case';
+import { ZodValidationPipe } from '@/presentation/pipes/zod-validation.pipe';
 import {
   MAX_ARTISTS,
   SearchQuerySchema,
   type SearchQuery,
 } from '@blendify/contracts';
-import { RateLimit } from '../request-limits/rate-limit.guard';
+import { RateLimit } from '@/presentation/request-limits/rate-limit.guard';
 
 const ResolveArtistsSchema = z.object({
   names: z.array(z.string().trim().min(1)).max(MAX_ARTISTS),

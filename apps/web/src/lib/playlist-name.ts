@@ -15,7 +15,9 @@ export function buildDefaultPlaylistName(input: {
   names: string[]
 }): string {
   const names = input.names.map((n) => n.trim()).filter(Boolean)
-  if (names.length === 0) return `${GENERATED_NAME_PREFIX}Mix`
+  if (names.length === 0) {
+    return `${GENERATED_NAME_PREFIX}Mix`
+  }
 
   let seeds: string
   if (names.length === 1) {

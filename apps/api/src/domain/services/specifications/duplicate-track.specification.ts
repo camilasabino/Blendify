@@ -1,5 +1,5 @@
-import { Track } from '../../track/track.entity';
-import { TrackNormalizer } from '../track-normalizer';
+import { Track } from '@/domain/track/track.entity';
+import { TrackNormalizer } from '@/domain/services/track-normalizer';
 
 export class DuplicateTrackSpecification {
   constructor(

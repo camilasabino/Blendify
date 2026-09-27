@@ -128,7 +128,9 @@ export function recreateNote(
   result: GenerationOutcome | null,
   t: ReturnType<typeof useT>,
 ): string | null {
-  if (!result) return null
+  if (!result) {
+    return null
+  }
   return result.mode === 'spotify'
     ? t('create.recreateNote')
     : t('create.recreateNoteGuest')

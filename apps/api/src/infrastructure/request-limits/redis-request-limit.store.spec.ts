@@ -1,4 +1,4 @@
-import type { RedisConnection } from '../cache/redis-connection';
+import type { RedisConnection } from '@/infrastructure/cache/redis-connection';
 import {
   ACQUIRE_SCRIPT,
   HIT_SCRIPT,

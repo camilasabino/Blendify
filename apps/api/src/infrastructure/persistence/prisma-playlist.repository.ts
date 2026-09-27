@@ -9,15 +9,15 @@ import {
   PlaylistSeedSchema,
   type PlaylistSeedDto,
 } from '@blendify/contracts';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import { PlaylistName } from '../../domain/value-objects/playlist-name.vo';
-import { Track, type TrackArtist } from '../../domain/track/track.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import { PlaylistName } from '@/domain/value-objects/playlist-name.vo';
+import { Track, type TrackArtist } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import {
   PlaylistRepositoryPort,
   type PlaylistLibraryFilter,
-} from '../../domain/repositories/playlist.repository.port';
+} from '@/domain/repositories/playlist.repository.port';
 import { PrismaService } from './prisma.service';
 
 interface TrackJson {
@@ -133,7 +133,9 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
   }
 
   async deleteMany(userId: string, ids: string[]): Promise<void> {
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      return;
+    }
     await this.prisma.playlist.deleteMany({
       where: { userId, id: { in: ids } },
     });

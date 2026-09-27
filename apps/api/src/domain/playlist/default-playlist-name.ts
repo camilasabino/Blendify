@@ -1,8 +1,12 @@
 export function buildDefaultPlaylistName(input: { names: string[] }): string {
   const names = input.names.map((n) => n.trim()).filter(Boolean);
 
-  if (names.length === 0) return 'Blendify · Mix';
-  if (names.length === 1) return truncate(`Blendify · Mix · ${names[0]}`);
+  if (names.length === 0) {
+    return 'Blendify · Mix';
+  }
+  if (names.length === 1) {
+    return truncate(`Blendify · Mix · ${names[0]}`);
+  }
   if (names.length === 2) {
     return truncate(`Blendify · Mix · ${names[0]} + ${names[1]}`);
   }

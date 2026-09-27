@@ -1,20 +1,21 @@
 import { Logger } from '@nestjs/common';
 import axios, { type AxiosRequestConfig } from 'axios';
-import { Artist } from '../../domain/artist/artist.entity';
-import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
+import { Artist } from '@/domain/artist/artist.entity';
+import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import {
   isFatalCatalogError,
   isSpotifyQuotaError,
-} from '../../domain/genre/catalog-resolve';
-import type {
-  CatalogProviderPort,
-  ResolveTrackOptions,
-  SearchTracksOptions,
-} from '../../domain/repositories/catalog-provider.port';
-import { Track, type TrackArtist } from '../../domain/track/track.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
-import { RedisCacheService } from '../cache/redis-cache.service';
+} from '@/domain/genre/catalog-resolve';
+import {
+  CATALOG_MATCH_SEARCH_LIMIT,
+  type CatalogProviderPort,
+  type ResolveTrackOptions,
+  type SearchTracksOptions,
+} from '@/domain/repositories/catalog-provider.port';
+import { Track, type TrackArtist } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import { pickResolvedTrack } from './pick-resolved-track';
 import { SpotifyApiClient } from './spotify-api.client';
 
@@ -87,7 +88,9 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
     const safeLimit = Math.min(Math.max(limit, 1), 10);
     const key = this.cacheKey('search-artists', query, safeLimit);
     const cached = await this.cache?.getJson<CachedArtist[]>(key);
-    if (cached) return cached.map(hydrateArtist);
+    if (cached) {
+      return cached.map(hydrateArtist);
+    }
 
     const data = await this.request<{
       artists: { items: SpotifyArtist[] };
@@ -122,7 +125,9 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
     const offset = Math.max(options.offset ?? 0, 0);
     const key = this.cacheKey('search-tracks', query, safeLimit, offset);
     const cached = await this.cache?.getJson<CachedTrack[]>(key);
-    if (cached) return cached.map(hydrateTrack);
+    if (cached) {
+      return cached.map(hydrateTrack);
+    }
 
     const data = await this.request<{
       tracks: { items: SpotifyTrack[] };
@@ -156,7 +161,9 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
   ): Promise<Track | null> {
     const artist = artistName.trim();
     const title = trackName.trim();
-    if (!artist || !title) return null;
+    if (!artist || !title) {
+      return null;
+    }
     const expectedArtistId = options.artistId?.trim() || undefined;
 
     try {
@@ -168,7 +175,7 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
         params: {
           q: `track:"${title}" artist:"${artist}"`,
           type: 'track',
-          limit: 10,
+          limit: CATALOG_MATCH_SEARCH_LIMIT,
           offset: 0,
           ...this.marketParam(),
         },
@@ -184,7 +191,9 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
           )
         : items;
 
-      if (scoped.length === 0) return null;
+      if (scoped.length === 0) {
+        return null;
+      }
 
       const tracks = scoped.map((item) => {
         const credited =
@@ -201,7 +210,9 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
         requireArtistNameMatch: !expectedArtistId,
       });
     } catch (error) {
-      if (isFatalCatalogError(error)) throw error;
+      if (isFatalCatalogError(error)) {
+        throw error;
+      }
       this.logger.warn(
         `resolveTrack failed for "${artist}" — "${title}": ${errorMessage(error)}`,
       );
@@ -210,14 +221,19 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
   }
 
   async getArtistsByIds(ids: string[]): Promise<Artist[]> {
-    if (ids.length === 0) return [];
+    if (ids.length === 0) {
+      return [];
+    }
     const byId = new Map<string, Artist>();
     const missing: string[] = [];
 
     for (const id of ids) {
       const cached = await this.getCachedArtist(id);
-      if (cached) byId.set(id, cached);
-      else missing.push(id);
+      if (cached) {
+        byId.set(id, cached);
+      } else {
+        missing.push(id);
+      }
     }
 
     for (const id of missing) {
@@ -280,7 +296,9 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
     try {
       return await this.tokens.getAccessToken();
     } catch (error) {
-      if (isSpotifyQuotaError(error)) throw error;
+      if (isSpotifyQuotaError(error)) {
+        throw error;
+      }
       throw new CatalogUnavailableError({ cause: error });
     }
   }
@@ -294,7 +312,9 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
   }
 
   private getCachedArtist(id: string): Promise<Artist | null> {
-    if (!this.cache) return Promise.resolve(null);
+    if (!this.cache) {
+      return Promise.resolve(null);
+    }
     return this.cache
       .getJson<CachedArtist>(`spotify:artist:${id}`)
       .then((artist) => (artist ? hydrateArtist(artist) : null));
@@ -399,7 +419,9 @@ function hydrateTrack(track: CachedTrack): Track {
 }
 
 function isProviderUnavailable(error: unknown): boolean {
-  if (!axios.isAxiosError(error)) return false;
+  if (!axios.isAxiosError(error)) {
+    return false;
+  }
   const status = error.response?.status;
   return status === undefined || status === 403 || status >= 500;
 }

@@ -1,5 +1,5 @@
 import { Artist } from './artist.entity';
-import { ArtistId } from '../value-objects/artist-id.vo';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import {
   normalizeArtistName,
   pickBestArtistMatch,

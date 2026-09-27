@@ -1,4 +1,4 @@
-import { Track } from '../track/track.entity';
+import { Track } from '@/domain/track/track.entity';
 import { AlternateVersionSpecification } from './specifications/alternate-version.specification';
 import { DuplicateTrackSpecification } from './specifications/duplicate-track.specification';
 

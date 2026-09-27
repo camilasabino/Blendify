@@ -104,13 +104,17 @@ function mixValidationError(
   t: ReturnType<typeof useT>,
 ): string | null {
   if (mode === 'artists') {
-    if (artistCount === 0) return t('create.addArtist')
+    if (artistCount === 0) {
+      return t('create.addArtist')
+    }
     if (artistCount > MAX_ARTISTS) {
       return t('create.maxArtists', { max: MAX_ARTISTS })
     }
     return null
   }
-  if (genreCount === 0) return t('create.addGenre')
+  if (genreCount === 0) {
+    return t('create.addGenre')
+  }
   if (genreCount > MAX_GENRES) {
     return t('create.maxGenres', { max: MAX_GENRES })
   }
@@ -118,7 +122,9 @@ function mixValidationError(
 }
 
 function mixRequestedTrackCount(result: GenerationOutcome | null): number {
-  if (!result) return 0
+  if (!result) {
+    return 0
+  }
   const { generation } = result.playlist
   if (generation.kind === 'artist_mix' || generation.kind === 'genre_mix') {
     return generation.tracksPerSeed * generation.seeds.length
@@ -132,8 +138,12 @@ function mixDisabledReason(
   genreCount: number,
   t: ReturnType<typeof useT>,
 ): string | null {
-  if (mode === 'artists' && artistCount === 0) return t('create.needArtist')
-  if (mode === 'genres' && genreCount === 0) return t('create.needGenre')
+  if (mode === 'artists' && artistCount === 0) {
+    return t('create.needArtist')
+  }
+  if (mode === 'genres' && genreCount === 0) {
+    return t('create.needGenre')
+  }
   return null
 }
 
@@ -386,7 +396,9 @@ export function MixPlaylistForm() {
       runMixGeneration({
         ...run,
         onProgress: (p) => {
-          if (isCurrentGeneration(run.epoch)) setProgress(p)
+          if (isCurrentGeneration(run.epoch)) {
+            setProgress(p)
+          }
         },
       }),
     onMutate: () => {
@@ -394,7 +406,9 @@ export function MixPlaylistForm() {
     },
     onSuccess: (outcome, run) => {
       useGenerationStore.getState().finish(run.epoch)
-      if (!isCurrentGeneration(run.epoch)) return
+      if (!isCurrentGeneration(run.epoch)) {
+        return
+      }
       setResult(outcome)
       setProgress(null)
       if (outcome.mode === 'spotify') {
@@ -404,7 +418,9 @@ export function MixPlaylistForm() {
     },
     onError: (_error, run) => {
       useGenerationStore.getState().finish(run.epoch)
-      if (!isCurrentGeneration(run.epoch)) return
+      if (!isCurrentGeneration(run.epoch)) {
+        return
+      }
       setProgress(null)
     },
   })
@@ -416,7 +432,9 @@ export function MixPlaylistForm() {
       setArtists((prev) => {
         const map = new Map(prev.map((a) => [a.id, a]))
         for (const artist of data.artists) {
-          if (map.size >= MAX_ARTISTS) break
+          if (map.size >= MAX_ARTISTS) {
+            break
+          }
           map.set(artist.id, artist)
         }
         return Array.from(map.values())
@@ -456,7 +474,9 @@ export function MixPlaylistForm() {
       if (prev.some((g) => g.id === genre.id)) {
         return prev.filter((g) => g.id !== genre.id)
       }
-      if (prev.length >= MAX_GENRES) return prev
+      if (prev.length >= MAX_GENRES) {
+        return prev
+      }
       return [...prev, genre]
     })
   }

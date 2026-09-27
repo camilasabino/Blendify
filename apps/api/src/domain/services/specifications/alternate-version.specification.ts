@@ -1,5 +1,5 @@
-import { ALTERNATE_KEYWORDS } from '../../constants';
-import { Track } from '../../track/track.entity';
+import { ALTERNATE_KEYWORDS } from '@/domain/constants';
+import { Track } from '@/domain/track/track.entity';
 
 function keywordPattern(keyword: string): RegExp {
   const escaped = keyword.replaceAll(/\s+/g, String.raw`\s+`);

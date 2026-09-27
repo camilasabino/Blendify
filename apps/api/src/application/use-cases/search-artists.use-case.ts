@@ -2,21 +2,23 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   CATALOG_PROVIDER_FACTORY,
   type CatalogProviderFactoryPort,
-} from '../../domain/repositories/catalog-provider.port';
+} from '@/domain/repositories/catalog-provider.port';
 import {
   DISCOVERY_CATALOG,
   type DiscoveryCatalogPort,
-} from '../../domain/repositories/discovery-catalog.port';
+} from '@/domain/repositories/discovery-catalog.port';
 import {
   normalizeArtistName,
   pickBestArtistMatch,
-} from '../../domain/artist/artist-name-match';
-import { artistNameVariants } from '../../domain/discovery/similar-track-query';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+} from '@/domain/artist/artist-name-match';
+import { artistNameVariants } from '@/domain/discovery/similar-track-query';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import type { ArtistDto } from '@blendify/contracts';
 import { z } from 'zod';
 
 const LASTFM_NAME_LIMIT = 40;
+const DEFAULT_SIMILAR_ARTISTS_LIMIT = 8;
+const MAX_SIMILAR_ARTISTS_LIMIT = 16;
 const SearchArtistsSchema = z.object({
   query: z.string().trim().min(1).max(100),
   limit: z.number().int().min(1).max(50).default(10),
@@ -91,7 +93,10 @@ export class SearchArtistsUseCase {
       return { artists: [], hasMore: false, source: 'lastfm' };
     }
 
-    const limit = Math.min(Math.max(options.limit ?? 8, 1), 16);
+    const limit = Math.min(
+      Math.max(options.limit ?? DEFAULT_SIMILAR_ARTISTS_LIMIT, 1),
+      MAX_SIMILAR_ARTISTS_LIMIT,
+    );
     const offset = Math.max(options.offset ?? 0, 0);
     // Exclude seed aliases too (e.g. "Yusuf" / "Cat Stevens" for the Spotify
     // combined name) so "More like" does not suggest the same artist back.
@@ -126,7 +131,9 @@ export class SearchArtistsUseCase {
         source: 'lastfm',
       };
     } catch (error) {
-      if (error instanceof BusinessRuleError) throw error;
+      if (error instanceof BusinessRuleError) {
+        throw error;
+      }
       this.logger.warn(
         `Last.fm similar failed: ${
           error instanceof Error ? error.message : String(error)

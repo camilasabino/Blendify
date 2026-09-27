@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { Server } from 'node:http';
 import request from 'supertest';
 import { HealthController } from './health.controller';
-import { PrismaService } from '../../infrastructure/persistence/prisma.service';
+import { PrismaService } from '@/infrastructure/persistence/prisma.service';
 
 describe('HealthController', () => {
   let app: INestApplication;

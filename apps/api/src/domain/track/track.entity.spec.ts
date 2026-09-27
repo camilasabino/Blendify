@@ -1,5 +1,5 @@
-import { ArtistId } from '../value-objects/artist-id.vo';
-import { TrackId } from '../value-objects/track-id.vo';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import { Track } from './track.entity';
 
 function baseProps() {

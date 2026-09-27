@@ -9,21 +9,21 @@ import type { z } from 'zod';
 import {
   MUSIC_PROVIDER_FACTORY,
   type MusicProviderFactoryPort,
-} from '../../domain/repositories/music-provider.factory.port';
+} from '@/domain/repositories/music-provider.factory.port';
 import {
   USER_REPOSITORY,
   UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
+} from '@/domain/repositories/user.repository.port';
 import {
   USAGE_STATS_REPOSITORY,
   UsageStatsRepositoryPort,
   type SeedUsageInput,
-} from '../../domain/repositories/usage-stats.repository.port';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import { PublishPlaylistService } from '../services/publish-playlist.service';
-import type { ProgressReporter } from '../services/generation-progress.tracker';
+} from '@/domain/repositories/usage-stats.repository.port';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import { PublishPlaylistService } from '@/application/services/publish-playlist.service';
+import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import { GeneratePlaylistUseCase } from './generate-playlist.use-case';
 
 export type SpotifyPlaylistRequest =

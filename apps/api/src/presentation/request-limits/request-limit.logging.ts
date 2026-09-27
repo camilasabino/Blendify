@@ -28,7 +28,9 @@ export function logRequestLimitEvent(
     const now = options.now ?? Date.now();
     const key = `${event}:${options.throttleKey}`;
     const last = lastLoggedAt.get(key);
-    if (last !== undefined && now - last < THROTTLE_MS) return;
+    if (last !== undefined && now - last < THROTTLE_MS) {
+      return;
+    }
     lastLoggedAt.set(key, now);
   }
   logger.warn(JSON.stringify({ event, ...fields }));

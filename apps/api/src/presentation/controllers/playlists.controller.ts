@@ -24,27 +24,27 @@ import {
 } from '@blendify/contracts';
 import type { z } from 'zod';
 import type { Request, Response } from 'express';
-import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
+import { JwtAuthGuard } from '@/infrastructure/auth/jwt-auth.guard';
 import {
   CreateSpotifyPlaylistUseCase,
   type SpotifyPlaylistRequest,
-} from '../../application/use-cases/create-spotify-playlist.use-case';
-import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
-import { SyncLibraryUseCase } from '../../application/use-cases/sync-library.use-case';
-import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
-import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
-import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
-import { BulkLibraryUseCase } from '../../application/use-cases/bulk-library.use-case';
-import { CurrentUser } from '../decorators/current-user.decorator';
-import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
-import { User } from '../../domain/user/user.entity';
+} from '@/application/use-cases/create-spotify-playlist.use-case';
+import { ListLibraryPlaylistsUseCase } from '@/application/use-cases/list-library-playlists.use-case';
+import { SyncLibraryUseCase } from '@/application/use-cases/sync-library.use-case';
+import { GetPlaylistDetailUseCase } from '@/application/use-cases/get-playlist-detail.use-case';
+import { RenamePlaylistUseCase } from '@/application/use-cases/rename-playlist.use-case';
+import { RemovePlaylistFromLibraryUseCase } from '@/application/use-cases/remove-playlist-from-library.use-case';
+import { BulkLibraryUseCase } from '@/application/use-cases/bulk-library.use-case';
+import { CurrentUser } from '@/presentation/decorators/current-user.decorator';
+import { ZodValidationPipe } from '@/presentation/pipes/zod-validation.pipe';
+import { User } from '@/domain/user/user.entity';
 import {
   acceptsNdjson,
   writeNdjsonGeneration,
-} from '../http/ndjson-generation';
-import type { ProgressReporter } from '../../application/services/generation-progress.tracker';
-import { RateLimit } from '../request-limits/rate-limit.guard';
-import { LimitGenerationConcurrency } from '../request-limits/generation-concurrency.interceptor';
+} from '@/presentation/http/ndjson-generation';
+import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
+import { RateLimit } from '@/presentation/request-limits/rate-limit.guard';
+import { LimitGenerationConcurrency } from '@/presentation/request-limits/generation-concurrency.interceptor';
 
 type MixRequest = z.output<typeof CreateMixRequestSchema>;
 type DiscoverRequest = z.output<typeof CreateDiscoverRequestSchema>;

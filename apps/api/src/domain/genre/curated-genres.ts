@@ -31,7 +31,9 @@ function loadCatalog(): CuratedGenre[] {
   ];
 
   for (const path of candidates) {
-    if (!existsSync(path)) continue;
+    if (!existsSync(path)) {
+      continue;
+    }
     const rows = JSON.parse(readFileSync(path, 'utf8')) as GenreJsonRow[];
     return rows.map((row) => {
       const tag = canonicalizeGenreTag(row.spotifyGenre);
@@ -115,12 +117,16 @@ const featuredMains: CuratedGenre[] = FEATURED_SPOTIFY_GENRES.map((spotify) =>
 
 export function findCuratedGenre(idOrName: string): CuratedGenre | undefined {
   const raw = idOrName.trim();
-  if (!raw) return undefined;
+  if (!raw) {
+    return undefined;
+  }
 
   if (raw.startsWith('custom:')) {
     try {
       const name = decodeURIComponent(raw.slice('custom:'.length)).trim();
-      if (!name || name.length > 80) return undefined;
+      if (!name || name.length > 80) {
+        return undefined;
+      }
       return {
         id: `custom:${encodeURIComponent(name)}`,
         name,
@@ -146,13 +152,21 @@ function addAmpersandCompounds(source: string, tokens: Set<string>): void {
     .map((part) => part.trim())
     .filter(Boolean)
     .join('&');
-  if (!ampCollapsed.includes('&')) return;
+  if (!ampCollapsed.includes('&')) {
+    return;
+  }
 
   for (const compound of ampCollapsed.split(' ')) {
-    if (!compound.includes('&')) continue;
+    if (!compound.includes('&')) {
+      continue;
+    }
     const pieces = compound.split('&').filter(Boolean);
-    if (pieces.length < 2) continue;
-    if (!pieces.every((p) => /^[a-z0-9]+$/i.test(p))) continue;
+    if (pieces.length < 2) {
+      continue;
+    }
+    if (!pieces.every((p) => /^[a-z0-9]+$/i.test(p))) {
+      continue;
+    }
     tokens.add(compound);
     tokens.add(pieces.join('and'));
     tokens.add(pieces.join(''));
@@ -160,7 +174,9 @@ function addAmpersandCompounds(source: string, tokens: Set<string>): void {
 }
 
 function addRnBAliases(lower: string, tokens: Set<string>): void {
-  if (!(lower.includes('r&b') || lower === 'rnb' || tokens.has('rb'))) return;
+  if (!(lower.includes('r&b') || lower === 'rnb' || tokens.has('rb'))) {
+    return;
+  }
   tokens.add('r&b');
   tokens.add('rnb');
   tokens.add('soul');
@@ -174,7 +190,9 @@ function tokensOf(value: string): string[] {
 
   for (const part of lower.replaceAll('&', ' ').split(/[\s/_+-]+/)) {
     const t = part.trim();
-    if (t.length >= 2) tokens.add(t);
+    if (t.length >= 2) {
+      tokens.add(t);
+    }
   }
 
   addRnBAliases(lower, tokens);
@@ -183,13 +201,17 @@ function tokensOf(value: string): string[] {
 
 function getRelatedGenres(genreId: string, limit = 48): CuratedGenre[] {
   const seed = findCuratedGenre(genreId);
-  if (!seed) return [];
+  if (!seed) {
+    return [];
+  }
 
   const seedSpotify = seed.spotifyGenre.toLowerCase();
   const seedTokens = new Set(tokensOf(seed.spotifyGenre));
 
   const ranked = CURATED_GENRES.map((g) => {
-    if (g.id === seed.id) return { g, score: 0 };
+    if (g.id === seed.id) {
+      return { g, score: 0 };
+    }
     const spotify = g.spotifyGenre.toLowerCase();
     let score = 0;
 
@@ -203,7 +225,9 @@ function getRelatedGenres(genreId: string, limit = 48): CuratedGenre[] {
       const tokens = tokensOf(g.spotifyGenre);
       let overlap = 0;
       for (const token of tokens) {
-        if (seedTokens.has(token)) overlap += 1;
+        if (seedTokens.has(token)) {
+          overlap += 1;
+        }
       }
       if (overlap > 0) {
         score += overlap * 12 - Math.max(0, tokens.length - seedTokens.size);
@@ -214,7 +238,9 @@ function getRelatedGenres(genreId: string, limit = 48): CuratedGenre[] {
   })
     .filter((x) => x.score > 0)
     .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
       return a.g.name.localeCompare(b.g.name);
     });
 
@@ -231,7 +257,9 @@ export function getExploreSuggestions(
   const selected = new Set<string>();
   for (const raw of selectedIds) {
     const id = raw.trim().toLowerCase();
-    if (!id || selected.has(id)) continue;
+    if (!id || selected.has(id)) {
+      continue;
+    }
     selected.add(id);
     unique.push(id);
   }
@@ -245,7 +273,9 @@ export function getExploreSuggestions(
   const seen = new Set<string>(selected);
 
   for (const related of getRelatedGenres(seedId, 96)) {
-    if (seen.has(related.id)) continue;
+    if (seen.has(related.id)) {
+      continue;
+    }
     seen.add(related.id);
     pool.push(related);
   }
@@ -262,13 +292,20 @@ function scoreMatch(genre: CuratedGenre, q: string): number {
   const id = genre.id;
   const spotify = genre.spotifyGenre.toLowerCase();
 
-  if (id === q || name === q || spotify === q) return 100;
-  if (name.startsWith(q) || id.startsWith(q) || spotify.startsWith(q))
+  if (id === q || name === q || spotify === q) {
+    return 100;
+  }
+  if (name.startsWith(q) || id.startsWith(q) || spotify.startsWith(q)) {
     return 80;
-  if (name.includes(q) || id.includes(q) || spotify.includes(q)) return 60;
+  }
+  if (name.includes(q) || id.includes(q) || spotify.includes(q)) {
+    return 60;
+  }
 
   const tokens = q.split(/[\s/_-]+/).filter((t) => t.length >= 2);
-  if (tokens.length < 2) return 0;
+  if (tokens.length < 2) {
+    return 0;
+  }
 
   let matched = 0;
   for (const token of tokens) {
@@ -276,15 +313,21 @@ function scoreMatch(genre: CuratedGenre, q: string): number {
       matched += 1;
     }
   }
-  if (matched === 0) return 0;
-  if (matched === tokens.length) return 75;
+  if (matched === 0) {
+    return 0;
+  }
+  if (matched === tokens.length) {
+    return 75;
+  }
   return 25 + matched * 8;
 }
 
 export function searchCuratedGenres(query: string, limit = 16): CuratedGenre[] {
   const trimmed = query.trim();
   const q = trimmed.toLowerCase();
-  if (!q) return listMainGenres().slice(0, limit);
+  if (!q) {
+    return listMainGenres().slice(0, limit);
+  }
 
   const ranked = CURATED_GENRES.map((g) => ({
     g,
@@ -292,9 +335,13 @@ export function searchCuratedGenres(query: string, limit = 16): CuratedGenre[] {
   }))
     .filter((x) => x.score > 0)
     .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
       const lenDiff = a.g.spotifyGenre.length - b.g.spotifyGenre.length;
-      if (lenDiff !== 0) return lenDiff;
+      if (lenDiff !== 0) {
+        return lenDiff;
+      }
       return a.g.name.localeCompare(b.g.name);
     });
 

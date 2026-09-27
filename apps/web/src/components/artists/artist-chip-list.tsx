@@ -17,7 +17,9 @@ export function ArtistChipList({
 }: ArtistChipListProps) {
   const t = useT()
 
-  if (artists.length === 0) return null
+  if (artists.length === 0) {
+    return null
+  }
 
   return (
     <ul className={cn('flex flex-wrap gap-2', className)}>

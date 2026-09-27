@@ -1,9 +1,10 @@
-import { Track } from '../track/track.entity';
-import { TrackDeduplicationService } from '../services/track-deduplication.service';
-import { DuplicateTrackSpecification } from '../services/specifications/duplicate-track.specification';
-import { createOrderingStrategy } from '../services/strategies/track-ordering.strategy';
+import { Track } from '@/domain/track/track.entity';
+import { TrackDeduplicationService } from '@/domain/services/track-deduplication.service';
+import { DuplicateTrackSpecification } from '@/domain/services/specifications/duplicate-track.specification';
+import { createOrderingStrategy } from '@/domain/services/strategies/track-ordering.strategy';
 import type { TrackOrderMode } from '@blendify/contracts';
-import { MAX_TRACKS } from '../constants';
+import { MAX_TRACKS } from '@/domain/constants';
+import { GENRE_MIX_MAX_TRACKS_PER_ARTIST } from '@/domain/genre/genre-generation.constants';
 
 /**
  * How many tracks to pull per seed artist while building the candidate pool.
@@ -13,10 +14,12 @@ export function tracksPerSeedArtist(
   tracksPerSeed: number,
   seedArtistCount: number,
 ): number {
-  if (seedArtistCount <= 0) return 2;
+  if (seedArtistCount <= 0) {
+    return 2;
+  }
   // Aim for ~1–2 tracks/artist in the final list; fetch a thin buffer.
   const fair = Math.ceil(tracksPerSeed / seedArtistCount);
-  return Math.min(3, Math.max(2, fair));
+  return Math.min(GENRE_MIX_MAX_TRACKS_PER_ARTIST, Math.max(2, fair));
 }
 
 /**
@@ -28,20 +31,30 @@ export function selectTracksWithArtistDiversity(
   needed: number,
   options: { maxPerArtist?: number } = {},
 ): Track[] {
-  if (needed <= 0 || tracks.length === 0) return [];
+  if (needed <= 0 || tracks.length === 0) {
+    return [];
+  }
 
-  const hardCap = Math.max(1, options.maxPerArtist ?? 3);
+  const hardCap = Math.max(
+    1,
+    options.maxPerArtist ?? GENRE_MIX_MAX_TRACKS_PER_ARTIST,
+  );
   const byArtist = new Map<string, Track[]>();
 
   for (const track of tracks) {
     const artistId = track.artistId.getValue();
     const bucket = byArtist.get(artistId);
-    if (bucket) bucket.push(track);
-    else byArtist.set(artistId, [track]);
+    if (bucket) {
+      bucket.push(track);
+    } else {
+      byArtist.set(artistId, [track]);
+    }
   }
 
   const artistIds = Array.from(byArtist.keys());
-  if (artistIds.length === 0) return [];
+  if (artistIds.length === 0) {
+    return [];
+  }
 
   for (let maxPerArtist = 1; maxPerArtist <= hardCap; maxPerArtist += 1) {
     const picked = roundRobinPick(byArtist, artistIds, needed, maxPerArtist);
@@ -67,12 +80,18 @@ function roundRobinPick(
   while (result.length < needed && progress) {
     progress = false;
     for (const artistId of artistIds) {
-      if (result.length >= needed) break;
+      if (result.length >= needed) {
+        break;
+      }
       const used = taken.get(artistId) ?? 0;
-      if (used >= maxPerArtist) continue;
+      if (used >= maxPerArtist) {
+        continue;
+      }
       const queue = byArtist.get(artistId) ?? [];
       const cursor = cursors.get(artistId) ?? 0;
-      if (cursor >= queue.length) continue;
+      if (cursor >= queue.length) {
+        continue;
+      }
       result.push(queue[cursor]);
       cursors.set(artistId, cursor + 1);
       taken.set(artistId, used + 1);
@@ -109,7 +128,7 @@ export class GenrePlaylistGenerationService {
       const diverse = selectTracksWithArtistDiversity(
         cleaned,
         input.tracksPerSeed,
-        { maxPerArtist: 3 },
+        { maxPerArtist: GENRE_MIX_MAX_TRACKS_PER_ARTIST },
       );
       allocation.set(genreId, diverse.length);
       selectedByGenre.set(genreId, diverse);
@@ -121,12 +140,17 @@ export class GenrePlaylistGenerationService {
     for (const tracks of selectedByGenre.values()) {
       for (const track of tracks) {
         const key = this.duplicateSpec.keyFor(track);
-        if (seen.has(key)) continue;
+        if (seen.has(key)) {
+          continue;
+        }
         seen.add(key);
         const artistId = track.artistId.getValue();
         const bucket = byRealArtist.get(artistId);
-        if (bucket) bucket.push(track);
-        else byRealArtist.set(artistId, [track]);
+        if (bucket) {
+          bucket.push(track);
+        } else {
+          byRealArtist.set(artistId, [track]);
+        }
       }
     }
 

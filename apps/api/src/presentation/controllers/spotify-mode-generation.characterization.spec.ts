@@ -7,41 +7,41 @@ import {
   PlaylistDetailSchema,
   type GenerationStreamEvent,
 } from '@blendify/contracts';
-import { GenreTrackCatalogService } from '../../application/services/genre-track-catalog.service';
-import { PublishPlaylistService } from '../../application/services/publish-playlist.service';
-import { BulkLibraryUseCase } from '../../application/use-cases/bulk-library.use-case';
-import { CreateSpotifyPlaylistUseCase } from '../../application/use-cases/create-spotify-playlist.use-case';
-import { GenerateArtistMixUseCase } from '../../application/use-cases/generate-artist-mix.use-case';
-import { GenerateDiscoverPlaylistUseCase } from '../../application/use-cases/generate-discover-playlist.use-case';
-import { GenerateGenreMixUseCase } from '../../application/use-cases/generate-genre-mix.use-case';
-import { GeneratePlaylistUseCase } from '../../application/use-cases/generate-playlist.use-case';
-import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
-import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
-import { SyncLibraryUseCase } from '../../application/use-cases/sync-library.use-case';
-import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
-import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
-import { Artist } from '../../domain/artist/artist.entity';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
-import type { Playlist } from '../../domain/playlist/playlist.entity';
-import { DISCOVERY_CATALOG } from '../../domain/repositories/discovery-catalog.port';
-import { MUSIC_PROVIDER_FACTORY } from '../../domain/repositories/music-provider.factory.port';
+import { GenreTrackCatalogService } from '@/application/services/genre-track-catalog.service';
+import { PublishPlaylistService } from '@/application/services/publish-playlist.service';
+import { BulkLibraryUseCase } from '@/application/use-cases/bulk-library.use-case';
+import { CreateSpotifyPlaylistUseCase } from '@/application/use-cases/create-spotify-playlist.use-case';
+import { GenerateArtistMixUseCase } from '@/application/use-cases/generate-artist-mix.use-case';
+import { GenerateDiscoverPlaylistUseCase } from '@/application/use-cases/generate-discover-playlist.use-case';
+import { GenerateGenreMixUseCase } from '@/application/use-cases/generate-genre-mix.use-case';
+import { GeneratePlaylistUseCase } from '@/application/use-cases/generate-playlist.use-case';
+import { GetPlaylistDetailUseCase } from '@/application/use-cases/get-playlist-detail.use-case';
+import { ListLibraryPlaylistsUseCase } from '@/application/use-cases/list-library-playlists.use-case';
+import { SyncLibraryUseCase } from '@/application/use-cases/sync-library.use-case';
+import { RemovePlaylistFromLibraryUseCase } from '@/application/use-cases/remove-playlist-from-library.use-case';
+import { RenamePlaylistUseCase } from '@/application/use-cases/rename-playlist.use-case';
+import { Artist } from '@/domain/artist/artist.entity';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import type { Playlist } from '@/domain/playlist/playlist.entity';
+import { DISCOVERY_CATALOG } from '@/domain/repositories/discovery-catalog.port';
+import { MUSIC_PROVIDER_FACTORY } from '@/domain/repositories/music-provider.factory.port';
 import {
   CATALOG_PROVIDER_FACTORY,
   type ResolveTrackOptions,
-} from '../../domain/repositories/catalog-provider.port';
-import { PLAYLIST_REPOSITORY } from '../../domain/repositories/playlist.repository.port';
-import { PROVIDER_QUOTA } from '../../domain/repositories/provider-quota.port';
-import { USAGE_STATS_REPOSITORY } from '../../domain/repositories/usage-stats.repository.port';
-import { USER_REPOSITORY } from '../../domain/repositories/user.repository.port';
-import { Track } from '../../domain/track/track.entity';
-import { User } from '../../domain/user/user.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
-import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
-import { GlobalExceptionFilter } from '../filters/global-exception.filter';
+} from '@/domain/repositories/catalog-provider.port';
+import { PLAYLIST_REPOSITORY } from '@/domain/repositories/playlist.repository.port';
+import { PROVIDER_QUOTA } from '@/domain/repositories/provider-quota.port';
+import { USAGE_STATS_REPOSITORY } from '@/domain/repositories/usage-stats.repository.port';
+import { USER_REPOSITORY } from '@/domain/repositories/user.repository.port';
+import { Track } from '@/domain/track/track.entity';
+import { User } from '@/domain/user/user.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import { JwtAuthGuard } from '@/infrastructure/auth/jwt-auth.guard';
+import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
 import { PlaylistsController } from './playlists.controller';
-import { inMemoryRequestLimitProviders } from '../request-limits/request-limits.testing';
+import { inMemoryRequestLimitProviders } from '@/presentation/request-limits/request-limits.testing';
 
 const SPOTIFY_PLAYLIST = {
   id: 'spotify-playlist-1',

@@ -4,11 +4,11 @@ import {
   StartPlaybackRequestSchema,
   type StartPlaybackRequest,
 } from '@blendify/contracts';
-import { ControlPlaybackUseCase } from '../../application/use-cases/control-playback.use-case';
-import { User } from '../../domain/user/user.entity';
-import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
-import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
+import { ControlPlaybackUseCase } from '@/application/use-cases/control-playback.use-case';
+import { User } from '@/domain/user/user.entity';
+import { JwtAuthGuard } from '@/infrastructure/auth/jwt-auth.guard';
+import { CurrentUser } from '@/presentation/decorators/current-user.decorator';
+import { ZodValidationPipe } from '@/presentation/pipes/zod-validation.pipe';
 
 @ApiTags('player')
 @ApiCookieAuth()

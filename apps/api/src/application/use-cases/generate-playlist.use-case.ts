@@ -4,11 +4,11 @@ import {
   GenerateMixRequestSchema,
 } from '@blendify/contracts';
 import type { z } from 'zod';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
 import {
   monotonicProgressReporter,
   type ProgressReporter,
-} from '../services/generation-progress.tracker';
+} from '@/application/services/generation-progress.tracker';
 import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import { GenerateGenreMixUseCase } from './generate-genre-mix.use-case';
 import { GenerateDiscoverPlaylistUseCase } from './generate-discover-playlist.use-case';

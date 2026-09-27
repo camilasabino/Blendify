@@ -1,5 +1,5 @@
 import { EquitableAllocationStrategy } from './allocation.strategy';
-import { MAX_TRACKS } from '../../constants';
+import { MAX_TRACKS } from '@/domain/constants';
 
 describe('EquitableAllocationStrategy', () => {
   const strategy = new EquitableAllocationStrategy();

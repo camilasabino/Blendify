@@ -1,10 +1,10 @@
 import { Controller, Delete, Get, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
-import { User } from '../../domain/user/user.entity';
-import { GetUserStatsUseCase } from '../../application/use-cases/get-user-stats.use-case';
-import { ResetUserStatsUseCase } from '../../application/use-cases/reset-user-stats.use-case';
+import { JwtAuthGuard } from '@/infrastructure/auth/jwt-auth.guard';
+import { CurrentUser } from '@/presentation/decorators/current-user.decorator';
+import { User } from '@/domain/user/user.entity';
+import { GetUserStatsUseCase } from '@/application/use-cases/get-user-stats.use-case';
+import { ResetUserStatsUseCase } from '@/application/use-cases/reset-user-stats.use-case';
 
 @ApiTags('stats')
 @ApiCookieAuth()

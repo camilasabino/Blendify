@@ -10,6 +10,7 @@ import Redis from 'ioredis';
 const COMMAND_TIMEOUT_MS = 500;
 const CONNECT_TIMEOUT_MS = 2_000;
 const MAX_RECONNECT_DELAY_MS = 2_000;
+const RECONNECT_BACKOFF_STEP_MS = 200;
 
 @Injectable()
 export class RedisConnection implements OnModuleInit, OnModuleDestroy {
@@ -31,7 +32,8 @@ export class RedisConnection implements OnModuleInit, OnModuleDestroy {
       enableReadyCheck: true,
       connectTimeout: CONNECT_TIMEOUT_MS,
       commandTimeout: COMMAND_TIMEOUT_MS,
-      retryStrategy: (times) => Math.min(times * 200, MAX_RECONNECT_DELAY_MS),
+      retryStrategy: (times) =>
+        Math.min(times * RECONNECT_BACKOFF_STEP_MS, MAX_RECONNECT_DELAY_MS),
     });
 
     redis.on('error', (error) => {
@@ -64,7 +66,9 @@ export class RedisConnection implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (!this.client) return;
+    if (!this.client) {
+      return;
+    }
     const client = this.client;
     this.client = null;
     this.ready = false;
@@ -87,8 +91,12 @@ export class RedisConnection implements OnModuleInit, OnModuleDestroy {
 export function sanitizeRedisUrl(raw: string): string {
   try {
     const url = new URL(raw);
-    if (url.password) url.password = '***';
-    if (url.username) url.username = '***';
+    if (url.password) {
+      url.password = '***';
+    }
+    if (url.username) {
+      url.username = '***';
+    }
     return url.toString();
   } catch {
     return 'redis://***';

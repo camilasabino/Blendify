@@ -22,8 +22,12 @@ export function useSuggestionSeed<T extends { id: string }>(selected: T[]) {
     prevLastIdRef.current = lastId
 
     setSeedId((prev) => {
-      if (!prev || !ids.has(prev)) return lastId
-      if (lastIdChanged) return lastId
+      if (!prev || !ids.has(prev)) {
+        return lastId
+      }
+      if (lastIdChanged) {
+        return lastId
+      }
       return prev
     })
   }, [selected, lastId])

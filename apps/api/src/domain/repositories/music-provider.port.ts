@@ -1,5 +1,5 @@
-import { Track } from '../track/track.entity';
-import { User } from '../user/user.entity';
+import { Track } from '@/domain/track/track.entity';
+import { User } from '@/domain/user/user.entity';
 import type {
   PlaybackDeviceDto,
   StartPlaybackRequest,

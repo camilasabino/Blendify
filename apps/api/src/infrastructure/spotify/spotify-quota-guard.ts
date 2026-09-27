@@ -10,7 +10,9 @@ import {
  * instead of continuing work that will only burn more empty attempts.
  */
 export function throwIfSpotifyQuotaBlocked(): void {
-  if (!isSpotifyQuotaBlocked()) return;
+  if (!isSpotifyQuotaBlocked()) {
+    return;
+  }
   throw createSpotifyQuotaError({
     retryAfterSeconds: getSpotifyQuotaRetryAfterSeconds(),
     reason: getSpotifyQuotaReason() ?? 'QUOTA_EXCEEDED',

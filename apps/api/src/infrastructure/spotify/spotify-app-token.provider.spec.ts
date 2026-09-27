@@ -5,7 +5,7 @@ import { SpotifyAppTokenProvider } from './spotify-app-token.provider';
 
 const mockPost = jest.fn();
 
-jest.mock('../http/outbound-http.logging', () => ({
+jest.mock('@/infrastructure/http/outbound-http.logging', () => ({
   createOutboundHttp: () => ({ post: mockPost }),
 }));
 
@@ -18,7 +18,9 @@ function createProvider(values: Record<string, string> = CONFIG) {
   const config = {
     getOrThrow: (key: string) => {
       const value = values[key];
-      if (value === undefined) throw new Error(`Missing ${key}`);
+      if (value === undefined) {
+        throw new Error(`Missing ${key}`);
+      }
       return value;
     },
   } as unknown as ConfigService;

@@ -2,9 +2,9 @@ import { JwtService } from '@nestjs/jwt';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AuthService, SESSION_TTL_SECONDS } from './auth.service';
-import { sessionJwtOptions } from '../../modules/auth.module';
-import type { UserRepositoryPort } from '../../domain/repositories/user.repository.port';
-import { User } from '../../domain/user/user.entity';
+import { sessionJwtOptions } from '@/modules/auth.module';
+import type { UserRepositoryPort } from '@/domain/repositories/user.repository.port';
+import { User } from '@/domain/user/user.entity';
 
 describe('AuthService cookie options', () => {
   const users: UserRepositoryPort = {

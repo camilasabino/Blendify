@@ -1,4 +1,4 @@
-import { Track } from '../track/track.entity';
+import { Track } from '@/domain/track/track.entity';
 import { TrackDeduplicationService } from './track-deduplication.service';
 import {
   AllocationStrategy,

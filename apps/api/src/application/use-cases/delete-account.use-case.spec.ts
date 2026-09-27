@@ -1,5 +1,5 @@
-import type { UserRepositoryPort } from '../../domain/repositories/user.repository.port';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import type { UserRepositoryPort } from '@/domain/repositories/user.repository.port';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { DeleteAccountUseCase } from './delete-account.use-case';
 
 function useCase(deleteById: jest.Mock) {

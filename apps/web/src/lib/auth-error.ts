@@ -15,7 +15,9 @@ export const AUTH_ERROR_PARAM = 'auth_error'
 
 /** Anything we do not recognise is reported as a generic provider failure. */
 export function parseAuthError(value: string | null): AuthError | null {
-  if (!value) return null
+  if (!value) {
+    return null
+  }
   return (AUTH_ERRORS as readonly string[]).includes(value)
     ? (value as AuthError)
     : 'connection_failed'

@@ -1,8 +1,8 @@
 import type { PlaylistGeneration, PlaylistSeedDto } from '@blendify/contracts';
-import { BusinessRuleError } from '../errors/business-rule.error';
-import { Track } from '../track/track.entity';
-import { PlaylistName } from '../value-objects/playlist-name.vo';
-import { MAX_TRACKS } from '../constants';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { Track } from '@/domain/track/track.entity';
+import { PlaylistName } from '@/domain/value-objects/playlist-name.vo';
+import { MAX_TRACKS } from '@/domain/constants';
 
 export interface CoverArtwork {
   imageUrl: string;
@@ -20,7 +20,9 @@ export function pickLinkedCoverArtwork(
   for (const source of sources) {
     const imageUrl = source.imageUrl?.trim();
     const spotifyUrl = source.spotifyUrl?.trim();
-    if (imageUrl && spotifyUrl) return { imageUrl, spotifyUrl };
+    if (imageUrl && spotifyUrl) {
+      return { imageUrl, spotifyUrl };
+    }
   }
   return undefined;
 }

@@ -4,8 +4,9 @@ import { AxiosInstance } from 'axios';
 import {
   USER_REPOSITORY,
   type UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
-import { createOutboundHttp } from '../http/outbound-http.logging';
+} from '@/domain/repositories/user.repository.port';
+import { createOutboundHttp } from '@/infrastructure/http/outbound-http.logging';
+import { SPOTIFY_HTTP_TIMEOUT_MS } from '@/infrastructure/spotify/spotify.constants';
 
 @Injectable()
 export class SpotifyTokenService {
@@ -19,7 +20,7 @@ export class SpotifyTokenService {
     this.accountsApi = createOutboundHttp(
       {
         baseURL: 'https://accounts.spotify.com',
-        timeout: 15_000,
+        timeout: SPOTIFY_HTTP_TIMEOUT_MS,
       },
       { logBodies: false },
     );

@@ -228,8 +228,12 @@ export const BulkLibraryRequestSchema = z.object({
 
 const QueryBooleanSchema = z.preprocess(
   (value) => {
-    if (value === '1' || value === 'true') return true;
-    if (value === '0' || value === 'false') return false;
+    if (value === '1' || value === 'true') {
+      return true;
+    }
+    if (value === '0' || value === 'false') {
+      return false;
+    }
     return value;
   },
   z.boolean(),

@@ -3,34 +3,30 @@ import { GenreMixRequestSchema } from '@blendify/contracts';
 import {
   CATALOG_PROVIDER_FACTORY,
   type CatalogProviderFactoryPort,
-} from '../../domain/repositories/catalog-provider.port';
+} from '@/domain/repositories/catalog-provider.port';
 import {
   GeneratedPlaylist,
   pickLinkedCoverArtwork,
   trackCoverSource,
-} from '../../domain/playlist/generated-playlist';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import {
-  MAX_GENRES,
-  MAX_TRACKS,
-  maxTracksPerSeedForCount,
-} from '../../domain/constants';
+} from '@/domain/playlist/generated-playlist';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { MAX_GENRES, maxTracksPerSeedForCount } from '@/domain/constants';
 import {
   findCuratedGenre,
   genreTrackGroupKey,
   type CuratedGenre,
-} from '../../domain/genre/curated-genres';
-import { GenrePlaylistGenerationService } from '../../domain/genre/genre-playlist-generation.service';
+} from '@/domain/genre/curated-genres';
+import { GenrePlaylistGenerationService } from '@/domain/genre/genre-playlist-generation.service';
 import {
   buildDefaultPlaylistDescription,
   buildDefaultPlaylistName,
-} from '../../domain/playlist/default-playlist-name';
+} from '@/domain/playlist/default-playlist-name';
 import { z } from 'zod';
-import { GenreTrackCatalogService } from '../services/genre-track-catalog.service';
+import { GenreTrackCatalogService } from '@/application/services/genre-track-catalog.service';
 import {
   GenerationProgressTracker,
   type ProgressReporter,
-} from '../services/generation-progress.tracker';
+} from '@/application/services/generation-progress.tracker';
 
 const GenerateGenreMixSchema = GenreMixRequestSchema.omit({
   coverImageBase64: true,
@@ -66,9 +62,10 @@ export class GenerateGenreMixUseCase {
 
     const maxPerGenre = maxTracksPerSeedForCount(genres.length);
     if (input.tracksPerSeed > maxPerGenre) {
-      throw new BusinessRuleError(
-        `At most ${maxPerGenre} tracks per genre for ${genres.length} genre(s) (cap ${MAX_TRACKS}).`,
-        'TRACK_BUDGET_EXCEEDED',
+      throw BusinessRuleError.trackBudgetExceeded(
+        'genre',
+        maxPerGenre,
+        genres.length,
       );
     }
 
@@ -154,7 +151,9 @@ export class GenerateGenreMixUseCase {
       if (!found) {
         continue;
       }
-      if (seen.has(found.id)) continue;
+      if (seen.has(found.id)) {
+        continue;
+      }
       seen.add(found.id);
       resolved.push(found);
     }

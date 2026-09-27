@@ -34,7 +34,9 @@ function mergeSimilarBatch(
   const nextBatch = batch.filter(
     (artist) => !selectedNames.has(normalizeArtistName(artist.name)),
   )
-  if (page === 0) return nextBatch
+  if (page === 0) {
+    return nextBatch
+  }
   const seen = new Set(prev.map((artist) => normalizeArtistName(artist.name)))
   return [
     ...prev,
@@ -54,7 +56,9 @@ function ExploreSeedPicker({
   onSetSeedId: (id: string) => void
 }>) {
   const t = useT()
-  if (selected.length <= 1) return null
+  if (selected.length <= 1) {
+    return null
+  }
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-xs text-cream-400">
@@ -85,7 +89,9 @@ function SimilarSuggestionsList({
   onResolve: (name: string) => void
 }>) {
   const t = useT()
-  if (suggestions.length === 0) return null
+  if (suggestions.length === 0) {
+    return null
+  }
   return (
     <ul className="flex flex-wrap gap-2">
       {suggestions.map((artist) => {
@@ -203,7 +209,9 @@ export function ArtistSimilarSuggestions({
 
   useEffect(() => {
     const batch = similarQuery.data?.artists
-    if (!batch) return
+    if (!batch) {
+      return
+    }
     setItems((prev) => mergeSimilarBatch(prev, batch, selectedNames, page))
   }, [similarQuery.data, page, selectedNames])
 
@@ -238,7 +246,9 @@ export function ArtistSimilarSuggestions({
   const emptyLabel =
     page > 0 ? t('artist.exploreExhausted') : t('artist.exploreEmpty')
 
-  if (selected.length === 0 || atLimit || !seed) return null
+  if (selected.length === 0 || atLimit || !seed) {
+    return null
+  }
 
   return (
     <div

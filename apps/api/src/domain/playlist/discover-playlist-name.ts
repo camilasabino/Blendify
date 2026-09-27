@@ -1,10 +1,13 @@
-import { MAX_ARTISTS } from '../constants';
+import { MAX_ARTISTS } from '@/domain/constants';
 
 /** Similar artists fetched from Last.fm (over-fetch for resolve misses). */
 export const DISCOVER_SIMILAR_FETCH = 40;
 export const DISCOVER_MIN_SIMILAR = 2;
 export const DISCOVER_MIN_SIMILAR_TRACKS = 4;
 export const DISCOVER_SIMILAR_TRACK_FETCH = 100;
+export const DISCOVER_FALLBACK_TOP_TRACKS_MIN = 20;
+export const DISCOVER_FALLBACK_TOP_TRACKS_MAX = 50;
+export const DISCOVER_FALLBACK_SIMILAR_ARTISTS_LIMIT = 12;
 
 /**
  * How many similar artists to include (seed is excluded from the mix).
@@ -23,7 +26,9 @@ export function tracksPerSeedForDiscoverTarget(
   artistCount: number,
   maxPerArtist: number,
 ): number {
-  if (artistCount <= 0) return 1;
+  if (artistCount <= 0) {
+    return 1;
+  }
   const raw = Math.ceil(trackTarget / artistCount);
   return Math.min(maxPerArtist, Math.max(1, raw));
 }

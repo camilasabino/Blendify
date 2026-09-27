@@ -81,7 +81,9 @@ export function StatsPage() {
         danger
         busy={resetMutation.isPending}
         onCancel={() => {
-          if (resetMutation.isPending) return
+          if (resetMutation.isPending) {
+            return
+          }
           setConfirmOpen(false)
         }}
         onConfirm={() => resetMutation.mutate()}

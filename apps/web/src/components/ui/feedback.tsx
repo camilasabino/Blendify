@@ -69,7 +69,9 @@ export function FieldError({
   children: ReactNode
   className?: string
 }>) {
-  if (!children) return null
+  if (!children) {
+    return null
+  }
   return <p className={cn('text-sm text-danger', className)}>{children}</p>
 }
 

@@ -20,11 +20,15 @@ export type ProgressReporter = (progress: GenerationProgress) => void;
 export function monotonicProgressReporter(
   reporter?: ProgressReporter,
 ): ProgressReporter | undefined {
-  if (!reporter) return undefined;
+  if (!reporter) {
+    return undefined;
+  }
 
   let lastPercent = 0;
   return (progress) => {
-    if (progress.percent < lastPercent) return;
+    if (progress.percent < lastPercent) {
+      return;
+    }
     lastPercent = progress.percent;
     reporter(progress);
   };
@@ -38,7 +42,9 @@ export class GenerationProgressTracker {
   constructor(private readonly onProgress?: ProgressReporter) {}
 
   report(phase: GenerationPhase, current: number, total: number): void {
-    if (!this.onProgress) return;
+    if (!this.onProgress) {
+      return;
+    }
 
     const now = Date.now();
     if (phase !== this.lastPhase) {

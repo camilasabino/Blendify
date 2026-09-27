@@ -35,7 +35,9 @@ function SelectedGenres({
   onRemove: (id: string) => void
 }>) {
   const t = useT()
-  if (selected.length === 0) return null
+  if (selected.length === 0) {
+    return null
+  }
 
   return (
       <ul className="flex flex-wrap gap-2">
@@ -227,7 +229,9 @@ function mergeExploreBatch(
   explorePage: number,
 ): CuratedGenre[] {
   const nextBatch = batch.filter((g) => !selectedIds.has(g.id))
-  if (explorePage === 0) return nextBatch
+  if (explorePage === 0) {
+    return nextBatch
+  }
   const seen = new Set(prev.map((g) => g.id))
   return [...prev, ...nextBatch.filter((g) => !seen.has(g.id))]
 }
@@ -276,7 +280,9 @@ export function GenrePicker({
   })
 
   const exploreRequestIds = useMemo(() => {
-    if (!seed) return []
+    if (!seed) {
+      return []
+    }
     const ids = selected.map((g) => g.id)
     return [...ids.filter((id) => id !== seed.id), seed.id]
   }, [selected, seed])
@@ -299,7 +305,9 @@ export function GenrePicker({
 
   useEffect(() => {
     const batch = exploreQuery.data?.genres
-    if (!batch || searching) return
+    if (!batch || searching) {
+      return
+    }
     setExploreItems((prev) =>
       mergeExploreBatch(prev, batch, selectedIds, explorePage),
     )
@@ -327,7 +335,9 @@ export function GenrePicker({
         value={query}
         onChange={(value) => {
           setQuery(value)
-          if (!value) setDebounced('')
+          if (!value) {
+            setDebounced('')
+          }
         }}
         placeholder={t('genre.searchPlaceholder')}
         clearLabel={t('search.clear')}

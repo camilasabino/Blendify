@@ -61,9 +61,15 @@ export function resolveOutboundUrl(config: InternalAxiosRequestConfig): string {
   const base = config.baseURL ?? '';
   const path = config.url ?? '';
   const combined = (() => {
-    if (!path) return base;
-    if (/^https?:\/\//i.test(path)) return path;
-    if (!base) return path;
+    if (!path) {
+      return base;
+    }
+    if (/^https?:\/\//i.test(path)) {
+      return path;
+    }
+    if (!base) {
+      return path;
+    }
     let baseTrimmed = base;
     while (baseTrimmed.endsWith('/')) {
       baseTrimmed = baseTrimmed.slice(0, -1);
@@ -80,7 +86,9 @@ export function resolveOutboundUrl(config: InternalAxiosRequestConfig): string {
     const params = config.params as Record<string, unknown> | undefined;
     if (params && typeof params === 'object' && !Array.isArray(params)) {
       for (const [key, value] of Object.entries(params)) {
-        if (value == null) continue;
+        if (value == null) {
+          continue;
+        }
         if (
           typeof value === 'string' ||
           typeof value === 'number' ||
@@ -177,26 +185,36 @@ function jsonSize(value: unknown): number {
  * (objects/arrays) so Logdy / pretty-printers can expand it.
  */
 function shrinkJsonForLog(value: unknown, maxChars: number): unknown {
-  if (jsonSize(value) <= maxChars) return value;
+  if (jsonSize(value) <= maxChars) {
+    return value;
+  }
 
   let preview: unknown = value;
   for (const maxItems of [25, 12, 6, 3, 1, 0]) {
     preview = capArrays(value, maxItems);
-    if (jsonSize(preview) <= maxChars) return preview;
+    if (jsonSize(preview) <= maxChars) {
+      return preview;
+    }
   }
 
   for (const maxLen of [400, 160, 64]) {
     preview = capLongStrings(capArrays(value, 0), maxLen);
-    if (jsonSize(preview) <= maxChars) return preview;
+    if (jsonSize(preview) <= maxChars) {
+      return preview;
+    }
   }
 
   return { _omitted: 'response too large to preview' };
 }
 
 export function summarizeOutboundPayload(data: unknown): unknown {
-  if (data == null) return null;
+  if (data == null) {
+    return null;
+  }
   if (typeof data === 'string') {
-    if (data.length <= MAX_LOG_CHARS) return data;
+    if (data.length <= MAX_LOG_CHARS) {
+      return data;
+    }
     // Prefer parsed JSON preview when the body is a JSON string.
     try {
       const parsed: unknown = JSON.parse(data);
@@ -217,7 +235,9 @@ export function summarizeOutboundPayload(data: unknown): unknown {
 
   const redacted = redactDeep(data);
   const chars = jsonSize(redacted);
-  if (chars <= MAX_LOG_CHARS) return redacted;
+  if (chars <= MAX_LOG_CHARS) {
+    return redacted;
+  }
 
   return {
     truncated: true,
@@ -227,7 +247,9 @@ export function summarizeOutboundPayload(data: unknown): unknown {
 }
 
 function looksLikeBase64Blob(value: string): boolean {
-  if (value.length < 400) return false;
+  if (value.length < 400) {
+    return false;
+  }
   const sample = value.slice(0, 240).replace(/\s+/g, '');
   return /^[A-Za-z0-9+/]+=*$/.test(sample);
 }
@@ -237,7 +259,9 @@ function looksLikeBase64Blob(value: string): boolean {
  * Large base64 blobs (playlist covers) are summarized, not dumped.
  */
 export function parseOutboundRequestBody(data: unknown): unknown {
-  if (data == null || data === '') return undefined;
+  if (data == null || data === '') {
+    return undefined;
+  }
 
   if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) {
     return { _type: 'buffer', bytes: data.length };
@@ -274,7 +298,9 @@ function entriesToObject(
 function parseOutboundStringBody(data: string): unknown {
   const trimmed = data.trim();
   const jsonBody = tryParseJsonBody(trimmed);
-  if (jsonBody !== undefined) return jsonBody;
+  if (jsonBody !== undefined) {
+    return jsonBody;
+  }
 
   if (looksLikeBase64Blob(data)) {
     return {
@@ -285,7 +311,9 @@ function parseOutboundStringBody(data: string): unknown {
   }
 
   const formBody = tryParseFormUrlEncoded(data, trimmed);
-  if (formBody !== undefined) return formBody;
+  if (formBody !== undefined) {
+    return formBody;
+  }
 
   return data;
 }
@@ -294,7 +322,9 @@ function tryParseJsonBody(trimmed: string): unknown {
   const looksLikeJson =
     (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
     (trimmed.startsWith('[') && trimmed.endsWith(']'));
-  if (!looksLikeJson) return undefined;
+  if (!looksLikeJson) {
+    return undefined;
+  }
   try {
     return JSON.parse(trimmed) as unknown;
   } catch {
@@ -307,11 +337,15 @@ function tryParseFormUrlEncoded(
   trimmed: string,
 ): Record<string, string> | undefined {
   // application/x-www-form-urlencoded (Spotify token exchange, etc.)
-  if (!data.includes('=') || trimmed.startsWith('<')) return undefined;
+  if (!data.includes('=') || trimmed.startsWith('<')) {
+    return undefined;
+  }
   try {
     const params = new URLSearchParams(data);
     const obj = entriesToObject(params.entries());
-    if (Object.keys(obj).length > 0) return obj;
+    if (Object.keys(obj).length > 0) {
+      return obj;
+    }
   } catch {
     return undefined;
   }
@@ -360,7 +394,9 @@ function logOutbound(
   responseBody: unknown,
   logBodies: boolean,
 ): void {
-  if (!config) return;
+  if (!config) {
+    return;
+  }
   const timed = config as TimedConfig;
   const startedAt = timed.__outboundStartedAt ?? Date.now();
   const durationMs = Math.max(0, Date.now() - startedAt);

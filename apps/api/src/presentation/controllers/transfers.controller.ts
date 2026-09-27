@@ -5,11 +5,11 @@ import {
   type CreateTransferRequest,
   type PlaylistTransferDto,
 } from '@blendify/contracts';
-import { CreatePlaylistTransferUseCase } from '../../application/use-cases/create-playlist-transfer.use-case';
-import { OptionalJwtAuthGuard } from '../../infrastructure/auth/optional-jwt-auth.guard';
-import { GuestTransferGate } from '../guards/guest-transfer.gate';
-import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
-import { RateLimit } from '../request-limits/rate-limit.guard';
+import { CreatePlaylistTransferUseCase } from '@/application/use-cases/create-playlist-transfer.use-case';
+import { OptionalJwtAuthGuard } from '@/infrastructure/auth/optional-jwt-auth.guard';
+import { GuestTransferGate } from '@/presentation/guards/guest-transfer.gate';
+import { ZodValidationPipe } from '@/presentation/pipes/zod-validation.pipe';
+import { RateLimit } from '@/presentation/request-limits/rate-limit.guard';
 
 @ApiTags('transfers')
 @UseGuards(GuestTransferGate, OptionalJwtAuthGuard)

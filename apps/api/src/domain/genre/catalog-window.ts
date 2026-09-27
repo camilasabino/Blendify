@@ -18,21 +18,26 @@ export const POPULAR_POOL_SHARE = 0.4;
 export const RARITIES_POOL_START = 0.6;
 /** How much of the chart to grow the pool by on each expand step. */
 const POOL_EXPAND_STEP_SHARE = 0.1;
+const CANDIDATE_BUDGET_OVER_FETCH = 8;
 
 /**
  * Candidate over-fetch so Spotify resolve misses don't underfill the mix.
  * Kept tight — each candidate may cost a search.
  */
 export function catalogCandidateBudget(needed: number): number {
-  if (needed <= 0) return 0;
-  return needed + 8;
+  if (needed <= 0) {
+    return 0;
+  }
+  return needed + CANDIDATE_BUDGET_OVER_FETCH;
 }
 
 export function catalogPoolBounds(
   length: number,
   mode: PopularityModeValue,
 ): { start: number; end: number } {
-  if (length <= 0) return { start: 0, end: 0 };
+  if (length <= 0) {
+    return { start: 0, end: 0 };
+  }
 
   switch (mode) {
     case PopularityMode.POPULAR: {
@@ -60,18 +65,26 @@ export function expandCatalogPoolBounds(
   mode: PopularityModeValue,
   current: { start: number; end: number },
 ): { start: number; end: number } | null {
-  if (length <= 0) return null;
-  if (mode === PopularityMode.BALANCED) return null;
+  if (length <= 0) {
+    return null;
+  }
+  if (mode === PopularityMode.BALANCED) {
+    return null;
+  }
 
   const step = Math.max(1, Math.ceil(length * POOL_EXPAND_STEP_SHARE));
 
   if (mode === PopularityMode.POPULAR) {
-    if (current.end >= length) return null;
+    if (current.end >= length) {
+      return null;
+    }
     return { start: 0, end: Math.min(length, current.end + step) };
   }
 
   // rarities: expand toward the chart head
-  if (current.start <= 0) return null;
+  if (current.start <= 0) {
+    return null;
+  }
   return { start: Math.max(0, current.start - step), end: length };
 }
 
@@ -157,18 +170,24 @@ export function sliceCatalogWindow<T>(
   needed: number,
   random: () => number = Math.random,
 ): T[] {
-  if (entries.length === 0 || needed <= 0) return [];
+  if (entries.length === 0 || needed <= 0) {
+    return [];
+  }
 
   const budget = catalogCandidateBudget(needed);
   let bounds = catalogPoolBounds(entries.length, mode);
 
   while (bounds.end - bounds.start < budget) {
     const expanded = expandCatalogPoolBounds(entries.length, mode, bounds);
-    if (!expanded) break;
+    if (!expanded) {
+      break;
+    }
     bounds = expanded;
   }
 
   const pool = entries.slice(bounds.start, bounds.end);
-  if (pool.length === 0) return [];
+  if (pool.length === 0) {
+    return [];
+  }
   return shuffleCopy(pool, random).slice(0, Math.min(pool.length, budget));
 }

@@ -2,12 +2,12 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   MUSIC_PROVIDER_FACTORY,
   type MusicProviderFactoryPort,
-} from '../../domain/repositories/music-provider.factory.port';
+} from '@/domain/repositories/music-provider.factory.port';
 import {
   PLAYLIST_REPOSITORY,
   PlaylistRepositoryPort,
-} from '../../domain/repositories/playlist.repository.port';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+} from '@/domain/repositories/playlist.repository.port';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 
 @Injectable()
 export class RemovePlaylistFromLibraryUseCase {

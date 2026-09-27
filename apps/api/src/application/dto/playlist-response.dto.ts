@@ -4,10 +4,10 @@ import type {
   PlaylistSummary,
   TrackDto,
 } from '@blendify/contracts';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import { Track } from '../../domain/track/track.entity';
-import type { PlaylistTransferOffer } from '../services/playlist-transfer-tokens.service';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import { Track } from '@/domain/track/track.entity';
+import type { PlaylistTransferOffer } from '@/application/services/playlist-transfer-tokens.service';
 
 export function toTrackResponse(track: Track): TrackDto {
   return {

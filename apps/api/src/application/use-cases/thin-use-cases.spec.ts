@@ -4,16 +4,16 @@ import { ResetUserStatsUseCase } from './reset-user-stats.use-case';
 import { SearchTracksUseCase } from './search-tracks.use-case';
 import { RenamePlaylistUseCase } from './rename-playlist.use-case';
 import { RemovePlaylistFromLibraryUseCase } from './remove-playlist-from-library.use-case';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import { Track } from '../../domain/track/track.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
-import type { PlaylistRepositoryPort } from '../../domain/repositories/playlist.repository.port';
-import type { CatalogProviderFactoryPort } from '../../domain/repositories/catalog-provider.port';
-import type { MusicProviderFactoryPort } from '../../domain/repositories/music-provider.factory.port';
-import type { UserRepositoryPort } from '../../domain/repositories/user.repository.port';
-import type { UsageStatsRepositoryPort } from '../../domain/repositories/usage-stats.repository.port';
-import { User } from '../../domain/user/user.entity';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import type { PlaylistRepositoryPort } from '@/domain/repositories/playlist.repository.port';
+import type { CatalogProviderFactoryPort } from '@/domain/repositories/catalog-provider.port';
+import type { MusicProviderFactoryPort } from '@/domain/repositories/music-provider.factory.port';
+import type { UserRepositoryPort } from '@/domain/repositories/user.repository.port';
+import type { UsageStatsRepositoryPort } from '@/domain/repositories/usage-stats.repository.port';
+import { User } from '@/domain/user/user.entity';
 
 function makeUser(): User {
   return User.create({ id: 'user-1', spotifyId: 's1', displayName: 'Camila' });

@@ -4,7 +4,7 @@ import {
   PlaylistSeedSchema,
 } from '@blendify/contracts';
 import { z } from 'zod';
-import { MAX_TRACKS } from '../../domain/constants';
+import { MAX_TRACKS } from '@/domain/constants';
 
 export const GenerateArtistMixSchema = ArtistMixRequestSchema.omit({
   coverImageBase64: true,

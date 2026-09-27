@@ -1,15 +1,15 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { GeneratePlaylistUseCase } from '../application/use-cases/generate-playlist.use-case';
-import { CATALOG_PROVIDER_FACTORY } from '../domain/repositories/catalog-provider.port';
-import { DISCOVERY_CATALOG } from '../domain/repositories/discovery-catalog.port';
-import { PROVIDER_QUOTA } from '../domain/repositories/provider-quota.port';
-import { GenerationController } from '../presentation/controllers/generation.controller';
-import { GenerationConcurrencyInterceptor } from '../presentation/request-limits/generation-concurrency.interceptor';
-import { RateLimitGuard } from '../presentation/request-limits/rate-limit.guard';
-import { RequestLimiter } from '../presentation/request-limits/request-limiter';
-import { inMemoryRequestLimitProviders } from '../presentation/request-limits/request-limits.testing';
+import { GeneratePlaylistUseCase } from '@/application/use-cases/generate-playlist.use-case';
+import { CATALOG_PROVIDER_FACTORY } from '@/domain/repositories/catalog-provider.port';
+import { DISCOVERY_CATALOG } from '@/domain/repositories/discovery-catalog.port';
+import { PROVIDER_QUOTA } from '@/domain/repositories/provider-quota.port';
+import { GenerationController } from '@/presentation/controllers/generation.controller';
+import { GenerationConcurrencyInterceptor } from '@/presentation/request-limits/generation-concurrency.interceptor';
+import { RateLimitGuard } from '@/presentation/request-limits/rate-limit.guard';
+import { RequestLimiter } from '@/presentation/request-limits/request-limiter';
+import { inMemoryRequestLimitProviders } from '@/presentation/request-limits/request-limits.testing';
 import { GenerationModule } from './generation.module';
 
 @Global()

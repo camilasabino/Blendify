@@ -1,9 +1,9 @@
 import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
 import { SyncLibraryUseCase } from './sync-library.use-case';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import type { PlaylistRepositoryPort } from '../../domain/repositories/playlist.repository.port';
-import type { MusicProviderFactoryPort } from '../../domain/repositories/music-provider.factory.port';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import type { PlaylistRepositoryPort } from '@/domain/repositories/playlist.repository.port';
+import type { MusicProviderFactoryPort } from '@/domain/repositories/music-provider.factory.port';
 
 function makePlaylist(id: string, spotifyId: string, name: string): Playlist {
   const seed = { id: `artist-${id}`, name };

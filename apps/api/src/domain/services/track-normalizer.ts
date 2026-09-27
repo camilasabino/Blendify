@@ -1,4 +1,4 @@
-import { ALTERNATE_KEYWORDS } from '../constants';
+import { ALTERNATE_KEYWORDS } from '@/domain/constants';
 import {
   collapseWhitespace,
   hasFeatCredit,
@@ -9,7 +9,9 @@ import {
 function stripTrailingDashSuffix(title: string): string {
   for (const sep of [' - ', ' – ', ' — '] as const) {
     const idx = title.lastIndexOf(sep);
-    if (idx >= 0) return title.slice(0, idx).trimEnd();
+    if (idx >= 0) {
+      return title.slice(0, idx).trimEnd();
+    }
   }
   return title;
 }
@@ -22,13 +24,21 @@ function keywordCutRange(
   const before = idx === 0 ? ' ' : result[idx - 1];
   const after =
     idx + keyLength >= result.length ? ' ' : result[idx + keyLength];
-  if (!' ([)-–—'.includes(before)) return null;
-  if (!(isWordBoundary(after) || after === ')' || after === ']')) return null;
+  if (!' ([)-–—'.includes(before)) {
+    return null;
+  }
+  if (!(isWordBoundary(after) || after === ')' || after === ']')) {
+    return null;
+  }
 
   let start = idx;
-  if (' ([)-–—'.includes(before) && before !== '') start = idx - 1;
+  if (' ([)-–—'.includes(before) && before !== '') {
+    start = idx - 1;
+  }
   let end = idx + keyLength;
-  if (after === ')' || after === ']') end += 1;
+  if (after === ')' || after === ']') {
+    end += 1;
+  }
   return { start: Math.max(0, start), end };
 }
 

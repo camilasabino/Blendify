@@ -1,18 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AxiosInstance } from 'axios';
-import { createOutboundHttp } from '../http/outbound-http.logging';
-import { RedisCacheService } from '../cache/redis-cache.service';
+import { createOutboundHttp } from '@/infrastructure/http/outbound-http.logging';
+import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import type {
   CatalogTrackCandidate,
   DiscoveryCatalogPort,
   SimilarArtistCandidate,
   SimilarTrackCandidate,
-} from '../../domain/repositories/discovery-catalog.port';
+} from '@/domain/repositories/discovery-catalog.port';
 import {
   artistNameVariants,
   buildSimilarTrackQueryVariants,
-} from '../../domain/discovery/similar-track-query';
+} from '@/domain/discovery/similar-track-query';
 import { encodeLastFmParam } from './lastfm-params';
 
 type LastFmImage = { size?: string; ['#text']?: string };
@@ -90,6 +90,7 @@ const LASTFM_CACHE_TTL_MS = 7 * DAY_MS;
 const LASTFM_EMPTY_CACHE_TTL_MS = 30 * 60 * 1000;
 const LASTFM_MAX_LIMIT = 100;
 const LASTFM_TAG_ARTISTS_MAX_LIMIT = 50;
+const LASTFM_HTTP_TIMEOUT_MS = 12_000;
 
 @Injectable()
 export class LastFmClient implements DiscoveryCatalogPort {
@@ -106,7 +107,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
     this.http = createOutboundHttp(
       {
         baseURL: 'https://ws.audioscrobbler.com/2.0/',
-        timeout: 12_000,
+        timeout: LASTFM_HTTP_TIMEOUT_MS,
         headers: {
           'User-Agent':
             'Blendify/1.0 (https://github.com/camilasabino/Blendify)',
@@ -129,7 +130,9 @@ export class LastFmClient implements DiscoveryCatalogPort {
     }
 
     const name = artistName.trim();
-    if (!name) return [];
+    if (!name) {
+      return [];
+    }
 
     const safeLimit = Math.min(Math.max(limit, 1), LASTFM_MAX_LIMIT);
     const cacheKey = this.key(
@@ -201,7 +204,9 @@ export class LastFmClient implements DiscoveryCatalogPort {
 
     const artist = artistName.trim();
     const track = trackName.trim();
-    if (!artist || !track) return [];
+    if (!artist || !track) {
+      return [];
+    }
 
     const safeLimit = Math.min(Math.max(limit, 1), LASTFM_MAX_LIMIT);
     // Versioned because query-variant rules affect the recommendation set.
@@ -226,7 +231,9 @@ export class LastFmClient implements DiscoveryCatalogPort {
             best = tracks;
             usedVariant = variant;
           }
-          if (best.length >= safeLimit) break;
+          if (best.length >= safeLimit) {
+            break;
+          }
         }
 
         this.logger.debug(
@@ -285,7 +292,9 @@ export class LastFmClient implements DiscoveryCatalogPort {
     }
 
     const name = tag.trim().toLowerCase();
-    if (!name) return [];
+    if (!name) {
+      return [];
+    }
 
     const safeLimit = Math.min(
       Math.max(limit, 1),
@@ -335,7 +344,9 @@ export class LastFmClient implements DiscoveryCatalogPort {
     }
 
     const name = tag.trim().toLowerCase();
-    if (!name) return [];
+    if (!name) {
+      return [];
+    }
 
     const safeLimit = Math.min(Math.max(limit, 1), LASTFM_MAX_LIMIT);
     const safePage = Math.max(1, Math.floor(page));
@@ -386,7 +397,9 @@ export class LastFmClient implements DiscoveryCatalogPort {
     }
 
     const name = artist.trim();
-    if (!name) return [];
+    if (!name) {
+      return [];
+    }
 
     const safeLimit = Math.min(Math.max(limit, 1), LASTFM_MAX_LIMIT);
     const cacheKey = this.key(
@@ -436,7 +449,9 @@ export class LastFmClient implements DiscoveryCatalogPort {
     ttlMs: (value: T) => number,
   ): Promise<T> {
     const cached = await this.cache.getJson<T>(cacheKey);
-    if (cached !== null && cached !== undefined) return cached;
+    if (cached !== null && cached !== undefined) {
+      return cached;
+    }
     const value = await load();
     await this.cache.setJson(cacheKey, value, ttlMs(value));
     return value;
@@ -454,27 +469,37 @@ export class LastFmClient implements DiscoveryCatalogPort {
 function normalizeArtistList(
   value: LastFmArtistNode | LastFmArtistNode[] | undefined,
 ): LastFmArtistNode[] {
-  if (!value) return [];
+  if (!value) {
+    return [];
+  }
   return Array.isArray(value) ? value : [value];
 }
 
 function normalizeTagTrackList(
   value: LastFmTagTrackNode | LastFmTagTrackNode[] | undefined,
 ): LastFmTagTrackNode[] {
-  if (!value) return [];
+  if (!value) {
+    return [];
+  }
   return Array.isArray(value) ? value : [value];
 }
 
 function normalizeSimilarTrackList(
   value: LastFmSimilarTrackNode | LastFmSimilarTrackNode[] | undefined,
 ): LastFmSimilarTrackNode[] {
-  if (!value) return [];
+  if (!value) {
+    return [];
+  }
   return Array.isArray(value) ? value : [value];
 }
 
 function coerceFiniteNumber(value: unknown): number | undefined {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') return Number(value);
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return Number(value);
+  }
   return undefined;
 }
 
@@ -492,7 +517,9 @@ function mapSimilarArtist(
   node: LastFmArtistNode,
 ): SimilarArtistCandidate | null {
   const name = node.name?.trim();
-  if (!name) return null;
+  if (!name) {
+    return null;
+  }
   const match = coerceFiniteNumber(node.match);
   return {
     name,
@@ -507,11 +534,15 @@ function mapSimilarTrack(
   node: LastFmSimilarTrackNode,
 ): SimilarTrackCandidate | null {
   const name = node.name?.trim();
-  if (!name) return null;
+  if (!name) {
+    return null;
+  }
   const artistRaw = node.artist;
   const artistName =
     typeof artistRaw === 'string' ? artistRaw.trim() : artistRaw?.name?.trim();
-  if (!artistName) return null;
+  if (!artistName) {
+    return null;
+  }
   const match = coerceFiniteNumber(node.match);
   const playcount = parsePlaycount(node.playcount);
   return {
@@ -531,13 +562,17 @@ function mapTagTrack(
   fallbackRank?: number,
 ): CatalogTrackCandidate | null {
   const trackName = node.name?.trim();
-  if (!trackName) return null;
+  if (!trackName) {
+    return null;
+  }
   const artistRaw = node.artist;
   const artistName =
     (typeof artistRaw === 'string'
       ? artistRaw.trim()
       : artistRaw?.name?.trim()) || fallbackArtist?.trim();
-  if (!artistName) return null;
+  if (!artistName) {
+    return null;
+  }
 
   const playcount = coerceFiniteNumber(node.playcount);
   const rank = coerceFiniteNumber(node['@attr']?.rank ?? fallbackRank);
@@ -551,18 +586,24 @@ function mapTagTrack(
 }
 
 function pickImageUrl(images: LastFmImage[] | undefined): string | undefined {
-  if (!images?.length) return undefined;
+  if (!images?.length) {
+    return undefined;
+  }
   const preferred = ['extralarge', 'large', 'medium', 'small', 'mega'];
   for (const size of preferred) {
     const hit = images.find(
       (image) => image.size === size && image['#text']?.trim(),
     );
     const url = normalizeImageUrl(hit?.['#text']);
-    if (url) return url;
+    if (url) {
+      return url;
+    }
   }
   for (const image of images) {
     const url = normalizeImageUrl(image['#text']);
-    if (url) return url;
+    if (url) {
+      return url;
+    }
   }
   return undefined;
 }
@@ -571,8 +612,14 @@ const LASTFM_PLACEHOLDER_HASH = '2a96cbd8b46e442fc41c2b86b821562f';
 
 function normalizeImageUrl(raw: string | undefined): string | undefined {
   const value = raw?.trim();
-  if (!value) return undefined;
-  if (!/^https?:\/\//i.test(value)) return undefined;
-  if (value.includes(LASTFM_PLACEHOLDER_HASH)) return undefined;
+  if (!value) {
+    return undefined;
+  }
+  if (!/^https?:\/\//i.test(value)) {
+    return undefined;
+  }
+  if (value.includes(LASTFM_PLACEHOLDER_HASH)) {
+    return undefined;
+  }
   return value.replace(/^http:\/\//i, 'https://');
 }

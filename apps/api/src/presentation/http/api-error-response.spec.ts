@@ -1,6 +1,6 @@
-import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { TransferError } from '../../domain/errors/transfer.error';
+import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { TransferError } from '@/domain/errors/transfer.error';
 import { toApiErrorResponse } from './api-error-response';
 
 describe('toApiErrorResponse', () => {

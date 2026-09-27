@@ -97,7 +97,9 @@ export function OrderModeSection<T extends OrderFields>({
 
 export function CoverErrorNotice({ message }: Readonly<{ message: string | null }>) {
   const t = useT()
-  if (!message) return null
+  if (!message) {
+    return null
+  }
   return (
     <div className="space-y-1">
       <FieldError>{message}</FieldError>
@@ -159,8 +161,12 @@ export function GenerationSubmitBar({
   const showReason = Boolean(disabledReason) && !isGenerating
   const showSummary = Boolean(summary) && !showReason
   let describedBy: string | undefined
-  if (showReason) describedBy = reasonId
-  else if (showSummary) describedBy = summaryId
+  if (showReason) {
+    describedBy = reasonId
+  }
+  else if (showSummary) {
+    describedBy = summaryId
+  }
 
   return (
     <div className="space-y-3 pt-2">

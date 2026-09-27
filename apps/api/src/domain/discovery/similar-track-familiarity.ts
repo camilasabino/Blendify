@@ -2,7 +2,7 @@ import type { PopularityMode } from '@blendify/contracts';
 import {
   catalogCandidateBudget,
   sliceCatalogWindow,
-} from '../genre/catalog-window';
+} from '@/domain/genre/catalog-window';
 
 function knownPlaycount(playcount: number | undefined): number | null {
   return typeof playcount === 'number' &&
@@ -19,7 +19,9 @@ export function selectSimilarTrackCandidates<T extends { playcount?: number }>(
   random: () => number = Math.random,
 ): T[] {
   const budget = catalogCandidateBudget(needed);
-  if (budget === 0 || candidates.length === 0) return [];
+  if (budget === 0 || candidates.length === 0) {
+    return [];
+  }
 
   const known: Array<{ candidate: T; index: number; playcount: number }> = [];
   const unknown: T[] = [];

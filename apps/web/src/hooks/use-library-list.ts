@@ -116,7 +116,9 @@ export function useLibraryList() {
   )
 
   async function refreshLibrary() {
-    if (refreshing) return
+    if (refreshing) {
+      return
+    }
     setRefreshing(true)
     setRefreshError(null)
     setRefreshSummary(null)
@@ -160,7 +162,9 @@ export function useLibraryList() {
   }
 
   function confirmPending() {
-    if (!pending) return
+    if (!pending) {
+      return
+    }
     if (pending.kind === 'alert') {
       setPending(null)
       return

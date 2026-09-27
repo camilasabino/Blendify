@@ -11,7 +11,9 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       retry: (failureCount, error) => {
-        if (isSpotifyRateLimited(error) || isRequestLimited(error)) return false
+        if (isSpotifyRateLimited(error) || isRequestLimited(error)) {
+          return false
+        }
         return failureCount < 1
       },
       refetchOnWindowFocus: false,

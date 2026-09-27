@@ -1,7 +1,7 @@
 import { pickResolvedTrack } from './pick-resolved-track';
-import { Track } from '../../domain/track/track.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 
 function track(
   id: string,

@@ -79,8 +79,12 @@ const WORD_OVERRIDES: Record<string, string> = {
 
 function titleToken(token: string, index: number, total: number): string {
   const lower = token.toLowerCase();
-  if (WORD_OVERRIDES[lower]) return WORD_OVERRIDES[lower];
-  if (ACRONYMS.has(lower)) return lower === 'dnb' ? 'DnB' : lower.toUpperCase();
+  if (WORD_OVERRIDES[lower]) {
+    return WORD_OVERRIDES[lower];
+  }
+  if (ACRONYMS.has(lower)) {
+    return lower === 'dnb' ? 'DnB' : lower.toUpperCase();
+  }
 
   if (lower.includes('-')) {
     return lower
@@ -101,7 +105,9 @@ function titleToken(token: string, index: number, total: number): string {
 
 export function canonicalizeGenreTag(tag: string): string {
   const trimmed = tag.trim().toLowerCase();
-  if (!trimmed) return trimmed;
+  if (!trimmed) {
+    return trimmed;
+  }
   const aliased = TAG_CANONICALIZATION[trimmed] ?? trimmed;
   return stripAccents(aliased);
 }
@@ -116,10 +122,14 @@ function stripAccents(value: string): string {
 
 export function formatGenreDisplayName(tag: string): string {
   const canonical = canonicalizeGenreTag(tag);
-  if (!canonical) return tag.trim();
+  if (!canonical) {
+    return tag.trim();
+  }
 
   const override = DISPLAY_OVERRIDES[canonical];
-  if (override) return override;
+  if (override) {
+    return override;
+  }
 
   const parts = canonical.split(/\s+/);
   return parts

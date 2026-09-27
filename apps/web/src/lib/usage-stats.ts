@@ -10,6 +10,8 @@ export function isUsageStatsEmpty(stats: UserUsageStats): boolean {
 }
 
 export function barWidthPercent(count: number, max: number): number {
-  if (max <= 0 || count <= 0) return 0
+  if (max <= 0 || count <= 0) {
+    return 0
+  }
   return Math.min(100, (count / max) * 100)
 }

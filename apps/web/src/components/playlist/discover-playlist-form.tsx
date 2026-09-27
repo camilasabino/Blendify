@@ -79,8 +79,12 @@ function discoverDisabledReason(
   hasTrack: boolean,
   t: ReturnType<typeof useT>,
 ): string | null {
-  if (seedMode === 'artist' && !hasArtist) return t('discover.needArtist')
-  if (seedMode === 'track' && !hasTrack) return t('discover.needTrack')
+  if (seedMode === 'artist' && !hasArtist) {
+    return t('discover.needArtist')
+  }
+  if (seedMode === 'track' && !hasTrack) {
+    return t('discover.needTrack')
+  }
   return null
 }
 
@@ -210,7 +214,9 @@ export function DiscoverPlaylistForm() {
       runDiscoverGeneration({
         ...run,
         onProgress: (p) => {
-          if (isCurrentGeneration(run.epoch)) setProgress(p)
+          if (isCurrentGeneration(run.epoch)) {
+            setProgress(p)
+          }
         },
       }),
     onMutate: () => {
@@ -218,7 +224,9 @@ export function DiscoverPlaylistForm() {
     },
     onSuccess: (outcome, run) => {
       useGenerationStore.getState().finish(run.epoch)
-      if (!isCurrentGeneration(run.epoch)) return
+      if (!isCurrentGeneration(run.epoch)) {
+        return
+      }
       setResult(outcome)
       setProgress(null)
       if (outcome.mode === 'spotify') {
@@ -228,7 +236,9 @@ export function DiscoverPlaylistForm() {
     },
     onError: (_error, run) => {
       useGenerationStore.getState().finish(run.epoch)
-      if (!isCurrentGeneration(run.epoch)) return
+      if (!isCurrentGeneration(run.epoch)) {
+        return
+      }
       setProgress(null)
     },
   })
@@ -302,7 +312,9 @@ export function DiscoverPlaylistForm() {
     let coverImageBase64: string | undefined
 
     if (seedMode === 'track') {
-      if (!track) return
+      if (!track) {
+        return
+      }
       const seedTrack = track
       const playlistName = buildDiscoverPlaylistName(seedTrack.name)
       request = {
@@ -328,7 +340,9 @@ export function DiscoverPlaylistForm() {
         ? await renderDiscoverCover(playlistName)
         : undefined
     } else {
-      if (!artist) return
+      if (!artist) {
+        return
+      }
       const seedArtist = artist
       const playlistName = buildDiscoverPlaylistName(seedArtist.name)
       request = {

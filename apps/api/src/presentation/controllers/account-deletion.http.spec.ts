@@ -7,21 +7,21 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import type { Server } from 'http';
 import request from 'supertest';
-import { DeleteAccountUseCase } from '../../application/use-cases/delete-account.use-case';
-import { GetUserStatsUseCase } from '../../application/use-cases/get-user-stats.use-case';
-import { ResetUserStatsUseCase } from '../../application/use-cases/reset-user-stats.use-case';
-import { USER_REPOSITORY } from '../../domain/repositories/user.repository.port';
+import { DeleteAccountUseCase } from '@/application/use-cases/delete-account.use-case';
+import { GetUserStatsUseCase } from '@/application/use-cases/get-user-stats.use-case';
+import { ResetUserStatsUseCase } from '@/application/use-cases/reset-user-stats.use-case';
+import { USER_REPOSITORY } from '@/domain/repositories/user.repository.port';
 import type {
   PersistableUser,
   UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
-import { User } from '../../domain/user/user.entity';
-import { AuthService } from '../../infrastructure/auth/auth.service';
-import { JwtStrategy } from '../../infrastructure/auth/jwt.strategy';
-import { SpotifyAuthClient } from '../../infrastructure/spotify/spotify-auth.client';
-import { GlobalExceptionFilter } from '../filters/global-exception.filter';
-import { OriginCsrfGuard } from '../guards/origin-csrf.guard';
-import { createBodyParser } from '../http/body-limits';
+} from '@/domain/repositories/user.repository.port';
+import { User } from '@/domain/user/user.entity';
+import { AuthService } from '@/infrastructure/auth/auth.service';
+import { JwtStrategy } from '@/infrastructure/auth/jwt.strategy';
+import { SpotifyAuthClient } from '@/infrastructure/spotify/spotify-auth.client';
+import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
+import { OriginCsrfGuard } from '@/presentation/guards/origin-csrf.guard';
+import { createBodyParser } from '@/presentation/http/body-limits';
 import { AccountController } from './account.controller';
 import { AuthController } from './auth.controller';
 import { StatsController } from './stats.controller';
@@ -57,13 +57,21 @@ class FakeDatabase {
   }
 
   deleteUser(id: string): boolean {
-    if (this.failOnDelete) throw new Error('connection terminated');
-    if (!this.users.delete(id)) return false;
+    if (this.failOnDelete) {
+      throw new Error('connection terminated');
+    }
+    if (!this.users.delete(id)) {
+      return false;
+    }
     for (const [key, row] of this.playlists) {
-      if (row.userId === id) this.playlists.delete(key);
+      if (row.userId === id) {
+        this.playlists.delete(key);
+      }
     }
     for (const [key, row] of this.seedUsages) {
-      if (row.userId === id) this.seedUsages.delete(key);
+      if (row.userId === id) {
+        this.seedUsages.delete(key);
+      }
     }
     this.usageStats.delete(id);
     return true;

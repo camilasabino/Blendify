@@ -1,9 +1,9 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { GenreCatalogService } from '../../application/services/genre-catalog.service';
-import { toGenreDto } from '../../domain/genre/curated-genres';
+import { GenreCatalogService } from '@/application/services/genre-catalog.service';
+import { toGenreDto } from '@/domain/genre/curated-genres';
 import { SearchQuerySchema, type SearchQuery } from '@blendify/contracts';
-import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
+import { ZodValidationPipe } from '@/presentation/pipes/zod-validation.pipe';
 
 @ApiTags('genres')
 @Controller('api/genres')

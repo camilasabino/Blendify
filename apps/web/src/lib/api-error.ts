@@ -41,7 +41,9 @@ const REQUEST_LIMIT_MESSAGES: Record<string, MessageKey> = {
 }
 
 function requestLimitMessageKey(error: unknown): MessageKey | null {
-  if (!(error instanceof ApiError) || !error.code) return null
+  if (!(error instanceof ApiError) || !error.code) {
+    return null
+  }
   return Object.hasOwn(REQUEST_LIMIT_MESSAGES, error.code)
     ? REQUEST_LIMIT_MESSAGES[error.code]
     : null
@@ -82,7 +84,9 @@ function formatRetryWaitLabel(
 
 function readRetryAfterSeconds(details?: Record<string, unknown>): number | null {
   const retryRaw = details?.retryAfterSeconds
-  if (typeof retryRaw === 'number' && Number.isFinite(retryRaw)) return retryRaw
+  if (typeof retryRaw === 'number' && Number.isFinite(retryRaw)) {
+    return retryRaw
+  }
   return null
 }
 
@@ -109,8 +113,12 @@ function mapRequestLimitMessage(
   t: Translate,
 ): string | null {
   const key = requestLimitMessageKey(error)
-  if (!key) return null
-  if (error.code === 'CONCURRENCY_LIMITED') return t(key)
+  if (!key) {
+    return null
+  }
+  if (error.code === 'CONCURRENCY_LIMITED') {
+    return t(key)
+  }
   return t(key, {
     wait: formatRetryWaitLabel(t, readRetryAfterSeconds(error.details), false),
   })
@@ -179,7 +187,9 @@ function mapTransferUnavailableMessage(
   error: ApiError,
   t: Translate,
 ): string | null {
-  if (error.code !== 'TRANSFER_PROVIDER_UNAVAILABLE') return null
+  if (error.code !== 'TRANSFER_PROVIDER_UNAVAILABLE') {
+    return null
+  }
   return t('transfer.errorUnavailable', {
     wait: formatRetryWaitLabel(t, readRetryAfterSeconds(error.details), false),
   })
@@ -189,7 +199,9 @@ function mapStaticCodeMessage(
   code: string | undefined,
   t: Translate,
 ): string | null {
-  if (!code) return null
+  if (!code) {
+    return null
+  }
   const key = STATIC_ERROR_MESSAGES[code]
   return key ? t(key) : null
 }
@@ -217,14 +229,18 @@ export function getApiErrorMessage(
 export type TransferErrorRecovery = 'regenerate' | 'retry' | 'none'
 
 export function getTransferErrorRecovery(error: unknown): TransferErrorRecovery {
-  if (!(error instanceof ApiError)) return 'retry'
+  if (!(error instanceof ApiError)) {
+    return 'retry'
+  }
   if (
     error.code === 'TRANSFER_TOKEN_EXPIRED' ||
     error.code === 'TRANSFER_TOKEN_INVALID'
   ) {
     return 'regenerate'
   }
-  if (error.code === 'TRANSFER_PLAYLIST_REJECTED') return 'none'
+  if (error.code === 'TRANSFER_PLAYLIST_REJECTED') {
+    return 'none'
+  }
   return 'retry'
 }
 

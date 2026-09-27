@@ -1,5 +1,5 @@
 import type { ConfigService } from '@nestjs/config';
-import type { SpotifyTokenService } from '../auth/spotify-token.service';
+import type { SpotifyTokenService } from '@/infrastructure/auth/spotify-token.service';
 import { SpotifyApiClient } from './spotify-api.client';
 import type { SpotifyAppTokenProvider } from './spotify-app-token.provider';
 import { SpotifyMusicProvider } from './spotify-music.provider';

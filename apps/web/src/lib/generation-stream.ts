@@ -28,7 +28,9 @@ export function parseGenerationStreamLine<T>(
   schema: z.ZodType<GenerationStreamEventOf<T>>,
 ): GenerationStreamEventOf<T> | null {
   const trimmed = line.trim()
-  if (!trimmed) return null
+  if (!trimmed) {
+    return null
+  }
   let parsed: unknown
   try {
     parsed = JSON.parse(trimmed)
@@ -36,8 +38,12 @@ export function parseGenerationStreamLine<T>(
     return null
   }
   const result = schema.safeParse(parsed)
-  if (result.success) return result.data
-  if (isResultEnvelope(parsed)) throw invalidGenerationResponseError()
+  if (result.success) {
+    return result.data
+  }
+  if (isResultEnvelope(parsed)) {
+    throw invalidGenerationResponseError()
+  }
   return null
 }
 
@@ -50,12 +56,16 @@ function consumeGenerationLines<T>(
 ): TerminalResult<T> {
   for (const line of lines) {
     const event = parseGenerationStreamLine(line, schema)
-    if (!event) continue
+    if (!event) {
+      continue
+    }
     if (event.type === 'progress') {
       onProgress?.(event)
       continue
     }
-    if (event.type === 'result') return { playlist: event.playlist }
+    if (event.type === 'result') {
+      return { playlist: event.playlist }
+    }
     throw new ApiError(event.message, event.statusCode, event)
   }
   return null
@@ -76,7 +86,9 @@ export async function readGenerationStream<T>(
 
   while (true) {
     const { done, value } = await reader.read()
-    if (done) break
+    if (done) {
+      break
+    }
     buffer += decoder.decode(value, { stream: true })
     const lines = buffer.split('\n')
     buffer = lines.pop() ?? ''

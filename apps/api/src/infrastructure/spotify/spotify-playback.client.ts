@@ -1,9 +1,10 @@
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import {
   PlaybackDevice,
   StartPlaybackInput,
-} from '../../domain/repositories/music-provider.port';
+} from '@/domain/repositories/music-provider.port';
 import { SpotifyApiClient } from './spotify-api.client';
+import { SPOTIFY_NO_ACTIVE_DEVICE_REASON } from './spotify.constants';
 
 export class SpotifyPlaybackClient {
   constructor(
@@ -23,9 +24,15 @@ export class SpotifyPlaybackClient {
   async startPlayback(input: StartPlaybackInput): Promise<void> {
     const token = await this.api.accessToken(this.userId);
     const body: Record<string, unknown> = {};
-    if (input.contextUri) body.context_uri = input.contextUri;
-    if (input.uris?.length) body.uris = input.uris;
-    if (input.offsetUri) body.offset = { uri: input.offsetUri };
+    if (input.contextUri) {
+      body.context_uri = input.contextUri;
+    }
+    if (input.uris?.length) {
+      body.uris = input.uris;
+    }
+    if (input.offsetUri) {
+      body.offset = { uri: input.offsetUri };
+    }
 
     if (!body.context_uri && !body.uris) {
       throw new BusinessRuleError(
@@ -57,7 +64,7 @@ export class SpotifyPlaybackClient {
     if (devices.length === 0) {
       throw new BusinessRuleError(
         'No active Spotify device. Open Spotify on your phone or computer, play anything once, then try again.',
-        'NO_ACTIVE_DEVICE',
+        SPOTIFY_NO_ACTIVE_DEVICE_REASON,
       );
     }
     return devices.find((device) => device.isActive)?.id ?? devices[0].id;

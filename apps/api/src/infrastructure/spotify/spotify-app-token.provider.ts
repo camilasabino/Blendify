@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
-import { createOutboundHttp } from '../http/outbound-http.logging';
+import { createOutboundHttp } from '@/infrastructure/http/outbound-http.logging';
 import { createSpotifyQuotaError } from './spotify-quota-error';
+import { SPOTIFY_HTTP_TIMEOUT_MS } from './spotify.constants';
 
 const EXPIRY_SKEW_MS = 60_000;
 
@@ -28,7 +29,7 @@ export class SpotifyAppTokenProvider {
     this.accountsApi = createOutboundHttp(
       {
         baseURL: 'https://accounts.spotify.com',
-        timeout: 15_000,
+        timeout: SPOTIFY_HTTP_TIMEOUT_MS,
       },
       { logBodies: false },
     );
@@ -115,9 +116,13 @@ function parseTokenResponse(
 ): { accessToken: string; expiresInSeconds: number } | null {
   const accessToken = data?.access_token;
   const expiresIn = data?.expires_in;
-  if (typeof accessToken !== 'string' || !accessToken.trim()) return null;
+  if (typeof accessToken !== 'string' || !accessToken.trim()) {
+    return null;
+  }
   if (typeof data?.token_type === 'string') {
-    if (data.token_type.toLowerCase() !== 'bearer') return null;
+    if (data.token_type.toLowerCase() !== 'bearer') {
+      return null;
+    }
   }
   if (
     typeof expiresIn !== 'number' ||
@@ -130,7 +135,9 @@ function parseTokenResponse(
 }
 
 function readRetryAfterSeconds(error: unknown): number | null {
-  if (!axios.isAxiosError(error)) return null;
+  if (!axios.isAxiosError(error)) {
+    return null;
+  }
   const raw: unknown = error.response?.headers?.['retry-after'];
   const seconds =
     typeof raw === 'string' || typeof raw === 'number'

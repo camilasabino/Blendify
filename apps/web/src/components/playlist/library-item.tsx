@@ -72,7 +72,9 @@ function itemBorderClass(selecting: boolean, selected: boolean) {
   if (selecting && selected) {
     return 'border-accent-line bg-accent-soft'
   }
-  if (selecting) return 'border-control hover:border-control-hover hover:bg-hover'
+  if (selecting) {
+    return 'border-control hover:border-control-hover hover:bg-hover'
+  }
   return 'border-divider'
 }
 
@@ -117,8 +119,12 @@ function LibraryItemRenameField({
         value={nameDraft}
         onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') onSubmit()
-          if (event.key === 'Escape') onCancel()
+          if (event.key === 'Enter') {
+            onSubmit()
+          }
+          if (event.key === 'Escape') {
+            onCancel()
+          }
         }}
         autoFocus
       />
@@ -399,7 +405,9 @@ function LibraryItemPreviewPanel({
       </div>
     )
   }
-  if (!detail) return null
+  if (!detail) {
+    return null
+  }
   return (
     <div id={id} className="mt-4 border-t border-divider pt-4">
       <Suspense
@@ -443,7 +451,9 @@ export function LibraryItem({
   useEffect(() => setNameDraft(playlist.name), [playlist.name])
 
   useEffect(() => {
-    if (!selecting) return
+    if (!selecting) {
+      return
+    }
     setMenuOpen(false)
     setPreviewOpen(false)
     setRenaming(false)
@@ -479,7 +489,9 @@ export function LibraryItem({
   }
 
   async function copyLink() {
-    if (!playlist.spotifyUrl) return
+    if (!playlist.spotifyUrl) {
+      return
+    }
     if (await copyToClipboard(playlist.spotifyUrl)) {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1_600)

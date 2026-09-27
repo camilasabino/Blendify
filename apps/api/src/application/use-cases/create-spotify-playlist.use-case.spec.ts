@@ -4,16 +4,16 @@ import type {
   PlaylistGeneration,
   PlaylistSeedDto,
 } from '@blendify/contracts';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
-import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
-import type { UsageStatsRepositoryPort } from '../../domain/repositories/usage-stats.repository.port';
-import type { UserRepositoryPort } from '../../domain/repositories/user.repository.port';
-import { Track } from '../../domain/track/track.entity';
-import { User } from '../../domain/user/user.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
-import type { PublishPlaylistService } from '../services/publish-playlist.service';
-import type { ProgressReporter } from '../services/generation-progress.tracker';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import type { MusicProviderPort } from '@/domain/repositories/music-provider.port';
+import type { UsageStatsRepositoryPort } from '@/domain/repositories/usage-stats.repository.port';
+import type { UserRepositoryPort } from '@/domain/repositories/user.repository.port';
+import { Track } from '@/domain/track/track.entity';
+import { User } from '@/domain/user/user.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import type { PublishPlaylistService } from '@/application/services/publish-playlist.service';
+import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import {
   CreateSpotifyPlaylistUseCase,
   type SpotifyPlaylistRequest,

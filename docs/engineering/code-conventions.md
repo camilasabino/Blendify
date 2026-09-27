@@ -89,6 +89,42 @@ coding sessions only need the short summary in `CLAUDE.md`.
   purely for cosmetic consistency — only rename when touching that code for
   another reason, or when the name is actively misleading.
 
+## Imports, control flow, and whitespace
+
+- **Absolute imports across directories.** `apps/api` and `apps/web` both use
+  a single `@/*` → `src/*` path alias for any import that crosses a directory
+  boundary (`import { Track } from '@/domain/track/track.entity'`, not
+  `'../../domain/track/track.entity'`). Same-directory relative imports
+  (`./x`) are fine — they describe colocated implementation. Cross-workspace
+  imports still go through the public package name (`@blendify/contracts`)
+  and never reach into another workspace's internals.
+  `apps/api` resolves the alias via `tsconfig.json` paths, a
+  `moduleNameMapper` entry in Jest, `tsc-alias` rewriting `dist/` after
+  `nest build`, and a `tsconfig-paths` bootstrap (`tsconfig-paths-bootstrap.js`,
+  loaded via `NODE_OPTIONS` in the `start`/`start:dev`/`start:debug` scripts)
+  for `nest start`'s own dev/watch output. `apps/web` already resolves it
+  through Vite/Vitest's `resolve.alias` and `tsconfig.app.json`.
+- **Import grouping.** Order imports as: framework/external packages, then
+  `@blendify/*` workspace packages, then `@/`-alias application imports, then
+  local relative imports — with a blank line between groups. This is a
+  human/code-review convention, not lint-enforced (neither app has an
+  import-sorting plugin installed, and one shouldn't be added just for this).
+- **Braces are mandatory** for every `if`/`else`/`for`/`while`/`do…while`
+  body, even a single-statement one. No inline `if (x) return`, `if (x) throw`,
+  `if (x) break`, or `if (x) continue`. This is lint-enforced: `curly: ['error',
+  'all']` in `apps/api`'s ESLint config, `"curly": "error"` in `apps/web`'s
+  `.oxlintrc.json`. Run `lint:fix` and let Prettier reformat the result.
+- **Vertical whitespace is a human convention, not a lint rule.** Separate
+  distinct logical phases (setup → validation → side effects → result) with a
+  blank line; don't leave a validation guard glued to unrelated code that
+  follows it. Don't add a blank line inside a guard whose entire body is a
+  single `return`/`throw`/`continue`/`break`. Don't mechanically insert blank
+  lines everywhere — the goal is visible structure, not padding.
+- **Avoid compressed control flow** generally: no nested ternaries, no
+  "clever" boolean expressions that hide a branch, no multiple meaningful
+  operations crammed onto one line. A simple expression ternary that
+  genuinely reads better inline is still fine.
+
 ## File and function size (heuristics, not hard limits)
 
 No `max-lines` lint rule. Use these as review signals:
@@ -186,7 +222,49 @@ same rule is used more than once (e.g. Spotify's 100-item playlist-add chunk
 size, Last.fm's per-call result cap, the 256 KB cover-image limit — all now
 named constants in their respective clients). A single well-named constant
 used once is still worth it when the number represents an external contract
-rather than an arbitrary choice.
+rather than an arbitrary choice. Don't extract everything, though — `0`/`1`
+in obvious length checks or increments, and trivial array indices, can stay
+inline.
+
+**Ownership: put a constant at the narrowest level that's still correct.**
+
+- *Function-local* — relevant to one function only, where naming materially
+  helps (e.g. `apps/api/src/domain/genre/catalog-resolve.ts`'s
+  `ATTEMPT_BUDGET_OVER_FETCH`).
+- *Module-level* — belongs to one file/service and nothing else uses it (most
+  of `genre-track-catalog.service.ts`'s tuning constants:
+  `GENRE_TAG_TRACK_CANDIDATE_LIMIT`, `MIN_TAG_COVERAGE_RATIO`,
+  `SEED_ARTIST_FALLBACK_RATIO`, etc.).
+- *Feature/domain constants module* — several files in the same feature share
+  the exact same semantic rule. Example:
+  `domain/genre/genre-generation.constants.ts` holds
+  `GENRE_MIX_MAX_TRACKS_PER_ARTIST` because it's the same "cap tracks per
+  artist while building a genre mix" invariant in both
+  `genre-track-catalog.service.ts` (candidate-pool resolution) and
+  `genre-playlist-generation.service.ts` (final selection).
+- *Provider constants* — Spotify/Last.fm-specific limits stay owned by that
+  client (already the pattern for the 100-item chunk size, per-call cap, and
+  256 KB cover limit above).
+- *Shared contracts* — only when the constant is genuinely part of the
+  API/web wire boundary (e.g. `MAX_ARTISTS`/`MAX_GENRES`/`MAX_TRACKS` in
+  `@blendify/contracts`, re-exported by `domain/constants.ts`). Never move a
+  backend-only implementation constant into `packages/contracts`.
+
+Do **not** create a generic `constants.ts` dumping ground for unrelated
+values. Two files using the same literal number is not, by itself, a reason
+to share a constant — share one only when both usages are the *same*
+conceptual invariant (see the `GENRE_MIX_MAX_TRACKS_PER_ARTIST` example
+above); otherwise a coincidental match (e.g. a search page size and an
+unrelated retry budget that both happen to be `10`) must stay two separate,
+independently named constants. Use `UPPER_SNAKE_CASE` for module-level
+primitive constants.
+
+For repeated string sentinels controlling flow (e.g. a return type of
+`T | null | 'stop'` used the same way in more than one function), prefer a
+small named type alias with one shared doc comment over duplicating the same
+prose JSDoc at every call site — see `SeedFanoutOutcome<T>` in
+`genre-track-catalog.service.ts`. Don't introduce a full Result/Either
+abstraction for control flow that's local to one file.
 
 ## Testing
 

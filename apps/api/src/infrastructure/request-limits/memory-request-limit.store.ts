@@ -23,7 +23,9 @@ export class MemoryRequestLimitStore implements RequestLimitStore {
 
   hit(key: string, windowMs: number): Promise<WindowHit> {
     const now = this.now();
-    if (this.windows.size > SWEEP_THRESHOLD) this.sweepWindows(now);
+    if (this.windows.size > SWEEP_THRESHOLD) {
+      this.sweepWindows(now);
+    }
 
     let window = this.windows.get(key);
     if (!window || window.expiresAt <= now) {
@@ -75,7 +77,9 @@ export class MemoryRequestLimitStore implements RequestLimitStore {
     for (const key of [permit.clientKey, permit.globalKey]) {
       const leases = this.leases.get(key);
       leases?.delete(permit.permitId);
-      if (leases?.size === 0) this.leases.delete(key);
+      if (leases?.size === 0) {
+        this.leases.delete(key);
+      }
     }
     return Promise.resolve();
   }
@@ -87,14 +91,18 @@ export class MemoryRequestLimitStore implements RequestLimitStore {
       this.leases.set(key, leases);
     }
     for (const [permitId, expiresAt] of leases) {
-      if (expiresAt <= now) leases.delete(permitId);
+      if (expiresAt <= now) {
+        leases.delete(permitId);
+      }
     }
     return leases;
   }
 
   private sweepWindows(now: number): void {
     for (const [key, window] of this.windows) {
-      if (window.expiresAt <= now) this.windows.delete(key);
+      if (window.expiresAt <= now) {
+        this.windows.delete(key);
+      }
     }
   }
 }

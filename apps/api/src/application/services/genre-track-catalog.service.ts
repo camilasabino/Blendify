@@ -1,37 +1,54 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { PopularityMode } from '@blendify/contracts';
-import { pickStrictArtistMatch } from '../../domain/artist/artist-name-match';
-import { Artist } from '../../domain/artist/artist.entity';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
+import { pickStrictArtistMatch } from '@/domain/artist/artist-name-match';
+import { Artist } from '@/domain/artist/artist.entity';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import {
   isFatalCatalogError,
   isSpotifyQuotaError,
   resolveAttemptBudget,
   resolveCatalogWithPoolExpand,
-} from '../../domain/genre/catalog-resolve';
+} from '@/domain/genre/catalog-resolve';
 import {
   type CuratedGenre,
   genreTrackGroupKey,
-} from '../../domain/genre/curated-genres';
-import { tracksPerSeedArtist } from '../../domain/genre/genre-playlist-generation.service';
+} from '@/domain/genre/curated-genres';
+import { tracksPerSeedArtist } from '@/domain/genre/genre-playlist-generation.service';
 import {
   DISCOVERY_CATALOG,
   type DiscoveryCatalogPort,
-} from '../../domain/repositories/discovery-catalog.port';
-import type { CatalogProviderPort } from '../../domain/repositories/catalog-provider.port';
+} from '@/domain/repositories/discovery-catalog.port';
+import {
+  CATALOG_MATCH_SEARCH_LIMIT,
+  type CatalogProviderPort,
+} from '@/domain/repositories/catalog-provider.port';
 import {
   PROVIDER_QUOTA,
   type ProviderQuotaPort,
-} from '../../domain/repositories/provider-quota.port';
-import { Track } from '../../domain/track/track.entity';
+} from '@/domain/repositories/provider-quota.port';
+import { Track } from '@/domain/track/track.entity';
+import { GENRE_MIX_MAX_TRACKS_PER_ARTIST } from '@/domain/genre/genre-generation.constants';
 
 const SPOTIFY_VARIOUS_ARTISTS_ARTIST_ID = '0LyfQWJT6nXafLPZqxe9Of';
+
+const GENRE_TAG_TRACK_CANDIDATE_LIMIT = 100;
+const MIN_TAG_COVERAGE_RATIO = 0.5;
+const SEED_ARTIST_FALLBACK_RATIO = 0.35;
+const MIN_SEED_ARTIST_FALLBACK_LIMIT = 5;
+const MAX_SEED_ARTIST_FALLBACK_LIMIT = 8;
+const SEED_ARTIST_CANDIDATE_BUFFER = 4;
+const MIN_SEED_ARTIST_CANDIDATE_LIMIT = 10;
+const MAX_SEED_ARTIST_CANDIDATE_LIMIT = 16;
+const ARTIST_NAME_MATCH_CANDIDATE_LIMIT = 3;
 
 export interface GenreTrackCatalogResult {
   tracksByGenre: Map<string, Track[]>;
   coverCandidates: Map<string, string | undefined>;
 }
+
+/** `null` skips this candidate and continues; `'stop'` ends the seed-fanout loop early (quota hit). */
+type SeedFanoutOutcome<T> = T | null | 'stop';
 
 @Injectable()
 export class GenreTrackCatalogService {
@@ -115,7 +132,7 @@ export class GenreTrackCatalogService {
     );
 
     let coverUrl: string | undefined;
-    if (collected.length < Math.ceil(tracksPerSeed * 0.5)) {
+    if (collected.length < Math.ceil(tracksPerSeed * MIN_TAG_COVERAGE_RATIO)) {
       this.quota.assertAvailable();
       const fallback = await this.resolveSeedArtistTracks(
         provider,
@@ -144,11 +161,18 @@ export class GenreTrackCatalogService {
     onMatched?: (matched: number) => void,
   ): Promise<Track[]> {
     const tag = genre.spotifyGenre.trim().toLowerCase();
-    if (!tag) return [];
+    if (!tag) {
+      return [];
+    }
 
     try {
-      const chart = await this.discoveryCatalog.getTopTracksForTag(tag, 100);
-      if (chart.length === 0) return [];
+      const chart = await this.discoveryCatalog.getTopTracksForTag(
+        tag,
+        GENRE_TAG_TRACK_CANDIDATE_LIMIT,
+      );
+      if (chart.length === 0) {
+        return [];
+      }
 
       const resolved = await resolveCatalogWithPoolExpand(
         provider,
@@ -156,8 +180,7 @@ export class GenreTrackCatalogService {
         popularity,
         tracksPerSeed,
         {
-          concurrency: 1,
-          maxPerArtist: 3,
+          maxPerArtist: GENRE_MIX_MAX_TRACKS_PER_ARTIST,
           onProgress: (update) => {
             onMatched?.(Math.min(update.matched, tracksPerSeed));
           },
@@ -165,7 +188,9 @@ export class GenreTrackCatalogService {
       );
       return resolved.filter((track) => !this.isJunkTrack(track));
     } catch (error) {
-      if (isFatalCatalogError(error)) throw error;
+      if (isFatalCatalogError(error)) {
+        throw error;
+      }
       this.logger.warn(
         `Tag chart resolve failed for "${tag}": ${errorMessage(error)}`,
       );
@@ -179,7 +204,13 @@ export class GenreTrackCatalogService {
     tracksPerSeed: number,
   ): Promise<{ tracks: Track[]; coverUrl: string | undefined }> {
     // Each fallback seed costs a Spotify search, so cap fan-out tightly.
-    const seedLimit = Math.min(8, Math.max(5, Math.ceil(tracksPerSeed * 0.35)));
+    const seedLimit = Math.min(
+      MAX_SEED_ARTIST_FALLBACK_LIMIT,
+      Math.max(
+        MIN_SEED_ARTIST_FALLBACK_LIMIT,
+        Math.ceil(tracksPerSeed * SEED_ARTIST_FALLBACK_RATIO),
+      ),
+    );
     const seedArtists = await this.resolveSeedArtists(
       provider,
       genre,
@@ -202,7 +233,9 @@ export class GenreTrackCatalogService {
     );
 
     for (const artist of seedArtists) {
-      if (collected.length >= fetchTarget) break;
+      if (collected.length >= fetchTarget) {
+        break;
+      }
       this.quota.assertAvailable();
 
       const page = await this.searchTracksForSeedArtist(
@@ -210,8 +243,12 @@ export class GenreTrackCatalogService {
         artist,
         collected.length,
       );
-      if (page === 'stop') break;
-      if (page === null) continue;
+      if (page === 'stop') {
+        break;
+      }
+      if (page === null) {
+        continue;
+      }
 
       this.collectMatchingSeedTracks({
         page,
@@ -230,21 +267,24 @@ export class GenreTrackCatalogService {
     };
   }
 
-  /** Returns tracks, `null` to skip artist, or `'stop'` to end the seed loop. */
   private async searchTracksForSeedArtist(
     provider: CatalogProviderPort,
     artist: Artist,
     collectedCount: number,
-  ): Promise<Track[] | null | 'stop'> {
+  ): Promise<SeedFanoutOutcome<Track[]>> {
     try {
       return await provider.searchTracks(`artist:"${artist.name}"`, {
-        limit: 10,
+        limit: CATALOG_MATCH_SEARCH_LIMIT,
         offset: 0,
       });
     } catch (error) {
-      if (error instanceof CatalogUnavailableError) throw error;
+      if (error instanceof CatalogUnavailableError) {
+        throw error;
+      }
       if (isSpotifyQuotaError(error)) {
-        if (collectedCount === 0) throw error;
+        if (collectedCount === 0) {
+          throw error;
+        }
         return 'stop';
       }
       this.logger.warn(
@@ -276,16 +316,26 @@ export class GenreTrackCatalogService {
     } = input;
 
     for (const track of page) {
-      if (track.artistId.getValue() !== artistId) continue;
-      if (this.isJunkTrack(track)) continue;
+      if (track.artistId.getValue() !== artistId) {
+        continue;
+      }
+      if (this.isJunkTrack(track)) {
+        continue;
+      }
       const id = track.id.getValue();
-      if (seen.has(id)) continue;
+      if (seen.has(id)) {
+        continue;
+      }
       const used = perArtistSeen.get(artistId) ?? 0;
-      if (used >= tracksPerArtist) break;
+      if (used >= tracksPerArtist) {
+        break;
+      }
       seen.add(id);
       perArtistSeen.set(artistId, used + 1);
       collected.push(track);
-      if (collected.length >= fetchTarget) break;
+      if (collected.length >= fetchTarget) {
+        break;
+      }
     }
   }
 
@@ -295,20 +345,32 @@ export class GenreTrackCatalogService {
     limit: number,
   ): Promise<Artist[]> {
     const tag = genre.spotifyGenre.trim().toLowerCase();
-    if (!tag) return [];
+    if (!tag) {
+      return [];
+    }
 
     try {
       const candidates = await this.discoveryCatalog.getTopArtistsForTag(
         tag,
-        Math.min(16, Math.max(limit + 4, 10)),
+        Math.min(
+          MAX_SEED_ARTIST_CANDIDATE_LIMIT,
+          Math.max(
+            limit + SEED_ARTIST_CANDIDATE_BUFFER,
+            MIN_SEED_ARTIST_CANDIDATE_LIMIT,
+          ),
+        ),
       );
-      if (candidates.length === 0) return [];
+      if (candidates.length === 0) {
+        return [];
+      }
 
       const resolved: Artist[] = [];
       const seen = new Set<string>();
 
       for (const candidate of candidates) {
-        if (resolved.length >= limit) break;
+        if (resolved.length >= limit) {
+          break;
+        }
         this.quota.assertAvailable();
 
         const outcome = await this.resolveOneSeedArtist(
@@ -317,13 +379,19 @@ export class GenreTrackCatalogService {
           seen,
           resolved.length,
         );
-        if (outcome === 'stop') break;
-        if (outcome) resolved.push(outcome);
+        if (outcome === 'stop') {
+          break;
+        }
+        if (outcome) {
+          resolved.push(outcome);
+        }
       }
 
       return resolved;
     } catch (error) {
-      if (isFatalCatalogError(error)) throw error;
+      if (isFatalCatalogError(error)) {
+        throw error;
+      }
       this.logger.warn(
         `Seed artist resolve failed for "${tag}": ${errorMessage(error)}`,
       );
@@ -331,28 +399,38 @@ export class GenreTrackCatalogService {
     }
   }
 
-  /** Returns a match, `null` to skip, or `'stop'` on quota with partial results. */
   private async resolveOneSeedArtist(
     provider: CatalogProviderPort,
     candidateName: string,
     seen: Set<string>,
     resolvedCount: number,
-  ): Promise<Artist | null | 'stop'> {
+  ): Promise<SeedFanoutOutcome<Artist>> {
     try {
-      const artists = await provider.searchArtists(candidateName, 3);
+      const artists = await provider.searchArtists(
+        candidateName,
+        ARTIST_NAME_MATCH_CANDIDATE_LIMIT,
+      );
       const match = pickStrictArtistMatch(
         candidateName,
         artists.filter((artist) => !this.isJunkArtist(artist)),
       );
-      if (!match) return null;
+      if (!match) {
+        return null;
+      }
       const id = match.id.getValue();
-      if (seen.has(id)) return null;
+      if (seen.has(id)) {
+        return null;
+      }
       seen.add(id);
       return match;
     } catch (error) {
-      if (error instanceof CatalogUnavailableError) throw error;
+      if (error instanceof CatalogUnavailableError) {
+        throw error;
+      }
       if (isSpotifyQuotaError(error)) {
-        if (resolvedCount === 0) throw error;
+        if (resolvedCount === 0) {
+          throw error;
+        }
         return 'stop';
       }
       this.logger.warn(

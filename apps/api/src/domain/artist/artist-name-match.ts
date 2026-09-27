@@ -1,4 +1,4 @@
-import { Artist } from '../artist/artist.entity';
+import { Artist } from '@/domain/artist/artist.entity';
 
 export function normalizeArtistName(name: string): string {
   return name
@@ -14,21 +14,29 @@ export function pickBestArtistMatch(
   query: string,
   candidates: Artist[],
 ): Artist | undefined {
-  if (candidates.length === 0) return undefined;
+  if (candidates.length === 0) {
+    return undefined;
+  }
 
   const q = normalizeArtistName(query);
-  if (!q) return candidates[0];
+  if (!q) {
+    return candidates[0];
+  }
 
   const exact = candidates.find(
     (candidate) => normalizeArtistName(candidate.name) === q,
   );
-  if (exact) return exact;
+  if (exact) {
+    return exact;
+  }
 
   const startsWith = candidates.find((candidate) => {
     const name = normalizeArtistName(candidate.name);
     return name.startsWith(q) || q.startsWith(name);
   });
-  if (startsWith) return startsWith;
+  if (startsWith) {
+    return startsWith;
+  }
 
   return candidates[0];
 }
@@ -38,15 +46,21 @@ export function pickStrictArtistMatch(
   query: string,
   candidates: Artist[],
 ): Artist | undefined {
-  if (candidates.length === 0) return undefined;
+  if (candidates.length === 0) {
+    return undefined;
+  }
 
   const q = normalizeArtistName(query);
-  if (!q) return undefined;
+  if (!q) {
+    return undefined;
+  }
 
   const exact = candidates.find(
     (candidate) => normalizeArtistName(candidate.name) === q,
   );
-  if (exact) return exact;
+  if (exact) {
+    return exact;
+  }
 
   return candidates.find((candidate) => {
     const name = normalizeArtistName(candidate.name);

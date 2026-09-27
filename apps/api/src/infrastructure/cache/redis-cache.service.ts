@@ -23,7 +23,9 @@ export class RedisCacheService {
     try {
       if (client) {
         const raw = await client.get(key);
-        if (raw == null) return null;
+        if (raw == null) {
+          return null;
+        }
         return JSON.parse(raw) as T;
       }
     } catch (error) {
@@ -35,7 +37,9 @@ export class RedisCacheService {
     }
 
     const cached = this.memory.get(key);
-    if (!cached) return null;
+    if (!cached) {
+      return null;
+    }
     if (cached.expiresAt <= Date.now()) {
       this.memory.delete(key);
       return null;

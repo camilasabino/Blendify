@@ -28,7 +28,9 @@ type PlaylistPreviewProps = Readonly<{
 }>
 
 function isDeviceMissingError(error: unknown): boolean {
-  if (!(error instanceof ApiError)) return false
+  if (!(error instanceof ApiError)) {
+    return false
+  }
   if (
     error.code === 'NO_ACTIVE_DEVICE' ||
     error.code === 'PLAYBACK_NOT_FOUND'
@@ -100,7 +102,9 @@ function ListenModeTabs({
     } else if (event.key === 'End') {
       next = LISTEN_MODES.at(-1)
     }
-    if (!next) return
+    if (!next) {
+      return
+    }
     event.preventDefault()
     onChange(next)
     tabRefs.current[next]?.focus()
@@ -308,7 +312,9 @@ export function PlaylistPreview({
     },
   })
 
-  if (!canEmbed && !canConnect) return null
+  if (!canEmbed && !canConnect) {
+    return null
+  }
 
   const showSwitcher = mode === 'full' && canEmbed && canConnect
   const showEmbed =
@@ -340,7 +346,9 @@ export function PlaylistPreview({
   }
 
   function playPlaylist() {
-    if (!contextUri) return
+    if (!contextUri) {
+      return
+    }
     setActiveUri(null)
     startPlay({ contextUri })
   }
@@ -355,14 +363,18 @@ export function PlaylistPreview({
   }
 
   function retryPlay() {
-    if (!lastPlay || !embedId) return
+    if (!lastPlay || !embedId) {
+      return
+    }
     openSpotifyPlaylist(embedId, spotifyUrl)
     setStatus(t('preview.wakingDevice'))
     playMutation.mutate({ play: lastPlay, openedSpotify: true })
   }
 
   function openSpotify() {
-    if (!embedId) return
+    if (!embedId) {
+      return
+    }
     openSpotifyPlaylist(embedId, spotifyUrl)
   }
 

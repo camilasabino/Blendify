@@ -1,5 +1,5 @@
 import type Redis from 'ioredis';
-import type { RedisConnection } from '../cache/redis-connection';
+import type { RedisConnection } from '@/infrastructure/cache/redis-connection';
 import {
   RequestLimitStoreUnavailableError,
   type PermitAcquisition,
@@ -82,7 +82,9 @@ export class RedisRequestLimitStore implements RequestLimitStore {
         request.leaseMs,
       ),
     )) as number;
-    if (result === 0) return { acquired: true };
+    if (result === 0) {
+      return { acquired: true };
+    }
     return { acquired: false, scope: result === 1 ? 'client' : 'global' };
   }
 
@@ -112,7 +114,9 @@ export class RedisRequestLimitStore implements RequestLimitStore {
 
   private async run<T>(command: (client: Redis) => Promise<T>): Promise<T> {
     const client = this.connection.readyClient();
-    if (!client) throw new RequestLimitStoreUnavailableError();
+    if (!client) {
+      throw new RequestLimitStoreUnavailableError();
+    }
     try {
       return await command(client);
     } catch (error) {

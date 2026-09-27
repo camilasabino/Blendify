@@ -1,15 +1,15 @@
 import { Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { MAX_TRACKS } from '../../domain/constants';
+import { MAX_TRACKS } from '@/domain/constants';
 import {
   CreateProviderPlaylistInput,
   PlaylistRemoteSnapshot,
   ProviderPlaylist,
-} from '../../domain/repositories/music-provider.port';
-import { Track } from '../../domain/track/track.entity';
-import { User } from '../../domain/user/user.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
+} from '@/domain/repositories/music-provider.port';
+import { Track } from '@/domain/track/track.entity';
+import { User } from '@/domain/user/user.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import { SpotifyApiClient } from './spotify-api.client';
 
 const ADD_TRACKS_CHUNK_SIZE = 100;
@@ -89,7 +89,9 @@ export class SpotifyPlaylistClient {
     const token = await this.api.accessToken(this.userId);
     const cleaned = jpegBase64.replace(/^data:image\/jpeg;base64,/i, '').trim();
     const bytes = Buffer.from(cleaned, 'base64');
-    if (bytes.length === 0) throw new Error('Cover image is empty');
+    if (bytes.length === 0) {
+      throw new Error('Cover image is empty');
+    }
     if (bytes.length > MAX_COVER_IMAGE_BYTES) {
       throw new Error('Cover image exceeds Spotify 256 KB limit');
     }
@@ -154,7 +156,9 @@ export class SpotifyPlaylistClient {
       // means "can't access it right now" (revoked scope, auth issue) —
       // treating that as deletion would erase Library rows on a permission
       // problem instead of surfacing it as a sync failure.
-      if (this.api.isStatus(error, 404)) return null;
+      if (this.api.isStatus(error, 404)) {
+        return null;
+      }
       throw this.api.toSpotifyError(
         `getPlaylistSnapshot(${playlistId})`,
         error,
@@ -187,16 +191,24 @@ export class SpotifyPlaylistClient {
           offset,
         );
         fetched = true;
-        if (typeof page.total === 'number') total = page.total;
+        if (typeof page.total === 'number') {
+          total = page.total;
+        }
 
         const mapped = appendMappedPlaylistTracks(page.items, tracks);
         totalDurationMs += mapped.addedDurationMs;
 
         offset += limit;
-        if (!page.next || page.items.length === 0) break;
-        if (typeof total === 'number' && offset >= total) break;
+        if (!page.next || page.items.length === 0) {
+          break;
+        }
+        if (typeof total === 'number' && offset >= total) {
+          break;
+        }
         // Bound pagination for very large playlists during library sync.
-        if (offset >= PLAYLIST_ITEMS_MAX_OFFSET) break;
+        if (offset >= PLAYLIST_ITEMS_MAX_OFFSET) {
+          break;
+        }
       }
 
       if (fetched && tracks.length === 0 && (total ?? 0) > 0) {
@@ -261,12 +273,18 @@ export class SpotifyPlaylistClient {
   ): Promise<void> {
     const token = await this.api.accessToken(this.userId);
     const body: Record<string, string | boolean> = {};
-    if (details.name !== undefined) body.name = details.name;
+    if (details.name !== undefined) {
+      body.name = details.name;
+    }
     if (details.description !== undefined) {
       body.description = details.description;
     }
-    if (details.isPublic !== undefined) body.public = details.isPublic;
-    if (Object.keys(body).length === 0) return;
+    if (details.isPublic !== undefined) {
+      body.public = details.isPublic;
+    }
+    if (Object.keys(body).length === 0) {
+      return;
+    }
 
     await this.api.request<unknown>(
       `updatePlaylistDetails(${playlistId})`,
@@ -406,10 +424,14 @@ export class SpotifyPlaylistClient {
           params: { limit, offset },
         });
         for (const item of data.items ?? []) {
-          if (item?.id) ids.add(item.id);
+          if (item?.id) {
+            ids.add(item.id);
+          }
         }
         offset += limit;
-        if (!data.next || (data.items?.length ?? 0) === 0) return ids;
+        if (!data.next || (data.items?.length ?? 0) === 0) {
+          return ids;
+        }
         if (typeof data.total === 'number' && offset >= data.total) {
           return ids;
         }
@@ -465,15 +487,21 @@ function appendMappedPlaylistTracks(
   for (const entry of items) {
     // Spotify /items uses `item`; older /tracks responses used `track`.
     const track = mapPlaylistTrack(entry?.item ?? entry?.track);
-    if (!track) continue;
+    if (!track) {
+      continue;
+    }
     addedDurationMs += track.durationMs;
-    if (tracks.length < MAX_TRACKS) tracks.push(track);
+    if (tracks.length < MAX_TRACKS) {
+      tracks.push(track);
+    }
   }
   return { addedDurationMs };
 }
 
 function mapPlaylistTrack(item?: SpotifyPlaylistTrack | null): Track | null {
-  if (!item?.id || !item.uri || !item.name?.trim()) return null;
+  if (!item?.id || !item.uri || !item.name?.trim()) {
+    return null;
+  }
   const artist = item.artists?.[0];
   return Track.create({
     id: TrackId.create(item.id),

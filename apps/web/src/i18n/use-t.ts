@@ -10,7 +10,9 @@ export function useT() {
   return useCallback(
     (key: MessageKey, vars?: Vars): string => {
       let text: string = messages[locale][key] ?? messages.en[key] ?? key
-      if (!vars) return text
+      if (!vars) {
+        return text
+      }
       for (const [name, value] of Object.entries(vars)) {
         text = text.replaceAll(`{${name}}`, String(value))
       }

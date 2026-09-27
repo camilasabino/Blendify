@@ -1,8 +1,8 @@
 import type { PlaylistGeneration } from '@blendify/contracts';
-import { MAX_TRACKS } from '../constants';
-import { Track } from '../track/track.entity';
-import { ArtistId } from '../value-objects/artist-id.vo';
-import { TrackId } from '../value-objects/track-id.vo';
+import { MAX_TRACKS } from '@/domain/constants';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import {
   GeneratedPlaylist,
   pickLinkedCoverArtwork,

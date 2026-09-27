@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { type AxiosInstance } from 'axios';
 import { z } from 'zod';
-import { TransferError } from '../../domain/errors/transfer.error';
+import { TransferError } from '@/domain/errors/transfer.error';
 import type {
   PlaylistTransfer,
   PlaylistTransferGateway,
-} from '../../domain/repositories/playlist-transfer.gateway.port';
-import type { TransferPlaylist } from '../../domain/transfer/transfer-playlist';
-import { createOutboundHttp } from '../http/outbound-http.logging';
+} from '@/domain/repositories/playlist-transfer.gateway.port';
+import type { TransferPlaylist } from '@/domain/transfer/transfer-playlist';
+import { createOutboundHttp } from '@/infrastructure/http/outbound-http.logging';
 
 export const SOUNDIIZ_IMPORT_URL = 'https://soundiiz.com/go/import-playlist';
 export const SOUNDIIZ_SOURCE_NAME = 'Blendify';
@@ -142,7 +142,9 @@ export function toSoundiizPayload(playlist: TransferPlaylist) {
 }
 
 function classifyHttpError(error: unknown): HttpFailure {
-  if (!axios.isAxiosError(error)) return { category: 'network' };
+  if (!axios.isAxiosError(error)) {
+    return { category: 'network' };
+  }
   const status = error.response?.status;
   if (status === undefined) {
     const timedOut =
@@ -174,7 +176,9 @@ export function sanitizeRetryAfter(
     seconds = Number(value);
   } else if (value) {
     const date = Date.parse(value);
-    if (!Number.isNaN(date)) seconds = Math.ceil((date - now) / 1000);
+    if (!Number.isNaN(date)) {
+      seconds = Math.ceil((date - now) / 1000);
+    }
   }
   if (!Number.isFinite(seconds) || seconds < 1) {
     return UPSTREAM_RETRY_AFTER_DEFAULT_SECONDS;
@@ -187,8 +191,12 @@ function toPlaylistTransfer(
   submittedTrackCount: number,
   now: number,
 ): PlaylistTransfer | null {
-  if (!isSafeShareUrl(response.shareUrl)) return null;
-  if (response.nbTracks > submittedTrackCount) return null;
+  if (!isSafeShareUrl(response.shareUrl)) {
+    return null;
+  }
+  if (response.nbTracks > submittedTrackCount) {
+    return null;
+  }
   const expiresAtMs = response.expiresAt * 1000;
   if (expiresAtMs <= now || expiresAtMs > now + SOUNDIIZ_MAX_LINK_LIFETIME_MS) {
     return null;

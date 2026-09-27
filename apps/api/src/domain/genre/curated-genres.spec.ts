@@ -32,7 +32,9 @@ describe('curated genres', () => {
     const mains = listMainGenres();
     const first = mains[0];
     expect(first).toBeDefined();
-    if (!first) return;
+    if (!first) {
+      return;
+    }
     expect(toGenreDto(first)).toEqual({
       id: first.id,
       name: first.name,
@@ -67,7 +69,9 @@ describe('curated genres', () => {
   it('explores related genres without returning the seed', () => {
     const seed = findCuratedGenre('jazz');
     expect(seed).toBeDefined();
-    if (!seed) return;
+    if (!seed) {
+      return;
+    }
 
     const { genres, hasMore } = getExploreSuggestions([seed.id], {
       limit: 6,
@@ -82,7 +86,9 @@ describe('curated genres', () => {
 
     const seed = findCuratedGenre('jazz');
     expect(seed).toBeDefined();
-    if (!seed) return;
+    if (!seed) {
+      return;
+    }
 
     const first = getExploreSuggestions([seed.id], { limit: 2, offset: 0 });
     const second = getExploreSuggestions([seed.id], { limit: 2, offset: 2 });
@@ -92,7 +98,9 @@ describe('curated genres', () => {
 
   it('explores related r&b aliases', () => {
     const seed = findCuratedGenre('r-n-b') ?? findCuratedGenre('r&b');
-    if (!seed) return;
+    if (!seed) {
+      return;
+    }
     const { genres } = getExploreSuggestions([seed.id], { limit: 8 });
     expect(genres.length).toBeGreaterThan(0);
   });

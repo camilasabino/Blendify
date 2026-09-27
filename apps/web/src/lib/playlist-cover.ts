@@ -22,9 +22,15 @@ const TITLE_LEN_LG = 22
 const TITLE_LEN_MD = 14
 
 function headlineFontSize(length: number): number {
-  if (length > TITLE_LEN_XL) return 26
-  if (length > TITLE_LEN_LG) return 32
-  if (length > TITLE_LEN_MD) return 38
+  if (length > TITLE_LEN_XL) {
+    return 26
+  }
+  if (length > TITLE_LEN_LG) {
+    return 32
+  }
+  if (length > TITLE_LEN_MD) {
+    return 38
+  }
   return 44
 }
 
@@ -73,7 +79,9 @@ export async function renderPlaylistCoverBase64(
     const dataUrl = canvas.toDataURL('image/jpeg', quality)
     const base64 = dataUrl.replace(/^data:image\/jpeg;base64,/, '')
     const bytes = Math.ceil((base64.length * 3) / 4)
-    if (bytes <= MAX_COVER_BYTES) return base64
+    if (bytes <= MAX_COVER_BYTES) {
+      return base64
+    }
   }
 
   return canvas
@@ -303,7 +311,9 @@ function wrapText(
   maxLines: number,
 ): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return ['']
+  if (words.length === 0) {
+    return ['']
+  }
 
   const lines: string[] = []
   let current = words[0]!
@@ -331,7 +341,9 @@ function truncateToWidth(
   text: string,
   maxWidth: number,
 ): string {
-  if (ctx.measureText(text).width <= maxWidth) return text
+  if (ctx.measureText(text).width <= maxWidth) {
+    return text
+  }
   let cut = text
   while (cut.length > 1 && ctx.measureText(`${cut}…`).width > maxWidth) {
     cut = cut.slice(0, -1)

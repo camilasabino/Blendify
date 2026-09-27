@@ -14,57 +14,57 @@ import {
   PlaylistTransferSchema,
   type GeneratedPlaylistStreamEvent,
 } from '@blendify/contracts';
-import { GenreCatalogService } from '../../application/services/genre-catalog.service';
-import { GenreTrackCatalogService } from '../../application/services/genre-track-catalog.service';
-import { PublishPlaylistService } from '../../application/services/publish-playlist.service';
-import { BulkLibraryUseCase } from '../../application/use-cases/bulk-library.use-case';
-import { ControlPlaybackUseCase } from '../../application/use-cases/control-playback.use-case';
-import { CreateSpotifyPlaylistUseCase } from '../../application/use-cases/create-spotify-playlist.use-case';
-import { GenerateArtistMixUseCase } from '../../application/use-cases/generate-artist-mix.use-case';
-import { GenerateDiscoverPlaylistUseCase } from '../../application/use-cases/generate-discover-playlist.use-case';
-import { GenerateGenreMixUseCase } from '../../application/use-cases/generate-genre-mix.use-case';
-import { GeneratePlaylistUseCase } from '../../application/use-cases/generate-playlist.use-case';
-import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
-import { GetUserStatsUseCase } from '../../application/use-cases/get-user-stats.use-case';
-import { CreatePlaylistTransferUseCase } from '../../application/use-cases/create-playlist-transfer.use-case';
-import { PlaylistTransferTokens } from '../../application/services/playlist-transfer-tokens.service';
-import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
-import { SyncLibraryUseCase } from '../../application/use-cases/sync-library.use-case';
-import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
-import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
-import { ResetUserStatsUseCase } from '../../application/use-cases/reset-user-stats.use-case';
-import { SearchArtistsUseCase } from '../../application/use-cases/search-artists.use-case';
-import { SearchTracksUseCase } from '../../application/use-cases/search-tracks.use-case';
-import { Artist } from '../../domain/artist/artist.entity';
-import { TransferError } from '../../domain/errors/transfer.error';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
-import type { Playlist } from '../../domain/playlist/playlist.entity';
-import { CATALOG_PROVIDER_FACTORY } from '../../domain/repositories/catalog-provider.port';
-import { DISCOVERY_CATALOG } from '../../domain/repositories/discovery-catalog.port';
-import { MUSIC_PROVIDER_FACTORY } from '../../domain/repositories/music-provider.factory.port';
-import { PLAYLIST_REPOSITORY } from '../../domain/repositories/playlist.repository.port';
-import { PLAYLIST_TRANSFER_GATEWAY } from '../../domain/repositories/playlist-transfer.gateway.port';
-import { PROVIDER_QUOTA } from '../../domain/repositories/provider-quota.port';
-import { USAGE_STATS_REPOSITORY } from '../../domain/repositories/usage-stats.repository.port';
-import { USER_REPOSITORY } from '../../domain/repositories/user.repository.port';
-import { Track } from '../../domain/track/track.entity';
-import { User } from '../../domain/user/user.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
-import { AuthService } from '../../infrastructure/auth/auth.service';
-import { JwtStrategy } from '../../infrastructure/auth/jwt.strategy';
-import { SpotifyAuthClient } from '../../infrastructure/spotify/spotify-auth.client';
-import { GlobalExceptionFilter } from '../filters/global-exception.filter';
-import { GuestTransferGate } from '../guards/guest-transfer.gate';
-import { OriginCsrfGuard } from '../guards/origin-csrf.guard';
-import { createBodyParser } from '../http/body-limits';
-import { RequestLimiter } from '../request-limits/request-limiter';
+import { GenreCatalogService } from '@/application/services/genre-catalog.service';
+import { GenreTrackCatalogService } from '@/application/services/genre-track-catalog.service';
+import { PublishPlaylistService } from '@/application/services/publish-playlist.service';
+import { BulkLibraryUseCase } from '@/application/use-cases/bulk-library.use-case';
+import { ControlPlaybackUseCase } from '@/application/use-cases/control-playback.use-case';
+import { CreateSpotifyPlaylistUseCase } from '@/application/use-cases/create-spotify-playlist.use-case';
+import { GenerateArtistMixUseCase } from '@/application/use-cases/generate-artist-mix.use-case';
+import { GenerateDiscoverPlaylistUseCase } from '@/application/use-cases/generate-discover-playlist.use-case';
+import { GenerateGenreMixUseCase } from '@/application/use-cases/generate-genre-mix.use-case';
+import { GeneratePlaylistUseCase } from '@/application/use-cases/generate-playlist.use-case';
+import { GetPlaylistDetailUseCase } from '@/application/use-cases/get-playlist-detail.use-case';
+import { GetUserStatsUseCase } from '@/application/use-cases/get-user-stats.use-case';
+import { CreatePlaylistTransferUseCase } from '@/application/use-cases/create-playlist-transfer.use-case';
+import { PlaylistTransferTokens } from '@/application/services/playlist-transfer-tokens.service';
+import { ListLibraryPlaylistsUseCase } from '@/application/use-cases/list-library-playlists.use-case';
+import { SyncLibraryUseCase } from '@/application/use-cases/sync-library.use-case';
+import { RemovePlaylistFromLibraryUseCase } from '@/application/use-cases/remove-playlist-from-library.use-case';
+import { RenamePlaylistUseCase } from '@/application/use-cases/rename-playlist.use-case';
+import { ResetUserStatsUseCase } from '@/application/use-cases/reset-user-stats.use-case';
+import { SearchArtistsUseCase } from '@/application/use-cases/search-artists.use-case';
+import { SearchTracksUseCase } from '@/application/use-cases/search-tracks.use-case';
+import { Artist } from '@/domain/artist/artist.entity';
+import { TransferError } from '@/domain/errors/transfer.error';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import type { Playlist } from '@/domain/playlist/playlist.entity';
+import { CATALOG_PROVIDER_FACTORY } from '@/domain/repositories/catalog-provider.port';
+import { DISCOVERY_CATALOG } from '@/domain/repositories/discovery-catalog.port';
+import { MUSIC_PROVIDER_FACTORY } from '@/domain/repositories/music-provider.factory.port';
+import { PLAYLIST_REPOSITORY } from '@/domain/repositories/playlist.repository.port';
+import { PLAYLIST_TRANSFER_GATEWAY } from '@/domain/repositories/playlist-transfer.gateway.port';
+import { PROVIDER_QUOTA } from '@/domain/repositories/provider-quota.port';
+import { USAGE_STATS_REPOSITORY } from '@/domain/repositories/usage-stats.repository.port';
+import { USER_REPOSITORY } from '@/domain/repositories/user.repository.port';
+import { Track } from '@/domain/track/track.entity';
+import { User } from '@/domain/user/user.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import { AuthService } from '@/infrastructure/auth/auth.service';
+import { JwtStrategy } from '@/infrastructure/auth/jwt.strategy';
+import { SpotifyAuthClient } from '@/infrastructure/spotify/spotify-auth.client';
+import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
+import { GuestTransferGate } from '@/presentation/guards/guest-transfer.gate';
+import { OriginCsrfGuard } from '@/presentation/guards/origin-csrf.guard';
+import { createBodyParser } from '@/presentation/http/body-limits';
+import { RequestLimiter } from '@/presentation/request-limits/request-limiter';
 import {
   DEFAULT_GENERATION_CONCURRENCY,
   DEFAULT_RATE_LIMITS,
   type RequestLimitsConfig,
-} from '../request-limits/request-limits.config';
-import { inMemoryRequestLimitProviders } from '../request-limits/request-limits.testing';
+} from '@/presentation/request-limits/request-limits.config';
+import { inMemoryRequestLimitProviders } from '@/presentation/request-limits/request-limits.testing';
 import { ArtistsController } from './artists.controller';
 import { AuthController } from './auth.controller';
 import { GenerationController } from './generation.controller';
@@ -548,7 +548,9 @@ describe('Guest Mode HTTP boundary', () => {
       let req = request(httpServer())
         [route.method](route.path)
         .set('Origin', FRONTEND);
-      if (cookie) req = req.set('Cookie', cookie);
+      if (cookie) {
+        req = req.set('Cookie', cookie);
+      }
       return 'body' in route ? req.send(route.body) : req;
     }
 

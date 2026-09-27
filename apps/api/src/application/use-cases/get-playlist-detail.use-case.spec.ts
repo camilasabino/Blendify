@@ -1,6 +1,6 @@
 import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import type { PlaylistRepositoryPort } from '../../domain/repositories/playlist.repository.port';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import type { PlaylistRepositoryPort } from '@/domain/repositories/playlist.repository.port';
 import { GetPlaylistDetailUseCase } from './get-playlist-detail.use-case';
 
 function makePlaylist(userId = 'user-1'): Playlist {

@@ -7,15 +7,15 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import type { Server } from 'http';
 import request from 'supertest';
-import { USER_REPOSITORY } from '../../domain/repositories/user.repository.port';
-import { User } from '../../domain/user/user.entity';
-import { AuthService } from '../../infrastructure/auth/auth.service';
-import { JwtStrategy } from '../../infrastructure/auth/jwt.strategy';
-import { SpotifyAuthClient } from '../../infrastructure/spotify/spotify-auth.client';
-import { SpotifyAccountRestrictedError } from '../../infrastructure/spotify/spotify-auth.errors';
-import { GlobalExceptionFilter } from '../filters/global-exception.filter';
-import { OriginCsrfGuard } from '../guards/origin-csrf.guard';
-import { createBodyParser } from '../http/body-limits';
+import { USER_REPOSITORY } from '@/domain/repositories/user.repository.port';
+import { User } from '@/domain/user/user.entity';
+import { AuthService } from '@/infrastructure/auth/auth.service';
+import { JwtStrategy } from '@/infrastructure/auth/jwt.strategy';
+import { SpotifyAuthClient } from '@/infrastructure/spotify/spotify-auth.client';
+import { SpotifyAccountRestrictedError } from '@/infrastructure/spotify/spotify-auth.errors';
+import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
+import { OriginCsrfGuard } from '@/presentation/guards/origin-csrf.guard';
+import { createBodyParser } from '@/presentation/http/body-limits';
 import { AuthController } from './auth.controller';
 
 const FRONTEND = 'http://localhost:5173';
@@ -102,7 +102,9 @@ async function createApp(world: {
 
 function setCookies(response: request.Response): string[] {
   const header = response.headers['set-cookie'];
-  if (!header) return [];
+  if (!header) {
+    return [];
+  }
   return Array.isArray(header) ? header : [header];
 }
 

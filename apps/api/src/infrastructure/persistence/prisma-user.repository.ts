@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { User } from '../../domain/user/user.entity';
+import { User } from '@/domain/user/user.entity';
 import {
   type PersistableUser,
   type UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
+} from '@/domain/repositories/user.repository.port';
 import { PrismaService } from './prisma.service';
 
 @Injectable()
@@ -76,7 +76,9 @@ export class PrismaUserRepository implements UserRepositoryPort {
 
   async findCredentialsById(id: string): Promise<PersistableUser | null> {
     const row = await this.prisma.user.findUnique({ where: { id } });
-    if (!row) return null;
+    if (!row) {
+      return null;
+    }
     return {
       id: row.id,
       spotifyId: row.spotifyId,

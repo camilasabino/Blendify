@@ -1,4 +1,4 @@
-import { DomainError } from '../errors/domain.error';
+import { DomainError } from '@/domain/errors/domain.error';
 import { ArtistId } from './artist-id.vo';
 
 describe('ArtistId', () => {

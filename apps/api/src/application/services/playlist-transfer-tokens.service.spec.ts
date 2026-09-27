@@ -2,10 +2,10 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { PlaylistGeneration } from '@blendify/contracts';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
-import { Track } from '../../domain/track/track.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import {
   PlaylistTransferTokens,
   TRANSFER_TOKEN_AUDIENCE,

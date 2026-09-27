@@ -10,7 +10,9 @@ type SpotifyLinkProps = Readonly<{
 
 export function SpotifyLink({ href, label, className }: SpotifyLinkProps) {
   const url = toSpotifyUrl(href)
-  if (!url) return null
+  if (!url) {
+    return null
+  }
   return (
     <a
       href={url}

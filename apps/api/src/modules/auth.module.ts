@@ -5,12 +5,12 @@ import { PassportModule } from '@nestjs/passport';
 import {
   AuthService,
   SESSION_TTL_SECONDS,
-} from '../infrastructure/auth/auth.service';
-import { JwtAuthGuard } from '../infrastructure/auth/jwt-auth.guard';
-import { JwtStrategy } from '../infrastructure/auth/jwt.strategy';
-import { OptionalJwtAuthGuard } from '../infrastructure/auth/optional-jwt-auth.guard';
-import { AuthController } from '../presentation/controllers/auth.controller';
-import { OriginCsrfGuard } from '../presentation/guards/origin-csrf.guard';
+} from '@/infrastructure/auth/auth.service';
+import { JwtAuthGuard } from '@/infrastructure/auth/jwt-auth.guard';
+import { JwtStrategy } from '@/infrastructure/auth/jwt.strategy';
+import { OptionalJwtAuthGuard } from '@/infrastructure/auth/optional-jwt-auth.guard';
+import { AuthController } from '@/presentation/controllers/auth.controller';
+import { OriginCsrfGuard } from '@/presentation/guards/origin-csrf.guard';
 import { APP_GUARD } from '@nestjs/core';
 
 export function sessionJwtOptions(config: ConfigService): JwtModuleOptions {

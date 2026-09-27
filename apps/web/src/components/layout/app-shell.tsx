@@ -113,13 +113,17 @@ export function AppShell() {
   }
 
   function cancelDeleteAccount() {
-    if (deleting) return
+    if (deleting) {
+      return
+    }
     setDeleteOpen(false)
     setDeleteFailed(false)
   }
 
   async function confirmDeleteAccount() {
-    if (deleting) return
+    if (deleting) {
+      return
+    }
     setDeleting(true)
     setDeleteFailed(false)
     try {

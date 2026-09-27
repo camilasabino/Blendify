@@ -1,10 +1,10 @@
 import { ConfigService } from '@nestjs/config';
-import type { RedisCacheService } from '../cache/redis-cache.service';
+import type { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import { LastFmClient } from './lastfm.client';
 
 const mockCreateOutboundHttp = jest.fn((..._args: unknown[]) => ({}));
 
-jest.mock('../http/outbound-http.logging', () => ({
+jest.mock('@/infrastructure/http/outbound-http.logging', () => ({
   createOutboundHttp: (...args: unknown[]) => mockCreateOutboundHttp(...args),
 }));
 

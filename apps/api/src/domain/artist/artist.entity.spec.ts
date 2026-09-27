@@ -1,4 +1,4 @@
-import { ArtistId } from '../value-objects/artist-id.vo';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { Artist } from './artist.entity';
 
 describe('Artist', () => {

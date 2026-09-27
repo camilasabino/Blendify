@@ -15,7 +15,9 @@ import type {
 import type { MessageKey } from '@/i18n/messages'
 
 const t = (key: MessageKey, vars?: Record<string, string | number>) => {
-  if (!vars) return key
+  if (!vars) {
+    return key
+  }
   return `${key}:${Object.entries(vars)
     .map(([k, v]) => `${k}=${v}`)
     .join(',')}`

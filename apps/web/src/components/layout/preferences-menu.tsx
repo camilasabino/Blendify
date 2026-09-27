@@ -22,7 +22,9 @@ export function PreferencesMenu() {
   )
 
   useEffect(() => {
-    if (open) setPersistToLibrary(readPersistToLibraryPreference())
+    if (open) {
+      setPersistToLibrary(readPersistToLibraryPreference())
+    }
   }, [open])
 
   return (

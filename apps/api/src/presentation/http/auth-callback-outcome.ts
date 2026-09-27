@@ -1,4 +1,4 @@
-import { SpotifyAccountRestrictedError } from '../../infrastructure/spotify/spotify-auth.errors';
+import { SpotifyAccountRestrictedError } from '@/infrastructure/spotify/spotify-auth.errors';
 
 /**
  * Product-level outcomes of a failed Spotify login. They are the only auth

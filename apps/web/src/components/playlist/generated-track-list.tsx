@@ -35,7 +35,9 @@ export function GeneratedTrackList({
   const listId = useId()
   const disclosure = useTrackListDisclosure(tracks)
 
-  if (tracks.length === 0) return null
+  if (tracks.length === 0) {
+    return null
+  }
 
   return (
     <div className="overflow-hidden rounded-card border border-divider bg-card">

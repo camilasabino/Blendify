@@ -88,3 +88,8 @@ Full detail: `docs/engineering/code-conventions.md` (read it for architecture, r
 - `@blendify/contracts` stays the source of truth for shared request/response/error contracts — infer types from its Zod schemas rather than hand-duplicating shapes.
 - Avoid premature abstractions; prefer a little clear duplication over an incorrect generalization.
 - Tests protect behavior/contracts, not private implementation details.
+- No parent-relative imports (`../`) across directories — use the `@/*` alias in `apps/api`/`apps/web`; same-directory (`./x`) relative imports are fine.
+- Braces are mandatory for every `if`/`else`/`for`/`while`/`do…while` body, even single-statement ones — no inline `if (x) return`/`throw`/`break`/`continue`.
+- Separate logical blocks (setup, validation, side effects, result) with a blank line; don't pad trivial single-line guards.
+- Extract magic numbers/strings that represent provider limits, thresholds, or business rules into a named constant, at the narrowest correct ownership level (function-local → module → feature/domain constants file → provider constants → `@blendify/contracts` only for genuine shared wire contracts).
+- Share a constant across files only when both usages are the same semantic invariant — matching literal values alone is not a reason to share one. Never add a generic `constants.ts` dumping ground.

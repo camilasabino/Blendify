@@ -5,7 +5,7 @@ import {
   listMainGenres,
   searchCuratedGenres,
   type CuratedGenre,
-} from '../../domain/genre/curated-genres';
+} from '@/domain/genre/curated-genres';
 
 @Injectable()
 export class GenreCatalogService {

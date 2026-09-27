@@ -38,13 +38,17 @@ function Dialog({
 
   useEffect(() => {
     const dialog = dialogRef.current
-    if (!dialog || !open) return
+    if (!dialog || !open) {
+      return
+    }
 
     const trigger =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null
-    if (!dialog.open) dialog.showModal()
+    if (!dialog.open) {
+      dialog.showModal()
+    }
     const frame = window.requestAnimationFrame(() => {
       const target =
         initialFocusRef?.current ??
@@ -58,13 +62,17 @@ function Dialog({
         suppressCloseEventRef.current = true
         dialog.close()
       }
-      if (trigger?.isConnected) trigger.focus()
+      if (trigger?.isConnected) {
+        trigger.focus()
+      }
     }
   }, [open, initialFocusRef])
 
   useEffect(() => {
     const dialog = dialogRef.current
-    if (!dialog || !open) return
+    if (!dialog || !open) {
+      return
+    }
     dialog.setAttribute('closedby', dismissible ? 'closerequest' : 'none')
   }, [open, dismissible])
 
@@ -78,20 +86,26 @@ function Dialog({
       )}
       onCancel={(event) => {
         event.preventDefault()
-        if (dismissible) onClose()
+        if (dismissible) {
+          onClose()
+        }
       }}
       onClose={(event) => {
         if (suppressCloseEventRef.current) {
           suppressCloseEventRef.current = false
           return
         }
-        if (!open) return
+        if (!open) {
+          return
+        }
         if (dismissible) {
           onClose()
           return
         }
         const dialog = event.currentTarget
-        if (!dialog.open) dialog.showModal()
+        if (!dialog.open) {
+          dialog.showModal()
+        }
       }}
     >
       <div className="relative">
@@ -146,7 +160,9 @@ export function ConfirmDialog({
       dismissible={!busy}
       initialFocusRef={danger && cancelLabel ? cancelRef : confirmRef}
       onClose={() => {
-        if (busy) return
+        if (busy) {
+          return
+        }
         onCancel()
       }}
       title={title}

@@ -6,8 +6,12 @@ import { buildGenerationSummary } from './generation-options'
 import { useGenerationSettingsCollapse } from '@/hooks/use-generation-settings-collapse'
 
 const t = ((key: string, vars?: Record<string, string | number>) => {
-  if (key === 'create.summaryMore') return `+${vars?.count} more`
-  if (key === 'create.summarySongs') return `${vars?.count} songs`
+  if (key === 'create.summaryMore') {
+    return `+${vars?.count} more`
+  }
+  if (key === 'create.summarySongs') {
+    return `${vars?.count} songs`
+  }
   return key
 }) as Parameters<typeof buildGenerationSummary>[1]
 

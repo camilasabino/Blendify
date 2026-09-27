@@ -56,8 +56,12 @@ function etaMessage(
   seconds: number | null | undefined,
   t: ReturnType<typeof useT>,
 ): string | null {
-  if (seconds == null || seconds <= 0) return null
-  if (seconds < 60) return t('create.etaLessThanMinute')
+  if (seconds == null || seconds <= 0) {
+    return null
+  }
+  if (seconds < 60) {
+    return t('create.etaLessThanMinute')
+  }
 
   const minutes = Math.max(1, Math.ceil(seconds / 60))
   return minutes === 1
@@ -70,7 +74,9 @@ function progressAnnouncement(
   workingHintKey: MessageKey,
   t: ReturnType<typeof useT>,
 ): string {
-  if (!progress) return t(workingHintKey)
+  if (!progress) {
+    return t(workingHintKey)
+  }
   const count = t('create.progressCount', {
     current: progress.current,
     total: progress.total,
@@ -108,7 +114,9 @@ function failedTitleKey(mode: AppMode): MessageKey {
 }
 
 function leaveNoteKey(mode: AppMode): MessageKey {
-  if (mode === 'guest') return 'create.leaveNoteGuest'
+  if (mode === 'guest') {
+    return 'create.leaveNoteGuest'
+  }
   return readPersistToLibraryPreference()
     ? 'create.leaveNoteLibrary'
     : 'create.leaveNoteSpotify'
@@ -538,14 +546,20 @@ export function GenerationResultPanel({
   const t = useT()
   const titleId = useId()
 
-  if (!isGenerating && !result && !error) return null
+  if (!isGenerating && !result && !error) {
+    return null
+  }
 
   const showError = !isGenerating && error != null
   const showResult = !isGenerating && !showError && result != null
   const readyLabel = t(readyKey(result?.mode ?? mode))
   let title = result?.playlist.name ?? readyLabel
-  if (isGenerating) title = t(workingTitleKey)
-  else if (showError) title = t(failedTitleKey(mode))
+  if (isGenerating) {
+    title = t(workingTitleKey)
+  }
+  else if (showError) {
+    title = t(failedTitleKey(mode))
+  }
 
   let announcement = ''
   if (isGenerating) {

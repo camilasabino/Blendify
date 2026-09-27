@@ -5,48 +5,51 @@ import {
   type PopularityMode as PopularityModeValue,
 } from '@blendify/contracts';
 import {
+  CATALOG_MATCH_SEARCH_LIMIT,
   CATALOG_PROVIDER_FACTORY,
   type CatalogProviderFactoryPort,
   type CatalogProviderPort,
-} from '../../domain/repositories/catalog-provider.port';
+} from '@/domain/repositories/catalog-provider.port';
 import {
   PROVIDER_QUOTA,
   type ProviderQuotaPort,
-} from '../../domain/repositories/provider-quota.port';
+} from '@/domain/repositories/provider-quota.port';
 import {
   DISCOVERY_CATALOG,
   type DiscoveryCatalogPort,
-} from '../../domain/repositories/discovery-catalog.port';
-import { PlaylistGenerationService } from '../../domain/services/playlist-generation.service';
+} from '@/domain/repositories/discovery-catalog.port';
+import { PlaylistGenerationService } from '@/domain/services/playlist-generation.service';
 import {
   GeneratedPlaylist,
   pickLinkedCoverArtwork,
   trackCoverSource,
-} from '../../domain/playlist/generated-playlist';
-import { Artist } from '../../domain/artist/artist.entity';
-import { pickBestArtistMatch } from '../../domain/artist/artist-name-match';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { Track } from '../../domain/track/track.entity';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
-import { MAX_TRACKS, maxTracksPerSeedForCount } from '../../domain/constants';
+} from '@/domain/playlist/generated-playlist';
+import { Artist } from '@/domain/artist/artist.entity';
+import { pickBestArtistMatch } from '@/domain/artist/artist-name-match';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { Track } from '@/domain/track/track.entity';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import { MAX_TRACKS, maxTracksPerSeedForCount } from '@/domain/constants';
 import {
   isFatalCatalogError,
   isSpotifyQuotaError,
   resolveCatalogWithPoolExpand,
-} from '../../domain/genre/catalog-resolve';
+} from '@/domain/genre/catalog-resolve';
 import {
   buildDefaultPlaylistDescription,
   buildDefaultPlaylistName,
-} from '../../domain/playlist/default-playlist-name';
+} from '@/domain/playlist/default-playlist-name';
 import {
   GenerateArtistMixDto,
   GenerateArtistMixSchema,
-} from '../dto/generate-artist-mix.dto';
+} from '@/application/dto/generate-artist-mix.dto';
 import {
   GenerationProgressTracker,
   type ProgressReporter,
-} from '../services/generation-progress.tracker';
+} from '@/application/services/generation-progress.tracker';
+
+const PER_ARTIST_FETCH_OVER_FETCH = 3;
 
 function isPendingArtistId(id: string): boolean {
   return id.startsWith('pending:');
@@ -83,9 +86,10 @@ export class GenerateArtistMixUseCase {
     );
     const maxPerArtist = maxTracksPerSeedForCount(artists.length);
     if (input.tracksPerSeed > maxPerArtist) {
-      throw new BusinessRuleError(
-        `At most ${maxPerArtist} tracks per artist for ${artists.length} artist(s) (cap ${MAX_TRACKS}).`,
-        'TRACK_BUDGET_EXCEEDED',
+      throw BusinessRuleError.trackBudgetExceeded(
+        'artist',
+        maxPerArtist,
+        artists.length,
       );
     }
 
@@ -287,7 +291,10 @@ export class GenerateArtistMixUseCase {
       const artistId = artist.id.getValue();
       const baseMatched = matched;
       // Small over-fetch so a shortfall on one seed can be topped up from others.
-      const fetchBudget = Math.min(MAX_TRACKS, tracksPerSeed + 3);
+      const fetchBudget = Math.min(
+        MAX_TRACKS,
+        tracksPerSeed + PER_ARTIST_FETCH_OVER_FETCH,
+      );
       const collected = await this.fetchTracksForArtist(
         catalog,
         artist,
@@ -353,22 +360,30 @@ export class GenerateArtistMixUseCase {
   ): Promise<void> {
     try {
       const page = await catalog.searchTracks(`artist:"${artist.name}"`, {
-        limit: 10,
+        limit: CATALOG_MATCH_SEARCH_LIMIT,
         offset: 0,
       });
       const seen = new Set(collected.map((t) => t.id.getValue()));
       for (const track of page) {
-        if (!this.trackMatchesArtist(track, artist)) continue;
+        if (!this.trackMatchesArtist(track, artist)) {
+          continue;
+        }
         const id = track.id.getValue();
-        if (seen.has(id)) continue;
+        if (seen.has(id)) {
+          continue;
+        }
         seen.add(id);
         collected.push(track);
         onMatched?.(Math.min(collected.length, tracksPerSeed));
       }
     } catch (error) {
-      if (error instanceof CatalogUnavailableError) throw error;
+      if (error instanceof CatalogUnavailableError) {
+        throw error;
+      }
       if (isSpotifyQuotaError(error)) {
-        if (collected.length === 0) throw error;
+        if (collected.length === 0) {
+          throw error;
+        }
         return;
       }
       this.logger.warn(
@@ -386,14 +401,18 @@ export class GenerateArtistMixUseCase {
     mode: PopularityModeValue,
     onMatched?: (matched: number) => void,
   ): Promise<Track[]> {
-    if (!this.discoveryCatalog.isConfigured()) return [];
+    if (!this.discoveryCatalog.isConfigured()) {
+      return [];
+    }
 
     try {
       const chart = await this.discoveryCatalog.getTopTracksForArtist(
         artist.name,
         50,
       );
-      if (chart.length === 0) return [];
+      if (chart.length === 0) {
+        return [];
+      }
 
       const refs = chart.map((entry) => ({
         ...entry,
@@ -414,7 +433,9 @@ export class GenerateArtistMixUseCase {
         },
       );
     } catch (error) {
-      if (isFatalCatalogError(error)) throw error;
+      if (isFatalCatalogError(error)) {
+        throw error;
+      }
       this.logger.warn(
         `Last.fm track fetch failed for "${artist.name}": ${errorMessage(error)}`,
       );

@@ -20,7 +20,9 @@ export function useAuthError(): {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
-    if (!params.has(AUTH_ERROR_PARAM)) return
+    if (!params.has(AUTH_ERROR_PARAM)) {
+      return
+    }
 
     setError(parseAuthError(params.get(AUTH_ERROR_PARAM)))
     params.delete(AUTH_ERROR_PARAM)

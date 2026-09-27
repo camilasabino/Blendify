@@ -3,13 +3,13 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Response, Request } from 'express';
 import { randomBytes } from 'node:crypto';
-import { AuthService } from '../../infrastructure/auth/auth.service';
+import { AuthService } from '@/infrastructure/auth/auth.service';
 import {
   authErrorRedirectUrl,
   classifyAuthorizeError,
   classifyCallbackFailure,
   type AuthCallbackError,
-} from '../http/auth-callback-outcome';
+} from '@/presentation/http/auth-callback-outcome';
 import type { AuthSession, OkResponse } from '@blendify/contracts';
 
 @ApiTags('auth')

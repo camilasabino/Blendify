@@ -1,4 +1,4 @@
-import { BusinessRuleError } from '../errors/business-rule.error';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 
 const MIN_LENGTH = 1;
 const MAX_LENGTH = 100;

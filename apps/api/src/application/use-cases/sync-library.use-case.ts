@@ -2,15 +2,15 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   MUSIC_PROVIDER_FACTORY,
   type MusicProviderFactoryPort,
-} from '../../domain/repositories/music-provider.factory.port';
-import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
+} from '@/domain/repositories/music-provider.factory.port';
+import type { MusicProviderPort } from '@/domain/repositories/music-provider.port';
 import {
   PLAYLIST_REPOSITORY,
   PlaylistRepositoryPort,
-} from '../../domain/repositories/playlist.repository.port';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import { PlaylistStatus } from '../../domain/playlist/playlist-status';
-import { isSpotifyQuotaError } from '../../domain/genre/catalog-resolve';
+} from '@/domain/repositories/playlist.repository.port';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import { PlaylistStatus } from '@/domain/playlist/playlist-status';
+import { isSpotifyQuotaError } from '@/domain/genre/catalog-resolve';
 import type { LibrarySyncResult } from '@blendify/contracts';
 
 @Injectable()
@@ -55,7 +55,9 @@ export class SyncLibraryUseCase {
     try {
       return await provider.listLibraryPlaylistIds();
     } catch (error) {
-      if (isSpotifyQuotaError(error)) throw error;
+      if (isSpotifyQuotaError(error)) {
+        throw error;
+      }
       this.logger.warn(
         `Could not list Spotify library playlists: ${
           error instanceof Error ? error.message : String(error)
@@ -83,7 +85,9 @@ export class SyncLibraryUseCase {
         confirmedMissingIds,
       );
     } catch (error) {
-      if (isSpotifyQuotaError(error)) throw error;
+      if (isSpotifyQuotaError(error)) {
+        throw error;
+      }
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Sync failed for playlist ${playlist.id}: ${message}`);
     }

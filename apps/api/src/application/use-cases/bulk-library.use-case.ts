@@ -2,11 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   PLAYLIST_REPOSITORY,
   PlaylistRepositoryPort,
-} from '../../domain/repositories/playlist.repository.port';
-import { Playlist } from '../../domain/playlist/playlist.entity';
+} from '@/domain/repositories/playlist.repository.port';
+import { Playlist } from '@/domain/playlist/playlist.entity';
 import { RemovePlaylistFromLibraryUseCase } from './remove-playlist-from-library.use-case';
 import type { BulkLibraryAction, BulkLibraryResult } from '@blendify/contracts';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 
 @Injectable()
 export class BulkLibraryUseCase {

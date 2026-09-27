@@ -6,7 +6,9 @@ function fakeContext(calls: string[]) {
     {},
     {
       get(_target, property) {
-        if (property === 'measureText') return () => ({ width: 10 })
+        if (property === 'measureText') {
+          return () => ({ width: 10 })
+        }
         if (
           property === 'createLinearGradient' ||
           property === 'createRadialGradient'

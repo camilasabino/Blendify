@@ -1,5 +1,5 @@
-import { ArtistId } from '../value-objects/artist-id.vo';
-import { TrackId } from '../value-objects/track-id.vo';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 
 export interface TrackArtist {
   id?: string;
@@ -97,12 +97,16 @@ function normalizeArtists(
   const out: TrackArtist[] = [];
   for (const artist of artists ?? []) {
     const name = artist?.name?.trim();
-    if (!name) continue;
+    if (!name) {
+      continue;
+    }
     const id = artist.id?.trim() || undefined;
     const key = id
       ? `id:${id}`
       : `name:${name.toLowerCase().replace(/\s+/g, ' ')}`;
-    if (seen.has(key)) continue;
+    if (seen.has(key)) {
+      continue;
+    }
     seen.add(key);
     out.push(id ? { id, name } : { name });
   }

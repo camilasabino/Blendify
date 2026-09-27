@@ -84,9 +84,13 @@ export function createBodyParser(
       res.status(body.statusCode).json(body);
     };
     parseJson(req, res, (jsonError?: unknown) => {
-      if (jsonError) return fail(jsonError);
+      if (jsonError) {
+        return fail(jsonError);
+      }
       parseForm(req, res, (formError?: unknown) => {
-        if (formError) return fail(formError);
+        if (formError) {
+          return fail(formError);
+        }
         next();
       });
     });

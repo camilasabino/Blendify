@@ -68,7 +68,9 @@ export function outcomeTrackCount(outcome: GenerationOutcome): number {
 }
 
 export function outcomeDurationMs(outcome: GenerationOutcome): number {
-  if (outcome.mode === 'spotify') return outcome.playlist.totalDurationMs
+  if (outcome.mode === 'spotify') {
+    return outcome.playlist.totalDurationMs
+  }
   return outcome.playlist.tracks.reduce(
     (total, track) => total + track.durationMs,
     0,

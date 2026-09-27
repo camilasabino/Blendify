@@ -1,33 +1,37 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { z } from 'zod';
 import {
+  CATALOG_MATCH_SEARCH_LIMIT,
   CATALOG_PROVIDER_FACTORY,
   type CatalogProviderFactoryPort,
   type CatalogProviderPort,
-} from '../../domain/repositories/catalog-provider.port';
+} from '@/domain/repositories/catalog-provider.port';
 import {
   PROVIDER_QUOTA,
   type ProviderQuotaPort,
-} from '../../domain/repositories/provider-quota.port';
+} from '@/domain/repositories/provider-quota.port';
 import {
   DISCOVERY_CATALOG,
   type DiscoveryCatalogPort,
-} from '../../domain/repositories/discovery-catalog.port';
+} from '@/domain/repositories/discovery-catalog.port';
 import {
   normalizeArtistName,
   pickStrictArtistMatch,
-} from '../../domain/artist/artist-name-match';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { Track } from '../../domain/track/track.entity';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
+} from '@/domain/artist/artist-name-match';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { Track } from '@/domain/track/track.entity';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import {
   GeneratedPlaylist,
   pickLinkedCoverArtwork,
   trackCoverSource,
-} from '../../domain/playlist/generated-playlist';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { maxTracksPerSeedForCount } from '../../domain/constants';
+} from '@/domain/playlist/generated-playlist';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { maxTracksPerSeedForCount } from '@/domain/constants';
 import {
+  DISCOVER_FALLBACK_SIMILAR_ARTISTS_LIMIT,
+  DISCOVER_FALLBACK_TOP_TRACKS_MAX,
+  DISCOVER_FALLBACK_TOP_TRACKS_MIN,
   DISCOVER_MIN_SIMILAR,
   DISCOVER_MIN_SIMILAR_TRACKS,
   DISCOVER_SIMILAR_FETCH,
@@ -36,20 +40,20 @@ import {
   buildDiscoverPlaylistName,
   discoverSimilarTargetForTracks,
   tracksPerSeedForDiscoverTarget,
-} from '../../domain/playlist/discover-playlist-name';
-import { primaryArtistName } from '../../domain/discovery/similar-track-query';
-import { selectSimilarTrackCandidates } from '../../domain/discovery/similar-track-familiarity';
-import { createOrderingStrategy } from '../../domain/services/strategies/track-ordering.strategy';
+} from '@/domain/playlist/discover-playlist-name';
+import { primaryArtistName } from '@/domain/discovery/similar-track-query';
+import { selectSimilarTrackCandidates } from '@/domain/discovery/similar-track-familiarity';
+import { createOrderingStrategy } from '@/domain/services/strategies/track-ordering.strategy';
 import {
   GenerateDiscoverPlaylistDto,
   GenerateDiscoverPlaylistSchema,
-} from '../dto/generate-discover-playlist.dto';
+} from '@/application/dto/generate-discover-playlist.dto';
 import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import {
   GenerationProgressTracker,
   monotonicProgressReporter,
   type ProgressReporter,
-} from '../services/generation-progress.tracker';
+} from '@/application/services/generation-progress.tracker';
 
 type DiscoverInput = z.output<typeof GenerateDiscoverPlaylistSchema>;
 type ArtistDiscoverInput = Extract<DiscoverInput, { kind: 'discover_artist' }>;
@@ -344,14 +348,20 @@ export class GenerateDiscoverPlaylistUseCase {
     const snapshot = input.artist;
     if (snapshot?.id === artistId) {
       const byId = await catalog.getArtistsByIds([artistId]);
-      if (byId[0]) return byId[0];
+      if (byId[0]) {
+        return byId[0];
+      }
       const matches = await catalog.searchArtists(snapshot.name, 3);
       const best = pickStrictArtistMatch(snapshot.name, matches);
-      if (best) return best;
+      if (best) {
+        return best;
+      }
     }
 
     const byId = await catalog.getArtistsByIds([artistId]);
-    if (byId[0]) return byId[0];
+    if (byId[0]) {
+      return byId[0];
+    }
 
     throw new BusinessRuleError(
       'Seed artist could not be resolved on Spotify.',
@@ -369,18 +379,24 @@ export class GenerateDiscoverPlaylistUseCase {
 
     const hits = await catalog.searchTracks(
       `track:"${snapshot.name}" artist:"${snapshot.artistName}"`,
-      { limit: 10, offset: 0 },
+      { limit: CATALOG_MATCH_SEARCH_LIMIT, offset: 0 },
     );
     const byId = hits.find((t) => t.id.getValue() === trackId);
-    if (byId) return byId;
+    if (byId) {
+      return byId;
+    }
 
     const resolved = await catalog.resolveTrack(
       snapshot.artistName,
       snapshot.name,
     );
-    if (resolved) return resolved;
+    if (resolved) {
+      return resolved;
+    }
 
-    if (hits[0]) return hits[0];
+    if (hits[0]) {
+      return hits[0];
+    }
 
     // Last resort: rebuild from client snapshot when search is thin.
     if (snapshot.uri?.startsWith('spotify:track:')) {
@@ -419,7 +435,9 @@ export class GenerateDiscoverPlaylistUseCase {
     tracker?.report('resolving_seeds', 0, Math.max(1, limit));
 
     for (const name of names) {
-      if (resolved.length >= limit) break;
+      if (resolved.length >= limit) {
+        break;
+      }
       const matches = await catalog.searchArtists(name, 3);
       const best = pickStrictArtistMatch(name, matches);
       if (!best) {
@@ -427,7 +445,9 @@ export class GenerateDiscoverPlaylistUseCase {
         continue;
       }
       const id = best.id.getValue();
-      if (seen.has(id)) continue;
+      if (seen.has(id)) {
+        continue;
+      }
       seen.add(id);
       resolved.push({
         id,
@@ -450,12 +470,18 @@ export class GenerateDiscoverPlaylistUseCase {
 
     const push = (items: SimilarTrackRef[]): void => {
       for (const item of items) {
-        if (out.length >= limit) return;
+        if (out.length >= limit) {
+          return;
+        }
         const name = item.name.trim();
         const artistName = item.artistName.trim();
-        if (!name || !artistName) continue;
+        if (!name || !artistName) {
+          continue;
+        }
         const key = normalizeTrackKey(artistName, name);
-        if (seen.has(key)) continue;
+        if (seen.has(key)) {
+          continue;
+        }
         seen.add(key);
         out.push({ name, artistName, playcount: item.playcount });
       }
@@ -483,7 +509,10 @@ export class GenerateDiscoverPlaylistUseCase {
       );
       const top = await this.discoveryCatalog.getTopTracksForArtist(
         seedArtist,
-        Math.min(50, Math.max(limit, 20)),
+        Math.min(
+          DISCOVER_FALLBACK_TOP_TRACKS_MAX,
+          Math.max(limit, DISCOVER_FALLBACK_TOP_TRACKS_MIN),
+        ),
       );
       push(
         top.map((t) => ({
@@ -500,10 +529,12 @@ export class GenerateDiscoverPlaylistUseCase {
       );
       const similarArtists = await this.discoveryCatalog.getSimilarArtists(
         seedArtist,
-        12,
+        DISCOVER_FALLBACK_SIMILAR_ARTISTS_LIMIT,
       );
       for (const artist of similarArtists) {
-        if (out.length >= limit) break;
+        if (out.length >= limit) {
+          break;
+        }
         const top = await this.discoveryCatalog.getTopTracksForArtist(
           artist.name,
           8,
@@ -532,7 +563,9 @@ export class GenerateDiscoverPlaylistUseCase {
     const seen = new Set<string>([seedTrackId]);
 
     for (const candidate of candidates) {
-      if (resolved.length >= limit) break;
+      if (resolved.length >= limit) {
+        break;
+      }
       const track = await catalog.resolveTrack(
         candidate.artistName,
         candidate.name,
@@ -542,7 +575,9 @@ export class GenerateDiscoverPlaylistUseCase {
         continue;
       }
       const id = track.id.getValue();
-      if (seen.has(id)) continue;
+      if (seen.has(id)) {
+        continue;
+      }
       seen.add(id);
       resolved.push(track);
       onMatched?.(resolved.length);

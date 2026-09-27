@@ -3,10 +3,10 @@ import {
   TrackSchema,
   type PlaylistGeneration,
 } from '@blendify/contracts';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
-import { Track } from '../../domain/track/track.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import {
   toGeneratedPlaylistResponse,
   toTrackResponse,

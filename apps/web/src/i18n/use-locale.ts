@@ -18,24 +18,34 @@ export const DOCUMENT_TITLE: Record<Locale, string> = {
 function detectLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored && isLocale(stored)) return stored
+    if (stored && isLocale(stored)) {
+      return stored
+    }
   } catch {
     void 0
   }
   if (typeof navigator !== 'undefined') {
     const lang = navigator.language.toLowerCase()
-    if (lang.startsWith('pt')) return 'pt'
-    if (lang.startsWith('es')) return 'es'
+    if (lang.startsWith('pt')) {
+      return 'pt'
+    }
+    if (lang.startsWith('es')) {
+      return 'es'
+    }
   }
   return 'en'
 }
 
 function syncDocumentLocale(locale: Locale) {
-  if (typeof document === 'undefined') return
+  if (typeof document === 'undefined') {
+    return
+  }
   document.documentElement.lang = locale === 'pt' ? 'pt-BR' : locale
   document.title = DOCUMENT_TITLE[locale]
   const meta = document.querySelector('meta[name="description"]')
-  if (meta) meta.setAttribute('content', META_DESCRIPTION[locale])
+  if (meta) {
+    meta.setAttribute('content', META_DESCRIPTION[locale])
+  }
 }
 
 type LocaleState = {

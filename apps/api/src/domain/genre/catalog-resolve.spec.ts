@@ -4,12 +4,12 @@ import {
   resolveCatalogTracks,
   resolveCatalogWithPoolExpand,
 } from './catalog-resolve';
-import { BusinessRuleError } from '../errors/business-rule.error';
-import { CatalogUnavailableError } from '../errors/catalog-unavailable.error';
-import type { CatalogProviderPort } from '../repositories/catalog-provider.port';
-import { Track } from '../track/track.entity';
-import { TrackId } from '../value-objects/track-id.vo';
-import { ArtistId } from '../value-objects/artist-id.vo';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
+import { Track } from '@/domain/track/track.entity';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { PopularityMode } from '@blendify/contracts';
 
 function makeTrack(id: string, artistId = 'a1'): Track {
@@ -138,7 +138,9 @@ describe('resolveCatalogTracks', () => {
     const provider = {
       resolveTrack: () => {
         calls += 1;
-        if (calls === 1) return Promise.reject(new Error('not found'));
+        if (calls === 1) {
+          return Promise.reject(new Error('not found'));
+        }
         return Promise.resolve(makeTrack(`t${calls}`));
       },
     } as unknown as CatalogProviderPort;
@@ -220,7 +222,9 @@ describe('resolveCatalogWithPoolExpand', () => {
         calls += 1;
         const index = Number(title.replace('Song ', ''));
         // Only deeper chart entries resolve — forces popular expand.
-        if (index < 20) return Promise.resolve(null);
+        if (index < 20) {
+          return Promise.resolve(null);
+        }
         return Promise.resolve(makeTrack(`t${index}`));
       },
     } as unknown as CatalogProviderPort;

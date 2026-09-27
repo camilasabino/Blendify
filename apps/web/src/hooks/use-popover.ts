@@ -35,7 +35,9 @@ export function usePopover<TPanel extends HTMLElement = HTMLDivElement>({
 
   const close = useCallback((restoreFocus = true) => {
     setOpen(false)
-    if (restoreFocus) triggerRef.current?.focus()
+    if (restoreFocus) {
+      triggerRef.current?.focus()
+    }
   }, [])
 
   const toggle = useCallback(() => setOpen((value) => !value), [])
@@ -45,17 +47,25 @@ export function usePopover<TPanel extends HTMLElement = HTMLDivElement>({
   }, [pathname])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      return
+    }
     const isOutside = (target: EventTarget | null) =>
       !rootRef.current?.contains(target as Node)
     const onPointerDown = (event: PointerEvent) => {
-      if (isOutside(event.target)) close(false)
+      if (isOutside(event.target)) {
+        close(false)
+      }
     }
     const onFocusIn = (event: FocusEvent) => {
-      if (isOutside(event.target)) close(false)
+      if (isOutside(event.target)) {
+        close(false)
+      }
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
+      if (event.key !== 'Escape') {
+        return
+      }
       event.preventDefault()
       close(true)
     }
@@ -78,7 +88,9 @@ export function usePopover<TPanel extends HTMLElement = HTMLDivElement>({
       const root = rootRef.current
       const trigger = triggerRef.current
       const panel = panelRef.current
-      if (!root || !trigger || !panel) return
+      if (!root || !trigger || !panel) {
+        return
+      }
       setPosition(
         computePopoverPosition({
           trigger: trigger.getBoundingClientRect(),
@@ -97,7 +109,9 @@ export function usePopover<TPanel extends HTMLElement = HTMLDivElement>({
     window.addEventListener('scroll', update, true)
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
-    if (panelRef.current) observer?.observe(panelRef.current)
+    if (panelRef.current) {
+      observer?.observe(panelRef.current)
+    }
     return () => {
       window.removeEventListener('resize', update)
       window.removeEventListener('scroll', update, true)
@@ -122,7 +136,9 @@ export function usePopover<TPanel extends HTMLElement = HTMLDivElement>({
 
   const onPanelKeyDown = useCallback((event: ReactKeyboardEvent) => {
     const items = panelItems(panelRef.current)
-    if (items.length === 0) return
+    if (items.length === 0) {
+      return
+    }
     const current = items.indexOf(document.activeElement as HTMLElement)
     const nextIndex = {
       ArrowDown: (current + 1) % items.length,
@@ -130,7 +146,9 @@ export function usePopover<TPanel extends HTMLElement = HTMLDivElement>({
       Home: 0,
       End: items.length - 1,
     }[event.key]
-    if (nextIndex === undefined) return
+    if (nextIndex === undefined) {
+      return
+    }
     event.preventDefault()
     items[nextIndex]?.focus()
   }, [])
@@ -151,6 +169,8 @@ export function usePopover<TPanel extends HTMLElement = HTMLDivElement>({
 }
 
 function panelItems(panel: HTMLElement | null): HTMLElement[] {
-  if (!panel) return []
+  if (!panel) {
+    return []
+  }
   return Array.from(panel.querySelectorAll<HTMLElement>(POPOVER_ITEM_SELECTOR))
 }

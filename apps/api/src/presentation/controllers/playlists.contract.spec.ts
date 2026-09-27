@@ -2,17 +2,17 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { Server } from 'http';
 import request from 'supertest';
-import { BulkLibraryUseCase } from '../../application/use-cases/bulk-library.use-case';
-import { RemovePlaylistFromLibraryUseCase } from '../../application/use-cases/remove-playlist-from-library.use-case';
-import { CreateSpotifyPlaylistUseCase } from '../../application/use-cases/create-spotify-playlist.use-case';
-import { GetPlaylistDetailUseCase } from '../../application/use-cases/get-playlist-detail.use-case';
-import { ListLibraryPlaylistsUseCase } from '../../application/use-cases/list-library-playlists.use-case';
-import { SyncLibraryUseCase } from '../../application/use-cases/sync-library.use-case';
-import { RenamePlaylistUseCase } from '../../application/use-cases/rename-playlist.use-case';
-import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
-import { GlobalExceptionFilter } from '../filters/global-exception.filter';
+import { BulkLibraryUseCase } from '@/application/use-cases/bulk-library.use-case';
+import { RemovePlaylistFromLibraryUseCase } from '@/application/use-cases/remove-playlist-from-library.use-case';
+import { CreateSpotifyPlaylistUseCase } from '@/application/use-cases/create-spotify-playlist.use-case';
+import { GetPlaylistDetailUseCase } from '@/application/use-cases/get-playlist-detail.use-case';
+import { ListLibraryPlaylistsUseCase } from '@/application/use-cases/list-library-playlists.use-case';
+import { SyncLibraryUseCase } from '@/application/use-cases/sync-library.use-case';
+import { RenamePlaylistUseCase } from '@/application/use-cases/rename-playlist.use-case';
+import { JwtAuthGuard } from '@/infrastructure/auth/jwt-auth.guard';
+import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
 import { PlaylistsController } from './playlists.controller';
-import { inMemoryRequestLimitProviders } from '../request-limits/request-limits.testing';
+import { inMemoryRequestLimitProviders } from '@/presentation/request-limits/request-limits.testing';
 
 describe('PlaylistsController contracts', () => {
   let app: INestApplication;

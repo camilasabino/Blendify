@@ -33,7 +33,9 @@ export class RateLimitGuard implements CanActivate {
     const bucket = this.reflector.getAllAndOverride<
       RateLimitBucket | undefined
     >(RATE_LIMIT_BUCKET, [context.getHandler(), context.getClass()]);
-    if (!bucket) return true;
+    if (!bucket) {
+      return true;
+    }
 
     const req = context.switchToHttp().getRequest<Request>();
     await this.limiter.consume(

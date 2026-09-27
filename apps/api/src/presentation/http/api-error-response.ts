@@ -1,13 +1,13 @@
 import { HttpStatus } from '@nestjs/common';
 import type { ApiErrorResponse } from '@blendify/contracts';
 import { ZodError } from 'zod';
-import { DomainError } from '../../domain/errors/domain.error';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
+import { DomainError } from '@/domain/errors/domain.error';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import {
   TransferError,
   type TransferErrorCode,
-} from '../../domain/errors/transfer.error';
+} from '@/domain/errors/transfer.error';
 import { RequestLimitError } from './request-limit.error';
 
 const TRANSFER_ERROR_STATUS: Record<TransferErrorCode, number> = {

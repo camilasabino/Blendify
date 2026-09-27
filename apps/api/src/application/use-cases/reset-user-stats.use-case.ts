@@ -2,12 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   USAGE_STATS_REPOSITORY,
   UsageStatsRepositoryPort,
-} from '../../domain/repositories/usage-stats.repository.port';
+} from '@/domain/repositories/usage-stats.repository.port';
 import {
   USER_REPOSITORY,
   UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+} from '@/domain/repositories/user.repository.port';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 
 @Injectable()
 export class ResetUserStatsUseCase {

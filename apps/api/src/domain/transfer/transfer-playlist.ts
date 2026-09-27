@@ -1,4 +1,4 @@
-import type { GeneratedPlaylist } from '../playlist/generated-playlist';
+import type { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
 
 const ISRC_PATTERN = /^[A-Z0-9]{12}$/;
 

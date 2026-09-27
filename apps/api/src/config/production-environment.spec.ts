@@ -23,7 +23,9 @@ function expectInvalid(
 ): void {
   const env: Record<string, unknown> = { ...PRODUCTION, ...overrides };
   for (const [key, value] of Object.entries(overrides)) {
-    if (value === undefined) delete env[key];
+    if (value === undefined) {
+      delete env[key];
+    }
   }
   expect(() => validateEnvironment(env)).toThrow(message);
 }

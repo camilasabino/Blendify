@@ -1,6 +1,6 @@
 import { CanActivate, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { User } from '../../domain/user/user.entity';
+import { User } from '@/domain/user/user.entity';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {

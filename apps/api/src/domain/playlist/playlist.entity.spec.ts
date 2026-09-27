@@ -1,11 +1,11 @@
 import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
 import { Playlist } from './playlist.entity';
 import { PlaylistStatus } from './playlist-status';
-import { Track } from '../track/track.entity';
-import { ArtistId } from '../value-objects/artist-id.vo';
-import { TrackId } from '../value-objects/track-id.vo';
-import { PlaylistName } from '../value-objects/playlist-name.vo';
-import { MAX_TRACKS } from '../constants';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import { PlaylistName } from '@/domain/value-objects/playlist-name.vo';
+import { MAX_TRACKS } from '@/domain/constants';
 
 function makeTrack(id: string, durationMs = 180_000): Track {
   return Track.create({

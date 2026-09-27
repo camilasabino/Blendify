@@ -43,14 +43,22 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
   const { open, focusItem } = popover
 
   useEffect(() => {
-    if (open) focusItem('selected')
+    if (open) {
+      focusItem('selected')
+    }
   }, [open, focusItem])
 
   function onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+      return
+    }
     event.preventDefault()
-    if (open) focusItem(event.key === 'ArrowUp' ? 'last' : 'first')
-    else popover.setOpen(true)
+    if (open) {
+      focusItem(event.key === 'ArrowUp' ? 'last' : 'first')
+    }
+    else {
+      popover.setOpen(true)
+    }
   }
 
   function select(code: Locale) {

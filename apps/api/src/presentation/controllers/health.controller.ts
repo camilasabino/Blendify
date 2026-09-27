@@ -1,7 +1,7 @@
 import { Controller, Get, HttpStatus, Logger, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { PrismaService } from '../../infrastructure/persistence/prisma.service';
+import { PrismaService } from '@/infrastructure/persistence/prisma.service';
 
 export interface HealthResponse {
   status: 'ok' | 'unavailable';

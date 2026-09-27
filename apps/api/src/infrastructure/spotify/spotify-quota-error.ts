@@ -1,12 +1,16 @@
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 
 export function formatSpotifyWaitLabel(
   seconds: number | null | undefined,
   quotaExceeded: boolean,
 ): string {
   if (seconds != null && seconds > 0) {
-    if (seconds < 90) return `${seconds}s`;
-    if (seconds < 3600) return `${Math.ceil(seconds / 60)} min`;
+    if (seconds < 90) {
+      return `${seconds}s`;
+    }
+    if (seconds < 3600) {
+      return `${Math.ceil(seconds / 60)} min`;
+    }
     return `${Math.ceil(seconds / 3600)} h`;
   }
   return quotaExceeded ? 'several hours' : '20s';

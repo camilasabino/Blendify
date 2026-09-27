@@ -3,10 +3,10 @@ import type {
   PlaylistKind,
   PlaylistSeedDto,
 } from '@blendify/contracts';
-import { BusinessRuleError } from '../errors/business-rule.error';
-import { Track } from '../track/track.entity';
-import { PlaylistName } from '../value-objects/playlist-name.vo';
-import { MAX_TRACKS } from '../constants';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { Track } from '@/domain/track/track.entity';
+import { PlaylistName } from '@/domain/value-objects/playlist-name.vo';
+import { MAX_TRACKS } from '@/domain/constants';
 import { PlaylistStatus } from './playlist-status';
 
 export interface PlaylistProps {
@@ -134,8 +134,12 @@ export class Playlist {
   }
 
   get totalDurationMs(): number {
-    if (this._totalDurationMs > 0) return this._totalDurationMs;
-    if (this._tracks.length === 0) return this._totalDurationMs;
+    if (this._totalDurationMs > 0) {
+      return this._totalDurationMs;
+    }
+    if (this._tracks.length === 0) {
+      return this._totalDurationMs;
+    }
     return this._tracks.reduce((sum, track) => sum + track.durationMs, 0);
   }
 
@@ -203,7 +207,9 @@ export class Playlist {
       this._totalDurationMs = snapshot.totalDurationMs;
     }
 
-    if (snapshot.imageUrl) this._imageUrl = snapshot.imageUrl;
+    if (snapshot.imageUrl) {
+      this._imageUrl = snapshot.imageUrl;
+    }
     this.touch();
   }
 

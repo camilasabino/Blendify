@@ -1,9 +1,9 @@
 import { SearchArtistsUseCase } from './search-artists.use-case';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { Artist } from '../../domain/artist/artist.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import type { DiscoveryCatalogPort } from '../../domain/repositories/discovery-catalog.port';
-import type { CatalogProviderFactoryPort } from '../../domain/repositories/catalog-provider.port';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { Artist } from '@/domain/artist/artist.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import type { DiscoveryCatalogPort } from '@/domain/repositories/discovery-catalog.port';
+import type { CatalogProviderFactoryPort } from '@/domain/repositories/catalog-provider.port';
 
 function makeArtist(id: string, name: string, imageUrl?: string): Artist {
   return Artist.create({

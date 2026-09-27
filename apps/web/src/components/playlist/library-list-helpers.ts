@@ -9,15 +9,25 @@ export function libraryDisplayTitle(
   playlist: Pick<PlaylistSummary, 'name' | 'seeds' | 'seedCount'>,
   t: Translate,
 ): string {
-  if (!playlist.name.startsWith(GENERATED_NAME_PREFIX)) return playlist.name
+  if (!playlist.name.startsWith(GENERATED_NAME_PREFIX)) {
+    return playlist.name
+  }
   const names = playlist.seeds
     .map((seed) => seed.name.trim())
     .filter(Boolean)
-  if (names.length === 0) return playlist.name
+  if (names.length === 0) {
+    return playlist.name
+  }
   const total = Math.max(names.length, playlist.seedCount)
-  if (total === 1) return names[0]
-  if (names.length < 2) return playlist.name
-  if (total === 2) return `${names[0]} + ${names[1]}`
+  if (total === 1) {
+    return names[0]
+  }
+  if (names.length < 2) {
+    return playlist.name
+  }
+  if (total === 2) {
+    return `${names[0]} + ${names[1]}`
+  }
   return t('library.titleMany', {
     first: names[0],
     second: names[1],
@@ -49,7 +59,9 @@ export function buildConfirmCopy(
   pending: PendingLibraryConfirm | null,
   t: Translate,
 ): ConfirmCopy | null {
-  if (!pending) return null
+  if (!pending) {
+    return null
+  }
   if (pending.kind === 'alert') {
     return {
       title: pending.title,
@@ -94,8 +106,12 @@ function buildSingleConfirmCopy(
 
 export function toggleIdInSet(current: Set<string>, id: string): Set<string> {
   const next = new Set(current)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
+  if (next.has(id)) {
+    next.delete(id)
+  }
+  else {
+    next.add(id)
+  }
   return next
 }
 
@@ -134,8 +150,12 @@ export function toBulkPending({
 }
 
 export function buildSyncSummary(removedCount: number, t: Translate): string {
-  if (removedCount === 0) return t('library.refreshSuccess')
-  if (removedCount === 1) return t('library.refreshSuccessOne')
+  if (removedCount === 0) {
+    return t('library.refreshSuccess')
+  }
+  if (removedCount === 1) {
+    return t('library.refreshSuccessOne')
+  }
   return t('library.refreshSuccessMany', { count: removedCount })
 }
 
@@ -143,7 +163,9 @@ export function pendingReferencesRemovedPlaylist(
   pending: PendingLibraryConfirm | null,
   visibleIds: Set<string>,
 ): boolean {
-  if (!pending || pending.kind === 'alert') return false
+  if (!pending || pending.kind === 'alert') {
+    return false
+  }
   if (pending.kind === 'bulk') {
     return pending.playlistIds.some((id) => !visibleIds.has(id))
   }

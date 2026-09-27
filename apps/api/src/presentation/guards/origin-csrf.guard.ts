@@ -26,7 +26,9 @@ export class OriginCsrfGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<Request>();
     const method = (req.method ?? 'GET').toUpperCase();
-    if (!MUTATING.has(method)) return true;
+    if (!MUTATING.has(method)) {
+      return true;
+    }
 
     // OAuth callbacks and health checks are not browser XHR from our SPA.
     const path = req.path ?? req.url ?? '';
@@ -51,10 +53,14 @@ export class OriginCsrfGuard implements CanActivate {
 
 function requestOrigin(req: Request): string | null {
   const origin = req.headers.origin?.trim();
-  if (origin) return origin.replace(/\/$/, '');
+  if (origin) {
+    return origin.replace(/\/$/, '');
+  }
 
   const referer = req.headers.referer?.trim();
-  if (!referer) return null;
+  if (!referer) {
+    return null;
+  }
   try {
     const url = new URL(referer);
     return `${url.protocol}//${url.host}`;

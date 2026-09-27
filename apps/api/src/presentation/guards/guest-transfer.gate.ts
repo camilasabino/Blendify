@@ -5,8 +5,12 @@ export const GUEST_TRANSFER_ENABLED = 'GUEST_TRANSFER_ENABLED';
 
 export function parseGuestTransferEnabled(raw: string | undefined): boolean {
   const value = raw?.trim().toLowerCase();
-  if (!value || value === 'false') return false;
-  if (value === 'true') return true;
+  if (!value || value === 'false') {
+    return false;
+  }
+  if (value === 'true') {
+    return true;
+  }
   throw new Error(
     `Invalid ${GUEST_TRANSFER_ENABLED} "${raw}". Use true or false.`,
   );
@@ -23,7 +27,9 @@ export class GuestTransferGate implements CanActivate {
   }
 
   canActivate(): boolean {
-    if (!this.enabled) throw new NotFoundException('Not found');
+    if (!this.enabled) {
+      throw new NotFoundException('Not found');
+    }
     return true;
   }
 }

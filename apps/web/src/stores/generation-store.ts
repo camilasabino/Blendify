@@ -19,7 +19,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     return { epoch, signal: controller.signal }
   },
   finish: (epoch) => {
-    if (get().epoch === epoch) set({ controller: null })
+    if (get().epoch === epoch) {
+      set({ controller: null })
+    }
   },
   cancelActive: () => {
     get().controller?.abort()

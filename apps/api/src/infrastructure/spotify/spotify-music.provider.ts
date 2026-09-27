@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import type {
   CatalogProviderFactoryPort,
   CatalogProviderPort,
-} from '../../domain/repositories/catalog-provider.port';
-import type { MusicProviderFactoryPort } from '../../domain/repositories/music-provider.factory.port';
+} from '@/domain/repositories/catalog-provider.port';
+import type { MusicProviderFactoryPort } from '@/domain/repositories/music-provider.factory.port';
 import type {
   CreateProviderPlaylistInput,
   MusicProviderPort,
@@ -12,10 +12,10 @@ import type {
   PlaylistRemoteSnapshot,
   ProviderPlaylist,
   StartPlaybackInput,
-} from '../../domain/repositories/music-provider.port';
-import { User } from '../../domain/user/user.entity';
-import { SpotifyTokenService } from '../auth/spotify-token.service';
-import { RedisCacheService } from '../cache/redis-cache.service';
+} from '@/domain/repositories/music-provider.port';
+import { User } from '@/domain/user/user.entity';
+import { SpotifyTokenService } from '@/infrastructure/auth/spotify-token.service';
+import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import { parseConfiguredMarket, resolveCatalogMarket } from './catalog-market';
 import { SpotifyApiClient } from './spotify-api.client';
 import { SpotifyAppTokenProvider } from './spotify-app-token.provider';

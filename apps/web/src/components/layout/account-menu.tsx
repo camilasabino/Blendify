@@ -27,14 +27,22 @@ export function AccountMenu({
     : t('nav.account')
 
   useEffect(() => {
-    if (open) focusItem('first')
+    if (open) {
+      focusItem('first')
+    }
   }, [open, focusItem])
 
   function onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+      return
+    }
     event.preventDefault()
-    if (open) focusItem(event.key === 'ArrowUp' ? 'last' : 'first')
-    else popover.setOpen(true)
+    if (open) {
+      focusItem(event.key === 'ArrowUp' ? 'last' : 'first')
+    }
+    else {
+      popover.setOpen(true)
+    }
   }
 
   function logOut() {

@@ -1,5 +1,5 @@
-import { normalizeArtistName } from '../../domain/artist/artist-name-match';
-import type { Track } from '../../domain/track/track.entity';
+import { normalizeArtistName } from '@/domain/artist/artist-name-match';
+import type { Track } from '@/domain/track/track.entity';
 
 /**
  * Choose the best Spotify search hit for an artist+title resolve.
@@ -11,7 +11,9 @@ export function pickResolvedTrack(
   trackName: string,
   options: { requireArtistNameMatch?: boolean } = {},
 ): Track | null {
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) {
+    return null;
+  }
   const wantedArtist = normalizeArtistName(artistName);
   const wantedTitle = normalizeArtistName(trackName);
   const artistMatched = candidates.filter(
@@ -25,11 +27,15 @@ export function pickResolvedTrack(
   } else {
     pool = [];
   }
-  if (pool.length === 0) return null;
+  if (pool.length === 0) {
+    return null;
+  }
   const exact = pool.find(
     (track) => normalizeArtistName(track.name) === wantedTitle,
   );
-  if (exact) return exact;
+  if (exact) {
+    return exact;
+  }
   return (
     pool.find((track) => {
       const name = normalizeArtistName(track.name);

@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios';
-import type { SpotifyTokenService } from '../auth/spotify-token.service';
+import type { SpotifyTokenService } from '@/infrastructure/auth/spotify-token.service';
 import { SpotifyApiClient } from './spotify-api.client';
 
 const adapter: AxiosAdapter = (config: InternalAxiosRequestConfig) =>

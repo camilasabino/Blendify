@@ -3,8 +3,8 @@ import {
   RequestLimitStoreUnavailableError,
   type PermitRef,
   type RequestLimitStore,
-} from '../../infrastructure/request-limits/request-limit.store';
-import { RequestLimitError } from '../http/request-limit.error';
+} from '@/infrastructure/request-limits/request-limit.store';
+import { RequestLimitError } from '@/presentation/http/request-limit.error';
 import type { ClientIdentity } from './client-identity';
 import {
   identityLogFields,
@@ -46,17 +46,23 @@ export class RequestLimiter {
         ),
       ));
     } catch (error) {
-      if (!(error instanceof RequestLimitStoreUnavailableError)) throw error;
+      if (!(error instanceof RequestLimitStoreUnavailableError)) {
+        throw error;
+      }
       logRequestLimitEvent(
         'request_limit.store_unavailable',
         { bucket, policy: policy.onStoreUnavailable },
         { throttleKey: bucket },
       );
-      if (policy.onStoreUnavailable === 'fail-open') return;
+      if (policy.onStoreUnavailable === 'fail-open') {
+        return;
+      }
       throw RequestLimitError.serviceUnavailable();
     }
 
-    if (hit.count <= policy.limit) return;
+    if (hit.count <= policy.limit) {
+      return;
+    }
     const retryAfterSeconds = Math.max(1, Math.ceil(hit.resetInMs / 1000));
     logRequestLimitEvent('request_limit.rejected', {
       bucket,
@@ -88,7 +94,9 @@ export class RequestLimiter {
         }),
       );
     } catch (error) {
-      if (!(error instanceof RequestLimitStoreUnavailableError)) throw error;
+      if (!(error instanceof RequestLimitStoreUnavailableError)) {
+        throw error;
+      }
       logRequestLimitEvent(
         'request_limit.store_unavailable',
         { bucket: 'generation-concurrency', policy: 'fail-closed' },
@@ -165,7 +173,9 @@ export class GenerationPermit {
   }
 
   async release(): Promise<void> {
-    if (this.released) return;
+    if (this.released) {
+      return;
+    }
     this.released = true;
     clearInterval(this.timer);
     try {
@@ -180,13 +190,17 @@ export class GenerationPermit {
   }
 
   private async renew(): Promise<void> {
-    if (this.released) return;
+    if (this.released) {
+      return;
+    }
     try {
       const renewed = await this.store.renew(
         this.ref,
         this.concurrency.leaseMs,
       );
-      if (renewed || this.released) return;
+      if (renewed || this.released) {
+        return;
+      }
       clearInterval(this.timer);
       logRequestLimitEvent('request_limit.permit_lost', {});
     } catch {

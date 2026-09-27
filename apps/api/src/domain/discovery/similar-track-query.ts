@@ -7,7 +7,7 @@ import {
   hasFeatCredit,
   includesWord,
   stripBracketedGroups,
-} from '../services/title-text';
+} from '@/domain/services/title-text';
 
 const VERSION_MARKERS = [
   'remastered',
@@ -30,7 +30,9 @@ const VERSION_MARKERS = [
 
 function hasVersionMarker(inner: string): boolean {
   const n = collapseWhitespace(inner.toLowerCase());
-  if (VERSION_MARKERS.some((marker) => includesWord(n, marker))) return true;
+  if (VERSION_MARKERS.some((marker) => includesWord(n, marker))) {
+    return true;
+  }
   if (n.includes('remaster')) {
     for (const token of n.split(/[\s._/-]+/)) {
       if (token.length >= 2 && token.length <= 4 && /^\d+$/.test(token)) {
@@ -38,14 +40,18 @@ function hasVersionMarker(inner: string): boolean {
       }
     }
   }
-  if (n.includes('from "') || n.includes("from '")) return true;
+  if (n.includes('from "') || n.includes("from '")) {
+    return true;
+  }
   return false;
 }
 
 function stripDashVersionSuffix(title: string): string {
   for (const sep of [' - ', ' – ', ' — '] as const) {
     const idx = title.lastIndexOf(sep);
-    if (idx < 0) continue;
+    if (idx < 0) {
+      continue;
+    }
     const tail = title.slice(idx + sep.length).trim();
     if (hasVersionMarker(tail) || tail.toLowerCase().startsWith('from ')) {
       return title.slice(0, idx).trimEnd();
@@ -90,21 +96,27 @@ function splitArtistAliases(artistName: string): string[] {
 
 export function primaryArtistName(artistName: string): string {
   const trimmed = artistName.trim();
-  if (!trimmed) return '';
+  if (!trimmed) {
+    return '';
+  }
   const primary = splitArtistAliases(trimmed)[0];
   return (primary ?? trimmed).trim();
 }
 
 export function artistNameVariants(artistName: string): string[] {
   const trimmed = artistName.trim();
-  if (!trimmed) return [];
+  if (!trimmed) {
+    return [];
+  }
 
   const aliases = splitArtistAliases(trimmed);
   const seen = new Set<string>();
   const variants: string[] = [];
   for (const name of [trimmed, ...aliases]) {
     const key = name.toLowerCase();
-    if (seen.has(key)) continue;
+    if (seen.has(key)) {
+      continue;
+    }
     seen.add(key);
     variants.push(name);
   }
@@ -113,7 +125,9 @@ export function artistNameVariants(artistName: string): string[] {
 
 export function cleanDiscoveryTrackTitle(trackName: string): string {
   let title = trackName.trim();
-  if (!title) return '';
+  if (!title) {
+    return '';
+  }
 
   title = stripBracketedGroups(title, hasFeatCredit);
   title = stripBracketedGroups(title, hasVersionMarker);
@@ -128,7 +142,9 @@ export function buildSimilarTrackQueryVariants(
 ): Array<{ artist: string; track: string }> {
   const artist = artistName.trim();
   const track = trackName.trim();
-  if (!artist || !track) return [];
+  if (!artist || !track) {
+    return [];
+  }
 
   const artists = artistNameVariants(artist);
   const cleaned = cleanDiscoveryTrackTitle(track) || track;
@@ -140,7 +156,9 @@ export function buildSimilarTrackQueryVariants(
   for (const a of artists) {
     for (const t of tracks) {
       const key = `${a.toLowerCase()}|${t.toLowerCase()}`;
-      if (seen.has(key)) continue;
+      if (seen.has(key)) {
+        continue;
+      }
       seen.add(key);
       variants.push({ artist: a, track: t });
     }

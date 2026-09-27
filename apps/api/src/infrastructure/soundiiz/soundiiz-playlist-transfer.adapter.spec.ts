@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
-import type { TransferPlaylist } from '../../domain/transfer/transfer-playlist';
+import type { TransferPlaylist } from '@/domain/transfer/transfer-playlist';
 import {
   isSafeShareUrl,
   sanitizeRetryAfter,
@@ -14,7 +14,7 @@ const mockCreateOutboundHttp = jest.fn((..._args: unknown[]) => ({
   post: mockPost,
 }));
 
-jest.mock('../http/outbound-http.logging', () => ({
+jest.mock('@/infrastructure/http/outbound-http.logging', () => ({
   createOutboundHttp: (...args: unknown[]) => mockCreateOutboundHttp(...args),
 }));
 

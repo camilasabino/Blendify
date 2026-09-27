@@ -91,7 +91,9 @@ export function loadRequestLimitsConfig(env: EnvReader): RequestLimitsConfig {
 export function resolveRateLimits(raw: string | undefined): RateLimitPolicies {
   const policies: RateLimitPolicies = { ...DEFAULT_RATE_LIMITS };
   const value = raw?.trim();
-  if (!value) return policies;
+  if (!value) {
+    return policies;
+  }
 
   const seen = new Set<string>();
   for (const entry of value.split(',')) {
@@ -123,8 +125,12 @@ export function resolveRateLimits(raw: string | undefined): RateLimitPolicies {
 
 export function parseClientIpSource(raw: string | undefined): ClientIpSource {
   const value = raw?.trim();
-  if (!value) return 'express';
-  if (isClientIpSource(value)) return value;
+  if (!value) {
+    return 'express';
+  }
+  if (isClientIpSource(value)) {
+    return value;
+  }
   throw new Error(
     `Invalid CLIENT_IP_SOURCE "${value}". Use one of: ${CLIENT_IP_SOURCES.join(', ')}.`,
   );
@@ -136,7 +142,9 @@ const TRUST_PROXY_KEYWORDS = new Set(['loopback', 'linklocal', 'uniquelocal']);
 
 export function parseTrustProxy(raw: string | undefined): TrustProxySetting {
   const value = raw?.trim();
-  if (!value || value.toLowerCase() === 'false') return false;
+  if (!value || value.toLowerCase() === 'false') {
+    return false;
+  }
   if (value.toLowerCase() === 'true') {
     throw new Error(
       'TRUST_PROXY=true is not allowed: it trusts any X-Forwarded-For value. Use a hop count or a list of proxy addresses/CIDRs.',
@@ -144,25 +152,39 @@ export function parseTrustProxy(raw: string | undefined): TrustProxySetting {
   }
   if (/^\d+$/.test(value)) {
     const hops = Number(value);
-    if (!Number.isSafeInteger(hops)) throw invalidTrustProxy(value);
+    if (!Number.isSafeInteger(hops)) {
+      throw invalidTrustProxy(value);
+    }
     return hops === 0 ? false : hops;
   }
 
   const entries = value.split(',').map((entry) => entry.trim());
   for (const entry of entries) {
-    if (!isTrustedProxyEntry(entry)) throw invalidTrustProxy(entry);
+    if (!isTrustedProxyEntry(entry)) {
+      throw invalidTrustProxy(entry);
+    }
   }
   return entries;
 }
 
 function isTrustedProxyEntry(entry: string): boolean {
-  if (TRUST_PROXY_KEYWORDS.has(entry)) return true;
+  if (TRUST_PROXY_KEYWORDS.has(entry)) {
+    return true;
+  }
   const [address, prefix, ...rest] = entry.split('/');
-  if (rest.length > 0) return false;
+  if (rest.length > 0) {
+    return false;
+  }
   const family = isIP(address);
-  if (family === 0) return false;
-  if (prefix === undefined) return true;
-  if (!/^\d+$/.test(prefix)) return false;
+  if (family === 0) {
+    return false;
+  }
+  if (prefix === undefined) {
+    return true;
+  }
+  if (!/^\d+$/.test(prefix)) {
+    return false;
+  }
   return Number(prefix) <= (family === 4 ? 32 : 128);
 }
 
@@ -172,7 +194,9 @@ function parsePositiveInteger(
   fallback: number,
 ): number {
   const value = raw?.trim();
-  if (!value) return fallback;
+  if (!value) {
+    return fallback;
+  }
   if (!isPositiveInteger(value)) {
     throw new Error(`${name} must be a positive integer (got "${value}")`);
   }

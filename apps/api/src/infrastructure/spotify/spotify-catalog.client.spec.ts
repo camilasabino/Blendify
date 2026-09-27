@@ -1,7 +1,7 @@
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { CatalogUnavailableError } from '../../domain/errors/catalog-unavailable.error';
-import type { RedisCacheService } from '../cache/redis-cache.service';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import type { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import {
   SpotifyCatalogClient,
   type CatalogTokenSource,

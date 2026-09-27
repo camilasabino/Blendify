@@ -3,10 +3,10 @@ import type { PlaylistDetail } from '@blendify/contracts';
 import {
   PLAYLIST_REPOSITORY,
   type PlaylistRepositoryPort,
-} from '../../domain/repositories/playlist.repository.port';
-import type { MusicProviderPort } from '../../domain/repositories/music-provider.port';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import { toPlaylistDetail } from '../dto/playlist-response.dto';
+} from '@/domain/repositories/playlist.repository.port';
+import type { MusicProviderPort } from '@/domain/repositories/music-provider.port';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import { toPlaylistDetail } from '@/application/dto/playlist-response.dto';
 import type { ProgressReporter } from './generation-progress.tracker';
 import { GenerationProgressTracker } from './generation-progress.tracker';
 

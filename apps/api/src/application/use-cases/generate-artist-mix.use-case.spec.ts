@@ -1,12 +1,12 @@
 import { PopularityMode } from '@blendify/contracts';
-import { Artist } from '../../domain/artist/artist.entity';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
-import type { CatalogProviderPort } from '../../domain/repositories/catalog-provider.port';
-import type { DiscoveryCatalogPort } from '../../domain/repositories/discovery-catalog.port';
-import { Track } from '../../domain/track/track.entity';
-import { ArtistId } from '../../domain/value-objects/artist-id.vo';
-import { TrackId } from '../../domain/value-objects/track-id.vo';
+import { Artist } from '@/domain/artist/artist.entity';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
+import type { DiscoveryCatalogPort } from '@/domain/repositories/discovery-catalog.port';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 
 function makeTrack(

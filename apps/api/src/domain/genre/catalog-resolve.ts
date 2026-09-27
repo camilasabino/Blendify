@@ -1,5 +1,5 @@
-import type { CatalogProviderPort } from '../repositories/catalog-provider.port';
-import type { Track } from '../track/track.entity';
+import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
+import type { Track } from '@/domain/track/track.entity';
 import type { PopularityMode } from '@blendify/contracts';
 import {
   catalogEntryKey,
@@ -7,11 +7,13 @@ import {
   nextCatalogBatch,
   type CatalogTrackRef,
 } from './catalog-window';
-import { BusinessRuleError } from '../errors/business-rule.error';
-import { CatalogUnavailableError } from '../errors/catalog-unavailable.error';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 
 /** Serial resolves — Dev Mode cannot sustain parallel search bursts. */
 const DEFAULT_CONCURRENCY = 1;
+
+const ATTEMPT_BUDGET_OVER_FETCH = 6;
 
 export function isSpotifyQuotaError(error: unknown): boolean {
   return (
@@ -48,7 +50,9 @@ export async function resolveCatalogTracks(
   },
 ): Promise<Track[]> {
   const needed = Math.max(0, options.needed);
-  if (needed === 0 || refs.length === 0) return [];
+  if (needed === 0 || refs.length === 0) {
+    return [];
+  }
 
   const concurrency = Math.max(1, options.concurrency ?? DEFAULT_CONCURRENCY);
   const maxPerArtist = options.maxPerArtist ?? Number.POSITIVE_INFINITY;
@@ -98,7 +102,9 @@ async function resolveCatalogBatch(
           artistId,
         });
       } catch (error) {
-        if (isFatalCatalogError(error)) throw error;
+        if (isFatalCatalogError(error)) {
+          throw error;
+        }
         return null;
       }
     }),
@@ -117,15 +123,21 @@ function acceptResolvedTracks(
   },
 ): void {
   for (const track of resolved) {
-    if (!track || state.collected.length >= state.needed) continue;
+    if (!track || state.collected.length >= state.needed) {
+      continue;
+    }
     if (state.artistId && track.artistId.getValue() !== state.artistId) {
       continue;
     }
     const id = track.id.getValue();
-    if (state.seenIds.has(id)) continue;
+    if (state.seenIds.has(id)) {
+      continue;
+    }
     const trackArtistId = track.artistId.getValue();
     const used = state.perArtist.get(trackArtistId) ?? 0;
-    if (used >= state.maxPerArtist) continue;
+    if (used >= state.maxPerArtist) {
+      continue;
+    }
     state.seenIds.add(id);
     state.perArtist.set(trackArtistId, used + 1);
     state.collected.push(track);
@@ -134,9 +146,11 @@ function acceptResolvedTracks(
 
 /** How many Spotify resolves to attempt for a target playlist size. */
 export function resolveAttemptBudget(needed: number): number {
-  if (needed <= 0) return 0;
+  if (needed <= 0) {
+    return 0;
+  }
   // Small over-fetch only — each attempt is a Spotify search.
-  return needed + 6;
+  return needed + ATTEMPT_BUDGET_OVER_FETCH;
 }
 
 /**
@@ -157,7 +171,9 @@ export async function resolveCatalogWithPoolExpand(
     onProgress?: (update: CatalogResolveProgress) => void;
   } = {},
 ): Promise<Track[]> {
-  if (chart.length === 0 || needed <= 0) return [];
+  if (chart.length === 0 || needed <= 0) {
+    return [];
+  }
 
   const collected: Track[] = [];
   const seenIds = new Set<string>();
@@ -175,7 +191,9 @@ export async function resolveCatalogWithPoolExpand(
     } = nextCatalogBatch(chart, mode, remaining, attemptedKeys, bounds, random);
     bounds = nextBounds;
 
-    if (exhausted || batch.length === 0) break;
+    if (exhausted || batch.length === 0) {
+      break;
+    }
 
     for (const entry of batch) {
       attemptedKeys.add(catalogEntryKey(entry));
@@ -199,10 +217,14 @@ export async function resolveCatalogWithPoolExpand(
 
     for (const track of resolved) {
       const id = track.id.getValue();
-      if (seenIds.has(id)) continue;
+      if (seenIds.has(id)) {
+        continue;
+      }
       seenIds.add(id);
       collected.push(track);
-      if (collected.length >= needed) break;
+      if (collected.length >= needed) {
+        break;
+      }
     }
 
     options.onProgress?.({

@@ -4,12 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { MAX_TRACKS, TRANSFER_TOKEN_MAX_LENGTH } from '@blendify/contracts';
 import { z } from 'zod';
-import type { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
-import { TransferError } from '../../domain/errors/transfer.error';
+import type { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import { TransferError } from '@/domain/errors/transfer.error';
 import {
   toTransferPlaylist,
   type TransferPlaylist,
-} from '../../domain/transfer/transfer-playlist';
+} from '@/domain/transfer/transfer-playlist';
 
 export const TRANSFER_TOKEN_TTL_SECONDS = 60 * 60;
 export const TRANSFER_TOKEN_AUDIENCE = 'blendify:playlist-transfer';
@@ -121,7 +121,9 @@ export class PlaylistTransferTokens {
     }
 
     const parsed = TransferTokenPayloadSchema.safeParse(payload);
-    if (!parsed.success) throw TransferError.tokenInvalid();
+    if (!parsed.success) {
+      throw TransferError.tokenInvalid();
+    }
     return parsed.data.pl;
   }
 

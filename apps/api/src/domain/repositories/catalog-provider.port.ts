@@ -1,7 +1,9 @@
-import { Artist } from '../artist/artist.entity';
-import { Track } from '../track/track.entity';
+import { Artist } from '@/domain/artist/artist.entity';
+import { Track } from '@/domain/track/track.entity';
 
 export const CATALOG_PROVIDER_FACTORY = 'CATALOG_PROVIDER_FACTORY' as const;
+
+export const CATALOG_MATCH_SEARCH_LIMIT = 10;
 
 export interface SearchTracksOptions {
   limit?: number;

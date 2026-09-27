@@ -14,6 +14,8 @@ type RateLimitedConfig = InternalAxiosRequestConfig & {
 const MIN_GAP_MS = 400;
 const LOCAL_COOLDOWN_MS = 20_000;
 const MAX_QUEUE_WAIT_MS = 1_500;
+const MAX_PLAUSIBLE_RETRY_AFTER_SECONDS = 48 * 3600;
+const DEFAULT_RETRY_AFTER_SECONDS = 20;
 
 let quotaBlockedUntil = 0;
 let lastQuotaReason: string | undefined;
@@ -33,10 +35,14 @@ function readRetryAfterSeconds(error: AxiosError): number | null {
     typeof headerCandidate === 'string' || typeof headerCandidate === 'number'
       ? String(headerCandidate)
       : null;
-  if (!header?.trim()) return null;
+  if (!header?.trim()) {
+    return null;
+  }
   const seconds = Number(header.trim());
-  if (!Number.isFinite(seconds) || seconds < 0) return null;
-  return Math.min(seconds, 48 * 3600);
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return null;
+  }
+  return Math.min(seconds, MAX_PLAUSIBLE_RETRY_AFTER_SECONDS);
 }
 
 function readQuotaReason(error: AxiosError): string | undefined {
@@ -66,7 +72,7 @@ function synthetic429(config: InternalAxiosRequestConfig): AxiosError {
         },
       },
       headers: AxiosHeaders.from({
-        'retry-after': String(remainingSec || 20),
+        'retry-after': String(remainingSec || DEFAULT_RETRY_AFTER_SECONDS),
       }),
       config,
     },
@@ -79,7 +85,9 @@ export function isSpotifyQuotaBlocked(): boolean {
 }
 
 export function getSpotifyQuotaRetryAfterSeconds(): number | null {
-  if (!isSpotifyQuotaBlocked()) return null;
+  if (!isSpotifyQuotaBlocked()) {
+    return null;
+  }
   return Math.max(1, Math.ceil((quotaBlockedUntil - Date.now()) / 1000));
 }
 
@@ -129,7 +137,9 @@ export function attachSpotifyRateLimit(
       throw synthetic429(cfg);
     }
 
-    if (wait > 0) await sleep(wait);
+    if (wait > 0) {
+      await sleep(wait);
+    }
 
     cfg.__releaseRateGate = release;
     return cfg;
@@ -154,7 +164,8 @@ export function attachSpotifyRateLimit(
       const status = error.response?.status;
 
       if (status === 429) {
-        const retrySec = readRetryAfterSeconds(error) ?? 20;
+        const retrySec =
+          readRetryAfterSeconds(error) ?? DEFAULT_RETRY_AFTER_SECONDS;
         const reason = readQuotaReason(error) ?? 'rate_limit';
         lastQuotaReason = reason;
         quotaBlockedUntil = Date.now() + retrySec * 1000;

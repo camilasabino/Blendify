@@ -4,7 +4,9 @@
  */
 
 export function isWordBoundary(ch: string): boolean {
-  if (!ch) return true;
+  if (!ch) {
+    return true;
+  }
   const code = ch.toLowerCase().codePointAt(0) ?? 0;
   const isLetter = (code >= 97 && code <= 122) || (code >= 48 && code <= 57);
   return !isLetter;
@@ -16,10 +18,14 @@ export function includesWord(haystack: string, needle: string): boolean {
   let from = 0;
   while (from <= h.length - n.length) {
     const idx = h.indexOf(n, from);
-    if (idx < 0) return false;
+    if (idx < 0) {
+      return false;
+    }
     const before = idx === 0 ? ' ' : h[idx - 1];
     const after = idx + n.length >= h.length ? ' ' : h[idx + n.length];
-    if (isWordBoundary(before) && isWordBoundary(after)) return true;
+    if (isWordBoundary(before) && isWordBoundary(after)) {
+      return true;
+    }
     from = idx + 1;
   }
   return false;
@@ -42,7 +48,9 @@ export function collapseWhitespace(value: string): string {
       pendingSpace = true;
       continue;
     }
-    if (pendingSpace && out.length > 0) out += ' ';
+    if (pendingSpace && out.length > 0) {
+      out += ' ';
+    }
     pendingSpace = false;
     out += ch;
   }

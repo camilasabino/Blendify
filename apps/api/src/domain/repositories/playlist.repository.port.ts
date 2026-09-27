@@ -1,4 +1,4 @@
-import { Playlist } from '../playlist/playlist.entity';
+import { Playlist } from '@/domain/playlist/playlist.entity';
 
 export const PLAYLIST_REPOSITORY = 'PLAYLIST_REPOSITORY' as const;
 

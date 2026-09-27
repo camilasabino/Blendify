@@ -2,8 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   USER_REPOSITORY,
   type UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+} from '@/domain/repositories/user.repository.port';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 
 @Injectable()
 export class DeleteAccountUseCase {

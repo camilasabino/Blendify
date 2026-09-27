@@ -5,7 +5,7 @@ import {
   type SeedUsageInput,
   type RankedSeedUsage,
   type UserUsageStatsSnapshot,
-} from '../../domain/repositories/usage-stats.repository.port';
+} from '@/domain/repositories/usage-stats.repository.port';
 import { PrismaService } from './prisma.service';
 
 @Injectable()
@@ -117,7 +117,9 @@ export class PrismaUsageStatsRepository implements UsageStatsRepositoryPort {
     artists: RankedSeedUsage[],
   ): Promise<RankedSeedUsage[]> {
     const missing = artists.filter((artist) => !artist.imageUrl);
-    if (missing.length === 0) return artists;
+    if (missing.length === 0) {
+      return artists;
+    }
 
     const playlists = await this.prisma.playlist.findMany({
       where: { userId },
@@ -130,13 +132,19 @@ export class PrismaUsageStatsRepository implements UsageStatsRepositoryPort {
     for (const playlist of playlists) {
       const rows = parseArtistSeeds(playlist.seeds);
       for (const row of rows) {
-        if (!row.id || !row.imageUrl || images.has(row.id)) continue;
+        if (!row.id || !row.imageUrl || images.has(row.id)) {
+          continue;
+        }
         images.set(row.id, row.imageUrl);
       }
-      if (images.size >= missing.length) break;
+      if (images.size >= missing.length) {
+        break;
+      }
     }
 
-    if (images.size === 0) return artists;
+    if (images.size === 0) {
+      return artists;
+    }
 
     return artists.map((artist) => ({
       ...artist,
@@ -164,7 +172,9 @@ function toRanked(row: {
 function parseArtistSeeds(
   value: unknown,
 ): Array<{ type?: string; id?: string; imageUrl?: string | null }> {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) {
+    return [];
+  }
   return value.filter(
     (
       row,
@@ -184,7 +194,9 @@ function dedupeSeeds(seeds: SeedUsageInput[]): SeedUsageInput[] {
   const out: SeedUsageInput[] = [];
   for (const seed of seeds) {
     const key = `${seed.kind}:${seed.seedKey}`;
-    if (!seed.seedKey.trim() || !seed.name.trim() || seen.has(key)) continue;
+    if (!seed.seedKey.trim() || !seed.name.trim() || seen.has(key)) {
+      continue;
+    }
     seen.add(key);
     out.push({
       kind: seed.kind,

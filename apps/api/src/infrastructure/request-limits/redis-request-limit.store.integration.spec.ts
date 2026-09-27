@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import { RedisConnection } from '../cache/redis-connection';
+import { RedisConnection } from '@/infrastructure/cache/redis-connection';
 import { RedisRequestLimitStore } from './redis-request-limit.store';
 
 const redisUrl = process.env.REDIS_TEST_URL;

@@ -42,7 +42,9 @@ async function runSessionRefresh(retries: boolean): Promise<void> {
 
   let last: SessionProbe = 'unreachable'
   for (const delay of delays) {
-    if (delay > 0) await sleep(delay)
+    if (delay > 0) {
+      await sleep(delay)
+    }
     const result = await probeSession()
     last = result.status
     if (result.status === 'authenticated') {

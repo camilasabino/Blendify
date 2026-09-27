@@ -1,4 +1,4 @@
-import { Track } from '../../track/track.entity';
+import { Track } from '@/domain/track/track.entity';
 import {
   TrackOrderMode,
   type TrackOrderMode as TrackOrderModeValue,
@@ -13,7 +13,9 @@ export class SortByArtistStrategy implements TrackOrderingStrategy {
     const flat = flatten(tracksByArtist);
     return flat.sort((a, b) => {
       const byArtist = compareText(a.artistName, b.artistName);
-      if (byArtist !== 0) return byArtist;
+      if (byArtist !== 0) {
+        return byArtist;
+      }
       return compareText(a.name, b.name);
     });
   }
@@ -24,7 +26,9 @@ export class SortByTitleStrategy implements TrackOrderingStrategy {
     const flat = flatten(tracksByArtist);
     return flat.sort((a, b) => {
       const byTitle = compareText(a.name, b.name);
-      if (byTitle !== 0) return byTitle;
+      if (byTitle !== 0) {
+        return byTitle;
+      }
       return compareText(a.artistName, b.artistName);
     });
   }

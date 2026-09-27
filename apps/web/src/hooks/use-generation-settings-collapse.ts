@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
 function scrollIntoViewRespectingMotion(element: HTMLElement | null) {
-  if (!element || typeof element.scrollIntoView !== 'function') return
+  if (!element || typeof element.scrollIntoView !== 'function') {
+    return
+  }
   const prefersReducedMotion =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -28,11 +30,15 @@ export function useGenerationSettingsCollapse(
   // Collapse again whenever a new generation starts.
   if (isGenerating !== wasGenerating) {
     setWasGenerating(isGenerating)
-    if (isGenerating) setSettingsExpanded(false)
+    if (isGenerating) {
+      setSettingsExpanded(false)
+    }
   }
 
   useEffect(() => {
-    if (!isGenerating) return
+    if (!isGenerating) {
+      return
+    }
     scrollIntoViewRespectingMotion(resultPanelRef.current)
     resultPanelRef.current?.focus({ preventScroll: true })
   }, [isGenerating])

@@ -2,9 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   MUSIC_PROVIDER_FACTORY,
   type MusicProviderFactoryPort,
-} from '../../domain/repositories/music-provider.factory.port';
-import type { StartPlaybackInput } from '../../domain/repositories/music-provider.port';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
+} from '@/domain/repositories/music-provider.factory.port';
+import type { StartPlaybackInput } from '@/domain/repositories/music-provider.port';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 
 @Injectable()
 export class ControlPlaybackUseCase {

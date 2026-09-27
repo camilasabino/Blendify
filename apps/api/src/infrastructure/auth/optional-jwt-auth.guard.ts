@@ -1,7 +1,7 @@
 import { ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
-import { User } from '../../domain/user/user.entity';
+import { User } from '@/domain/user/user.entity';
 
 const WARN_THROTTLE_MS = 30_000;
 
@@ -25,7 +25,9 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
     err: Error | null,
     user: TUser | false | null,
   ): TUser | undefined {
-    if (err) throw err;
+    if (err) {
+      throw err;
+    }
     return user || undefined;
   }
 

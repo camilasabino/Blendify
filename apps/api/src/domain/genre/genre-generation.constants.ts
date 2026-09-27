@@ -1,0 +1,1 @@
+export const GENRE_MIX_MAX_TRACKS_PER_ARTIST = 3;

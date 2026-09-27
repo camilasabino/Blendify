@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
-import { createOutboundHttp } from '../http/outbound-http.logging';
+import { createOutboundHttp } from '@/infrastructure/http/outbound-http.logging';
 import { SpotifyAccountRestrictedError } from './spotify-auth.errors';
+import { SPOTIFY_HTTP_TIMEOUT_MS } from './spotify.constants';
 
 @Injectable()
 export class SpotifyAuthClient {
@@ -13,14 +14,14 @@ export class SpotifyAuthClient {
     this.accountsApi = createOutboundHttp(
       {
         baseURL: 'https://accounts.spotify.com',
-        timeout: 15_000,
+        timeout: SPOTIFY_HTTP_TIMEOUT_MS,
       },
       { logBodies: false },
     );
     this.api = createOutboundHttp(
       {
         baseURL: 'https://api.spotify.com/v1',
-        timeout: 15_000,
+        timeout: SPOTIFY_HTTP_TIMEOUT_MS,
       },
       { logBodies: false },
     );

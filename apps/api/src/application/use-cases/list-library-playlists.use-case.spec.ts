@@ -1,7 +1,7 @@
 import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
 import { ListLibraryPlaylistsUseCase } from './list-library-playlists.use-case';
-import { Playlist } from '../../domain/playlist/playlist.entity';
-import type { PlaylistRepositoryPort } from '../../domain/repositories/playlist.repository.port';
+import { Playlist } from '@/domain/playlist/playlist.entity';
+import type { PlaylistRepositoryPort } from '@/domain/repositories/playlist.repository.port';
 
 function makePlaylist(): Playlist {
   const seed = { id: 'artist-1', name: 'Sade' };

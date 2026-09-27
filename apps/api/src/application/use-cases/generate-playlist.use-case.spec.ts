@@ -1,6 +1,6 @@
 import type { GenerationProgress } from '@blendify/contracts';
-import { GeneratedPlaylist } from '../../domain/playlist/generated-playlist';
-import type { ProgressReporter } from '../services/generation-progress.tracker';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import type { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import type { GenerateDiscoverPlaylistUseCase } from './generate-discover-playlist.use-case';
 import type { GenerateGenreMixUseCase } from './generate-genre-mix.use-case';
@@ -76,7 +76,9 @@ function progress(percent: number): GenerationProgress {
 function emitting(percents: number[]) {
   return jest.fn(
     (_request: unknown, options?: { onProgress?: ProgressReporter }) => {
-      for (const percent of percents) options?.onProgress?.(progress(percent));
+      for (const percent of percents) {
+        options?.onProgress?.(progress(percent));
+      }
       return Promise.resolve(generated);
     },
   );
@@ -109,7 +111,9 @@ describe('GeneratePlaylistUseCase', () => {
 
     expect(context[generator]).toHaveBeenCalledWith(requests[kind], undefined);
     for (const other of ['artistMix', 'genreMix', 'discover'] as const) {
-      if (other !== generator) expect(context[other]).not.toHaveBeenCalled();
+      if (other !== generator) {
+        expect(context[other]).not.toHaveBeenCalled();
+      }
     }
   });
 

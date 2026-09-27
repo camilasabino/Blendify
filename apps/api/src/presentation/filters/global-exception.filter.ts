@@ -3,7 +3,7 @@ import { Response } from 'express';
 import {
   retryAfterHeaderValue,
   toApiErrorResponse,
-} from '../http/api-error-response';
+} from '@/presentation/http/api-error-response';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -22,7 +22,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     const retryAfter = retryAfterHeaderValue(body);
-    if (retryAfter) response.setHeader('Retry-After', retryAfter);
+    if (retryAfter) {
+      response.setHeader('Retry-After', retryAfter);
+    }
     response.status(body.statusCode).json(body);
   }
 }

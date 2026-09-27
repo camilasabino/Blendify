@@ -5,14 +5,15 @@ import axios, {
   AxiosRequestConfig,
   AxiosResponse,
 } from 'axios';
-import { BusinessRuleError } from '../../domain/errors/business-rule.error';
-import { SpotifyTokenService } from '../auth/spotify-token.service';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { SpotifyTokenService } from '@/infrastructure/auth/spotify-token.service';
 import {
   attachOutboundHttpLogging,
   type OutboundHttpLoggingOptions,
-} from '../http/outbound-http.logging';
+} from '@/infrastructure/http/outbound-http.logging';
 import { createSpotifyQuotaError } from './spotify-quota-error';
 import { attachSpotifyRateLimit } from './spotify-rate-limit';
+import { SPOTIFY_NO_ACTIVE_DEVICE_REASON } from './spotify.constants';
 
 type SpotifyErrorPayload = {
   error?: { message?: string; status?: number; reason?: string };
@@ -72,11 +73,16 @@ export class SpotifyApiClient {
   }
 
   isNoActiveDeviceError(error: unknown): boolean {
-    if (!axios.isAxiosError(error)) return false;
+    if (!axios.isAxiosError(error)) {
+      return false;
+    }
     const payload = (error as AxiosError<SpotifyErrorPayload>).response?.data;
     const reason = payload?.error?.reason ?? '';
     const message = payload?.error?.message ?? '';
-    return reason === 'NO_ACTIVE_DEVICE' || /no active device/i.test(message);
+    return (
+      reason === SPOTIFY_NO_ACTIVE_DEVICE_REASON ||
+      /no active device/i.test(message)
+    );
   }
 
   toPlaybackError(operation: string, error: unknown): Error {
@@ -92,10 +98,13 @@ export class SpotifyApiClient {
 
     this.logger.warn(`Spotify ${operation} failed (${status}): ${message}`);
 
-    if (reason === 'NO_ACTIVE_DEVICE' || /no active device/i.test(message)) {
+    if (
+      reason === SPOTIFY_NO_ACTIVE_DEVICE_REASON ||
+      /no active device/i.test(message)
+    ) {
       return new BusinessRuleError(
         'No active Spotify device. Open Spotify on your phone or computer, play anything once, then try again.',
-        'NO_ACTIVE_DEVICE',
+        SPOTIFY_NO_ACTIVE_DEVICE_REASON,
       );
     }
     if (status === 404) {

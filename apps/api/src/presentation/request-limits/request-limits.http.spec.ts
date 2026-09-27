@@ -8,7 +8,7 @@ import {
 import { Test } from '@nestjs/testing';
 import type { Server } from 'http';
 import request from 'supertest';
-import { GlobalExceptionFilter } from '../filters/global-exception.filter';
+import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
 import { LimitGenerationConcurrency } from './generation-concurrency.interceptor';
 import { RateLimit } from './rate-limit.guard';
 import { RequestLimiter } from './request-limiter';
@@ -79,7 +79,9 @@ async function settle() {
 }
 
 async function waitForPending(count: number) {
-  for (let i = 0; i < 50 && pending.length < count; i += 1) await settle();
+  for (let i = 0; i < 50 && pending.length < count; i += 1) {
+    await settle();
+  }
   expect(pending).toHaveLength(count);
 }
 

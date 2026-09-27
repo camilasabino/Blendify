@@ -4,9 +4,9 @@ import {
   selectTracksWithArtistDiversity,
   tracksPerSeedArtist,
 } from './genre-playlist-generation.service';
-import { Track } from '../track/track.entity';
-import { TrackId } from '../value-objects/track-id.vo';
-import { ArtistId } from '../value-objects/artist-id.vo';
+import { Track } from '@/domain/track/track.entity';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 
 function track(
   artistId: string,

@@ -6,22 +6,22 @@ import {
   type GeneratedPlaylistDto,
 } from '@blendify/contracts';
 import type { Request, Response } from 'express';
-import { OptionalJwtAuthGuard } from '../../infrastructure/auth/optional-jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '@/infrastructure/auth/optional-jwt-auth.guard';
 import {
   GeneratePlaylistUseCase,
   type PlaylistGenerationRequest,
-} from '../../application/use-cases/generate-playlist.use-case';
-import { toGeneratedPlaylistResponse } from '../../application/dto/playlist-response.dto';
-import { PlaylistTransferTokens } from '../../application/services/playlist-transfer-tokens.service';
-import type { ProgressReporter } from '../../application/services/generation-progress.tracker';
-import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
+} from '@/application/use-cases/generate-playlist.use-case';
+import { toGeneratedPlaylistResponse } from '@/application/dto/playlist-response.dto';
+import { PlaylistTransferTokens } from '@/application/services/playlist-transfer-tokens.service';
+import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
+import { ZodValidationPipe } from '@/presentation/pipes/zod-validation.pipe';
 import {
   acceptsNdjson,
   writeNdjsonGeneration,
-} from '../http/ndjson-generation';
-import { RateLimit } from '../request-limits/rate-limit.guard';
-import { LimitGenerationConcurrency } from '../request-limits/generation-concurrency.interceptor';
-import { GuestTransferGate } from '../guards/guest-transfer.gate';
+} from '@/presentation/http/ndjson-generation';
+import { RateLimit } from '@/presentation/request-limits/rate-limit.guard';
+import { LimitGenerationConcurrency } from '@/presentation/request-limits/generation-concurrency.interceptor';
+import { GuestTransferGate } from '@/presentation/guards/guest-transfer.gate';
 
 @ApiTags('generate')
 @UseGuards(OptionalJwtAuthGuard)

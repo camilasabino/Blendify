@@ -3,8 +3,8 @@ import {
   PLAYLIST_TRANSFER_GATEWAY,
   type PlaylistTransfer,
   type PlaylistTransferGateway,
-} from '../../domain/repositories/playlist-transfer.gateway.port';
-import { PlaylistTransferTokens } from '../services/playlist-transfer-tokens.service';
+} from '@/domain/repositories/playlist-transfer.gateway.port';
+import { PlaylistTransferTokens } from '@/application/services/playlist-transfer-tokens.service';
 
 @Injectable()
 export class CreatePlaylistTransferUseCase {

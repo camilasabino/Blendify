@@ -166,7 +166,9 @@ async function requestGeneration<T>(
   }
 
   const parsed = contract.result.safeParse(await response.json())
-  if (!parsed.success) throw invalidGenerationResponseError()
+  if (!parsed.success) {
+    throw invalidGenerationResponseError()
+  }
   return parsed.data
 }
 
@@ -319,9 +321,15 @@ export const api = {
     } = {},
   ) => {
     const params = new URLSearchParams()
-    if (options.limit != null) params.set('limit', String(options.limit))
-    if (options.offset != null) params.set('offset', String(options.offset))
-    if (options.q?.trim()) params.set('q', options.q.trim())
+    if (options.limit != null) {
+      params.set('limit', String(options.limit))
+    }
+    if (options.offset != null) {
+      params.set('offset', String(options.offset))
+    }
+    if (options.q?.trim()) {
+      params.set('q', options.q.trim())
+    }
     const query = params.toString()
     const path = query ? `/api/playlists?${query}` : '/api/playlists'
     return request<PlaylistLibraryPage>(path)

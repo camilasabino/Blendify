@@ -1,7 +1,7 @@
 import {
   parseClientIpSource,
   parseTrustProxy,
-} from '../presentation/request-limits/request-limits.config';
+} from '@/presentation/request-limits/request-limits.config';
 
 const EXAMPLE_JWT_SECRET = 'change-me-to-a-long-random-secret-in-production';
 const MIN_JWT_SECRET_LENGTH = 32;
@@ -26,12 +26,16 @@ const REMOVED_VARIABLES = ['JWT_EXPIRES_IN', 'COOKIE_SECRET', 'API_URL'];
 type Environment = Record<string, unknown>;
 
 export function validateEnvironment(env: Environment): Environment {
-  if (read(env, 'NODE_ENV') !== 'production') return env;
+  if (read(env, 'NODE_ENV') !== 'production') {
+    return env;
+  }
 
   const problems: string[] = [];
 
   for (const name of REQUIRED_IN_PRODUCTION) {
-    if (!read(env, name)) problems.push(`${name} is required`);
+    if (!read(env, name)) {
+      problems.push(`${name} is required`);
+    }
   }
 
   for (const name of REMOVED_VARIABLES) {
@@ -95,7 +99,9 @@ export function validateEnvironment(env: Environment): Environment {
 
 function read(env: Environment, name: string): string | undefined {
   const value = env[name];
-  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'string') {
+    return value.trim();
+  }
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
   }
@@ -112,6 +118,8 @@ function isHttpsUrl(value: string): boolean {
 }
 
 function isHttpsOrigin(value: string): boolean {
-  if (!isHttpsUrl(value)) return false;
+  if (!isHttpsUrl(value)) {
+    return false;
+  }
   return new URL(value).origin === value;
 }

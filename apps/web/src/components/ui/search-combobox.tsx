@@ -15,6 +15,8 @@ import { Spinner } from '@/components/ui/spinner'
 import { useT } from '@/i18n/use-t'
 import { cn, focusRing } from '@/lib/utils'
 
+const MIN_SEARCH_QUERY_LENGTH = 2
+
 function comboboxStatus({
   showPopup,
   isError,
@@ -34,11 +36,21 @@ function comboboxStatus({
   errorLabel: (error: unknown) => string
   t: ReturnType<typeof useT>
 }>): string {
-  if (!showPopup) return ''
-  if (isError) return errorLabel(error)
-  if (isFetching) return ''
-  if (itemCount === 0) return emptyLabel
-  if (itemCount === 1) return t('search.resultsOne')
+  if (!showPopup) {
+    return ''
+  }
+  if (isError) {
+    return errorLabel(error)
+  }
+  if (isFetching) {
+    return ''
+  }
+  if (itemCount === 0) {
+    return emptyLabel
+  }
+  if (itemCount === 1) {
+    return t('search.resultsOne')
+  }
   return t('search.resultsMany', { count: itemCount })
 }
 
@@ -111,7 +123,9 @@ function SearchComboboxOptions<T extends { id: string }>({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => onSelect(item)}
                 onKeyDown={(event) => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  if (event.key !== 'Enter' && event.key !== ' ') {
+                    return
+                  }
                   event.preventDefault()
                   onSelect(item)
                 }}
@@ -182,7 +196,7 @@ export function SearchCombobox<T extends { id: string }>({
   const result = useQuery({
     queryKey: [queryKey, 'search', debounced],
     queryFn: () => search(debounced),
-    enabled: debounced.length >= 2,
+    enabled: debounced.length >= MIN_SEARCH_QUERY_LENGTH,
     retry: false,
     staleTime: 60_000,
   })
@@ -194,11 +208,13 @@ export function SearchCombobox<T extends { id: string }>({
   useEffect(() => setActiveIndex(-1), [debounced, items.length])
 
   const optionId = (index: number) => `${listId}-option-${index}`
-  const showPopup = open && debounced.length >= 2
+  const showPopup = open && debounced.length >= MIN_SEARCH_QUERY_LENGTH
   const showOptions = showPopup && !result.isError && items.length > 0
 
   useEffect(() => {
-    if (activeIndex < 0) return
+    if (activeIndex < 0) {
+      return
+    }
     const option = document.getElementById(`${listId}-option-${activeIndex}`)
     if (typeof option?.scrollIntoView === 'function') {
       option.scrollIntoView({ block: 'nearest' })
@@ -213,7 +229,9 @@ export function SearchCombobox<T extends { id: string }>({
   }
 
   function select(item: T) {
-    if (selectedIds.has(item.id) || disabled) return
+    if (selectedIds.has(item.id) || disabled) {
+      return
+    }
     onSelect(item)
     clear()
   }
@@ -249,14 +267,20 @@ export function SearchCombobox<T extends { id: string }>({
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
-      if (!open) setOpen(true)
-      if (selectable.length > 0) moveActive(event.key === 'ArrowDown' ? 1 : -1)
+      if (!open) {
+        setOpen(true)
+      }
+      if (selectable.length > 0) {
+        moveActive(event.key === 'ArrowDown' ? 1 : -1)
+      }
       return
     }
     if (event.key === 'Enter' && showOptions && activeIndex >= 0) {
       event.preventDefault()
       const item = items[activeIndex]
-      if (item) select(item)
+      if (item) {
+        select(item)
+      }
     }
   }
 
@@ -277,7 +301,9 @@ export function SearchCombobox<T extends { id: string }>({
       className={cn('relative', className)}
       onBlur={(event: FocusEvent<HTMLDivElement>) => {
         const next = event.relatedTarget
-        if (next instanceof Node && containerRef.current?.contains(next)) return
+        if (next instanceof Node && containerRef.current?.contains(next)) {
+          return
+        }
         setOpen(false)
       }}
     >

@@ -1,10 +1,10 @@
 import { Logger } from '@nestjs/common';
-import { MemoryRequestLimitStore } from '../../infrastructure/request-limits/memory-request-limit.store';
+import { MemoryRequestLimitStore } from '@/infrastructure/request-limits/memory-request-limit.store';
 import {
   RequestLimitStoreUnavailableError,
   type RequestLimitStore,
-} from '../../infrastructure/request-limits/request-limit.store';
-import { RequestLimitError } from '../http/request-limit.error';
+} from '@/infrastructure/request-limits/request-limit.store';
+import { RequestLimitError } from '@/presentation/http/request-limit.error';
 import type { ClientIdentity } from './client-identity';
 import { RequestLimiter } from './request-limiter';
 import {
@@ -60,7 +60,9 @@ async function rejection(
   try {
     await promise;
   } catch (error) {
-    if (error instanceof RequestLimitError) return error;
+    if (error instanceof RequestLimitError) {
+      return error;
+    }
     throw error;
   }
   throw new Error('Expected a RequestLimitError');

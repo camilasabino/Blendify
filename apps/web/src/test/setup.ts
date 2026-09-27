@@ -7,7 +7,9 @@ HTMLDialogElement.prototype.showModal ??= function showModal(
 }
 
 HTMLDialogElement.prototype.close ??= function close(this: HTMLDialogElement) {
-  if (!this.hasAttribute('open')) return
+  if (!this.hasAttribute('open')) {
+    return
+  }
   this.removeAttribute('open')
   this.dispatchEvent(new Event('close'))
 }

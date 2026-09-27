@@ -69,7 +69,9 @@ const GENRE_ICON_RULES: GenreIconRule[] = [
 export function resolveGenreIcon(name: string, id?: string): LucideIcon {
   const haystack = `${name} ${id ?? ''}`.trim()
   for (const rule of GENRE_ICON_RULES) {
-    if (rule.test.test(haystack)) return rule.icon
+    if (rule.test.test(haystack)) {
+      return rule.icon
+    }
   }
   return Music2
 }

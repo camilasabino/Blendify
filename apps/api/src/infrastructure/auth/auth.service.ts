@@ -2,12 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { CookieOptions, Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import { SpotifyAuthClient } from '../spotify/spotify-auth.client';
-import { User } from '../../domain/user/user.entity';
+import { SpotifyAuthClient } from '@/infrastructure/spotify/spotify-auth.client';
+import { User } from '@/domain/user/user.entity';
 import {
   USER_REPOSITORY,
   type UserRepositoryPort,
-} from '../../domain/repositories/user.repository.port';
+} from '@/domain/repositories/user.repository.port';
 
 export interface SessionPayload {
   sub: string;
@@ -44,9 +44,13 @@ export class AuthService {
    */
   consumeOAuthState(state: string | undefined): boolean {
     const value = state?.trim();
-    if (!value) return false;
+    if (!value) {
+      return false;
+    }
     this.pruneUsedOAuthStates();
-    if (usedOAuthStates.has(value)) return false;
+    if (usedOAuthStates.has(value)) {
+      return false;
+    }
     usedOAuthStates.set(value, Date.now() + OAUTH_STATE_TTL_MS);
     return true;
   }
@@ -96,7 +100,9 @@ export class AuthService {
   private pruneUsedOAuthStates(): void {
     const now = Date.now();
     for (const [state, expiresAt] of usedOAuthStates) {
-      if (expiresAt <= now) usedOAuthStates.delete(state);
+      if (expiresAt <= now) {
+        usedOAuthStates.delete(state);
+      }
     }
   }
 

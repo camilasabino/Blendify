@@ -1,4 +1,4 @@
-import { MAX_TRACKS } from '../../constants';
+import { MAX_TRACKS } from '@/domain/constants';
 
 export interface AllocationInput {
   artistIds: string[];

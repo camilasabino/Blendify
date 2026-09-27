@@ -1,5 +1,5 @@
 import { DomainError } from './domain.error';
-import { MAX_ARTISTS, MAX_GENRES, MAX_TRACKS } from '../constants';
+import { MAX_ARTISTS, MAX_GENRES, MAX_TRACKS } from '@/domain/constants';
 
 export class BusinessRuleError extends DomainError {
   constructor(
@@ -86,6 +86,17 @@ export class BusinessRuleError extends DomainError {
       'Could not find reliable artists for this genre right now.',
       'GENRE_LOOKUP_UNAVAILABLE',
       details,
+    );
+  }
+
+  static trackBudgetExceeded(
+    unit: 'artist' | 'genre',
+    max: number,
+    count: number,
+  ): BusinessRuleError {
+    return new BusinessRuleError(
+      `At most ${max} tracks per ${unit} for ${count} ${unit}(s) (cap ${MAX_TRACKS}).`,
+      'TRACK_BUDGET_EXCEEDED',
     );
   }
 }

@@ -10,11 +10,15 @@ const UNKNOWN_CLIENT = 'unknown';
 
 export function normalizeIp(raw: string | undefined): string | null {
   const value = raw?.trim();
-  if (!value) return null;
+  if (!value) {
+    return null;
+  }
   const lower = value.toLowerCase();
   if (lower.startsWith(IPV4_MAPPED_PREFIX)) {
     const mapped = lower.slice(IPV4_MAPPED_PREFIX.length);
-    if (isIP(mapped) === 4) return mapped;
+    if (isIP(mapped) === 4) {
+      return mapped;
+    }
   }
   return isIP(lower) === 0 ? null : lower;
 }
@@ -33,7 +37,9 @@ export function resolveClientIp(
       : { ip: UNKNOWN_CLIENT, fallback: true };
   }
   const resolved = normalizeIp(req.ip);
-  if (resolved) return { ip: resolved, fallback: false };
+  if (resolved) {
+    return { ip: resolved, fallback: false };
+  }
   return {
     ip: normalizeIp(req.socket?.remoteAddress) ?? UNKNOWN_CLIENT,
     fallback: true,
@@ -57,6 +63,8 @@ export function resolveClientIdentity(
     return { kind: 'user', key: `u:${userId}` };
   }
   const { ip, fallback } = resolveClientIp(req, source);
-  if (fallback) onInvalidIp?.();
+  if (fallback) {
+    onInvalidIp?.();
+  }
   return { kind: 'ip', key: `ip:${ip}` };
 }

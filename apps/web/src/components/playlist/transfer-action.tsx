@@ -63,7 +63,9 @@ export function TransferAction({
   const continueUrl = toSafeHttpsUrl(transfer?.url)
 
   useEffect(() => {
-    if (continueUrl) continueRef.current?.focus()
+    if (continueUrl) {
+      continueRef.current?.focus()
+    }
   }, [continueUrl])
 
   return (

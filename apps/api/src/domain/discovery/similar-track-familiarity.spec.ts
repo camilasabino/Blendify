@@ -1,5 +1,5 @@
 import { PopularityMode } from '@blendify/contracts';
-import { catalogCandidateBudget } from '../genre/catalog-window';
+import { catalogCandidateBudget } from '@/domain/genre/catalog-window';
 import { selectSimilarTrackCandidates } from './similar-track-familiarity';
 
 type Candidate = { name: string; playcount?: number };
@@ -96,7 +96,9 @@ describe('selectSimilarTrackCandidates', () => {
         seededRandom(seed),
       );
       expect(picked).toHaveLength(budget);
-      for (const candidate of picked) seen.add(candidate.name);
+      for (const candidate of picked) {
+        seen.add(candidate.name);
+      }
     }
     expect([...seen].some((name) => upper.has(name))).toBe(true);
     expect([...seen].some((name) => lower.has(name))).toBe(true);
