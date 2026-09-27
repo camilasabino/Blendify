@@ -403,7 +403,6 @@ const destinationFields = [
   'spotifyUrl',
   'status',
   'createdAt',
-  'missingOnSpotify',
   'persistToLibrary',
 ];
 

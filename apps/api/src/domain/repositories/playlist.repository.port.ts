@@ -16,7 +16,6 @@ type PlaylistLibraryResultPage = {
 export type PlaylistLibraryFilter = {
   q?: string;
   playlistIds?: string[];
-  missingOnSpotify?: boolean;
 };
 
 export interface PlaylistRepositoryPort {
@@ -35,11 +34,6 @@ export interface PlaylistRepositoryPort {
   ): Promise<PlaylistLibraryResultPage>;
 
   deleteFailedByUserId(userId: string): Promise<number>;
-
-  countLibraryPresence(
-    userId: string,
-    q?: string,
-  ): Promise<{ total: number; active: number; deleted: number }>;
 
   delete(id: string): Promise<void>;
 

@@ -40,7 +40,6 @@ export function toPlaylistSummary(playlist: Playlist): PlaylistSummary {
     spotifyUrl: playlist.spotifyUrl ?? null,
     spotifyId: playlist.spotifyId,
     status: playlist.status,
-    missingOnSpotify: playlist.missingOnSpotify,
     imageUrl: playlist.imageUrl ?? null,
     createdAt: playlist.createdAt.toISOString(),
     updatedAt: playlist.updatedAt.toISOString(),

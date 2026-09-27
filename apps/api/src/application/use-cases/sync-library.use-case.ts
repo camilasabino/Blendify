@@ -71,7 +71,6 @@ export class SyncLibraryUseCase {
     libraryIds: Set<string> | null,
     confirmedMissingIds: string[],
   ): Promise<void> {
-    if (playlist.missingOnSpotify) return;
     if (!playlist.spotifyId || playlist.status !== PlaylistStatus.COMPLETED) {
       return;
     }

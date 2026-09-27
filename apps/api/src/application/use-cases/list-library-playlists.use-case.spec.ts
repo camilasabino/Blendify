@@ -32,9 +32,6 @@ describe('ListLibraryPlaylistsUseCase', () => {
     const playlists = {
       deleteFailedByUserId: jest.fn().mockResolvedValue(undefined),
       listLibraryPage,
-      countLibraryPresence: jest
-        .fn()
-        .mockResolvedValue({ active: 1, deleted: 0 }),
     } as unknown as PlaylistRepositoryPort;
 
     const page = await new ListLibraryPlaylistsUseCase(playlists).execute(
@@ -50,7 +47,7 @@ describe('ListLibraryPlaylistsUseCase', () => {
     });
   });
 
-  it('returns library summaries with active/deleted counts', async () => {
+  it('returns library summaries', async () => {
     const playlist = makePlaylist();
     const playlists = {
       deleteFailedByUserId: jest.fn().mockResolvedValue(undefined),
@@ -58,9 +55,6 @@ describe('ListLibraryPlaylistsUseCase', () => {
         items: [playlist],
         total: 1,
       }),
-      countLibraryPresence: jest
-        .fn()
-        .mockResolvedValue({ active: 1, deleted: 0 }),
     } as unknown as PlaylistRepositoryPort;
 
     const page = await new ListLibraryPlaylistsUseCase(playlists).execute(
@@ -69,8 +63,7 @@ describe('ListLibraryPlaylistsUseCase', () => {
 
     expect(page.playlists).toHaveLength(1);
     expect(page.playlists[0]?.name).toBe('Evening mix');
-    expect(page.activeCount).toBe(1);
-    expect(page.deletedCount).toBe(0);
+    expect(page.total).toBe(1);
   });
 
   it('ignores purge failures and still lists the library', async () => {
@@ -82,9 +75,6 @@ describe('ListLibraryPlaylistsUseCase', () => {
     const playlists = {
       deleteFailedByUserId: jest.fn().mockRejectedValue(new Error('db')),
       listLibraryPage,
-      countLibraryPresence: jest
-        .fn()
-        .mockResolvedValue({ active: 1, deleted: 0 }),
     } as unknown as PlaylistRepositoryPort;
 
     const page = await new ListLibraryPlaylistsUseCase(playlists).execute(
@@ -108,9 +98,6 @@ describe('ListLibraryPlaylistsUseCase', () => {
     const playlists = {
       deleteFailedByUserId: jest.fn().mockResolvedValue(undefined),
       listLibraryPage,
-      countLibraryPresence: jest
-        .fn()
-        .mockResolvedValue({ active: 0, deleted: 0 }),
     } as unknown as PlaylistRepositoryPort;
 
     await new ListLibraryPlaylistsUseCase(playlists).execute('user-1', {

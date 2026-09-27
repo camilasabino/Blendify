@@ -128,7 +128,6 @@ describe('playlist contracts', () => {
       spotifyUrl: 'https://open.spotify.com/playlist/playlist-1',
       spotifyId: 'spotify-playlist-1',
       status: 'COMPLETED',
-      missingOnSpotify: false,
       imageUrl: null,
       createdAt: '2026-07-31T12:00:00.000Z',
       updatedAt: '2026-07-31T12:00:00.000Z',

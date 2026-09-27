@@ -265,9 +265,7 @@ describe('SyncLibraryUseCase', () => {
     expect(result.removedCount).toBe(0);
   });
 
-  it('skips already-missing and not-yet-completed playlists', async () => {
-    const missing = makePlaylist('playlist-1', 'sp1', 'Already missing');
-    missing.markMissingOnSpotify();
+  it('skips not-yet-completed playlists', async () => {
     const pending = Playlist.create({
       id: 'playlist-2',
       userId: 'user-1',
@@ -283,7 +281,7 @@ describe('SyncLibraryUseCase', () => {
         seeds: [{ id: 'artist-2', name: 'Pending' }],
       },
     });
-    const { repository, deleteMany } = makeRepository([missing, pending]);
+    const { repository, deleteMany } = makeRepository([pending]);
     const getPlaylistSnapshot = jest.fn();
     const provider = {
       listLibraryPlaylistIds: jest.fn().mockResolvedValue(new Set(['sp1'])),
@@ -297,7 +295,7 @@ describe('SyncLibraryUseCase', () => {
 
     expect(getPlaylistSnapshot).not.toHaveBeenCalled();
     expect(deleteMany).not.toHaveBeenCalled();
-    expect(result.checkedCount).toBe(2);
+    expect(result.checkedCount).toBe(1);
     expect(result.removedCount).toBe(0);
   });
 });

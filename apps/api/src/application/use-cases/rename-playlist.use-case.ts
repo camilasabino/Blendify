@@ -34,7 +34,7 @@ export class RenamePlaylistUseCase {
 
     playlist.rename(name);
 
-    if (playlist.spotifyId && !playlist.missingOnSpotify) {
+    if (playlist.spotifyId) {
       try {
         const provider = this.providers.forUser(userId);
         await provider.updatePlaylistDetails(playlist.spotifyId, { name });

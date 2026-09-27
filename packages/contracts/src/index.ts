@@ -283,7 +283,6 @@ export const PlaylistSummarySchema = z.object({
   spotifyUrl: z.string().nullable(),
   spotifyId: z.string().optional(),
   status: PlaylistStatusSchema,
-  missingOnSpotify: z.boolean(),
   imageUrl: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -331,8 +330,6 @@ export const PlaylistLibraryPageSchema = z.object({
   total: z.number().int().nonnegative(),
   limit: z.number().int().positive(),
   offset: z.number().int().nonnegative(),
-  activeCount: z.number().int().nonnegative(),
-  deletedCount: z.number().int().nonnegative(),
 });
 
 export const BulkLibraryResultSchema = z.object({

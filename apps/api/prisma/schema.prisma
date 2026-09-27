@@ -76,7 +76,6 @@ model Playlist {
   seeds            Json
   tracks           Json
   generation       Json
-  missingOnSpotify Boolean        @default(false)
   syncedTrackCount Int?
   imageUrl         String?
   createdAt        DateTime       @default(now())

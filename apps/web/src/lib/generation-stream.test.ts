@@ -22,7 +22,6 @@ const playlist = {
   totalDurationMs: 1000,
   spotifyUrl: null,
   status: 'COMPLETED',
-  missingOnSpotify: false,
   imageUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',

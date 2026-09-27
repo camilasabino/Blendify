@@ -34,15 +34,12 @@ export class ListLibraryPlaylistsUseCase {
       offset,
       q,
     });
-    const presence = await this.playlists.countLibraryPresence(userId, q);
 
     return {
       playlists: page.items.map(toPlaylistSummary),
       total: page.total,
       limit,
       offset,
-      activeCount: presence.active,
-      deletedCount: presence.deleted,
     };
   }
 

@@ -33,8 +33,7 @@ export class BulkLibraryUseCase {
       return { action, affected, failed };
     }
 
-    const active = scoped.filter((playlist) => !playlist.missingOnSpotify);
-    const { affected, failed } = await this.purgeActive(userId, active);
+    const { affected, failed } = await this.purgeActive(userId, scoped);
     return { action, affected, failed };
   }
 

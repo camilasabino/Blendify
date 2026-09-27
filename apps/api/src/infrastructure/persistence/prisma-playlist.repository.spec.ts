@@ -33,7 +33,6 @@ function row(tracks: unknown[]): PlaylistModel {
     seeds: [{ type: 'artist', id: 'kid-id', name: 'The Kid LAROI' }],
     tracks: tracks as PlaylistModel['tracks'],
     generation,
-    missingOnSpotify: false,
     syncedTrackCount: null,
     imageUrl: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),

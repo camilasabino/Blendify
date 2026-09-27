@@ -23,7 +23,6 @@ export interface PlaylistProps {
   totalDurationMs: number;
   createdAt: Date;
   updatedAt: Date;
-  missingOnSpotify?: boolean;
   syncedTrackCount?: number;
   imageUrl?: string;
 }
@@ -47,7 +46,6 @@ export class Playlist {
   private _status: PlaylistStatus;
   private _totalDurationMs: number;
   private _updatedAt: Date;
-  private _missingOnSpotify: boolean;
   private _syncedTrackCount?: number;
   private _imageUrl?: string;
 
@@ -71,7 +69,6 @@ export class Playlist {
     this._totalDurationMs = props.totalDurationMs;
     this.createdAt = props.createdAt;
     this._updatedAt = props.updatedAt;
-    this._missingOnSpotify = props.missingOnSpotify ?? false;
     this._syncedTrackCount = props.syncedTrackCount;
     this._imageUrl = props.imageUrl;
   }
@@ -146,10 +143,6 @@ export class Playlist {
     return this._updatedAt;
   }
 
-  get missingOnSpotify(): boolean {
-    return this._missingOnSpotify;
-  }
-
   get trackCount(): number {
     return this._syncedTrackCount ?? this._tracks.length;
   }
@@ -175,7 +168,6 @@ export class Playlist {
   linkToSpotify(spotifyId: string, spotifyUrl: string): void {
     this._spotifyId = spotifyId;
     this._spotifyUrl = spotifyUrl;
-    this._missingOnSpotify = false;
     this.touch();
   }
 
@@ -212,12 +204,6 @@ export class Playlist {
     }
 
     if (snapshot.imageUrl) this._imageUrl = snapshot.imageUrl;
-    this._missingOnSpotify = false;
-    this.touch();
-  }
-
-  markMissingOnSpotify(): void {
-    this._missingOnSpotify = true;
     this.touch();
   }
 

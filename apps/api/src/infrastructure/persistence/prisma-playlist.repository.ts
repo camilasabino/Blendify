@@ -76,7 +76,6 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
         })),
       ),
       generation: toJson(playlist.generation),
-      missingOnSpotify: playlist.missingOnSpotify,
       syncedTrackCount: playlist.syncedTrackCount ?? null,
       imageUrl: playlist.imageUrl ?? null,
     };
@@ -129,20 +128,6 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
     return result.count;
   }
 
-  async countLibraryPresence(
-    userId: string,
-    q?: string,
-  ): Promise<{ total: number; active: number; deleted: number }> {
-    const base = this.libraryWhere(userId, { q });
-    const [total, deleted] = await this.prisma.$transaction([
-      this.prisma.playlist.count({ where: base }),
-      this.prisma.playlist.count({
-        where: { ...base, missingOnSpotify: true },
-      }),
-    ]);
-    return { total, deleted, active: total - deleted };
-  }
-
   async delete(id: string): Promise<void> {
     await this.prisma.playlist.delete({ where: { id } });
   }
@@ -162,9 +147,6 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
     return {
       userId,
       status: { not: PrismaStatus.FAILED },
-      ...(filter.missingOnSpotify === undefined
-        ? {}
-        : { missingOnSpotify: filter.missingOnSpotify }),
       ...(filter.playlistIds?.length ? { id: { in: filter.playlistIds } } : {}),
       ...(q ? { name: { contains: q, mode: 'insensitive' as const } } : {}),
     };
@@ -204,7 +186,6 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
       totalDurationMs: row.totalDurationMs,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      missingOnSpotify: row.missingOnSpotify,
       syncedTrackCount: row.syncedTrackCount ?? undefined,
       imageUrl: row.imageUrl ?? undefined,
     });

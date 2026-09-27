@@ -51,15 +51,8 @@ const badgeBase =
 
 function exceptionalStatus(
   status: PlaylistStatus,
-  deleted: boolean,
   t: ReturnType<typeof useT>,
 ): { label: string; className: string } | null {
-  if (deleted) {
-    return {
-      label: t('library.deleted'),
-      className: 'border-control text-cream-300',
-    }
-  }
   if (status === 'PENDING') {
     return {
       label: t('library.statusPending'),
@@ -85,18 +78,11 @@ function itemBorderClass(selecting: boolean, selected: boolean) {
 
 function LibraryItemCover({
   imageUrl,
-  deleted,
 }: Readonly<{
   imageUrl: string | null
-  deleted: boolean
 }>) {
   return (
-    <div
-      className={cn(
-        'flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-control bg-charcoal-700',
-        deleted && 'grayscale',
-      )}
-    >
+    <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-control bg-charcoal-700">
       {imageUrl ? (
         <img
           src={imageUrl}
@@ -149,7 +135,6 @@ function LibraryItemRenameField({
 function LibraryItemMeta({
   playlist,
   title,
-  deleted,
   renaming,
   selecting,
   nameDraft,
@@ -160,7 +145,6 @@ function LibraryItemMeta({
 }: Readonly<{
   playlist: PlaylistSummary
   title: string
-  deleted: boolean
   renaming: boolean
   selecting: boolean
   nameDraft: string
@@ -172,7 +156,7 @@ function LibraryItemMeta({
   const t = useT()
   const locale = useLocaleStore((state) => state.locale)
   const showRename = renaming && !selecting
-  const status = exceptionalStatus(playlist.status, deleted, t)
+  const status = exceptionalStatus(playlist.status, t)
   const details = [
     formatShortDate(playlist.createdAt, locale),
     formatSongCount(playlist.trackCount, t),
@@ -195,10 +179,7 @@ function LibraryItemMeta({
         />
       ) : (
         <h3
-          className={cn(
-            'truncate font-sans text-base font-semibold',
-            deleted ? 'text-cream-300' : 'text-cream-50',
-          )}
+          className="truncate font-sans text-base font-semibold text-cream-50"
           title={playlist.name}
         >
           {title}
@@ -227,7 +208,6 @@ function LibraryItemMenu({
   placement,
   onKeyDown,
   playlist,
-  deleted,
   copied,
   onCopyLink,
   onStartRename,
@@ -239,15 +219,14 @@ function LibraryItemMenu({
   placement: string | undefined
   onKeyDown: (event: KeyboardEvent) => void
   playlist: PlaylistSummary
-  deleted: boolean
   copied: boolean
   onCopyLink: () => void
   onStartRename: () => void
   onAskConfirm: (confirm: PendingLibraryConfirm) => void
 }>) {
   const t = useT()
-  const showSpotifyActions = Boolean(playlist.spotifyUrl) && !deleted
-  const showPurge = !deleted && Boolean(playlist.spotifyId)
+  const showSpotifyActions = Boolean(playlist.spotifyUrl)
+  const showPurge = Boolean(playlist.spotifyId)
 
   return (
     <ul
@@ -459,8 +438,7 @@ export function LibraryItem({
   const { open: menuOpen, setOpen: setMenuOpen } = menu
   const menuId = useId()
   const previewId = useId()
-  const deleted = playlist.missingOnSpotify
-  const canPreview = !deleted && Boolean(playlist.spotifyId)
+  const canPreview = Boolean(playlist.spotifyId)
 
   useEffect(() => setNameDraft(playlist.name), [playlist.name])
 
@@ -501,7 +479,7 @@ export function LibraryItem({
   }
 
   async function copyLink() {
-    if (!playlist.spotifyUrl || deleted) return
+    if (!playlist.spotifyUrl) return
     if (await copyToClipboard(playlist.spotifyUrl)) {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1_600)
@@ -509,14 +487,11 @@ export function LibraryItem({
   }
 
   const title = libraryDisplayTitle(playlist, t)
-  const cover = (
-    <LibraryItemCover imageUrl={playlist.imageUrl} deleted={deleted} />
-  )
+  const cover = <LibraryItemCover imageUrl={playlist.imageUrl} />
   const meta = (
     <LibraryItemMeta
       playlist={playlist}
       title={title}
-      deleted={deleted}
       renaming={renaming}
       selecting={selecting}
       nameDraft={nameDraft}
@@ -566,7 +541,7 @@ export function LibraryItem({
 
         {!selecting ? (
           <LibraryItemActions
-            spotifyUrl={deleted ? null : playlist.spotifyUrl}
+            spotifyUrl={playlist.spotifyUrl}
             canPreview={canPreview}
             previewOpen={previewOpen}
             previewId={previewId}
@@ -584,7 +559,6 @@ export function LibraryItem({
                 placement={menu.placement}
                 onKeyDown={menu.onPanelKeyDown}
                 playlist={playlist}
-                deleted={deleted}
                 copied={copied}
                 onCopyLink={() => void copyLink()}
                 onStartRename={() => {

@@ -47,7 +47,6 @@ describe('Playlist entity', () => {
     expect(playlist.kind).toBe('artist_mix');
     expect(playlist.totalDurationMs).toBe(90_000);
     expect(playlist.trackCount).toBe(1);
-    expect(playlist.missingOnSpotify).toBe(false);
   });
 
   it('rejects empty seeds and too many tracks', () => {
@@ -99,7 +98,6 @@ describe('Playlist entity', () => {
     playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
     expect(playlist.spotifyId).toBe('sp1');
     expect(playlist.spotifyUrl).toContain('sp1');
-    expect(playlist.missingOnSpotify).toBe(false);
 
     playlist.setImageUrl('  https://img  ');
     expect(playlist.imageUrl).toBe('https://img');
@@ -107,14 +105,12 @@ describe('Playlist entity', () => {
     expect(playlist.imageUrl).toBeUndefined();
   });
 
-  it('marks completed, failed, and missing on Spotify', () => {
+  it('marks completed and failed', () => {
     const playlist = makePlaylist();
     playlist.markCompleted();
     expect(playlist.status).toBe(PlaylistStatus.COMPLETED);
     playlist.markFailed();
     expect(playlist.status).toBe(PlaylistStatus.FAILED);
-    playlist.markMissingOnSpotify();
-    expect(playlist.missingOnSpotify).toBe(true);
   });
 
   it('syncs from Spotify including tracks and duration fallbacks', () => {
@@ -136,7 +132,6 @@ describe('Playlist entity', () => {
     expect(playlist.tracks).toHaveLength(2);
     expect(playlist.totalDurationMs).toBe(150_000);
     expect(playlist.imageUrl).toBe('https://cover');
-    expect(playlist.missingOnSpotify).toBe(false);
   });
 
   it('keeps local tracks when Spotify reports tracks but sends an empty payload', () => {

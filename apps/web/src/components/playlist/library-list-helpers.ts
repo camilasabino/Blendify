@@ -41,14 +41,8 @@ export type ConfirmCopy = {
 
 function deleteConfirmKey(
   purge: boolean,
-  missingOnSpotify: boolean,
-):
-  | 'library.purgeSpotifyConfirm'
-  | 'library.deleteConfirmDeleted'
-  | 'library.deleteConfirmActive' {
-  if (purge) return 'library.purgeSpotifyConfirm'
-  if (missingOnSpotify) return 'library.deleteConfirmDeleted'
-  return 'library.deleteConfirmActive'
+): 'library.purgeSpotifyConfirm' | 'library.deleteConfirmActive' {
+  return purge ? 'library.purgeSpotifyConfirm' : 'library.deleteConfirmActive'
 }
 
 export function buildConfirmCopy(
@@ -93,10 +87,7 @@ function buildSingleConfirmCopy(
   const purge = pending.kind === 'purge'
   return {
     title: t(purge ? 'library.purgeTitle' : 'library.deleteTitle'),
-    description: t(
-      deleteConfirmKey(purge, pending.playlist.missingOnSpotify),
-      { name: pending.playlist.name },
-    ),
+    description: t(deleteConfirmKey(purge), { name: pending.playlist.name }),
     danger: true,
   }
 }
@@ -115,8 +106,8 @@ export function visibleSelectionState(
   const selectedPlaylists = playlists.filter((playlist) =>
     selectedIds.has(playlist.id),
   )
-  const selectedActive = selectedPlaylists.filter(
-    (playlist) => !playlist.missingOnSpotify,
+  const selectedActive = selectedPlaylists.filter((playlist) =>
+    Boolean(playlist.spotifyId),
   )
   const allVisibleSelected =
     playlists.length > 0 &&

@@ -180,32 +180,6 @@ describe('thin application use cases', () => {
     expect(save).toHaveBeenCalled();
   });
 
-  it('RenamePlaylistUseCase skips the Spotify sync for a playlist marked missing on Spotify', async () => {
-    const playlist = makePlaylist();
-    playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
-    playlist.markMissingOnSpotify();
-    const save = jest
-      .fn()
-      .mockImplementation((p: Playlist) => Promise.resolve(p));
-    const playlists = {
-      findById: jest.fn().mockResolvedValue(playlist),
-      save,
-    } as unknown as PlaylistRepositoryPort;
-    const updatePlaylistDetails = jest.fn();
-    const providers = {
-      forUser: () => ({ updatePlaylistDetails }),
-    } as unknown as MusicProviderFactoryPort;
-
-    const detail = await new RenamePlaylistUseCase(
-      playlists,
-      providers,
-    ).execute('user-1', 'playlist-1', 'Renamed');
-
-    expect(detail.name).toBe('Renamed');
-    expect(updatePlaylistDetails).not.toHaveBeenCalled();
-    expect(save).toHaveBeenCalled();
-  });
-
   it('RenamePlaylistUseCase saves locally even when the Spotify sync fails', async () => {
     const playlist = makePlaylist();
     playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
@@ -251,14 +225,14 @@ describe('thin application use cases', () => {
     expect(del).toHaveBeenCalledWith('playlist-1');
   });
 
-  it('RemovePlaylistFromLibraryUseCase purges Spotify then marks missing', async () => {
+  it('RemovePlaylistFromLibraryUseCase purges Spotify then deletes locally', async () => {
     const playlist = makePlaylist();
     playlist.linkToSpotify('sp1', 'https://open.spotify.com/playlist/sp1');
     const save = jest
       .fn()
       .mockImplementation((p: Playlist) => Promise.resolve(p));
     const deletePlaylist = jest.fn().mockResolvedValue(undefined);
-    const del = jest.fn();
+    const del = jest.fn().mockResolvedValue(undefined);
     const playlists = {
       findById: jest.fn().mockResolvedValue(playlist),
       save,
@@ -275,9 +249,8 @@ describe('thin application use cases', () => {
     );
 
     expect(deletePlaylist).toHaveBeenCalledWith('sp1');
-    expect(playlist.missingOnSpotify).toBe(true);
-    expect(save).toHaveBeenCalled();
-    expect(del).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalledWith('playlist-1');
   });
 
   it('RemovePlaylistFromLibraryUseCase surfaces Spotify purge failures', async () => {

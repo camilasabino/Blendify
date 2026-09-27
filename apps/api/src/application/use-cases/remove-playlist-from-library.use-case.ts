@@ -30,11 +30,7 @@ export class RemovePlaylistFromLibraryUseCase {
       throw BusinessRuleError.playlistNotFound(playlistId);
     }
 
-    if (
-      options.fromSpotify &&
-      playlist.spotifyId &&
-      !playlist.missingOnSpotify
-    ) {
+    if (options.fromSpotify && playlist.spotifyId) {
       const provider = this.providers.forUser(userId);
       try {
         await provider.deletePlaylist(playlist.spotifyId);
@@ -46,9 +42,6 @@ export class RemovePlaylistFromLibraryUseCase {
         );
         throw error;
       }
-      playlist.markMissingOnSpotify();
-      await this.playlists.save(playlist);
-      return;
     }
 
     await this.playlists.delete(playlistId);

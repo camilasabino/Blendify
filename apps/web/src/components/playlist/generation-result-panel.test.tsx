@@ -46,7 +46,6 @@ const readyPlaylist: PlaylistDetail = {
   totalDurationMs: 40 * 60_000,
   spotifyUrl: 'https://open.spotify.com/playlist/playlist-1',
   status: 'COMPLETED',
-  missingOnSpotify: false,
   imageUrl: null,
   createdAt: '2026-09-23T12:00:00Z',
   updatedAt: '2026-09-23T12:00:00Z',

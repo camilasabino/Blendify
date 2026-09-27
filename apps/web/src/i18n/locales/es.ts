@@ -316,7 +316,7 @@ export const es: Record<MessageKey, string> = {
   'library.bulkRemoveSelected': 'Quitar {count} de Blendify',
   'library.bulkRemoveTitle': '¿Quitar de Blendify?',
   'library.bulkPurgeSelectedConfirm':
-    '¿Quitar de Spotify las {count} playlists seleccionadas? Seguirán en tu biblioteca de Blendify, marcadas como «No está en Spotify».',
+    '¿Quitar de Spotify las {count} playlists seleccionadas? También se quitarán de tu biblioteca de Blendify.',
   'library.bulkRemoveSelectedConfirm':
     '¿Quitar de Blendify las {count} playlists seleccionadas? Seguirán en Spotify.',
   'library.bulkPartial': 'Se completó para {affected}, pero {failed} no pudieron procesarse. Actualiza la página e inténtalo nuevamente si es necesario.',
@@ -331,14 +331,11 @@ export const es: Record<MessageKey, string> = {
   'library.purgeSpotify': 'Quitar de Spotify',
   'library.deleteConfirmActive':
     '¿Quitar «{name}» de Blendify? Permanecerá en Spotify.',
-  'library.deleteConfirmDeleted':
-    '¿Quitar «{name}» de Blendify? Ya no está en Spotify; solo se borrará el registro de Blendify.',
   'library.purgeSpotifyConfirm':
-    '¿Quitar «{name}» de Spotify? Seguirá en tu biblioteca de Blendify, marcada como «No está en Spotify».',
+    '¿Quitar «{name}» de Spotify? También se quitará de tu biblioteca de Blendify.',
   'library.purgeSpotifyError': 'No se pudo quitar la playlist de Spotify. Revisa tu conexión e inténtalo nuevamente.',
   'library.statusPending': 'Creando…',
   'library.statusFailed': 'No se pudo crear',
-  'library.deleted': 'No está en Spotify',
   'library.save': 'Guardar',
   'common.cancel': 'Cancelar',
   'common.loading': 'Cargando…',

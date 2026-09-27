@@ -303,7 +303,7 @@ export const en = {
   'library.bulkRemoveSelected': 'Remove {count} from Blendify',
   'library.bulkRemoveTitle': 'Remove from Blendify?',
   'library.bulkPurgeSelectedConfirm':
-    'Remove {count} selected playlists from Spotify? They stay in your Blendify Library, marked “Not on Spotify.”',
+    'Remove {count} selected playlists from Spotify? They will also be removed from your Blendify Library.',
   'library.bulkRemoveSelectedConfirm':
     'Remove {count} selected playlists from Blendify? They stay on Spotify.',
   'library.bulkPartial':
@@ -318,15 +318,12 @@ export const en = {
   'library.purgeSpotify': 'Remove from Spotify',
   'library.deleteConfirmActive':
     'Remove “{name}” from Blendify? It will remain on Spotify.',
-  'library.deleteConfirmDeleted':
-    'Remove “{name}” from Blendify? It’s already gone from Spotify; this only removes the Blendify record.',
   'library.purgeSpotifyConfirm':
-    'Remove “{name}” from Spotify? It stays in your Blendify Library, marked “Not on Spotify.”',
+    'Remove “{name}” from Spotify? It will also be removed from your Blendify Library.',
   'library.purgeSpotifyError':
     'Couldn’t remove the playlist from Spotify. Check your connection and try again.',
   'library.statusPending': 'Creating…',
   'library.statusFailed': 'Couldn’t create',
-  'library.deleted': 'Not on Spotify',
   'library.save': 'Save',
   'common.cancel': 'Cancel',
   'common.loading': 'Loading…',
