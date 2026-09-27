@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AiClarification } from '@/components/ai/ai-clarification'
 import { aiErrorMessage } from '@/components/ai/ai-copy'
+import { AiCurrentRequest } from '@/components/ai/ai-current-request'
 import { AiIntentSummary } from '@/components/ai/ai-intent-summary'
 import { AiPromptForm } from '@/components/ai/ai-prompt-form'
 import { ErrorState } from '@/components/ui/feedback'
@@ -15,11 +16,16 @@ export function AiPlaylistPage() {
   const t = useT()
   useDocumentTitle(t('nav.ai'))
   const [prompt, setPrompt] = useState('')
+  const [submittedPrompt, setSubmittedPrompt] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
   const { session, error, isPending, submit, choose, reset } = useAiSession()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const clarificationRef = useRef<HTMLHeadingElement>(null)
   const summaryRef = useRef<HTMLHeadingElement>(null)
+
+  const readyIntent = session?.status === 'ready' ? session.intent : null
+  const isCompact = readyIntent !== null && !isEditing
 
   useEffect(() => {
     if (!session) {
@@ -35,6 +41,12 @@ export function AiPlaylistPage() {
     }
   }, [error])
 
+  useEffect(() => {
+    if (isEditing) {
+      textareaRef.current?.focus()
+    }
+  }, [isEditing])
+
   function changePrompt(next: string) {
     setPrompt(next)
     setValidationError(null)
@@ -49,18 +61,21 @@ export function AiPlaylistPage() {
     }
 
     setValidationError(null)
+    setIsEditing(false)
+    setSubmittedPrompt(trimmed)
     submit(trimmed)
   }
 
   function editRequest() {
-    textareaRef.current?.focus()
+    setIsEditing(true)
   }
 
   function startOver() {
     reset()
     setPrompt('')
+    setSubmittedPrompt('')
     setValidationError(null)
-    textareaRef.current?.focus()
+    setIsEditing(true)
   }
 
   return (
@@ -68,19 +83,23 @@ export function AiPlaylistPage() {
       <PageHeader
         eyebrow={t('ai.eyebrow')}
         title={t('ai.title')}
-        description={t('ai.subtitle')}
+        description={isCompact ? undefined : t('ai.subtitle')}
       />
 
-      <FormSection accent="amber" title={t('ai.requestTitle')}>
-        <AiPromptForm
-          prompt={prompt}
-          onPromptChange={changePrompt}
-          onSubmit={submitPrompt}
-          isPending={isPending}
-          validationError={validationError}
-          textareaRef={textareaRef}
-        />
-      </FormSection>
+      {isCompact ? (
+        <AiCurrentRequest prompt={submittedPrompt} onEdit={editRequest} />
+      ) : (
+        <FormSection accent="amber" title={t('ai.requestTitle')}>
+          <AiPromptForm
+            prompt={prompt}
+            onPromptChange={changePrompt}
+            onSubmit={submitPrompt}
+            isPending={isPending}
+            validationError={validationError}
+            textareaRef={textareaRef}
+          />
+        </FormSection>
+      )}
 
       <p role="status" className="sr-only">
         {isPending ? t('ai.interpreting') : ''}
@@ -101,11 +120,10 @@ export function AiPlaylistPage() {
         />
       ) : null}
 
-      {session?.status === 'ready' && session.intent ? (
+      {readyIntent && !isEditing ? (
         <AiIntentSummary
-          intent={session.intent}
+          intent={readyIntent}
           headingRef={summaryRef}
-          onEdit={editRequest}
           onStartOver={startOver}
         />
       ) : null}

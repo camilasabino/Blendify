@@ -51,8 +51,10 @@ apps/ai/evals/results/
 .cache/
 .blendify/
 
-# Internal development docs (specs, progress, follow-ups) stay local
+# Internal development docs stay local
 docs/specs/
 docs/followups/
+docs/superpowers/
 .claude/handoffs/
 .claude/settings.local.json
+.superpowers/

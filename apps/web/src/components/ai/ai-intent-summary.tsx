@@ -11,14 +11,12 @@ import {
 type AiIntentSummaryProps = Readonly<{
   intent: AiIntentSummaryDto
   headingRef: RefObject<HTMLHeadingElement | null>
-  onEdit: () => void
   onStartOver: () => void
 }>
 
 export function AiIntentSummary({
   intent,
   headingRef,
-  onEdit,
   onStartOver,
 }: AiIntentSummaryProps) {
   const t = useT()
@@ -93,14 +91,9 @@ export function AiIntentSummary({
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Button variant="secondary" onClick={onEdit}>
-          {t('ai.editRequest')}
-        </Button>
-        <Button variant="ghost" onClick={onStartOver}>
-          {t('ai.startOver')}
-        </Button>
-      </div>
+      <Button variant="ghost" onClick={onStartOver}>
+        {t('ai.startOver')}
+      </Button>
     </section>
   )
 }

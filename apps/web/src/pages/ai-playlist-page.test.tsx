@@ -54,6 +54,10 @@ function promptField() {
   return screen.getByRole('textbox', { name: 'Playlist request' })
 }
 
+function queryPromptField() {
+  return screen.queryByRole('textbox', { name: 'Playlist request' })
+}
+
 function expectNoGenerationAction() {
   expect(screen.queryByRole('button', { name: /create playlist/i })).toBeNull()
 }
@@ -140,9 +144,24 @@ describe('Create with AI page', () => {
     expect(within(summary).getByText('Coldplay')).toBeVisible()
     expect(within(summary).getByText('Not used')).toBeVisible()
     expect(within(summary).getByText(/rainy afternoon/)).toBeVisible()
-    expect(within(summary).getByRole('button', { name: 'Edit request' })).toBeEnabled()
+    expect(within(summary).queryByRole('button', { name: 'Edit request' })).toBeNull()
     expect(within(summary).getByRole('button', { name: 'Start over' })).toBeEnabled()
     expectNoGenerationAction()
+
+    expect(queryPromptField()).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Music similar to Björk' })).toBeNull()
+    expect(
+      screen.queryByText(
+        'Name artists, a song or genres, and add details like size, familiarity or songs to avoid. Blendify shows what it understood before building anything.',
+      ),
+    ).toBeNull()
+
+    const requestCard = screen
+      .getByRole('heading', { name: 'Your request' })
+      .closest('section') as HTMLElement
+    expect(within(requestCard).getByText(`“${PROMPT}”`)).toBeVisible()
+    const editButton = within(requestCard).getByRole('button', { name: 'Edit request' })
+    expect(editButton).toBeEnabled()
   })
 
   it('submits with Ctrl+Enter but keeps Enter for new lines', async () => {
@@ -191,6 +210,30 @@ describe('Create with AI page', () => {
     })
   })
 
+  it('shows the submitted request, not an unsent draft, after a clarification resolves', async () => {
+    const user = userEvent.setup()
+    const submitted = 'Music like Radiohead and Interpol'
+    stubApi({
+      'POST /api/ai/sessions': () => jsonResponse(CLARIFICATION_SESSION, 201),
+      'POST /api/ai/sessions/session-token/clarification': () => jsonResponse(READY_SESSION),
+    })
+    renderPage()
+
+    await user.type(promptField(), submitted)
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+    await screen.findByRole('heading', { name: 'One thing to confirm' })
+
+    await user.type(promptField(), ', drop the mellow tracks')
+    await user.click(screen.getByRole('button', { name: 'Start from Interpol' }))
+
+    await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
+    const requestCard = screen
+      .getByRole('heading', { name: 'Your request' })
+      .closest('section') as HTMLElement
+    expect(within(requestCard).getByText(`“${submitted}”`)).toBeVisible()
+    expect(within(requestCard).queryByText(/drop the mellow tracks/)).toBeNull()
+  })
+
   it('announces a recoverable AI error and keeps the prompt for another try', async () => {
     const user = userEvent.setup()
     stubApi({
@@ -224,15 +267,20 @@ describe('Create with AI page', () => {
 
     await user.type(promptField(), PROMPT)
     await user.click(screen.getByRole('button', { name: 'Review request' }))
-    await user.click(await screen.findByRole('button', { name: 'Edit request' }))
+    await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
+
+    await user.click(screen.getByRole('button', { name: 'Edit request' }))
 
     expect(promptField()).toHaveFocus()
     expect(promptField()).toHaveValue(PROMPT)
+    expect(screen.getByRole('button', { name: 'Music similar to Björk' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'Here’s what Blendify understood' })).toBeNull()
 
     await user.type(promptField(), ', around 40 songs')
     await user.click(screen.getByRole('button', { name: 'Review request' }))
 
     await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
+    expect(queryPromptField()).toBeNull()
     expect(sessionCalls(calls).map((call) => call.body)).toEqual([
       { prompt: PROMPT },
       { prompt: `${PROMPT}, around 40 songs` },
@@ -246,11 +294,37 @@ describe('Create with AI page', () => {
 
     await user.type(promptField(), PROMPT)
     await user.click(screen.getByRole('button', { name: 'Review request' }))
-    await user.click(await screen.findByRole('button', { name: 'Start over' }))
+    await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
+
+    await user.click(screen.getByRole('button', { name: 'Start over' }))
 
     expect(promptField()).toHaveValue('')
     expect(promptField()).toHaveFocus()
     expect(screen.queryByRole('heading', { name: 'Here’s what Blendify understood' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit request' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Music similar to Björk' })).toBeVisible()
+  })
+
+  it('wraps a long request in the compact card without truncating it', async () => {
+    const user = userEvent.setup()
+    const longPrompt =
+      'A very long playlist request that names many artists in a row: Radiohead, Interpol, ' +
+      'Boards of Canada, Grizzly Bear, Beach House, Fleet Foxes, Bon Iver, and The National, ' +
+      'around fifty songs, favoring rarities over hits, and please avoid anything by Coldplay.'
+    stubApi({
+      'POST /api/ai/sessions': () =>
+        jsonResponse({ ...READY_SESSION, intent: { ...READY_SESSION.intent!, artists: [] } }, 201),
+    })
+    renderPage()
+
+    await user.type(promptField(), longPrompt)
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+    await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
+    const requestCard = screen
+      .getByRole('heading', { name: 'Your request' })
+      .closest('section') as HTMLElement
+    expect(within(requestCard).getByText(`“${longPrompt}”`)).toBeVisible()
   })
 
   it.each([
@@ -267,5 +341,22 @@ describe('Create with AI page', () => {
     expect(screen.getByRole('heading', { level: 1, name: title })).toBeVisible()
     expect(screen.getByRole('button', { name: submit })).toBeVisible()
     expect(screen.getByRole('textbox', { name: label })).toBeVisible()
+  })
+
+  it('keeps the compact request card usable in a translated locale', async () => {
+    const user = userEvent.setup()
+    stubApi({ 'POST /api/ai/sessions': () => jsonResponse(READY_SESSION, 201) })
+    renderPage()
+
+    act(() => {
+      useLocaleStore.getState().setLocale('es')
+    })
+
+    await user.type(screen.getByRole('textbox'), PROMPT)
+    await user.click(screen.getByRole('button', { name: 'Revisar pedido' }))
+
+    const requestCard = (await screen.findByText('Tu pedido')).closest('section') as HTMLElement
+    expect(within(requestCard).getByText(`“${PROMPT}”`)).toBeVisible()
+    expect(within(requestCard).getByRole('button', { name: 'Editar pedido' })).toBeVisible()
   })
 })
