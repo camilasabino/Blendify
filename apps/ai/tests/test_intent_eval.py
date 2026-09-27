@@ -1,3 +1,4 @@
+import hashlib
 import re
 from typing import Any
 
@@ -22,9 +23,13 @@ from tests.fakes import interpreted_output
 
 HISTORICAL_V1_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v1.json"
 HISTORICAL_V1_CASE_COUNT = 27
+HISTORICAL_V2_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v2.json"
+HISTORICAL_V2_DATASET_SHA256 = "e48d430825cf60d4cf1142f5c9e32206b2415269ce9df5189b2682e411201d68"
 DATASET_VERSION, CASES = load_dataset()
 ALL_DATASET_CASES = [
-    case for path in (HISTORICAL_V1_DATASET_PATH, DATASET_PATH) for case in load_dataset(path)[1]
+    case
+    for path in (HISTORICAL_V1_DATASET_PATH, HISTORICAL_V2_DATASET_PATH, DATASET_PATH)
+    for case in load_dataset(path)[1]
 ]
 KINDS = set(PlaylistKind.__args__)
 MOODS = set(Mood.__args__)
@@ -36,7 +41,7 @@ PROVIDER_CONTENT_PATTERN = re.compile(r"spotify:|open\.spotify|https?://|\b[0-9A
 def test_dataset_is_versioned_with_unique_case_ids() -> None:
     ids = [case.id for case in CASES]
 
-    assert DATASET_VERSION == "intent-eval-v2"
+    assert DATASET_VERSION == "intent-eval-v3"
     assert len(ids) == len(set(ids))
 
 
@@ -46,6 +51,16 @@ def test_historical_v1_dataset_is_preserved_for_baseline_comparison() -> None:
     assert version == "intent-eval-v1"
     assert len(cases) == HISTORICAL_V1_CASE_COUNT
     assert DATASET_PATH != HISTORICAL_V1_DATASET_PATH
+
+
+def test_historical_v2_dataset_is_preserved_for_baseline_comparison() -> None:
+    digest = hashlib.sha256(HISTORICAL_V2_DATASET_PATH.read_bytes()).hexdigest()
+    version, cases = load_dataset(HISTORICAL_V2_DATASET_PATH)
+
+    assert digest == HISTORICAL_V2_DATASET_SHA256
+    assert version == "intent-eval-v2"
+    assert DATASET_PATH != HISTORICAL_V2_DATASET_PATH
+    assert len(CASES) == len(cases)
 
 
 def test_dataset_covers_every_mood_in_each_supported_language() -> None:
@@ -71,6 +86,50 @@ def test_dataset_keeps_activity_out_of_the_mood_vocabulary() -> None:
     assert party.expect["outcome"] == "interpreted"
     assert party.expect["mood"] == "happy"
     assert party.expect["unsupportedCategoriesWithin"] == ["activity"]
+
+    running = next(case for case in CASES if case.id == "en-mood-activity-running")
+
+    assert running.expect["mood"] == "energetic"
+    assert running.expect["unsupportedCategoriesWithin"] == ["activity"]
+
+    long_run = next(case for case in CASES if case.id == "en-activity-only")
+
+    assert long_run.prompt == "Music for a long run"
+    assert long_run.expect["unsupportedCategories"] == ["activity"]
+
+
+def test_dataset_never_force_fits_a_musical_characteristic_into_a_mood() -> None:
+    groovy = next(case for case in CASES if case.id == "en-characteristic-is-not-a-mood")
+
+    assert groovy.prompt == "Groovy funk music"
+    assert groovy.expect["genres"] == ["funk"]
+    assert groovy.expect["mood"] is None
+    assert groovy.expect["unsupportedCategories"] == ["other"]
+
+
+def test_dataset_never_reports_a_supported_duration_as_unsupported() -> None:
+    duration_only = next(case for case in CASES if case.id == "en-duration-without-basis")
+
+    assert duration_only.prompt == "Music for about 45 minutes"
+    assert duration_only.expect["clarificationReason"] == "ambiguous_request"
+    assert duration_only.expect["unsupportedCategories"] == []
+
+
+def test_dataset_never_duplicates_a_canonicalized_mood_as_unsupported() -> None:
+    sentimental = next(case for case in CASES if case.id == "es-mood-sentimental-nostalgic")
+
+    assert sentimental.expect["mood"] == "nostalgic"
+    assert sentimental.expect["unsupportedCategories"] == []
+
+
+def test_dataset_never_infers_an_era_from_a_nostalgic_mood() -> None:
+    nostalgic = next(case for case in CASES if case.id == "en-mood-nostalgic-only")
+    nostalgic_era = next(case for case in CASES if case.id == "en-mood-nostalgic-era")
+
+    assert nostalgic.expect["mood"] == "nostalgic"
+    assert nostalgic.expect["unsupportedCategories"] == []
+    assert nostalgic_era.expect["mood"] == "nostalgic"
+    assert nostalgic_era.expect["unsupportedCategories"] == ["era"]
 
 
 def test_dataset_covers_every_kind_language_and_outcome() -> None:

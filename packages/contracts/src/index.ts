@@ -433,7 +433,10 @@ export const AI_MOODS = [
   'energetic',
   'sad',
   'romantic',
+  'angry',
   'dark',
+  'nostalgic',
+  'dreamy',
 ] as const;
 export const AI_SESSION_STATUSES = ['ready', 'needs_clarification'] as const;
 export const AI_SEED_TYPES = ['artist', 'genre', 'track'] as const;

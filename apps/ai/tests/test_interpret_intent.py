@@ -112,7 +112,7 @@ def test_returns_a_mood_only_intent_with_a_target_duration_and_an_activity(
     "invalid_fields",
     [
         {"mood": "party"},
-        {"mood": "nostalgic"},
+        {"mood": "groovy"},
         {"targetDurationMinutes": -30},
         {"targetDurationMinutes": 90.5},
         {"targetDurationMinutes": "60"},

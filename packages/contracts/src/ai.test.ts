@@ -114,6 +114,20 @@ describe('AI session contracts', () => {
     ).toBe(false);
   });
 
+  it('keeps the closed canonical mood vocabulary', () => {
+    expect(AI_MOODS).toEqual([
+      'happy',
+      'calm',
+      'energetic',
+      'sad',
+      'romantic',
+      'angry',
+      'dark',
+      'nostalgic',
+      'dreamy',
+    ]);
+  });
+
   it.each(AI_MOODS)('accepts the %s mood in the summary', (mood) => {
     const result = AiSessionSchema.safeParse({
       ...READY_SESSION,
@@ -123,7 +137,7 @@ describe('AI session contracts', () => {
     expect(result.success).toBe(true);
   });
 
-  it.each(['nostalgic', 'party', 'workout'])(
+  it.each(['groovy', 'party', 'workout', 'chill'])(
     'rejects %s outside the closed mood vocabulary',
     (mood) => {
       const result = AiSessionSchema.safeParse({

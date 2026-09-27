@@ -330,6 +330,38 @@ describe('Create with AI sessions over HTTP', () => {
     expectNoProviderCalls(world);
   });
 
+  it.each(['angry', 'nostalgic', 'dreamy'] as const)(
+    'keeps the %s mood through the session and review without any provider',
+    async (mood) => {
+      world.interpreter.interpretIntent.mockResolvedValue(
+        interpreted({
+          kind: 'genre_mix',
+          artists: [],
+          targetTrackCount: null,
+          mood,
+          popularity: null,
+          excludeArtists: [],
+          unsupportedConstraints: [],
+        }),
+      );
+
+      const response = await createSession({
+        prompt: `Something ${mood}`,
+      }).expect(201);
+
+      expect(AiSessionSchema.parse(response.body)).toMatchObject({
+        status: 'ready',
+        clarification: null,
+        intent: { kind: 'genre_mix', genres: [], mood, unmetConstraints: [] },
+      });
+      expect([...world.stored.values()][0].aiSafe.intent).toMatchObject({
+        genres: [],
+        mood,
+      });
+      expectNoProviderCalls(world);
+    },
+  );
+
   it('reviews duration and a curated genre without any provider', async () => {
     world.interpreter.interpretIntent.mockResolvedValue(
       interpreted({

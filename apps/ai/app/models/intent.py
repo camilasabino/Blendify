@@ -13,7 +13,17 @@ AI_INTENT_USER_TEXT_MAX_LENGTH = 300
 PlaylistKind = Literal["artist_mix", "genre_mix", "discover_artist", "discover_track"]
 PopularityMode = Literal["popular", "balanced", "rarities"]
 TrackOrderMode = Literal["artist", "title", "random"]
-Mood = Literal["happy", "calm", "energetic", "sad", "romantic", "dark"]
+Mood = Literal[
+    "happy",
+    "calm",
+    "energetic",
+    "sad",
+    "romantic",
+    "angry",
+    "dark",
+    "nostalgic",
+    "dreamy",
+]
 UnsupportedConstraintCategory = Literal[
     "duration",
     "era",

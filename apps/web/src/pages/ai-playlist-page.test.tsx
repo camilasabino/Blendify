@@ -203,6 +203,42 @@ describe('Create with AI page', () => {
     expectNoGenerationAction()
   })
 
+  it.each([
+    ['angry', 'Angry'],
+    ['nostalgic', 'Nostalgic'],
+    ['dreamy', 'Dreamy'],
+  ] as const)('shows the %s mood with its localized label', async (mood, label) => {
+    const user = userEvent.setup()
+    stubApi({
+      'POST /api/ai/sessions': () =>
+        jsonResponse(
+          {
+            ...READY_SESSION,
+            intent: {
+              ...READY_SESSION.intent,
+              kind: 'genre_mix',
+              artists: [],
+              mood,
+              excludeArtists: [],
+              unmetConstraints: [],
+            },
+          },
+          201,
+        ),
+    })
+    renderPage()
+
+    await user.type(promptField(), `Something ${mood}`)
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+    const heading = await screen.findByRole('heading', {
+      name: 'Here’s what Blendify understood',
+    })
+    const summary = heading.closest('section') as HTMLElement
+    expect(within(summary).getByText(label)).toBeVisible()
+    expect(within(summary).queryByText(mood)).toBeNull()
+  })
+
   it('submits with Ctrl+Enter but keeps Enter for new lines', async () => {
     const user = userEvent.setup()
     const { calls } = stubApi({

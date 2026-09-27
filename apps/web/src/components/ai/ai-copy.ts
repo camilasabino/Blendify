@@ -30,7 +30,10 @@ export const MOOD_LABEL_KEYS: Record<AiMood, MessageKey> = {
   energetic: 'ai.mood.energetic',
   sad: 'ai.mood.sad',
   romantic: 'ai.mood.romantic',
+  angry: 'ai.mood.angry',
   dark: 'ai.mood.dark',
+  nostalgic: 'ai.mood.nostalgic',
+  dreamy: 'ai.mood.dreamy',
 }
 
 export const CATEGORY_LABEL_KEYS: Record<AiUnsupportedConstraintCategory, MessageKey> = {

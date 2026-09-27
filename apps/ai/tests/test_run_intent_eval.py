@@ -155,8 +155,8 @@ def test_preflight_states_the_run_bounds_without_secrets_or_prompts() -> None:
     assert plan.request_budget == len(cases) * MAX_OUTPUT_VALIDATION_ATTEMPTS
     assert f"max provider requests:    {plan.request_budget}" in preflight
     assert "gpt-5.6-luna" in preflight
-    assert "intent-eval-v2" in preflight
-    assert "intent-v2" in preflight
+    assert "intent-eval-v3" in preflight
+    assert "intent-v3" in preflight
     assert "explicitly enabled" in preflight
     assert API_KEY not in preflight
     assert all(case.prompt not in preflight for case in cases)

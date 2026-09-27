@@ -5,10 +5,29 @@ import moodGenreMap from './data/mood-genre-map.json';
 import { moodGenreIds } from './mood-genres';
 
 const CATALOG_IDS = new Set(CURATED_GENRES.map((genre) => genre.id));
+const ACTIVITIES = [
+  'focus',
+  'workout',
+  'running',
+  'party',
+  'studying',
+  'sleep',
+];
 
 describe('curated mood → genre mapping', () => {
   it('maps exactly the moods of the shared vocabulary', () => {
     expect(Object.keys(moodGenreMap).sort()).toEqual([...AI_MOODS].sort());
+  });
+
+  it('never maps an activity as a mood', () => {
+    const moods: readonly string[] = AI_MOODS;
+
+    expect(ACTIVITIES.filter((activity) => moods.includes(activity))).toEqual(
+      [],
+    );
+    expect(
+      ACTIVITIES.filter((activity) => Object.hasOwn(moodGenreMap, activity)),
+    ).toEqual([]);
   });
 
   it.each(AI_MOODS)('maps %s to a small set of distinct genres', (mood) => {

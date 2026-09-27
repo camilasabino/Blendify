@@ -12,7 +12,7 @@ from app.models.intent import (
     PlaylistIntent,
 )
 
-DATASET_PATH = Path(__file__).resolve().parent / "intent-eval-v2.json"
+DATASET_PATH = Path(__file__).resolve().parent / "intent-eval-v3.json"
 
 EvalLanguage = Literal["en", "es", "pt"]
 ExpectationStatus = Literal["passed", "failed", "unchecked"]

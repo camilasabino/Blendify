@@ -10,5 +10,20 @@
   ],
   "sad": ["slowcore", "sad-rap", "emo", "blues", "singer-songwriter"],
   "romantic": ["r-b", "quiet-storm", "neo-soul", "bolero", "soft-rock"],
-  "dark": ["gothic-rock", "post-punk", "dark-ambient", "doom-metal", "trip-hop"]
+  "angry": ["punk", "hardcore-punk", "thrash-metal", "nu-metal", "rap-metal"],
+  "dark": [
+    "gothic-rock",
+    "post-punk",
+    "dark-ambient",
+    "doom-metal",
+    "trip-hop"
+  ],
+  "nostalgic": [
+    "adult-standards",
+    "mellow-gold",
+    "classic-rock",
+    "new-wave",
+    "synthwave"
+  ],
+  "dreamy": ["dream-pop", "shoegaze", "ethereal-wave", "chillwave"]
 }

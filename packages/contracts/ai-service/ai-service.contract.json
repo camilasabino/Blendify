@@ -221,10 +221,13 @@
                       {
                         "type": "string",
                         "enum": [
+                          "angry",
                           "calm",
                           "dark",
+                          "dreamy",
                           "energetic",
                           "happy",
+                          "nostalgic",
                           "romantic",
                           "sad"
                         ]
