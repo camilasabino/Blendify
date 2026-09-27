@@ -8,8 +8,10 @@ LOG_DIR="$RUNTIME_DIR/logs"
 PID_DIR="$RUNTIME_DIR/pids"
 API_PID_FILE="$PID_DIR/api.pid"
 WEB_PID_FILE="$PID_DIR/web.pid"
+AI_PID_FILE="$PID_DIR/ai.pid"
 API_PORT="${API_PORT:-3000}"
 WEB_PORT="${WEB_PORT:-5173}"
+AI_PORT="${AI_PORT:-8000}"
 
 mkdir -p "$LOG_DIR" "$PID_DIR"
 
@@ -62,6 +64,10 @@ wait_for_http() {
   done
   echo "✗ Timed out waiting for $label ($url)"
   return 1
+}
+
+can_start_ai_service() {
+  command -v uv >/dev/null 2>&1 && [[ -f "$ROOT/apps/ai/.env" ]]
 }
 
 wait_for_postgres() {

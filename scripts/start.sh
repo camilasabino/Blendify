@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start Blendify infra + API + Web in the background.
+# Start Blendify infra + API + Web (+ optional AI service) in the background.
 # Usage:
 #   ./scripts/start.sh
 #   ./scripts/start.sh --no-migrate
@@ -44,14 +44,30 @@ echo "→ Web (logs: $LOG_DIR/web.log)"
 nohup npm run dev:web >"$LOG_DIR/web.log" 2>&1 &
 echo $! >"$WEB_PID_FILE"
 
+AI_STARTED=false
+if can_start_ai_service; then
+  echo "→ AI service (logs: $LOG_DIR/ai.log)"
+  nohup npm run dev:ai >"$LOG_DIR/ai.log" 2>&1 &
+  echo $! >"$AI_PID_FILE"
+  AI_STARTED=true
+else
+  echo "→ AI service skipped (optional: install uv and create apps/ai/.env)"
+fi
+
 wait_for_http "http://127.0.0.1:$API_PORT/api/health" "API" 60 || true
 wait_for_http "http://127.0.0.1:$WEB_PORT" "Web" 60 || true
+if [[ "$AI_STARTED" == true ]]; then
+  wait_for_http "http://127.0.0.1:$AI_PORT/health" "AI service" 60 || true
+fi
 
 echo
 echo "✓ Blendify is running"
 echo "  Web  → http://127.0.0.1:$WEB_PORT"
 echo "  API  → http://127.0.0.1:$API_PORT"
 echo "  Docs → http://127.0.0.1:$API_PORT/api/docs"
+if [[ "$AI_STARTED" == true ]]; then
+  echo "  AI   → http://127.0.0.1:$AI_PORT/health"
+fi
 echo "  Logs → $LOG_DIR/"
 echo
 echo "Stop with:  npm run stop   or   ./scripts/stop.sh"

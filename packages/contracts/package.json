@@ -4,11 +4,23 @@
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "ai-service": [
+        "dist/ai-service.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./ai-service": {
+      "types": "./dist/ai-service.d.ts",
+      "require": "./dist/ai-service.js",
+      "default": "./dist/ai-service.js"
     }
   },
   "files": [

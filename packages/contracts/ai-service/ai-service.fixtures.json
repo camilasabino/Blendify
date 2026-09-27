@@ -1,0 +1,323 @@
+{
+  "cases": [
+    {
+      "name": "request with a user-authored prompt",
+      "schema": "InterpretIntentRequest",
+      "valid": true,
+      "payload": {
+        "prompt": "Indie rock, around 30 tracks. Use Radiohead and Interpol. Avoid Coldplay."
+      }
+    },
+    {
+      "name": "request with a whitespace-only prompt",
+      "schema": "InterpretIntentRequest",
+      "valid": false,
+      "payload": { "prompt": "   " }
+    },
+    {
+      "name": "request without a prompt",
+      "schema": "InterpretIntentRequest",
+      "valid": false,
+      "payload": {}
+    },
+    {
+      "name": "request carrying Spotify track ids",
+      "schema": "InterpretIntentRequest",
+      "valid": false,
+      "payload": {
+        "prompt": "More like these",
+        "spotifyTrackIds": ["4uLU6hMCjMI75M1A2tKUQC"]
+      }
+    },
+    {
+      "name": "request carrying a resolved playlist",
+      "schema": "InterpretIntentRequest",
+      "valid": false,
+      "payload": {
+        "prompt": "Make it less mainstream",
+        "playlist": {
+          "tracks": [
+            {
+              "id": "4uLU6hMCjMI75M1A2tKUQC",
+              "name": "Teardrop",
+              "artistName": "Massive Attack",
+              "uri": "spotify:track:4uLU6hMCjMI75M1A2tKUQC"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "interpreted response with every intent field set",
+      "schema": "InterpretIntentResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "artist_mix",
+            "artists": ["Radiohead", "Interpol"],
+            "genres": ["indie rock"],
+            "seedTracks": [
+              { "title": "Teardrop", "artist": "Massive Attack" },
+              { "title": "Enjoy the Silence", "artist": null }
+            ],
+            "targetTrackCount": 30,
+            "popularity": "rarities",
+            "orderMode": "random",
+            "excludeArtists": ["Coldplay"],
+            "excludeTracks": [{ "title": "Creep", "artist": "Radiohead" }],
+            "unsupportedConstraints": [
+              {
+                "category": "energy",
+                "capability": "needs_clarification",
+                "userText": "more energetic over time"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "interpreted response with empty and null intent fields",
+      "schema": "InterpretIntentResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": ["classic rock"],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": []
+          }
+        }
+      }
+    },
+    {
+      "name": "clarification response",
+      "schema": "InterpretIntentResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "needs_clarification",
+          "clarification": {
+            "reason": "unsupported_constraint",
+            "unsupportedConstraints": [
+              {
+                "category": "artist_attribute",
+                "capability": "deferred",
+                "userText": "more women"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "intent carrying a provider id",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "artist_mix",
+            "artists": ["Radiohead"],
+            "artistIds": ["4Z8W4fKeB5YxbusRsdQVPb"],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": []
+          }
+        }
+      }
+    },
+    {
+      "name": "track reference carrying a Spotify URI",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "discover_track",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [
+              {
+                "title": "Teardrop",
+                "artist": "Massive Attack",
+                "uri": "spotify:track:67Hna13dNDkZvBpTXRIaOJ"
+              }
+            ],
+            "targetTrackCount": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": []
+          }
+        }
+      }
+    },
+    {
+      "name": "intent with a playlist kind Blendify cannot execute",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "hybrid",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": []
+          }
+        }
+      }
+    },
+    {
+      "name": "intent with an unknown popularity mode",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": ["jazz"],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "popularity": "obscure",
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": []
+          }
+        }
+      }
+    },
+    {
+      "name": "intent with a zero target track count",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": ["jazz"],
+            "seedTracks": [],
+            "targetTrackCount": 0,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": []
+          }
+        }
+      }
+    },
+    {
+      "name": "intent omitting a list instead of sending it empty",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": ["jazz"],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "unsupportedConstraints": []
+          }
+        }
+      }
+    },
+    {
+      "name": "unsupported constraint marked as supported",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "needs_clarification",
+          "clarification": {
+            "reason": "unsupported_constraint",
+            "unsupportedConstraints": [
+              {
+                "category": "mood",
+                "capability": "supported",
+                "userText": "sad songs"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "error envelope",
+      "schema": "AiServiceErrorResponse",
+      "valid": true,
+      "payload": {
+        "code": "MODEL_UNAVAILABLE",
+        "message": "Intent interpretation is not available."
+      }
+    },
+    {
+      "name": "error envelope with an unknown code",
+      "schema": "AiServiceErrorResponse",
+      "valid": false,
+      "payload": { "code": "SPOTIFY_ERROR", "message": "Unexpected." }
+    },
+    {
+      "name": "health response",
+      "schema": "AiServiceHealth",
+      "valid": true,
+      "payload": { "status": "ok", "intentInterpretation": "unavailable" }
+    },
+    {
+      "name": "health response exposing provider details",
+      "schema": "AiServiceHealth",
+      "valid": false,
+      "payload": {
+        "status": "ok",
+        "intentInterpretation": "available",
+        "modelApiKey": "sk-test"
+      }
+    }
+  ]
+}

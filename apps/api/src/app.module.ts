@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnvironment } from './config/production-environment';
 import { AccountModule } from './modules/account.module';
+import { AiModule } from './modules/ai.module';
 import { AuthModule } from './modules/auth.module';
 import { CatalogModule } from './modules/catalog.module';
 import { GenerationModule } from './modules/generation.module';
@@ -27,6 +28,7 @@ import { TransfersModule } from './modules/transfers.module';
     CatalogModule,
     GenerationModule,
     TransfersModule,
+    AiModule,
     PlaylistsModule,
     StatsModule,
     PlaybackModule,

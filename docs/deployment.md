@@ -723,7 +723,10 @@ With `NODE_ENV=production` the API refuses to start
 - `JWT_SECRET` is shorter than 32 characters or equals the example value;
 - `TRUST_PROXY` is `false`/`0` or invalid (`true` is always rejected);
 - `CLIENT_IP_SOURCE` is not `express` or `railway-x-forwarded-for`;
-- a removed variable is still set: `JWT_EXPIRES_IN`, `COOKIE_SECRET`, `API_URL`.
+- a removed variable is still set: `JWT_EXPIRES_IN`, `COOKIE_SECRET`, `API_URL`;
+- `AI_SERVICE_URL` is set but is not an `http(s)` URL without credentials, or
+  `AI_SERVICE_TOKEN` is shorter than 32 characters (both are optional; see
+  [AI service](#19-ai-service-not-deployed)).
 
 The session lifetime is fixed at 7 days in code: the JWT `exp` and the cookie
 `maxAge` share one constant (`SESSION_TTL_SECONDS`).
@@ -1110,4 +1113,29 @@ is down during an incident. It is not the normal workflow.
 
 Never paste connection strings, tokens or real user identifiers into issues,
 commits or chat logs.
+
+## 19. AI service (not deployed)
+
+`apps/ai` (FastAPI, Python managed by `uv`) interprets user-authored requests
+for Create with AI. It is **not** part of `.railway/railway.ts` yet: no model
+provider has been selected, and declaring the resource would make the next
+`railway config apply` create and deploy it. Intended shape when it is added:
+
+| Setting | Value |
+|---|---|
+| Service | `ai`, same Railway project, **no public domain** (reached only by `api` over the private network) |
+| Source | Repository root `apps/ai`; Railpack detects `pyproject.toml` + `uv.lock`; watch patterns `apps/ai/**` |
+| Start | `uvicorn --factory app.main:create_app --host :: --port $PORT` (`::` so the private network can reach it) |
+| Health check | `/health` — no auth, no model call; reports whether intent interpretation is available |
+| Variables | `AI_SERVICE_ENV=production`; `AI_SERVICE_TOKEN` as `preserve()`, sealed (≥ 32 random characters; the service refuses to start without it) |
+| `api` variables | `AI_SERVICE_URL=http://ai.railway.internal:<PORT>`, `AI_SERVICE_TOKEN` (same value, sealed) |
+
+Every route except `/health` requires `Authorization: Bearer <AI_SERVICE_TOKEN>`
+(constant-time comparison; with no token configured those routes reject every
+request). The browser never calls the AI service. Model-provider variables
+and secrets are added with the provider choice.
+
+Kill switch: unset `AI_SERVICE_URL` on `api`. The API then reports AI as
+unavailable without any network call; Mix, Discover, Library, publishing and
+transfer do not depend on the AI service.
 

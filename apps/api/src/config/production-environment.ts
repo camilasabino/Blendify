@@ -5,6 +5,7 @@ import {
 
 const EXAMPLE_JWT_SECRET = 'change-me-to-a-long-random-secret-in-production';
 const MIN_JWT_SECRET_LENGTH = 32;
+const MIN_AI_SERVICE_TOKEN_LENGTH = 32;
 
 const REQUIRED_IN_PRODUCTION = [
   'FRONTEND_URL',
@@ -67,6 +68,8 @@ export function validateEnvironment(env: Environment): Environment {
     );
   }
 
+  problems.push(...aiServiceProblems(env));
+
   const trustProxy = read(env, 'TRUST_PROXY');
   if (trustProxy) {
     try {
@@ -106,6 +109,39 @@ function read(env: Environment, name: string): string | undefined {
     return String(value);
   }
   return undefined;
+}
+
+function aiServiceProblems(env: Environment): string[] {
+  const serviceUrl = read(env, 'AI_SERVICE_URL');
+  if (!serviceUrl) {
+    return [];
+  }
+
+  const problems: string[] = [];
+  if (!isHttpUrl(serviceUrl)) {
+    problems.push('AI_SERVICE_URL must be an http(s) URL without credentials');
+  }
+
+  const serviceToken = read(env, 'AI_SERVICE_TOKEN') ?? '';
+  if (serviceToken.length < MIN_AI_SERVICE_TOKEN_LENGTH) {
+    problems.push(
+      `AI_SERVICE_TOKEN must be a random value of at least ${MIN_AI_SERVICE_TOKEN_LENGTH} characters when AI_SERVICE_URL is set`,
+    );
+  }
+  return problems;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isHttpsUrl(value: string): boolean {

@@ -17,7 +17,8 @@ Blendify/
 │   │       ├── infrastructure/ # Spotify/Last.fm clients, cache, persistence, auth
 │   │       ├── modules/        # feature composition (NestJS modules)
 │   │       └── presentation/   # controllers, pipes, guards, filters
-│   └── web/    # React 19 + Vite SPA (@blendify/web)
+│   ├── web/    # React 19 + Vite SPA (@blendify/web)
+│   └── ai/     # internal FastAPI AI service (Python, uv; not an npm workspace)
 ├── packages/
 │   └── contracts/  # shared Zod schemas and inferred types (@blendify/contracts)
 ├── docs/           # brand and product media
@@ -36,6 +37,8 @@ npm run format:check    # verify API formatting (Prettier)
 
 npm run db:generate      # generate Prisma Client
 npm run db:migrate        # create/apply a local Prisma migration
+
+npm run ai:sync / dev:ai / test:ai / lint:ai   # AI service (uv; port 8000)
 
 npm run docker:up          # start PostgreSQL + Redis
 npm run start                 # start infra + both apps (logs in .blendify/logs/)
@@ -66,6 +69,8 @@ Git hooks (Husky + commitlint) enforce Conventional Commits and run lint on pre-
 **Shared contracts are the source of truth.** `packages/contracts` defines Zod schemas for HTTP requests/responses, errors, playlist recipes, and statistics; both `apps/api` and `apps/web` depend on `@blendify/contracts` and infer TypeScript types from the same schemas rather than duplicating shape definitions.
 
 **Web app** (`apps/web/src`) is a Vite SPA: `pages/` for route-level screens (mix, discover, library, stats, landing), `stores/` for Zustand state (e.g. `auth-store.ts`), `lib/` for API client, error mapping, generation streaming, and other framework-agnostic helpers, `hooks/` and `components/` for UI, `i18n/` for English/Spanish/Brazilian Portuguese translations.
+
+**AI service** (`apps/ai`): internal FastAPI service reached only by the API through the `INTENT_INTERPRETER` port (`infrastructure/ai`), authenticated with a shared bearer token. It interprets user-authored text into typed intent; it never receives Spotify/Last.fm/Soundiiz data, IDs, URLs, or user data, and never calls those providers. Its wire contract is owned by `@blendify/contracts/ai-service` (Zod); Python mirrors it and both sides are checked against `packages/contracts/ai-service/` (normalized contract + shared fixtures). Changing the contract: edit the Zod schema, run `npm test -w @blendify/contracts -- -u`, update the Pydantic models until `npm run test:ai` passes. The API and Mix/Discover must keep working when the AI service is absent.
 
 **Auth**: Spotify OAuth with server-side token storage in PostgreSQL and an HTTP-only `blendify_session` cookie (no tokens in the browser). Session cookies are always `Secure` and host-only; the canonical local origin is `http://127.0.0.1:5173` (Spotify rejects `localhost` redirect URIs). Production deployment is documented in `docs/deployment.md`.
 

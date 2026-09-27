@@ -87,6 +87,23 @@ jobs:
       - run: npm ci
       - run: npm run test:web
 
+  test-ai:
+    name: test-ai
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ai
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          working-directory: apps/ai
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+
   e2e:
     name: e2e
     runs-on: ubuntu-latest

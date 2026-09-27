@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop Blendify API + Web (and optionally Docker infra).
+# Stop Blendify API + Web + AI service (and optionally Docker infra).
 # Usage:
 #   ./scripts/stop.sh
 #   ./scripts/stop.sh --infra   # also docker compose down
@@ -15,7 +15,7 @@ for arg in "$@"; do
     --infra|-i) STOP_INFRA=true ;;
     -h|--help)
       echo "Usage: ./scripts/stop.sh [--infra]"
-      echo "  Stops API (:$API_PORT) and Web (:$WEB_PORT)."
+      echo "  Stops API (:$API_PORT), Web (:$WEB_PORT), and AI service (:$AI_PORT)."
       echo "  --infra  also runs docker compose down"
       exit 0
       ;;
@@ -25,8 +25,10 @@ done
 echo "==> Stopping Blendify app"
 stop_pidfile "$API_PID_FILE" "API"
 stop_pidfile "$WEB_PID_FILE" "Web"
+stop_pidfile "$AI_PID_FILE" "AI service"
 kill_port "$API_PORT"
 kill_port "$WEB_PORT"
+kill_port "$AI_PORT"
 
 if [[ "$STOP_INFRA" == true ]]; then
   echo "→ Stopping Docker infra (Postgres + Redis)"

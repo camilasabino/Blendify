@@ -137,6 +137,17 @@ npm run dev:web    # http://127.0.0.1:5173
 ```
 
 Or `npm run start` for a one-command local start (logs in `.blendify/logs/`).
+
+The internal AI service (`apps/ai`, Python via [uv](https://docs.astral.sh/uv/))
+is optional; Mix and Discover run without it. To run it locally:
+
+```bash
+cp apps/ai/.env.example apps/ai/.env   # then set the same AI_SERVICE_TOKEN
+npm run ai:sync                        # and AI_SERVICE_URL in apps/api/.env
+npm run dev:ai                         # http://127.0.0.1:8000/health
+```
+
+`npm run start` also starts it when `uv` and `apps/ai/.env` are present.
 Playback control requires Spotify Premium; Development Mode apps must
 allow-list every account that signs in.
 
@@ -147,6 +158,8 @@ npm run build        # build contracts, API, and web
 npm test             # contract, API, and web tests
 npm run test:e2e     # Playwright browser suite
 npm run lint         # ESLint + oxlint
+npm run test:ai      # AI service tests (pytest)
+npm run lint:ai      # AI service lint + format check (ruff)
 ```
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/)

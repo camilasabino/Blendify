@@ -108,4 +108,41 @@ describe('validateEnvironment', () => {
       expectInvalid({ [name]: 'value' }, `${name} is no longer supported`);
     },
   );
+
+  describe('AI service', () => {
+    const AI_SERVICE = {
+      AI_SERVICE_URL: 'http://ai.railway.internal:8080',
+      AI_SERVICE_TOKEN: 't'.repeat(32),
+    };
+
+    it('keeps the AI service optional in production', () => {
+      expect(validateEnvironment(PRODUCTION)).toEqual(PRODUCTION);
+    });
+
+    it('accepts a private-network URL with a long service token', () => {
+      const env = { ...PRODUCTION, ...AI_SERVICE };
+      expect(validateEnvironment(env)).toEqual(env);
+    });
+
+    it('requires a long service token when the AI service URL is set', () => {
+      expectInvalid(
+        { ...AI_SERVICE, AI_SERVICE_TOKEN: undefined },
+        'AI_SERVICE_TOKEN must be a random value of at least 32 characters',
+      );
+      expectInvalid(
+        { ...AI_SERVICE, AI_SERVICE_TOKEN: 'short' },
+        'AI_SERVICE_TOKEN must be a random value of at least 32 characters',
+      );
+    });
+
+    it.each(['not a url', 'ftp://ai.internal', 'http://user:pass@ai.internal'])(
+      'rejects AI_SERVICE_URL %s',
+      (url) => {
+        expectInvalid(
+          { ...AI_SERVICE, AI_SERVICE_URL: url },
+          'AI_SERVICE_URL must be an http(s) URL without credentials',
+        );
+      },
+    );
+  });
 });

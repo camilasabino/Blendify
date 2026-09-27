@@ -39,6 +39,12 @@ playwright-report/
 apps/web/playwright-report/
 apps/web/test-results/
 
+# Python (apps/ai)
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
 # Misc
 *.tsbuildinfo
 .cache/

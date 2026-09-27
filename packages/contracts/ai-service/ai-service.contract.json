@@ -1,0 +1,370 @@
+{
+  "AiServiceErrorResponse": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "code": {
+        "type": "string",
+        "enum": [
+          "INTERNAL_ERROR",
+          "INVALID_MODEL_OUTPUT",
+          "INVALID_REQUEST",
+          "MODEL_RATE_LIMITED",
+          "MODEL_TIMEOUT",
+          "MODEL_UNAVAILABLE",
+          "NOT_FOUND",
+          "UNAUTHORIZED"
+        ]
+      },
+      "message": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      }
+    },
+    "required": [
+      "code",
+      "message"
+    ]
+  },
+  "AiServiceHealth": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "intentInterpretation": {
+        "type": "string",
+        "enum": [
+          "available",
+          "unavailable"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "const": "ok"
+      }
+    },
+    "required": [
+      "intentInterpretation",
+      "status"
+    ]
+  },
+  "InterpretIntentRequest": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      }
+    },
+    "required": [
+      "prompt"
+    ]
+  },
+  "InterpretIntentResponse": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "promptVersion": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "result": {
+        "anyOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "clarification": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "ambiguous_request",
+                      "not_a_playlist_request",
+                      "unsupported_constraint"
+                    ]
+                  },
+                  "unsupportedConstraints": {
+                    "type": "array",
+                    "maxItems": 25,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "capability": {
+                          "type": "string",
+                          "enum": [
+                            "deferred",
+                            "needs_clarification"
+                          ]
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "activity",
+                            "artist_attribute",
+                            "duration",
+                            "energy",
+                            "era",
+                            "mood",
+                            "other",
+                            "progression",
+                            "tempo"
+                          ]
+                        },
+                        "userText": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        }
+                      },
+                      "required": [
+                        "capability",
+                        "category",
+                        "userText"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "reason",
+                  "unsupportedConstraints"
+                ]
+              },
+              "outcome": {
+                "type": "string",
+                "const": "needs_clarification"
+              }
+            },
+            "required": [
+              "clarification",
+              "outcome"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "intent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "artists": {
+                    "type": "array",
+                    "maxItems": 25,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "excludeArtists": {
+                    "type": "array",
+                    "maxItems": 25,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "excludeTracks": {
+                    "type": "array",
+                    "maxItems": 25,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "artist": {
+                          "anyOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            }
+                          ]
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "artist",
+                        "title"
+                      ]
+                    }
+                  },
+                  "genres": {
+                    "type": "array",
+                    "maxItems": 25,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "artist_mix",
+                      "discover_artist",
+                      "discover_track",
+                      "genre_mix"
+                    ]
+                  },
+                  "orderMode": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "artist",
+                          "random",
+                          "title"
+                        ]
+                      }
+                    ]
+                  },
+                  "popularity": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "balanced",
+                          "popular",
+                          "rarities"
+                        ]
+                      }
+                    ]
+                  },
+                  "seedTracks": {
+                    "type": "array",
+                    "maxItems": 25,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "artist": {
+                          "anyOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            }
+                          ]
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "artist",
+                        "title"
+                      ]
+                    }
+                  },
+                  "targetTrackCount": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "unsupportedConstraints": {
+                    "type": "array",
+                    "maxItems": 25,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "capability": {
+                          "type": "string",
+                          "enum": [
+                            "deferred",
+                            "needs_clarification"
+                          ]
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "activity",
+                            "artist_attribute",
+                            "duration",
+                            "energy",
+                            "era",
+                            "mood",
+                            "other",
+                            "progression",
+                            "tempo"
+                          ]
+                        },
+                        "userText": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        }
+                      },
+                      "required": [
+                        "capability",
+                        "category",
+                        "userText"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "artists",
+                  "excludeArtists",
+                  "excludeTracks",
+                  "genres",
+                  "kind",
+                  "orderMode",
+                  "popularity",
+                  "seedTracks",
+                  "targetTrackCount",
+                  "unsupportedConstraints"
+                ]
+              },
+              "outcome": {
+                "type": "string",
+                "const": "interpreted"
+              }
+            },
+            "required": [
+              "intent",
+              "outcome"
+            ]
+          }
+        ]
+      }
+    },
+    "required": [
+      "promptVersion",
+      "result"
+    ]
+  }
+}

@@ -21,6 +21,24 @@ coding sessions only need the short summary in `CLAUDE.md`.
   expected — to diverge from the wire DTOs (e.g. `Track` entity vs.
   `TrackSchema`); that split is intentional, not duplication.
 
+## AI service (`apps/ai`, Python)
+
+- Toolchain: `uv` (dependencies and Python version), `ruff` (lint and
+  format), `pytest`. Don't add overlapping tools.
+- Layout by concept: `models/` (Pydantic wire models), `providers/`
+  (model-provider port and adapters), `prompts/` (versioned prompt
+  templates), `interpretation/` (orchestration), `api/` (FastAPI routes, auth,
+  error handlers), `config/`. No `utils.py`/`helpers.py`/`constants.py`.
+- Type every public function and boundary. Wire models extend `WireModel`
+  (camelCase aliases, `extra="forbid"`, every field required — absence is
+  `null` or `[]`).
+- The same rules as TypeScript apply: named constants at the narrowest owner,
+  no explanatory comments, tests assert behavior, no real model or provider
+  calls in tests.
+- Provider-content firewall: AI-service request models carry only
+  user-authored text. Never add fields for provider IDs, URLs, artwork,
+  catalog results, playlists, or user data.
+
 ## API: hexagonal architecture
 
 - `domain/` — entities, value objects, domain services (`strategies/` for
