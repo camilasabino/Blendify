@@ -24,6 +24,7 @@ test.describe('Authenticated shell', () => {
     await expect(mainNav.getByRole('link')).toHaveText([
       'Mix',
       'Discover',
+      'Create with AI',
       'Library',
       'Stats',
     ])

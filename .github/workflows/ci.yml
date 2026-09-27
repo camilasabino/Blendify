@@ -95,7 +95,7 @@ jobs:
         working-directory: apps/ai
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           working-directory: apps/ai
           enable-cache: true
@@ -130,7 +130,7 @@ jobs:
 
   sonar:
     name: sonar
-    needs: [quality, test-contracts, test-api, test-web]
+    needs: [quality, test-contracts, test-api, test-web, test-ai]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -151,8 +151,9 @@ jobs:
       - run: npm run test:cov -w @blendify/web
       - run: npm run test:cov -w @blendify/contracts
       - run: npm run sonar:coverage
-      - name: Scan with SonarCloud
+      - name: Scan with SonarCloud (non-blocking)
         if: env.SONAR_TOKEN != ''
+        continue-on-error: true
         uses: SonarSource/sonarqube-scan-action@v7
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}

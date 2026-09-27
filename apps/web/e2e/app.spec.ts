@@ -14,7 +14,11 @@ test.describe('Guest bootstrap and shell', () => {
     ).toBeVisible()
 
     const mainNav = page.getByRole('navigation', { name: 'Main menu' }).first()
-    await expect(mainNav.getByRole('link')).toHaveText(['Mix', 'Discover'])
+    await expect(mainNav.getByRole('link')).toHaveText([
+      'Mix',
+      'Discover',
+      'Create with AI',
+    ])
     await expect(page.getByRole('link', { name: 'Library' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'Stats' })).toHaveCount(0)
 
