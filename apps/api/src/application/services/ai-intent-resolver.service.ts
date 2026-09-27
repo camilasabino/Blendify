@@ -34,14 +34,17 @@ export class AiIntentResolver {
     private readonly catalogs: CatalogProviderFactoryPort,
   ) {}
 
-  async resolve(intent: AiIntent): Promise<AiIntentResolution> {
+  async resolve(
+    intent: AiIntent,
+    beforeLookup: () => void = () => undefined,
+  ): Promise<AiIntentResolution> {
     const seedType = seedTypeOfKind(intent.kind);
 
     switch (seedType) {
       case 'genre':
         return this.resolveGenres(intent.genres);
       case 'artist':
-        return this.resolveArtists(intent.artists);
+        return this.resolveArtists(intent.artists, beforeLookup);
       case 'track':
         return this.resolveTrack(intent.seedTracks[0]);
     }
@@ -56,12 +59,16 @@ export class AiIntentResolver {
     return { status: 'resolved', seeds: { artists: [], genres, track: null } };
   }
 
-  private async resolveArtists(names: string[]): Promise<AiIntentResolution> {
+  private async resolveArtists(
+    names: string[],
+    beforeLookup: () => void,
+  ): Promise<AiIntentResolution> {
     const catalog = this.catalogs.forMarket();
     const artists: ResolvedAiSeed[] = [];
     const missing: string[] = [];
 
     for (const name of names) {
+      beforeLookup();
       const candidates = await catalog.searchArtists(
         name,
         ARTIST_MATCH_CANDIDATES,
@@ -73,7 +80,11 @@ export class AiIntentResolver {
         continue;
       }
       if (!artists.some((artist) => artist.id === match.id.getValue())) {
-        artists.push({ id: match.id.getValue(), name: match.name });
+        artists.push({
+          id: match.id.getValue(),
+          name: match.name,
+          imageUrl: match.imageUrl,
+        });
       }
     }
 
@@ -131,8 +142,12 @@ function toTrackSeed(track: Track): ResolvedAiTrackSeed {
   return {
     id: track.id.getValue(),
     name: track.name,
+    imageUrl: track.albumImageUrl,
     artistId: track.artistId.getValue(),
     artistName: track.artistName,
+    uri: track.uri,
+    durationMs: track.durationMs,
+    popularity: track.popularity,
   };
 }
 

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   AI_MOODS,
   AI_PROMPT_MAX_LENGTH,
+  AiGenerationSchema,
+  AiGenerationStreamEventSchema,
   AiSessionSchema,
+  AiSessionStateSchema,
   AnswerAiClarificationRequestSchema,
   CreateAiSessionRequestSchema,
   MAX_TRACKS,
@@ -204,6 +207,162 @@ describe('AI session contracts', () => {
         optionId: 'set_kind:artist_mix',
         intent: { kind: 'genre_mix' },
       }).success,
+    ).toBe(false);
+  });
+});
+
+const GENERATION = {
+  sessionId: 'opaque-session-token',
+  expiresAt: '2026-09-27T12:30:00.000Z',
+  status: 'generated',
+  intent: { ...READY_SESSION.intent, targetDurationMinutes: 60, mood: 'calm' },
+  playlist: {
+    name: 'Blendify · Radiohead · Interpol',
+    description: 'Made with Blendify.',
+    seeds: [{ type: 'artist', id: 'artist-1', name: 'Radiohead' }],
+    tracks: [
+      {
+        id: 'track-1',
+        name: 'Reckoner',
+        artistId: 'artist-1',
+        artistName: 'Radiohead',
+        durationMs: 290_000,
+        popularity: 60,
+        uri: 'spotify:track:track-1',
+      },
+    ],
+  },
+  trackCount: 1,
+  durationMs: 290_000,
+  unmetConstraints: [
+    { type: 'track_count', requested: 30, actual: 1 },
+    { type: 'duration', requestedMinutes: 60, actualDurationMs: 290_000 },
+    { type: 'mood', mood: 'calm', reason: 'seed_not_mood_based' },
+  ],
+};
+
+describe('AI generation contracts', () => {
+  it('accepts a generated preview with explicit unmet constraints', () => {
+    expect(AiGenerationSchema.parse(GENERATION)).toEqual(GENERATION);
+  });
+
+  it('never carries a transfer offer, the internal generator recipe or unknown top-level state', () => {
+    const withInternals = {
+      ...GENERATION,
+      playlist: {
+        ...GENERATION.playlist,
+        transfer: null,
+        generation: {
+          version: 1,
+          kind: 'discover_artist',
+          targetTrackCount: 30,
+          seed: { id: 'artist-1', name: 'Radiohead' },
+          popularity: 'balanced',
+          orderMode: 'random',
+        },
+      },
+    };
+
+    const parsed = AiGenerationSchema.parse(withInternals).playlist;
+    expect(parsed).not.toHaveProperty('transfer');
+    expect(parsed).not.toHaveProperty('generation');
+    expect(
+      AiGenerationSchema.safeParse({ ...GENERATION, executionPlan: {} }).success,
+    ).toBe(false);
+    expect(
+      AiGenerationSchema.safeParse({ ...GENERATION, status: 'generating' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects unmet constraints outside the deterministic vocabulary', () => {
+    for (const unmet of [
+      { type: 'mood', mood: 'calm', reason: 'model_said_so' },
+      { type: 'mood', mood: 'happy', reason: 'genres_outside_mood' },
+      { type: 'duration', requestedMinutes: 0, actualDurationMs: 1 },
+      { type: 'track_count', requested: MAX_TRACKS + 1, actual: 1 },
+      { type: 'activity', userText: 'running' },
+    ]) {
+      expect(
+        AiGenerationSchema.safeParse({ ...GENERATION, unmetConstraints: [unmet] })
+          .success,
+      ).toBe(false);
+    }
+  });
+
+  it('streams progress, the generated result or a normalized error', () => {
+    for (const event of [
+      { type: 'progress', phase: 'matching_tracks', current: 1, total: 2, percent: 50 },
+      { type: 'result', playlist: GENERATION },
+      {
+        type: 'error',
+        statusCode: 429,
+        code: 'SPOTIFY_RATE_LIMITED',
+        message: 'Spotify rate limit.',
+        details: { retryAfterSeconds: 30 },
+      },
+    ]) {
+      expect(AiGenerationStreamEventSchema.safeParse(event).success).toBe(true);
+    }
+  });
+});
+
+describe('AI session state contract', () => {
+  const outcome = {
+    playlist: GENERATION.playlist,
+    trackCount: GENERATION.trackCount,
+    durationMs: GENERATION.durationMs,
+    unmetConstraints: GENERATION.unmetConstraints,
+  };
+
+  it('restores every public session state', () => {
+    for (const state of [
+      { ...CLARIFICATION_SESSION, execution: null },
+      { ...READY_SESSION, execution: null },
+      { ...READY_SESSION, execution: { status: 'generating' } },
+      { ...READY_SESSION, execution: { status: 'generated', ...outcome } },
+      {
+        ...READY_SESSION,
+        execution: {
+          status: 'generation_failed',
+          error: {
+            code: 'SPOTIFY_RATE_LIMITED',
+            category: 'provider_rate_limited',
+            retryAfterSeconds: 30,
+          },
+        },
+      },
+    ]) {
+      expect(AiSessionStateSchema.parse(state)).toEqual(state);
+    }
+  });
+
+  it('rejects internal execution details and unknown failure categories', () => {
+    for (const execution of [
+      { status: 'generating', startedAt: '2026-09-27T12:00:00.000Z' },
+      { status: 'generating', lockToken: 'lease' },
+      { status: 'generated', ...outcome, executionPlan: {} },
+      {
+        status: 'generation_failed',
+        error: { code: 'X', category: 'provider_raw', retryAfterSeconds: null },
+      },
+      {
+        status: 'generation_failed',
+        error: {
+          code: 'X',
+          category: 'failed',
+          retryAfterSeconds: null,
+          providerPayload: {},
+        },
+      },
+    ]) {
+      expect(
+        AiSessionStateSchema.safeParse({ ...READY_SESSION, execution })
+          .success,
+      ).toBe(false);
+    }
+    expect(
+      AiSessionStateSchema.safeParse({ ...READY_SESSION, execution: undefined })
+        .success,
     ).toBe(false);
   });
 });

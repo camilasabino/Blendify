@@ -54,6 +54,7 @@ export class CreateAiSessionUseCase {
       promptVersion: interpretation.promptVersion,
       aiSafe: { intent: null },
       clarification: null,
+      execution: null,
       createdAt: createdAt.toISOString(),
       updatedAt: createdAt.toISOString(),
       expiresAt: new Date(

@@ -1,4 +1,8 @@
 import { isIP } from 'node:net';
+import {
+  GENERATION_LEASE_MS,
+  GENERATION_LEASE_RENEW_INTERVAL_MS,
+} from '@/application/services/generation-lease.policy';
 
 export const RATE_LIMIT_BUCKETS = [
   'search',
@@ -51,8 +55,8 @@ export interface GenerationConcurrencyConfig {
 export const DEFAULT_GENERATION_CONCURRENCY: GenerationConcurrencyConfig = {
   perClient: 2,
   global: 6,
-  leaseMs: 30_000,
-  renewIntervalMs: 10_000,
+  leaseMs: GENERATION_LEASE_MS,
+  renewIntervalMs: GENERATION_LEASE_RENEW_INTERVAL_MS,
 };
 
 export const CLIENT_IP_SOURCES = [

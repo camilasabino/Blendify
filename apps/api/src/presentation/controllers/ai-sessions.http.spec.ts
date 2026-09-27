@@ -7,13 +7,32 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import type { Server } from 'http';
 import request from 'supertest';
-import { AiSessionSchema, type AiSessionDto } from '@blendify/contracts';
+import {
+  AiGenerationSchema,
+  AiGenerationStreamEventSchema,
+  AiSessionSchema,
+  AiSessionStateSchema,
+  type AiSessionDto,
+} from '@blendify/contracts';
 import type {
   InterpretIntentRequest,
   InterpretIntentResponse,
 } from '@blendify/contracts/ai-service';
+import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
+import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
+import { GenerateAiPlaylistUseCase } from '@/application/use-cases/generate-ai-playlist.use-case';
+import { GetAiSessionUseCase } from '@/application/use-cases/get-ai-session.use-case';
+import {
+  GeneratePlaylistUseCase,
+  type PlaylistGenerationRequest,
+} from '@/application/use-cases/generate-playlist.use-case';
+import { Artist } from '@/domain/artist/artist.entity';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import type { AiSession } from '@/domain/ai/ai-session';
 import { AiInterpretationError } from '@/domain/errors/ai-interpretation.error';
 import { AI_SESSION_REPOSITORY } from '@/domain/repositories/ai-session.repository.port';
@@ -39,6 +58,7 @@ const JWT_SECRET = 'ai-sessions-test-secret';
 const SESSIONS_PATH = '/api/ai/sessions';
 const PROMPT = '30 deep cuts from Radiohead and Interpol, no Coldplay';
 const INTERPRET_LIMIT = 3;
+const GENERATION_LIMIT = 2;
 
 function interpreted(
   overrides: Record<string, unknown> = {},
@@ -69,7 +89,7 @@ function interpreted(
 }
 
 function unavailableProvider() {
-  return jest.fn(() => {
+  return jest.fn<unknown, unknown[]>(() => {
     throw createSpotifyQuotaError({
       retryAfterSeconds: 3_600,
       reason: 'QUOTA_EXCEEDED',
@@ -104,8 +124,80 @@ function createWorld() {
       find: jest.fn((token: string) =>
         Promise.resolve(stored.get(token) ?? null),
       ),
+      acquireGenerationLock: jest.fn(() =>
+        Promise.resolve<string | null>('lease'),
+      ),
+      releaseGenerationLock: jest.fn(() => Promise.resolve()),
+      hasGenerationLock: jest.fn(() => Promise.resolve(false)),
+      saveGenerationOutcome: jest.fn(
+        (token: string, session: AiSession, attemptId: string) => {
+          const current = stored.get(token)?.execution;
+          if (
+            current?.status !== 'generating' ||
+            current.attemptId !== attemptId
+          ) {
+            return Promise.resolve(false);
+          }
+          stored.set(token, session);
+          return Promise.resolve(true);
+        },
+      ),
+      renewGenerationLock: jest.fn(() => Promise.resolve(true)),
+    },
+    generator: {
+      execute: jest.fn<
+        Promise<GeneratedPlaylist>,
+        [PlaylistGenerationRequest, { onProgress?: ProgressReporter }?]
+      >(),
     },
   };
+}
+
+function workingCatalog() {
+  return {
+    searchArtists: jest.fn((name: string) =>
+      Promise.resolve(
+        name === 'Radiohed'
+          ? []
+          : [
+              Artist.create({
+                id: ArtistId.create(`${name.toLowerCase()}-id`),
+                name,
+              }),
+            ],
+      ),
+    ),
+    searchTracks: jest.fn(() => Promise.resolve([])),
+    resolveTrack: jest.fn(() => Promise.resolve(null)),
+    getArtistsByIds: jest.fn(() => Promise.resolve([])),
+  };
+}
+
+function generatedPlaylist(): GeneratedPlaylist {
+  const tracks = ['r1', 'r2', 'c1'].map((id) =>
+    Track.create({
+      id: TrackId.create(id),
+      name: `Song ${id}`,
+      artistId: ArtistId.create(id === 'c1' ? 'coldplay-id' : 'radiohead-id'),
+      artistName: id === 'c1' ? 'Coldplay' : 'Radiohead',
+      durationMs: 240_000,
+      popularity: 40,
+      uri: `spotify:track:${id}`,
+    }),
+  );
+  return GeneratedPlaylist.create({
+    name: 'Blendify · Radiohead · Interpol',
+    generation: {
+      version: 1,
+      kind: 'artist_mix',
+      tracksPerSeed: 15,
+      seeds: [{ id: 'radiohead-id', name: 'Radiohead' }],
+      popularity: 'rarities',
+      orderMode: 'random',
+    },
+    seeds: [{ type: 'artist', id: 'radiohead-id', name: 'Radiohead' }],
+    tracks,
+  });
 }
 
 type World = ReturnType<typeof createWorld>;
@@ -155,14 +247,22 @@ async function createApp(
       { provide: AI_SESSION_REPOSITORY, useValue: world.sessions },
       { provide: CATALOG_PROVIDER_FACTORY, useValue: world.catalogFactory },
       { provide: DISCOVERY_CATALOG, useValue: world.discovery },
+      { provide: GeneratePlaylistUseCase, useValue: world.generator },
       CreateAiSessionUseCase,
       AnswerAiClarificationUseCase,
+      AiIntentResolver,
+      GenerateAiPlaylistUseCase,
+      GetAiSessionUseCase,
       ...inMemoryRequestLimitProviders({
         rateLimits: {
           ...DEFAULT_RATE_LIMITS,
           interpret: {
             ...DEFAULT_RATE_LIMITS.interpret,
             limit: INTERPRET_LIMIT,
+          },
+          generation: {
+            ...DEFAULT_RATE_LIMITS.generation,
+            limit: GENERATION_LIMIT,
           },
         },
       }),
@@ -607,5 +707,296 @@ describe('Create with AI sessions over HTTP', () => {
 
     expect(response.body).toMatchObject({ code: 'AI_UNAVAILABLE' });
     expectNoProviderCalls(world);
+  });
+  function generate(sessionId: string, cookie?: string, accept?: string) {
+    const req = request(server())
+      .post(`${SESSIONS_PATH}/${sessionId}/generate`)
+      .set('Origin', FRONTEND);
+    const withCookie = cookie ? req.set('Cookie', cookie) : req;
+    return accept ? withCookie.set('Accept', accept) : withCookie;
+  }
+
+  function useWorkingProviders() {
+    const catalog = workingCatalog();
+    world.catalogFactory.forMarket.mockImplementation(() => catalog);
+    world.generator.execute.mockResolvedValue(generatedPlaylist());
+    return catalog;
+  }
+
+  it('creates a Guest playlist preview only on the explicit generate command', async () => {
+    const catalog = useWorkingProviders();
+    const created = await createSession().expect(201);
+    const sessionId = (created.body as AiSessionDto).sessionId;
+    expect(world.generator.execute).not.toHaveBeenCalled();
+    expect(catalog.searchArtists).not.toHaveBeenCalled();
+
+    const response = await generate(sessionId).expect(200);
+
+    const generation = AiGenerationSchema.parse(response.body);
+    expect(generation).toMatchObject({
+      sessionId,
+      status: 'generated',
+      intent: {
+        artists: ['Radiohead', 'Interpol'],
+        excludeArtists: ['Coldplay'],
+      },
+      trackCount: 2,
+      durationMs: 480_000,
+      unmetConstraints: [{ type: 'track_count', requested: 30, actual: 2 }],
+    });
+    expect(generation.playlist.tracks.map((t) => t.artistName)).toEqual([
+      'Radiohead',
+      'Radiohead',
+    ]);
+    expect(response.body).not.toHaveProperty('execution');
+    expect((response.body as { playlist: object }).playlist).not.toHaveProperty(
+      'transfer',
+    );
+    expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
+    expect(world.stored.get(sessionId)?.execution?.status).toBe('generated');
+  });
+
+  it('streams generation progress and the preview as NDJSON', async () => {
+    useWorkingProviders();
+    world.generator.execute.mockImplementation((_request, options) => {
+      options?.onProgress?.({
+        phase: 'matching_tracks',
+        current: 1,
+        total: 2,
+        percent: 50,
+      });
+      return Promise.resolve(generatedPlaylist());
+    });
+    const created = await createSession().expect(201);
+
+    const response = await generate(
+      (created.body as AiSessionDto).sessionId,
+      undefined,
+      'application/x-ndjson',
+    ).expect(200);
+
+    const events = response.text
+      .trim()
+      .split('\n')
+      .map((line) => AiGenerationStreamEventSchema.parse(JSON.parse(line)));
+    expect(events.map((event) => event.type)).toEqual(['progress', 'result']);
+  });
+
+  it('refuses to generate while the request still needs clarification', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({ genres: ['Shoegaze'] }),
+    );
+    const created = await createSession().expect(201);
+
+    const response = await generate(
+      (created.body as AiSessionDto).sessionId,
+    ).expect(409);
+
+    expect(response.body).toMatchObject({ code: 'AI_SESSION_NOT_READY' });
+    expectNoProviderCalls(world);
+    expect(world.generator.execute).not.toHaveBeenCalled();
+  });
+
+  it('keeps authenticated sessions private to their user', async () => {
+    useWorkingProviders();
+    const owner = await sessionCookie('user-1');
+    const created = await createSession({ prompt: PROMPT }, owner).expect(201);
+    const sessionId = (created.body as AiSessionDto).sessionId;
+
+    await generate(sessionId).expect(404);
+    await generate(sessionId, owner).expect(200);
+  });
+
+  it('reports an artist that cannot be found as a typed, editable failure', async () => {
+    useWorkingProviders();
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({ artists: ['Radiohed', 'Interpol'] }),
+    );
+    const created = await createSession().expect(201);
+
+    const response = await generate(
+      (created.body as AiSessionDto).sessionId,
+    ).expect(422);
+
+    expect(response.body).toEqual({
+      statusCode: 422,
+      code: 'AI_SEED_NOT_FOUND',
+      message: expect.any(String) as string,
+      details: { seedType: 'artist', names: ['Radiohed'] },
+    });
+  });
+
+  it('keeps the Spotify quota category and Retry-After for generation', async () => {
+    const created = await createSession().expect(201);
+
+    const response = await generate(
+      (created.body as AiSessionDto).sessionId,
+    ).expect(429);
+
+    expect(response.headers['retry-after']).toBe('3600');
+    expect(response.body).toMatchObject({
+      code: 'SPOTIFY_QUOTA_EXCEEDED',
+      details: { retryAfterSeconds: 3_600 },
+    });
+    expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
+  });
+
+  it('limits generation with the existing generation bucket', async () => {
+    useWorkingProviders();
+    const created = await createSession().expect(201);
+    const sessionId = (created.body as AiSessionDto).sessionId;
+
+    for (let attempt = 0; attempt < GENERATION_LIMIT; attempt += 1) {
+      await generate(sessionId).expect(200);
+    }
+    const response = await generate(sessionId).expect(429);
+
+    expect(response.body).toMatchObject({ code: 'RATE_LIMITED' });
+    expect(world.generator.execute).toHaveBeenCalledTimes(1);
+  });
+
+  function readSession(sessionId: string, cookie?: string) {
+    const req = request(server()).get(`${SESSIONS_PATH}/${sessionId}`);
+    return cookie ? req.set('Cookie', cookie) : req;
+  }
+
+  function expectNoReadSideEffects(interpretations: number): void {
+    expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(
+      interpretations,
+    );
+    expectNoProviderCalls(world);
+    expect(world.generator.execute).not.toHaveBeenCalled();
+  }
+
+  it('restores a reviewed session and then its generated preview', async () => {
+    const created = await createSession().expect(201);
+    const sessionId = (created.body as AiSessionDto).sessionId;
+
+    const reviewed = AiSessionStateSchema.parse(
+      (await readSession(sessionId).expect(200)).body,
+    );
+    expect(reviewed).toMatchObject({
+      sessionId,
+      status: 'ready',
+      intent: { artists: ['Radiohead', 'Interpol'], targetTrackCount: 30 },
+      execution: null,
+    });
+    expectNoReadSideEffects(1);
+
+    useWorkingProviders();
+    const generated = await generate(sessionId).expect(200);
+    world.catalogFactory.forMarket.mockClear();
+    world.generator.execute.mockClear();
+
+    const restored = await readSession(sessionId).expect(200);
+    const state = AiSessionStateSchema.parse(restored.body);
+    const generation = AiGenerationSchema.parse(generated.body);
+    expect(state.execution).toEqual({
+      status: 'generated',
+      playlist: generation.playlist,
+      trackCount: generation.trackCount,
+      durationMs: generation.durationMs,
+      unmetConstraints: generation.unmetConstraints,
+    });
+    expect(JSON.stringify(restored.body)).not.toMatch(
+      /startedAt|attemptId|recipe|ownerUserId|originalPrompt|aiSafe|lease|"generation"/,
+    );
+    expectNoReadSideEffects(1);
+  });
+
+  it('restores a pending clarification without calling the model again', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({ genres: ['Shoegaze'] }),
+    );
+    const created = await createSession().expect(201);
+
+    const state = AiSessionStateSchema.parse(
+      (await readSession((created.body as AiSessionDto).sessionId).expect(200))
+        .body,
+    );
+
+    expect(state).toMatchObject({
+      status: 'needs_clarification',
+      intent: null,
+      execution: null,
+    });
+    expect(state.clarification?.options.length).toBeGreaterThan(0);
+    expectNoReadSideEffects(1);
+  });
+
+  it('exposes only the normalized failure of a failed generation', async () => {
+    const created = await createSession().expect(201);
+    const sessionId = (created.body as AiSessionDto).sessionId;
+    await generate(sessionId).expect(429);
+    world.catalogFactory.forMarket.mockClear();
+
+    const state = AiSessionStateSchema.parse(
+      (await readSession(sessionId).expect(200)).body,
+    );
+
+    expect(state.execution).toEqual({
+      status: 'generation_failed',
+      error: {
+        code: 'SPOTIFY_QUOTA_EXCEEDED',
+        category: 'provider_rate_limited',
+        retryAfterSeconds: 3_600,
+      },
+    });
+    expectNoReadSideEffects(1);
+  });
+
+  it('reports a live generation as generating and a lease-less one as interrupted, never exposing attempt or lease', async () => {
+    const created = await createSession().expect(201);
+    const sessionId = (created.body as AiSessionDto).sessionId;
+    const stored = world.stored.get(sessionId) as AiSession;
+    world.stored.set(sessionId, {
+      ...stored,
+      execution: {
+        status: 'generating',
+        attemptId: 'attempt-a',
+        startedAt: new Date().toISOString(),
+      },
+    });
+    world.sessions.hasGenerationLock.mockResolvedValue(true);
+
+    const response = await readSession(sessionId).expect(200);
+
+    expect(AiSessionStateSchema.parse(response.body).execution).toEqual({
+      status: 'generating',
+    });
+    expect(response.text).not.toMatch(/attempt|lease|startedAt/);
+
+    world.sessions.hasGenerationLock.mockResolvedValue(false);
+    const interrupted = await readSession(sessionId).expect(200);
+
+    expect(AiSessionStateSchema.parse(interrupted.body).execution).toEqual({
+      status: 'generation_failed',
+      error: {
+        code: 'AI_GENERATION_INTERRUPTED',
+        category: 'failed',
+        retryAfterSeconds: null,
+      },
+    });
+    expect(interrupted.text).not.toMatch(/attempt|lease|startedAt|failedAt/);
+    expect(world.stored.get(sessionId)?.execution?.status).toBe('generating');
+    expectNoReadSideEffects(1);
+  });
+
+  it('hides sessions that are unknown, malformed or owned by another user', async () => {
+    const owner = await sessionCookie('user-1');
+    const intruder = await sessionCookie('user-2');
+    const created = await createSession({ prompt: PROMPT }, owner).expect(201);
+    const sessionId = (created.body as AiSessionDto).sessionId;
+
+    for (const response of [
+      await readSession(sessionId).expect(404),
+      await readSession(sessionId, intruder).expect(404),
+      await readSession('unknown-session').expect(404),
+      await readSession('bad$token').expect(404),
+    ]) {
+      expect(response.body).toMatchObject({ code: 'AI_SESSION_NOT_FOUND' });
+    }
+    await readSession(sessionId, owner).expect(200);
+    expectNoReadSideEffects(1);
   });
 });

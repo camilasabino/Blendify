@@ -6,6 +6,7 @@ import {
   AiInterpretationError,
   type AiInterpretationErrorCode,
 } from '@/domain/errors/ai-interpretation.error';
+import { AiGenerationError } from '@/domain/errors/ai-generation.error';
 import {
   AiSessionError,
   type AiSessionErrorCode,
@@ -39,6 +40,9 @@ const AI_INTERPRETATION_ERROR_STATUS: Record<
 const AI_SESSION_ERROR_STATUS: Record<AiSessionErrorCode, number> = {
   AI_SESSION_NOT_FOUND: HttpStatus.NOT_FOUND,
   AI_CLARIFICATION_OPTION_UNAVAILABLE: HttpStatus.CONFLICT,
+  AI_SESSION_NOT_READY: HttpStatus.CONFLICT,
+  AI_GENERATION_IN_PROGRESS: HttpStatus.CONFLICT,
+  AI_GENERATION_SUPERSEDED: HttpStatus.CONFLICT,
 };
 
 export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
@@ -84,6 +88,15 @@ export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
       statusCode: AI_SESSION_ERROR_STATUS[exception.code],
       code: exception.code,
       message: exception.message,
+    };
+  }
+
+  if (exception instanceof AiGenerationError) {
+    return {
+      statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      code: exception.code,
+      message: exception.message,
+      details: { ...exception.details },
     };
   }
 

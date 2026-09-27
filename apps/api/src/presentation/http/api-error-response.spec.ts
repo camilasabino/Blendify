@@ -1,3 +1,5 @@
+import { AiGenerationError } from '@/domain/errors/ai-generation.error';
+import { AiSessionError } from '@/domain/errors/ai-session.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { TransferError } from '@/domain/errors/transfer.error';
@@ -51,6 +53,30 @@ describe('toApiErrorResponse', () => {
       message:
         'The transfer service is temporarily unavailable. Try again shortly.',
       details: { retryAfterSeconds: 45 },
+    });
+  });
+
+  it('maps a seed not found during AI generation to an editable 422', () => {
+    expect(
+      toApiErrorResponse(AiGenerationError.seedNotFound('track', ['Creeep'])),
+    ).toEqual({
+      statusCode: 422,
+      code: 'AI_SEED_NOT_FOUND',
+      message:
+        'Some requested artists or tracks could not be found. Edit the request and try again.',
+      details: { seedType: 'track', names: ['Creeep'] },
+    });
+  });
+
+  it.each([
+    AiSessionError.notReady(),
+    AiSessionError.generationInProgress(),
+    AiSessionError.generationSuperseded(),
+  ])('maps the AI session state conflict %s to 409', (error) => {
+    expect(toApiErrorResponse(error)).toEqual({
+      statusCode: 409,
+      code: error.code,
+      message: error.message,
     });
   });
 });

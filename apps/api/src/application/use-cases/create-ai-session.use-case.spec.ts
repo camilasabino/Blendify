@@ -56,6 +56,11 @@ function createUseCase(response: InterpretIntentResponse | Error) {
       return Promise.resolve();
     }),
     find: jest.fn(() => Promise.resolve(null)),
+    acquireGenerationLock: jest.fn(() => Promise.resolve('lease')),
+    releaseGenerationLock: jest.fn(() => Promise.resolve()),
+    hasGenerationLock: jest.fn(() => Promise.resolve(false)),
+    saveGenerationOutcome: jest.fn(() => Promise.resolve(true)),
+    renewGenerationLock: jest.fn(() => Promise.resolve(true)),
   };
   const useCase = new CreateAiSessionUseCase(interpreter, sessions);
   return { useCase, interpreter, saved };
@@ -100,7 +105,7 @@ describe('CreateAiSessionUseCase', () => {
       expiresAt: new Date(NOW.getTime() + AI_SESSION_TTL_MS).toISOString(),
       aiSafe: { intent: { artists: ['Radiohead', 'Interpol'] } },
     });
-    expect(session).not.toHaveProperty('execution');
+    expect(session.execution).toBeNull();
   });
 
   it('keeps an unresolved seed track as the user-authored names', async () => {

@@ -529,6 +529,88 @@ export const AiSessionSchema = z.strictObject({
   clarification: AiClarificationSchema.nullable(),
 });
 
+export const AI_MOOD_UNMET_REASONS = [
+  'seed_not_mood_based',
+  'mood_not_enforced_for_explicit_genres',
+] as const;
+
+export const AI_GENERATION_FAILURE_CATEGORIES = [
+  'seed_not_found',
+  'provider_rate_limited',
+  'provider_unavailable',
+  'insufficient_results',
+  'failed',
+] as const;
+
+export const AiGeneratedPlaylistSchema = GeneratedPlaylistSchema.omit({
+  generation: true,
+  transfer: true,
+});
+
+export const AiGenerationUnmetConstraintSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('track_count'),
+    requested: z.number().int().min(1).max(MAX_TRACKS),
+    actual: z.number().int().nonnegative(),
+  }),
+  z.strictObject({
+    type: z.literal('duration'),
+    requestedMinutes: z.number().int().positive(),
+    actualDurationMs: z.number().int().nonnegative(),
+  }),
+  z.strictObject({
+    type: z.literal('mood'),
+    mood: AiMoodSchema,
+    reason: z.enum(AI_MOOD_UNMET_REASONS),
+  }),
+]);
+
+const aiGenerationOutcomeShape = {
+  playlist: AiGeneratedPlaylistSchema,
+  trackCount: z.number().int().nonnegative(),
+  durationMs: z.number().int().nonnegative(),
+  unmetConstraints: z.array(AiGenerationUnmetConstraintSchema),
+};
+
+export const AiGenerationSchema = z.strictObject({
+  sessionId: z.string().min(1),
+  expiresAt: z.iso.datetime(),
+  status: z.literal('generated'),
+  intent: AiIntentSummarySchema,
+  ...aiGenerationOutcomeShape,
+});
+
+export const AiGenerationFailureSchema = z.strictObject({
+  code: z.string().min(1),
+  category: z.enum(AI_GENERATION_FAILURE_CATEGORIES),
+  retryAfterSeconds: z.number().nonnegative().nullable(),
+});
+
+export const AiSessionExecutionSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('generating') }),
+  z.strictObject({
+    status: z.literal('generated'),
+    ...aiGenerationOutcomeShape,
+  }),
+  z.strictObject({
+    status: z.literal('generation_failed'),
+    error: AiGenerationFailureSchema,
+  }),
+]);
+
+export const AiSessionStateSchema = AiSessionSchema.extend({
+  execution: AiSessionExecutionSchema.nullable(),
+});
+
+export const AiGenerationStreamEventSchema = z.discriminatedUnion('type', [
+  GenerationProgressEventSchema,
+  z.object({
+    type: z.literal('result'),
+    playlist: AiGenerationSchema,
+  }),
+  GenerationErrorEventSchema,
+]);
+
 export const CreateAiSessionRequestSchema = z.strictObject({
   prompt: z.string().trim().min(1).max(AI_PROMPT_MAX_LENGTH),
 });
@@ -595,6 +677,20 @@ export type AiClarificationOption = z.infer<typeof AiClarificationOptionSchema>;
 export type AiClarificationReason = (typeof AI_CLARIFICATION_REASONS)[number];
 export type AiClarification = z.infer<typeof AiClarificationSchema>;
 export type AiSessionDto = z.infer<typeof AiSessionSchema>;
+export type AiMoodUnmetReason = (typeof AI_MOOD_UNMET_REASONS)[number];
+export type AiGeneratedPlaylist = z.infer<typeof AiGeneratedPlaylistSchema>;
+export type AiGenerationUnmetConstraint = z.infer<
+  typeof AiGenerationUnmetConstraintSchema
+>;
+export type AiGenerationDto = z.infer<typeof AiGenerationSchema>;
+export type AiGenerationFailureCategory =
+  (typeof AI_GENERATION_FAILURE_CATEGORIES)[number];
+export type AiGenerationFailureDto = z.infer<typeof AiGenerationFailureSchema>;
+export type AiSessionExecutionDto = z.infer<typeof AiSessionExecutionSchema>;
+export type AiSessionStateDto = z.infer<typeof AiSessionStateSchema>;
+export type AiGenerationStreamEvent = z.infer<
+  typeof AiGenerationStreamEventSchema
+>;
 export type CreateAiSessionRequest = z.infer<typeof CreateAiSessionRequestSchema>;
 export type AnswerAiClarificationRequest = z.infer<
   typeof AnswerAiClarificationRequestSchema

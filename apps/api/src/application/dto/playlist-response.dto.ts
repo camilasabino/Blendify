@@ -1,4 +1,5 @@
 import type {
+  AiGeneratedPlaylist,
   GeneratedPlaylistDto,
   PlaylistDetail,
   PlaylistSummary,
@@ -54,19 +55,27 @@ export function toPlaylistDetail(playlist: Playlist): PlaylistDetail {
   };
 }
 
-export function toGeneratedPlaylistResponse(
+export function toGeneratedPlaylistPreview(
   playlist: GeneratedPlaylist,
-  transfer: PlaylistTransferOffer | null,
-): GeneratedPlaylistDto {
+): AiGeneratedPlaylist {
   return {
     name: playlist.name,
     description: playlist.description,
-    generation: playlist.generation,
     seeds: [...playlist.seeds],
     tracks: playlist.tracks.map(toTrackResponse),
     ...(playlist.coverArtwork
       ? { coverArtwork: { ...playlist.coverArtwork } }
       : {}),
+  };
+}
+
+export function toGeneratedPlaylistResponse(
+  playlist: GeneratedPlaylist,
+  transfer: PlaylistTransferOffer | null,
+): GeneratedPlaylistDto {
+  return {
+    ...toGeneratedPlaylistPreview(playlist),
+    generation: playlist.generation,
     transfer: transfer
       ? { token: transfer.token, expiresAt: transfer.expiresAt.toISOString() }
       : null,

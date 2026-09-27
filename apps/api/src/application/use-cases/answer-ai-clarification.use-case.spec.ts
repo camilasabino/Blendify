@@ -35,6 +35,7 @@ function storedSession(overrides: Partial<AiSession> = {}): AiSession {
     promptVersion: 'intent-v2',
     aiSafe: { intent: DISCOVER_INTENT },
     clarification: findIntentClarification(DISCOVER_INTENT),
+    execution: null,
     createdAt: NOW.toISOString(),
     updatedAt: NOW.toISOString(),
     expiresAt: EXPIRES_AT.toISOString(),
@@ -50,6 +51,11 @@ function createUseCase(session: AiSession | null) {
       return Promise.resolve();
     }),
     find: jest.fn(() => Promise.resolve(session)),
+    acquireGenerationLock: jest.fn(() => Promise.resolve('lease')),
+    releaseGenerationLock: jest.fn(() => Promise.resolve()),
+    hasGenerationLock: jest.fn(() => Promise.resolve(false)),
+    saveGenerationOutcome: jest.fn(() => Promise.resolve(true)),
+    renewGenerationLock: jest.fn(() => Promise.resolve(true)),
   };
   return {
     useCase: new AnswerAiClarificationUseCase(sessions),

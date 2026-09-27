@@ -31,7 +31,7 @@ export function toAiSessionResponse(
   };
 }
 
-function toIntentSummary(intent: AiIntent): AiIntentSummary {
+export function toIntentSummary(intent: AiIntent): AiIntentSummary {
   return {
     kind: intent.kind,
     artists: intent.artists,

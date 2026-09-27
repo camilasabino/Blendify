@@ -83,6 +83,21 @@ describe('AiIntentResolver', () => {
     expect(catalog.searchArtists).not.toHaveBeenCalled();
   });
 
+  it('resolves a mood-only genre mix with no explicit genres and no provider calls', async () => {
+    const { catalog, resolver } = createResolver();
+
+    const resolution = await resolver.resolve(
+      intent({ kind: 'genre_mix', mood: 'calm' }),
+    );
+
+    expect(resolution).toEqual({
+      status: 'resolved',
+      seeds: { artists: [], genres: [], track: null },
+    });
+    expect(catalog.searchArtists).not.toHaveBeenCalled();
+    expect(catalog.searchTracks).not.toHaveBeenCalled();
+  });
+
   it.each(['definitely not a genre', 'custom:anything'])(
     'reports an unknown genre: %s',
     async (name) => {
@@ -122,6 +137,25 @@ describe('AiIntentResolver', () => {
       'Radiohead',
       'Interpol',
     ]);
+  });
+
+  it('checks before every artist lookup and stops once the check fails', async () => {
+    const { catalog, resolver } = createResolver();
+    const stop = new Error('lease lost');
+    let lookups = 0;
+
+    await expect(
+      resolver.resolve(
+        intent({ artists: ['Radiohead', 'Interpol', 'Slowdive'] }),
+        () => {
+          lookups += 1;
+          if (lookups > 1) {
+            throw stop;
+          }
+        },
+      ),
+    ).rejects.toBe(stop);
+    expect(catalog.searchArtists).toHaveBeenCalledTimes(1);
   });
 
   it('reports artists the catalog cannot match', async () => {
