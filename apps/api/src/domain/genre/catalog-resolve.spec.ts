@@ -3,6 +3,7 @@ import {
   resolveAttemptBudget,
   resolveCatalogTracks,
   resolveCatalogWithPoolExpand,
+  seedResolveAttemptLimit,
 } from './catalog-resolve';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
@@ -239,6 +240,141 @@ describe('resolveCatalogWithPoolExpand', () => {
 
     expect(tracks).toHaveLength(5);
     expect(calls).toBeGreaterThan(20);
+  });
+
+  const chartOf = (length: number) =>
+    Array.from({ length }, (_, i) => ({
+      artistName: 'A',
+      trackName: `Song ${i}`,
+    }));
+
+  it('stops at maxAttempts when every candidate misses', async () => {
+    const resolveTrack = jest.fn().mockResolvedValue(null);
+    const provider = { resolveTrack } as unknown as CatalogProviderPort;
+
+    const tracks = await resolveCatalogWithPoolExpand(
+      provider,
+      chartOf(50),
+      PopularityMode.BALANCED,
+      6,
+      { concurrency: 1, maxAttempts: 18, random: () => 0 },
+    );
+
+    expect(tracks).toEqual([]);
+    expect(resolveTrack).toHaveBeenCalledTimes(18);
+  });
+
+  it('returns the partial matches when maxAttempts is reached', async () => {
+    let calls = 0;
+    const provider = {
+      resolveTrack: () => {
+        calls += 1;
+        return Promise.resolve(calls % 4 === 0 ? makeTrack(`t${calls}`) : null);
+      },
+    } as unknown as CatalogProviderPort;
+
+    const tracks = await resolveCatalogWithPoolExpand(
+      provider,
+      chartOf(50),
+      PopularityMode.BALANCED,
+      6,
+      { concurrency: 1, maxAttempts: 18, random: () => 0 },
+    );
+
+    expect(calls).toBe(18);
+    expect(tracks.map((t) => t.id.getValue())).toEqual([
+      't4',
+      't8',
+      't12',
+      't16',
+    ]);
+  });
+
+  it('stops normally once needed is filled before the cap', async () => {
+    let calls = 0;
+    const provider = {
+      resolveTrack: () => {
+        calls += 1;
+        return Promise.resolve(makeTrack(`t${calls}`));
+      },
+    } as unknown as CatalogProviderPort;
+
+    const tracks = await resolveCatalogWithPoolExpand(
+      provider,
+      chartOf(50),
+      PopularityMode.BALANCED,
+      6,
+      { concurrency: 1, maxAttempts: 18, random: () => 0 },
+    );
+
+    expect(tracks).toHaveLength(6);
+    expect(calls).toBe(6);
+  });
+
+  it('never attempts more than the available chart', async () => {
+    const resolveTrack = jest.fn().mockResolvedValue(null);
+    const provider = { resolveTrack } as unknown as CatalogProviderPort;
+
+    await resolveCatalogWithPoolExpand(
+      provider,
+      chartOf(10),
+      PopularityMode.POPULAR,
+      6,
+      { concurrency: 1, maxAttempts: 18, random: () => 0 },
+    );
+
+    expect(resolveTrack).toHaveBeenCalledTimes(10);
+  });
+
+  it('still aborts on Spotify quota when a cap is set', async () => {
+    let calls = 0;
+    const provider = {
+      resolveTrack: () => {
+        calls += 1;
+        return calls === 3
+          ? Promise.reject(
+              new BusinessRuleError('quota', 'SPOTIFY_QUOTA_EXCEEDED'),
+            )
+          : Promise.resolve(null);
+      },
+    } as unknown as CatalogProviderPort;
+
+    await expect(
+      resolveCatalogWithPoolExpand(
+        provider,
+        chartOf(50),
+        PopularityMode.BALANCED,
+        6,
+        { concurrency: 1, maxAttempts: 18, random: () => 0 },
+      ),
+    ).rejects.toMatchObject({ code: 'SPOTIFY_QUOTA_EXCEEDED' });
+    expect(calls).toBe(3);
+  });
+
+  it('still aborts when the catalog is unavailable and a cap is set', async () => {
+    const resolveTrack = jest
+      .fn()
+      .mockRejectedValue(new CatalogUnavailableError());
+    const provider = { resolveTrack } as unknown as CatalogProviderPort;
+
+    await expect(
+      resolveCatalogWithPoolExpand(
+        provider,
+        chartOf(50),
+        PopularityMode.BALANCED,
+        6,
+        { concurrency: 1, maxAttempts: 18, random: () => 0 },
+      ),
+    ).rejects.toBeInstanceOf(CatalogUnavailableError);
+    expect(resolveTrack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('seedResolveAttemptLimit', () => {
+  it('allows a bounded multiple of the per-seed need', () => {
+    expect(seedResolveAttemptLimit(6)).toBe(18);
+    expect(seedResolveAttemptLimit(2)).toBe(14);
+    expect(seedResolveAttemptLimit(0)).toBe(0);
   });
 });
 

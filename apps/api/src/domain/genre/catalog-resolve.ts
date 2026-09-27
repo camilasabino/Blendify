@@ -15,6 +15,9 @@ const DEFAULT_CONCURRENCY = 1;
 
 const ATTEMPT_BUDGET_OVER_FETCH = 6;
 
+const SEED_ATTEMPT_MULTIPLIER = 3;
+const SEED_ATTEMPT_MIN_OVER_FETCH = 12;
+
 export function isSpotifyQuotaError(error: unknown): boolean {
   return (
     error instanceof BusinessRuleError &&
@@ -153,6 +156,16 @@ export function resolveAttemptBudget(needed: number): number {
   return needed + ATTEMPT_BUDGET_OVER_FETCH;
 }
 
+export function seedResolveAttemptLimit(needed: number): number {
+  if (needed <= 0) {
+    return 0;
+  }
+  return Math.max(
+    needed * SEED_ATTEMPT_MULTIPLIER,
+    needed + SEED_ATTEMPT_MIN_OVER_FETCH,
+  );
+}
+
 /**
  * Resolve tracks from a Last.fm chart using the popularity pool, then expand
  * the pool toward the rest of the chart until `needed` is filled or the chart
@@ -167,6 +180,7 @@ export async function resolveCatalogWithPoolExpand(
     concurrency?: number;
     maxPerArtist?: number;
     artistId?: string;
+    maxAttempts?: number;
     random?: () => number;
     onProgress?: (update: CatalogResolveProgress) => void;
   } = {},
@@ -180,31 +194,36 @@ export async function resolveCatalogWithPoolExpand(
   const attemptedKeys = new Set<string>();
   let bounds = catalogPoolBounds(chart.length, mode);
   const random = options.random ?? Math.random;
+  const maxAttempts = options.maxAttempts ?? Number.POSITIVE_INFINITY;
   let attempted = 0;
 
-  while (collected.length < needed) {
+  while (collected.length < needed && attempted < maxAttempts) {
     const remaining = needed - collected.length;
     const {
-      batch,
+      batch: candidates,
       bounds: nextBounds,
       exhausted,
     } = nextCatalogBatch(chart, mode, remaining, attemptedKeys, bounds, random);
     bounds = nextBounds;
 
-    if (exhausted || batch.length === 0) {
+    if (exhausted || candidates.length === 0) {
       break;
     }
+
+    const batch = candidates.slice(0, maxAttempts - attempted);
 
     for (const entry of batch) {
       attemptedKeys.add(catalogEntryKey(entry));
     }
 
+    let batchAttempted = 0;
     const resolved = await resolveCatalogTracks(provider, batch, {
       needed: remaining,
       concurrency: options.concurrency,
       maxPerArtist: options.maxPerArtist,
       artistId: options.artistId,
       onProgress: (update) => {
+        batchAttempted = update.attempted;
         options.onProgress?.({
           matched: collected.length + update.matched,
           needed,
@@ -213,7 +232,7 @@ export async function resolveCatalogWithPoolExpand(
       },
     });
 
-    attempted += batch.length;
+    attempted += batchAttempted;
 
     for (const track of resolved) {
       const id = track.id.getValue();

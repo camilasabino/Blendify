@@ -35,6 +35,7 @@ import {
   isFatalCatalogError,
   isSpotifyQuotaError,
   resolveCatalogWithPoolExpand,
+  seedResolveAttemptLimit,
 } from '@/domain/genre/catalog-resolve';
 import {
   buildDefaultPlaylistDescription,
@@ -427,6 +428,7 @@ export class GenerateArtistMixUseCase {
         {
           concurrency: 1,
           artistId: artist.id.getValue(),
+          maxAttempts: seedResolveAttemptLimit(tracksPerSeed),
           onProgress: (update) => {
             onMatched?.(Math.min(update.matched, tracksPerSeed));
           },

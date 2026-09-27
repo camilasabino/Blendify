@@ -477,3 +477,126 @@ describe('SpotifyCatalogClient.resolveTrack', () => {
     ).resolves.toBeNull();
   });
 });
+
+describe('SpotifyCatalogClient.resolveTrack cache', () => {
+  const smoothOperator = {
+    id: 'track-1',
+    name: 'Smooth Operator',
+    duration_ms: 1000,
+    uri: 'spotify:track:track-1',
+    artists: [{ id: 'sade', name: 'Sade' }],
+  };
+
+  it('does not call Spotify twice for a repeated successful resolution', async () => {
+    const { api, raw } = createApi({ tracks: { items: [smoothOperator] } });
+    const { cache } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    const first = await client.resolveTrack('Sade', 'Smooth Operator', {
+      artistId: 'sade',
+    });
+    const second = await client.resolveTrack('Sade', 'Smooth Operator', {
+      artistId: 'sade',
+    });
+
+    expect(raw).toHaveBeenCalledTimes(1);
+    expect(first?.id.getValue()).toBe('track-1');
+    expect(second?.id.getValue()).toBe('track-1');
+    expect(second?.artistId.getValue()).toBe('sade');
+  });
+
+  it('does not call Spotify twice for a repeated confirmed no-match', async () => {
+    const { api, raw } = createApi({ tracks: { items: [] } });
+    const { cache } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    expect(await client.resolveTrack('Sade', 'Unknown Song')).toBeNull();
+    expect(await client.resolveTrack('Sade', 'Unknown Song')).toBeNull();
+
+    expect(raw).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cache provider errors', async () => {
+    const { api, raw } = createApi({ tracks: { items: [smoothOperator] } });
+    raw.mockRejectedValueOnce(httpError(500));
+    const { cache, store } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    await expect(
+      client.resolveTrack('Sade', 'Smooth Operator'),
+    ).rejects.toBeInstanceOf(CatalogUnavailableError);
+    expect(store.size).toBe(0);
+
+    const retried = await client.resolveTrack('Sade', 'Smooth Operator');
+    expect(retried?.id.getValue()).toBe('track-1');
+    expect(raw).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache quota or network failures', async () => {
+    const { api, raw } = createApi({ tracks: { items: [smoothOperator] } });
+    raw
+      .mockRejectedValueOnce(httpError(429))
+      .mockRejectedValueOnce(networkError());
+    const { cache, store } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    await expect(
+      client.resolveTrack('Sade', 'Smooth Operator'),
+    ).rejects.toMatchObject({ code: 'SPOTIFY_RATE_LIMITED' });
+    await expect(
+      client.resolveTrack('Sade', 'Smooth Operator'),
+    ).rejects.toBeInstanceOf(CatalogUnavailableError);
+
+    expect(store.size).toBe(0);
+  });
+
+  it('does not cache malformed responses', async () => {
+    const { api, raw } = createApi({});
+    const { cache, store } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    expect(await client.resolveTrack('Sade', 'Smooth Operator')).toBeNull();
+    expect(await client.resolveTrack('Sade', 'Smooth Operator')).toBeNull();
+
+    expect(store.size).toBe(0);
+    expect(raw).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps resolutions separate per expected artist id', async () => {
+    const { api, raw } = createApi({ tracks: { items: [smoothOperator] } });
+    const { cache } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    const scoped = await client.resolveTrack('Sade', 'Smooth Operator', {
+      artistId: 'sade',
+    });
+    const otherProfile = await client.resolveTrack('Sade', 'Smooth Operator', {
+      artistId: 'other-sade',
+    });
+
+    expect(raw).toHaveBeenCalledTimes(2);
+    expect(scoped?.id.getValue()).toBe('track-1');
+    expect(otherProfile).toBeNull();
+  });
+
+  it('keeps resolutions separate per market', async () => {
+    const { api, raw } = createApi({ tracks: { items: [smoothOperator] } });
+    const { cache } = createCache();
+    const tokens = createTokens();
+
+    await new SpotifyCatalogClient(api, tokens, 'AR', cache).resolveTrack(
+      'Sade',
+      'Smooth Operator',
+    );
+    await new SpotifyCatalogClient(api, tokens, 'BR', cache).resolveTrack(
+      'Sade',
+      'Smooth Operator',
+    );
+
+    expect(raw).toHaveBeenCalledTimes(2);
+    expect(raw.mock.calls.map(([, config]) => config.params?.market)).toEqual([
+      'AR',
+      'BR',
+    ]);
+  });
+});

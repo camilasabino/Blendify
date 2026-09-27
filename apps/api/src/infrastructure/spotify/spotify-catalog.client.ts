@@ -73,6 +73,9 @@ type CachedTrack = {
 
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const ARTIST_CACHE_TTL_MS = 30 * 60 * 1000;
+const RESOLVE_CACHE_TTL_MS = 30 * 60 * 1000;
+
+type CachedResolution = { track: CachedTrack | null };
 
 export class SpotifyCatalogClient implements CatalogProviderPort {
   private readonly logger = new Logger(SpotifyCatalogClient.name);
@@ -165,10 +168,17 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
       return null;
     }
     const expectedArtistId = options.artistId?.trim() || undefined;
+    const key = `${this.cacheKey('resolve-track', `${artist}\u0000${title}`)}${
+      expectedArtistId ?? ''
+    }`;
+    const cached = await this.cache?.getJson<CachedResolution>(key);
+    if (cached) {
+      return cached.track ? hydrateTrack(cached.track) : null;
+    }
 
     try {
       const data = await this.request<{
-        tracks: { items: SpotifyTrack[] };
+        tracks?: { items?: SpotifyTrack[] };
       }>('resolveTrack', {
         method: 'GET',
         url: '/search',
@@ -181,8 +191,11 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
         },
       });
 
-      const items = (data.tracks?.items ?? []).filter(
-        (item): item is SpotifyTrack => Boolean(item?.id && item?.uri),
+      if (!Array.isArray(data?.tracks?.items)) {
+        return null;
+      }
+      const items = data.tracks.items.filter((item): item is SpotifyTrack =>
+        Boolean(item?.id && item?.uri),
       );
 
       const scoped = expectedArtistId
@@ -192,6 +205,7 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
         : items;
 
       if (scoped.length === 0) {
+        await this.cacheResolution(key, null);
         return null;
       }
 
@@ -206,9 +220,11 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
         });
       });
 
-      return pickResolvedTrack(tracks, artist, title, {
+      const picked = pickResolvedTrack(tracks, artist, title, {
         requireArtistNameMatch: !expectedArtistId,
       });
+      await this.cacheResolution(key, picked);
+      return picked;
     } catch (error) {
       if (isFatalCatalogError(error)) {
         throw error;
@@ -318,6 +334,19 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
     return this.cache
       .getJson<CachedArtist>(`spotify:artist:${id}`)
       .then((artist) => (artist ? hydrateArtist(artist) : null));
+  }
+
+  private async cacheResolution(
+    key: string,
+    track: Track | null,
+  ): Promise<void> {
+    await this.cache?.setJson(
+      key,
+      {
+        track: track ? serializeTrack(track) : null,
+      } satisfies CachedResolution,
+      RESOLVE_CACHE_TTL_MS,
+    );
   }
 
   private async cacheArtist(artist: Artist): Promise<void> {
