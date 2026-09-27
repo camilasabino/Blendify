@@ -6,6 +6,7 @@ import {
   Blend,
   Compass,
   Library,
+  Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useCapabilities } from '@/hooks/use-capabilities'
@@ -15,6 +16,7 @@ import { BlendifyMark } from '@/components/brand/blendify-mark'
 import { AccountMenu } from '@/components/layout/account-menu'
 import { ConnectSpotifyButton } from '@/components/layout/connect-spotify-button'
 import { readSpotifyRequiredState } from '@/lib/spotify-required'
+import { isAiCreationEnabled } from '@/lib/ai-creation'
 import { SpotifyRequiredNotice } from '@/components/layout/spotify-required-notice'
 import { Footer } from '@/components/layout/footer'
 import { ConfirmDialog } from '@/components/ui/dialog'
@@ -27,13 +29,22 @@ import { cn, focusRing, pageGutter, shellGutter } from '@/lib/utils'
 type NavItem = {
   to: string
   labelKey: MessageKey
+  tabLabelKey?: MessageKey
   icon: typeof Blend
   requires?: SpotifyOnlyCapability
+}
+
+const AI_NAV_ITEM: NavItem = {
+  to: '/app/ai',
+  labelKey: 'nav.ai',
+  tabLabelKey: 'nav.aiShort',
+  icon: Sparkles,
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
   { to: '/app/mix', labelKey: 'nav.create', icon: Blend },
   { to: '/app/discover', labelKey: 'nav.discover', icon: Compass },
+  ...(isAiCreationEnabled() ? [AI_NAV_ITEM] : []),
   {
     to: '/app/library',
     labelKey: 'nav.library',
@@ -207,10 +218,17 @@ export function AppShell() {
 
         <nav className="lg:hidden" aria-label={t('nav.main')}>
           <div className="mx-auto flex w-full max-w-6xl gap-1 px-2 pt-1 sm:px-6 md:justify-center md:gap-2">
-            {navItems.map(({ to, labelKey, icon: Icon }) => (
+            {navItems.map(({ to, labelKey, tabLabelKey, icon: Icon }) => (
               <NavLink key={to} to={to} className={tabLinkClass}>
                 <Icon aria-hidden className="size-4 shrink-0" />
-                {t(labelKey)}
+                {tabLabelKey ? (
+                  <>
+                    <span aria-hidden>{t(tabLabelKey)}</span>
+                    <span className="sr-only">{t(labelKey)}</span>
+                  </>
+                ) : (
+                  t(labelKey)
+                )}
               </NavLink>
             ))}
           </div>

@@ -2,6 +2,14 @@ import { HttpStatus } from '@nestjs/common';
 import type { ApiErrorResponse } from '@blendify/contracts';
 import { ZodError } from 'zod';
 import { DomainError } from '@/domain/errors/domain.error';
+import {
+  AiInterpretationError,
+  type AiInterpretationErrorCode,
+} from '@/domain/errors/ai-interpretation.error';
+import {
+  AiSessionError,
+  type AiSessionErrorCode,
+} from '@/domain/errors/ai-session.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import {
@@ -15,6 +23,22 @@ const TRANSFER_ERROR_STATUS: Record<TransferErrorCode, number> = {
   TRANSFER_TOKEN_EXPIRED: HttpStatus.GONE,
   TRANSFER_PLAYLIST_REJECTED: HttpStatus.UNPROCESSABLE_ENTITY,
   TRANSFER_PROVIDER_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+};
+
+const AI_INTERPRETATION_ERROR_STATUS: Record<
+  AiInterpretationErrorCode,
+  number
+> = {
+  AI_REQUEST_REJECTED: HttpStatus.BAD_REQUEST,
+  AI_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  AI_RATE_LIMITED: HttpStatus.TOO_MANY_REQUESTS,
+  AI_TIMEOUT: HttpStatus.GATEWAY_TIMEOUT,
+  AI_INVALID_OUTPUT: HttpStatus.BAD_GATEWAY,
+};
+
+const AI_SESSION_ERROR_STATUS: Record<AiSessionErrorCode, number> = {
+  AI_SESSION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  AI_CLARIFICATION_OPTION_UNAVAILABLE: HttpStatus.CONFLICT,
 };
 
 export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
@@ -44,6 +68,22 @@ export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
       ...(exception.retryAfterSeconds
         ? { details: { retryAfterSeconds: exception.retryAfterSeconds } }
         : {}),
+    };
+  }
+
+  if (exception instanceof AiInterpretationError) {
+    return {
+      statusCode: AI_INTERPRETATION_ERROR_STATUS[exception.code],
+      code: exception.code,
+      message: exception.message,
+    };
+  }
+
+  if (exception instanceof AiSessionError) {
+    return {
+      statusCode: AI_SESSION_ERROR_STATUS[exception.code],
+      code: exception.code,
+      message: exception.message,
     };
   }
 

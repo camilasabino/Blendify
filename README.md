@@ -147,6 +147,13 @@ npm run ai:sync                        # and AI_SERVICE_URL in apps/api/.env
 npm run dev:ai                         # http://127.0.0.1:8000/health
 ```
 
+`AI_PROVIDER` is required (`openai`, or `disabled` to keep interpretation
+unavailable); `openai` also requires `AI_MODEL` and `OPENAI_API_KEY` (read only
+by the AI service). There are no code defaults for provider or model. With
+`openai`, each `/app/ai` request is a paid model call. Create with AI
+(`/app/ai`) is shown in dev builds; production builds need
+`VITE_AI_CREATION_ENABLED=true`.
+
 `npm run start` also starts it when `uv` and `apps/ai/.env` are present.
 Playback control requires Spotify Premium; Development Mode apps must
 allow-list every account that signs in.
@@ -160,6 +167,7 @@ npm run test:e2e     # Playwright browser suite
 npm run lint         # ESLint + oxlint
 npm run test:ai      # AI service tests (pytest)
 npm run lint:ai      # AI service lint + format check (ruff)
+ALLOW_PAID_AI_EVALS=true npm run eval:ai -- --confirm  # paid real-model eval (manual only)
 ```
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/)

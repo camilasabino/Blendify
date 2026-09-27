@@ -155,17 +155,30 @@ describe('Guest routing', () => {
     expect(screen.queryByText(notice)).toBeNull()
   })
 
-  it('shows Mix, Discover, and Connect Spotify only', async () => {
+  it('shows Mix, Discover, Create with AI, and Connect Spotify only', async () => {
     renderApp('/app/mix')
     await screen.findByRole('heading', { name: 'Create your mix' })
 
     const links = within(mainNav()).getAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual(['Mix', 'Discover'])
+    expect(links.map((link) => link.textContent)).toEqual([
+      'Mix',
+      'Discover',
+      'Create with AI',
+    ])
     expect(screen.queryByRole('link', { name: 'Library' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Stats' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Account menu/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Preferences' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Connect Spotify' })).toBeVisible()
+  })
+
+  it('opens Create with AI without a Spotify session', async () => {
+    renderApp('/app/ai')
+
+    expect(
+      await screen.findByRole('heading', { name: 'Describe the playlist you want' }),
+    ).toBeVisible()
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/ai')
   })
 
   it('starts the existing OAuth flow from Connect Spotify', async () => {
@@ -315,6 +328,7 @@ describe('Spotify Mode routing', () => {
     expect(links.map((link) => link.textContent)).toEqual([
       'Mix',
       'Discover',
+      'Create with AI',
       'Library',
       'Stats',
     ])

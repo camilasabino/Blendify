@@ -12,7 +12,6 @@ AI_INTENT_USER_TEXT_MAX_LENGTH = 300
 PlaylistKind = Literal["artist_mix", "genre_mix", "discover_artist", "discover_track"]
 PopularityMode = Literal["popular", "balanced", "rarities"]
 TrackOrderMode = Literal["artist", "title", "random"]
-CapabilityStatus = Literal["needs_clarification", "deferred"]
 UnsupportedConstraintCategory = Literal[
     "duration",
     "era",
@@ -50,7 +49,6 @@ class IntentTrackReference(WireModel):
 
 class UnsupportedConstraint(WireModel):
     category: UnsupportedConstraintCategory
-    capability: CapabilityStatus
     user_text: UserText
 
 

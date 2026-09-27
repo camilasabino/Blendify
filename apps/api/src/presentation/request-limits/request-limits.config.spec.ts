@@ -40,6 +40,19 @@ describe('resolveRateLimits', () => {
     });
   });
 
+  it('defines a dedicated fail-closed AI interpretation bucket', () => {
+    expect(DEFAULT_RATE_LIMITS.interpret).toEqual({
+      limit: 10,
+      windowMs: 600_000,
+      onStoreUnavailable: 'fail-closed',
+    });
+    expect(resolveRateLimits('interpret=4/300').interpret).toEqual({
+      limit: 4,
+      windowMs: 300_000,
+      onStoreUnavailable: 'fail-closed',
+    });
+  });
+
   it.each([
     ['unknown bucket', 'upload=5/60', /unknown bucket "upload"/],
     ['duplicate bucket', 'search=5/60,search=6/60', /duplicate bucket/],

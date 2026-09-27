@@ -1,6 +1,8 @@
-from collections.abc import Mapping
-
-from app.providers.model_provider import ModelIntentRequest, ModelUnavailableError
+from app.providers.model_provider import (
+    ModelIntentRequest,
+    ModelIntentResult,
+    ModelUnavailableError,
+)
 
 
 class DisabledModelProvider:
@@ -8,5 +10,5 @@ class DisabledModelProvider:
     def is_available(self) -> bool:
         return False
 
-    async def generate_intent(self, request: ModelIntentRequest) -> Mapping[str, object]:
+    async def generate_intent(self, request: ModelIntentRequest) -> ModelIntentResult:
         raise ModelUnavailableError("No model provider is configured")

@@ -39,6 +39,7 @@ npm run db:generate      # generate Prisma Client
 npm run db:migrate        # create/apply a local Prisma migration
 
 npm run ai:sync / dev:ai / test:ai / lint:ai   # AI service (uv; port 8000)
+ALLOW_PAID_AI_EVALS=true npm run eval:ai -- --confirm   # paid real-model intent eval (manual only, never in CI)
 
 npm run docker:up          # start PostgreSQL + Redis
 npm run start                 # start infra + both apps (logs in .blendify/logs/)
@@ -77,6 +78,12 @@ Git hooks (Husky + commitlint) enforce Conventional Commits and run lint on pre-
 **External API pressure**: Spotify Development Mode has a strict rolling request budget. The API mitigates this with Redis-backed search/catalog caches, sequential resolution, lazy suggestions, and typed quota errors surfaced through `spotify-quota-guard`/`spotify-quota.service`. Generation limits: 12 artists per Artist Mix, 5 genres per Genre Mix, 50 tracks per playlist, `floor(50 / seedCount)` tracks per seed.
 
 **Logging**: outbound Spotify/Last.fm/token-refresh calls use structured JSON logging with secrets and sensitive query params redacted.
+
+## Paid AI provider calls
+
+Never execute paid/external AI-provider calls or real-model evals without explicit user approval for that specific run, even if credentials are already configured. This covers OpenAI and any future model provider, real-model evals, paid API smoke tests, manual provider experiments, and submitting prompts to `/app/ai` while `apps/ai/.env` enables a real provider. A configured `OPENAI_API_KEY` is not authorization. Mocked/deterministic tests are unaffected.
+
+No normal command (dev, start, test, lint, format, build, git/install hooks, CI) may trigger a real model call. `eval:ai` stays manual-only: it refuses to run unless `OPENAI_API_KEY`, `AI_PROVIDER=openai`, `AI_MODEL`, a command-line `ALLOW_PAID_AI_EVALS=true` (never persisted in an env file), and `--confirm` are all present.
 
 ## Quality analysis
 

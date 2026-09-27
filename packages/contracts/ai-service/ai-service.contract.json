@@ -96,13 +96,6 @@
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
-                        "capability": {
-                          "type": "string",
-                          "enum": [
-                            "deferred",
-                            "needs_clarification"
-                          ]
-                        },
                         "category": {
                           "type": "string",
                           "enum": [
@@ -124,7 +117,6 @@
                         }
                       },
                       "required": [
-                        "capability",
                         "category",
                         "userText"
                       ]
@@ -301,13 +293,6 @@
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
-                        "capability": {
-                          "type": "string",
-                          "enum": [
-                            "deferred",
-                            "needs_clarification"
-                          ]
-                        },
                         "category": {
                           "type": "string",
                           "enum": [
@@ -329,7 +314,6 @@
                         }
                       },
                       "required": [
-                        "capability",
                         "category",
                         "userText"
                       ]

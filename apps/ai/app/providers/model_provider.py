@@ -10,11 +10,24 @@ class ModelIntentRequest:
     user_prompt: str
 
 
+@dataclass(frozen=True, slots=True)
+class ModelTokenUsage:
+    input_tokens: int
+    output_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
+class ModelIntentResult:
+    payload: Mapping[str, object]
+    model: str
+    usage: ModelTokenUsage | None
+
+
 class IntentModelProvider(Protocol):
     @property
     def is_available(self) -> bool: ...
 
-    async def generate_intent(self, request: ModelIntentRequest) -> Mapping[str, object]: ...
+    async def generate_intent(self, request: ModelIntentRequest) -> ModelIntentResult: ...
 
 
 class ModelProviderError(Exception):
@@ -25,9 +38,17 @@ class ModelUnavailableError(ModelProviderError):
     pass
 
 
+class ModelConfigurationError(ModelProviderError):
+    pass
+
+
 class ModelRateLimitedError(ModelProviderError):
     pass
 
 
 class ModelTimeoutError(ModelProviderError):
+    pass
+
+
+class ModelInvalidOutputError(ModelProviderError):
     pass

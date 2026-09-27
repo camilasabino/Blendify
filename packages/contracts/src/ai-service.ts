@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import {
+  AI_PROMPT_MAX_LENGTH,
+  AI_UNSUPPORTED_CONSTRAINT_CATEGORIES,
   PlaylistKindSchema,
   PopularityModeSchema,
   TrackOrderModeSchema,
 } from './index';
 
-export const AI_INTENT_PROMPT_MAX_LENGTH = 2_000;
+export const AI_INTENT_PROMPT_MAX_LENGTH = AI_PROMPT_MAX_LENGTH;
 export const AI_INTENT_NAME_MAX_LENGTH = 200;
 export const AI_INTENT_LIST_MAX_ITEMS = 25;
 export const AI_INTENT_TARGET_TRACK_COUNT_MAX = 1_000;
@@ -13,18 +15,8 @@ export const AI_INTENT_USER_TEXT_MAX_LENGTH = 300;
 export const AI_PROMPT_VERSION_MAX_LENGTH = 64;
 export const AI_SERVICE_ERROR_MESSAGE_MAX_LENGTH = 300;
 
-export const CAPABILITY_STATUSES = ['needs_clarification', 'deferred'] as const;
-export const UNSUPPORTED_CONSTRAINT_CATEGORIES = [
-  'duration',
-  'era',
-  'energy',
-  'mood',
-  'activity',
-  'tempo',
-  'progression',
-  'artist_attribute',
-  'other',
-] as const;
+export const UNSUPPORTED_CONSTRAINT_CATEGORIES =
+  AI_UNSUPPORTED_CONSTRAINT_CATEGORIES;
 export const CLARIFICATION_REASONS = [
   'ambiguous_request',
   'unsupported_constraint',
@@ -55,7 +47,6 @@ export const IntentTrackReferenceSchema = z.strictObject({
 
 export const UnsupportedConstraintSchema = z.strictObject({
   category: z.enum(UNSUPPORTED_CONSTRAINT_CATEGORIES),
-  capability: z.enum(CAPABILITY_STATUSES),
   userText: z.string().trim().min(1).max(AI_INTENT_USER_TEXT_MAX_LENGTH),
 });
 
@@ -127,6 +118,9 @@ export const AI_SERVICE_WIRE_SCHEMAS = {
 
 export type IntentTrackReference = z.infer<typeof IntentTrackReferenceSchema>;
 export type UnsupportedConstraint = z.infer<typeof UnsupportedConstraintSchema>;
+export type UnsupportedConstraintCategory =
+  (typeof UNSUPPORTED_CONSTRAINT_CATEGORIES)[number];
+export type ClarificationReason = (typeof CLARIFICATION_REASONS)[number];
 export type PlaylistIntent = z.infer<typeof PlaylistIntentSchema>;
 export type IntentClarification = z.infer<typeof IntentClarificationSchema>;
 export type IntentInterpretation = z.infer<typeof IntentInterpretationSchema>;

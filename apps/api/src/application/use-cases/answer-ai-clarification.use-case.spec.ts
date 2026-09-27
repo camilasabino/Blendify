@@ -1,0 +1,153 @@
+import { AiIntentEvaluator } from '@/application/services/ai-intent-evaluator.service';
+import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
+import { Artist } from '@/domain/artist/artist.entity';
+import type { AiIntent } from '@/domain/ai/ai-intent';
+import { findIntentClarification } from '@/domain/ai/ai-intent-rules';
+import {
+  AI_SESSION_RECORD_VERSION,
+  type AiSession,
+} from '@/domain/ai/ai-session';
+import { AiSessionError } from '@/domain/errors/ai-session.error';
+import type { AiSessionRepositoryPort } from '@/domain/repositories/ai-session.repository.port';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { AnswerAiClarificationUseCase } from './answer-ai-clarification.use-case';
+
+const TOKEN = 'session-token';
+const NOW = new Date('2026-09-27T12:00:00.000Z');
+const EXPIRES_AT = new Date(NOW.getTime() + 10 * 60_000);
+
+const DISCOVER_INTENT: AiIntent = {
+  kind: 'discover_artist',
+  artists: ['Radiohead', 'Interpol'],
+  genres: [],
+  seedTracks: [],
+  targetTrackCount: null,
+  popularity: null,
+  orderMode: null,
+  excludeArtists: [],
+  excludeTracks: [],
+  unsupportedConstraints: [],
+};
+
+function storedSession(overrides: Partial<AiSession> = {}): AiSession {
+  return {
+    version: AI_SESSION_RECORD_VERSION,
+    ownerUserId: null,
+    originalPrompt: 'Music like Radiohead and Interpol',
+    promptVersion: 'intent-v1',
+    aiSafe: { intent: DISCOVER_INTENT },
+    clarification: findIntentClarification(DISCOVER_INTENT),
+    execution: null,
+    createdAt: NOW.toISOString(),
+    updatedAt: NOW.toISOString(),
+    expiresAt: EXPIRES_AT.toISOString(),
+    ...overrides,
+  };
+}
+
+function createUseCase(session: AiSession | null) {
+  const saved: Array<{ session: AiSession; ttlMs: number }> = [];
+  const sessions: AiSessionRepositoryPort = {
+    save: jest.fn((_token: string, next: AiSession, ttlMs: number) => {
+      saved.push({ session: next, ttlMs });
+      return Promise.resolve();
+    }),
+    find: jest.fn(() => Promise.resolve(session)),
+  };
+  const catalog = {
+    searchArtists: jest.fn((name: string) =>
+      Promise.resolve([
+        Artist.create({ id: ArtistId.create(name.toLowerCase()), name }),
+      ]),
+    ),
+    searchTracks: jest.fn(),
+    resolveTrack: jest.fn(),
+    getArtistsByIds: jest.fn(),
+  };
+  const evaluator = new AiIntentEvaluator(
+    new AiIntentResolver({ forMarket: () => catalog }),
+  );
+  return {
+    useCase: new AnswerAiClarificationUseCase(sessions, evaluator),
+    saved,
+  };
+}
+
+describe('AnswerAiClarificationUseCase', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('applies an offered option and resolves the updated intent without a model call', async () => {
+    const { useCase, saved } = createUseCase(storedSession());
+
+    const { session } = await useCase.execute({
+      token: TOKEN,
+      optionId: 'keep_seed:artist:1',
+      userId: null,
+    });
+
+    expect(session.aiSafe.intent?.artists).toEqual(['Interpol']);
+    expect(session.clarification).toBeNull();
+    expect(session.execution?.resolvedSeeds.artists).toEqual([
+      { id: 'interpol', name: 'Interpol' },
+    ]);
+    expect(saved[0].ttlMs).toBe(EXPIRES_AT.getTime() - NOW.getTime());
+    expect(saved[0].session.expiresAt).toBe(EXPIRES_AT.toISOString());
+  });
+
+  it('rejects an option that was not offered', async () => {
+    const { useCase, saved } = createUseCase(storedSession());
+
+    await expect(
+      useCase.execute({
+        token: TOKEN,
+        optionId: 'set_track_count:50',
+        userId: null,
+      }),
+    ).rejects.toEqual(AiSessionError.optionUnavailable());
+    expect(saved).toEqual([]);
+  });
+
+  it.each([
+    ['a missing session', null, null],
+    [
+      'an expired session',
+      storedSession({ expiresAt: new Date(NOW.getTime() - 1).toISOString() }),
+      null,
+    ],
+    [
+      "another user's session",
+      storedSession({ ownerUserId: 'user-1' }),
+      'user-2',
+    ],
+    [
+      'a user session read as Guest',
+      storedSession({ ownerUserId: 'user-1' }),
+      null,
+    ],
+  ])('reports %s as not found', async (_label, session, userId) => {
+    const { useCase } = createUseCase(session);
+
+    await expect(
+      useCase.execute({ token: TOKEN, optionId: 'keep_seed:artist:0', userId }),
+    ).rejects.toEqual(AiSessionError.notFound());
+  });
+
+  it('lets the owner continue an authenticated session', async () => {
+    const { useCase } = createUseCase(storedSession({ ownerUserId: 'user-1' }));
+
+    const { session } = await useCase.execute({
+      token: TOKEN,
+      optionId: 'set_kind:artist_mix',
+      userId: 'user-1',
+    });
+
+    expect(session.aiSafe.intent?.kind).toBe('artist_mix');
+    expect(session.execution?.resolvedSeeds.artists).toHaveLength(2);
+  });
+});

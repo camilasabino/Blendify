@@ -1,9 +1,11 @@
 import {
+  AiSessionSchema,
   GeneratedPlaylistSchema,
   GeneratedPlaylistStreamEventSchema,
   GenerationStreamEventSchema,
   PlaylistDetailSchema,
   PlaylistTransferSchema,
+  type AiSessionDto,
   type ArtistDto,
   type BulkLibraryAction,
   type BulkLibraryResult,
@@ -44,6 +46,7 @@ import {
 } from '@/lib/generation-stream'
 
 export type User = UserDto
+export type AiSession = AiSessionDto
 export type Artist = ArtistDto
 export type CuratedGenre = GenreDto
 export type {
@@ -106,6 +109,19 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   return payload as T
+}
+
+async function requestAiSession(
+  path: string,
+  body: Record<string, string>,
+): Promise<AiSession> {
+  const parsed = AiSessionSchema.safeParse(
+    await request<unknown>(path, { method: 'POST', body }),
+  )
+  if (!parsed.success) {
+    throw new ApiError('Invalid Create with AI response', 502)
+  }
+  return parsed.data
 }
 
 const SPOTIFY_GENERATION: GenerationContract<PlaylistDetail> = {
@@ -377,4 +393,13 @@ export const api = {
 
   listPlaybackDevices: () =>
     request<{ devices: PlaybackDeviceDto[] }>('/api/player/devices'),
+
+  createAiSession: (prompt: string) =>
+    requestAiSession('/api/ai/sessions', { prompt }),
+
+  answerAiClarification: (sessionId: string, optionId: string) =>
+    requestAiSession(
+      `/api/ai/sessions/${encodeURIComponent(sessionId)}/clarification`,
+      { optionId },
+    ),
 }

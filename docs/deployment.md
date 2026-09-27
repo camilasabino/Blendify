@@ -1117,9 +1117,9 @@ commits or chat logs.
 ## 19. AI service (not deployed)
 
 `apps/ai` (FastAPI, Python managed by `uv`) interprets user-authored requests
-for Create with AI. It is **not** part of `.railway/railway.ts` yet: no model
-provider has been selected, and declaring the resource would make the next
-`railway config apply` create and deploy it. Intended shape when it is added:
+for Create with AI. It is **not** part of `.railway/railway.ts` yet: declaring
+the resource would make the next `railway config apply` create and deploy it.
+Intended shape when it is added:
 
 | Setting | Value |
 |---|---|
@@ -1127,15 +1127,45 @@ provider has been selected, and declaring the resource would make the next
 | Source | Repository root `apps/ai`; Railpack detects `pyproject.toml` + `uv.lock`; watch patterns `apps/ai/**` |
 | Start | `uvicorn --factory app.main:create_app --host :: --port $PORT` (`::` so the private network can reach it) |
 | Health check | `/health` — no auth, no model call; reports whether intent interpretation is available |
-| Variables | `AI_SERVICE_ENV=production`; `AI_SERVICE_TOKEN` as `preserve()`, sealed (≥ 32 random characters; the service refuses to start without it) |
+| Variables | `AI_SERVICE_ENV=production`; `AI_SERVICE_TOKEN` as `preserve()`, sealed (≥ 32 random characters; the service refuses to start without it); `AI_PROVIDER=openai` (required in every environment, no code default; `disabled` is the only alternative); `AI_MODEL=gpt-5.6-luna` (required with `openai`, no code default); `OPENAI_API_KEY` as `preserve()`, sealed (required when `AI_PROVIDER=openai`) |
 | `api` variables | `AI_SERVICE_URL=http://ai.railway.internal:<PORT>`, `AI_SERVICE_TOKEN` (same value, sealed) |
 
 Every route except `/health` requires `Authorization: Bearer <AI_SERVICE_TOKEN>`
 (constant-time comparison; with no token configured those routes reject every
-request). The browser never calls the AI service. Model-provider variables
-and secrets are added with the provider choice.
+request). The browser never calls the AI service, and `OPENAI_API_KEY` exists
+only on `ai`. The service sends OpenAI the versioned system prompt and the
+user's request text only (`store=false`); it never logs prompts or model output.
+
+The public endpoint `POST /api/ai/sessions` has its own rate-limit bucket
+`interpret` (default 10 per 10 minutes per client, fail-closed). Emergency brake
+without redeploying `ai`: `RATE_LIMIT_OVERRIDES=interpret=1/3600` on `api`.
 
 Kill switch: unset `AI_SERVICE_URL` on `api`. The API then reports AI as
 unavailable without any network call; Mix, Discover, Library, publishing and
 transfer do not depend on the AI service.
 
+
+### Real-model evals (manual, paid)
+
+Real-model evals are never part of CI. The `test-ai` job uses fakes only and
+needs no `OPENAI_API_KEY`. Locally, the eval runs only as
+`ALLOW_PAID_AI_EVALS=true npm run eval:ai -- --confirm` with `AI_PROVIDER=openai`,
+`AI_MODEL` and `OPENAI_API_KEY` configured; the runner refuses before any request
+if any of them is missing, or if `ALLOW_PAID_AI_EVALS` is persisted in `apps/ai/.env`. A run is
+capped at `cases × 2` provider requests (the interpreter's attempt bound) and
+4,000 output tokens per request.
+
+No GitHub eval workflow exists yet. If one is added, it must be a separate
+`.github/workflows/ai-eval.yml` whose only trigger is `workflow_dispatch` (no
+`push`, `pull_request`, `schedule` or `workflow_call`), and whose job declares
+`environment: ai-evals`. Manual setup before that workflow exists:
+
+1. Repository → Settings → Environments → New environment `ai-evals`.
+2. Enable **Required reviewers** and add yourself. The repository is public, so
+   required reviewers are available on every GitHub plan. Leave **Prevent
+   self-review** off while you are the only reviewer, or the run cannot be
+   approved.
+3. **Deployment branches and tags** → Selected branches → `main` only.
+4. Add `OPENAI_API_KEY` as an **environment secret** of `ai-evals`, never as a
+   repository secret, so only approved jobs in that environment can read it.
+5. Optionally set a spending limit for the project in the OpenAI dashboard.

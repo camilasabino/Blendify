@@ -71,7 +71,6 @@
             "unsupportedConstraints": [
               {
                 "category": "energy",
-                "capability": "needs_clarification",
                 "userText": "more energetic over time"
               }
             ]
@@ -115,7 +114,6 @@
             "unsupportedConstraints": [
               {
                 "category": "artist_attribute",
-                "capability": "deferred",
                 "userText": "more women"
               }
             ]
@@ -268,7 +266,7 @@
       }
     },
     {
-      "name": "unsupported constraint marked as supported",
+      "name": "unsupported constraint carrying a model capability verdict",
       "schema": "InterpretIntentResponse",
       "valid": false,
       "payload": {

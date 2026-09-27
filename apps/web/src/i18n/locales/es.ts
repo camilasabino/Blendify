@@ -457,4 +457,98 @@ export const es: Record<MessageKey, string> = {
   'discover.workingHintGuest': 'Buscando canciones relacionadas para tu playlist…',
   'create.readyGuest': 'Playlist generada',
   'create.failedTitleGuest': 'No se pudo generar la playlist',
+  'nav.ai': 'Crear con IA',
+  'nav.aiShort': 'IA',
+  'ai.eyebrow': 'Crear con IA',
+  'ai.title': 'Describe la playlist que quieres',
+  'ai.subtitle':
+    'Nombra artistas, una canción o géneros, y agrega detalles como tamaño, familiaridad o canciones a evitar. Blendify te muestra lo que entendió antes de crear nada.',
+  'ai.requestTitle': 'Tu pedido',
+  'ai.promptLabel': 'Pedido de playlist',
+  'ai.promptPlaceholder':
+    'Por ejemplo: 30 temas menos conocidos de Soda Stereo y Los Fabulosos Cadillacs, nada de Maná',
+  'ai.promptHint': 'Presiona Ctrl+Enter o ⌘+Enter para enviar.',
+  'ai.promptRequired': 'Primero describe la playlist que quieres.',
+  'ai.suggestionsLabel': 'Prueba un ejemplo',
+  'ai.suggestion.artists': '30 temas menos conocidos de Radiohead e Interpol',
+  'ai.suggestion.genres': 'Shoegaze y dream pop, unas 40 canciones',
+  'ai.suggestion.discoverArtist': 'Música parecida a Björk',
+  'ai.suggestion.discoverTrack': 'Empezar desde Teardrop de Massive Attack',
+  'ai.submit': 'Crear playlist',
+  'ai.submitting': 'Leyendo tu pedido…',
+  'ai.interpreting': 'Leyendo tu pedido…',
+  'ai.error.unavailable':
+    'Crear con IA no está disponible en este momento. Mix y Descubrir siguen funcionando.',
+  'ai.error.timeout': 'Leer tu pedido tardó demasiado. Vuelve a intentarlo.',
+  'ai.error.rateLimited':
+    'Crear con IA está ocupado en este momento. Vuelve a intentarlo en un rato.',
+  'ai.error.invalidOutput':
+    'Blendify no pudo entender ese pedido. Prueba a escribirlo de otra forma.',
+  'ai.error.sessionExpired': 'Este pedido expiró. Envíalo de nuevo.',
+  'ai.error.optionUnavailable':
+    'Esa opción ya no está disponible. Envía tu pedido de nuevo.',
+  'ai.error.generic': 'No se pudo leer tu pedido. Vuelve a intentarlo.',
+  'ai.clarify.title': 'Una cosa para confirmar',
+  'ai.clarify.ambiguous':
+    'Nombra al menos un artista, una canción o un género para que Blendify sepa por dónde empezar.',
+  'ai.clarify.unsupportedOnly':
+    'Blendify no puede crear una playlist solo con esto. Agrega un artista, una canción o un género.',
+  'ai.clarify.notAPlaylist':
+    'Eso no parece un pedido de playlist. Describe la música que quieres.',
+  'ai.clarify.mixedSeeds':
+    'Blendify parte de un solo tipo de punto de partida a la vez. ¿Cuál debería usar?',
+  'ai.clarify.tooManyArtists':
+    'Un mix puede usar hasta {limit} artistas y tu pedido nombra {count}. Edítalo para quedarte con los que quieras.',
+  'ai.clarify.tooManyGenres':
+    'Un mix puede usar hasta {limit} géneros y tu pedido nombra {count}. Edítalo para quedarte con los que quieras.',
+  'ai.clarify.singleArtist':
+    'Descubrir parte de un solo artista. Elige uno o mézclalos.',
+  'ai.clarify.singleTrack': 'Descubrir parte de una sola canción. Elige una.',
+  'ai.clarify.trackCount':
+    'Las playlists pueden tener hasta {limit} canciones.',
+  'ai.clarify.ordering':
+    'Blendify no puede ordenar las canciones de esa forma con confianza. Elige otro orden:',
+  'ai.clarify.unknownGenres':
+    'Blendify no reconoce estos géneros: {names}. Prueba con otro nombre.',
+  'ai.clarify.artistsNotFound':
+    'No se encontraron estos artistas: {names}. Revisa cómo están escritos.',
+  'ai.clarify.tracksNotFound':
+    'No se encontró esta canción: {names}. Agrega el artista o revisa el título.',
+  'ai.clarify.optionsLabel': 'Elige una opción',
+  'ai.clarify.orEdit': 'O edita tu pedido arriba y envíalo de nuevo.',
+  'ai.clarify.edit': 'Edita tu pedido arriba y envíalo de nuevo.',
+  'ai.option.useArtists': 'Usar solo los artistas',
+  'ai.option.useGenres': 'Usar solo los géneros',
+  'ai.option.useSong': 'Usar solo la canción',
+  'ai.option.mixArtists': 'Mezclar estos artistas',
+  'ai.option.keepSeed': 'Empezar desde {name}',
+  'ai.option.trackCount': 'Usar {count} canciones',
+  'ai.kind.artist_mix': 'Mix de artistas',
+  'ai.kind.genre_mix': 'Mix de géneros',
+  'ai.kind.discover_artist': 'Descubrir desde un artista',
+  'ai.kind.discover_track': 'Descubrir desde una canción',
+  'ai.category.duration': 'Duración',
+  'ai.category.era': 'Época',
+  'ai.category.energy': 'Energía',
+  'ai.category.mood': 'Estado de ánimo',
+  'ai.category.activity': 'Actividad',
+  'ai.category.tempo': 'Tempo',
+  'ai.category.progression': 'Progresión',
+  'ai.category.artist_attribute': 'Datos de artistas',
+  'ai.category.other': 'Otro',
+  'ai.summary.title': 'Esto es lo que entendió Blendify',
+  'ai.summary.subtitle':
+    'Revisa estos ajustes. Edita tu pedido si algo no está bien.',
+  'ai.summary.type': 'Tipo de playlist',
+  'ai.summary.artists': 'Artistas',
+  'ai.summary.genres': 'Géneros',
+  'ai.summary.seedTrack': 'Canción de partida',
+  'ai.summary.songs': 'Canciones',
+  'ai.summary.avoiding': 'Evitando',
+  'ai.summary.trackBy': '{title} de {artist}',
+  'ai.summary.unmet': 'No se aplicará',
+  'ai.summary.unmetHint':
+    'Blendify no tiene datos confiables para esto, así que no influirá en la playlist.',
+  'ai.editRequest': 'Editar pedido',
+  'ai.startOver': 'Empezar de nuevo',
 }

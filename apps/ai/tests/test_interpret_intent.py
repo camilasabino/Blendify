@@ -56,7 +56,6 @@ def test_returns_a_clarification_result(make_client: ClientFactory) -> None:
             "unsupportedConstraints": [
                 {
                     "category": "energy",
-                    "capability": "needs_clarification",
                     "userText": "more energetic over time",
                 }
             ],
@@ -149,7 +148,7 @@ def test_rejects_requests_without_the_internal_token(
 
 def test_fails_closed_when_no_service_token_is_configured(make_client: ClientFactory) -> None:
     provider = ScriptedModelProvider([interpreted_output()])
-    tokenless = Settings(environment="development", service_token=None)
+    tokenless = Settings(environment="development", service_token=None, model_provider="disabled")
 
     response = post_prompt(make_client(provider, tokenless))
 

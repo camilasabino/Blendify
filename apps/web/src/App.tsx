@@ -5,6 +5,7 @@ import { useT } from '@/i18n/use-t'
 import { AppShell } from '@/components/layout/app-shell'
 import { SpotifyOnlyRoute } from '@/components/layout/spotify-only-route'
 import { Spinner } from '@/components/ui/spinner'
+import { isAiCreationEnabled } from '@/lib/ai-creation'
 
 const LandingPage = lazy(() =>
   import('@/pages/landing-page').then((module) => ({
@@ -19,6 +20,11 @@ const MixPlaylistPage = lazy(() =>
 const DiscoverPlaylistPage = lazy(() =>
   import('@/pages/discover-playlist-page').then((module) => ({
     default: module.DiscoverPlaylistPage,
+  })),
+)
+const AiPlaylistPage = lazy(() =>
+  import('@/pages/ai-playlist-page').then((module) => ({
+    default: module.AiPlaylistPage,
   })),
 )
 const LibraryPage = lazy(() =>
@@ -49,6 +55,9 @@ export default function App() {
           <Route index element={<Navigate to="mix" replace />} />
           <Route path="mix" element={<MixPlaylistPage />} />
           <Route path="discover" element={<DiscoverPlaylistPage />} />
+          {isAiCreationEnabled() ? (
+            <Route path="ai" element={<AiPlaylistPage />} />
+          ) : null}
           <Route
             element={
               <SpotifyOnlyRoute capability="canUseLibrary" feature="library" />

@@ -28,7 +28,9 @@ coding sessions only need the short summary in `CLAUDE.md`.
 - Layout by concept: `models/` (Pydantic wire models), `providers/`
   (model-provider port and adapters), `prompts/` (versioned prompt
   templates), `interpretation/` (orchestration), `api/` (FastAPI routes, auth,
-  error handlers), `config/`. No `utils.py`/`helpers.py`/`constants.py`.
+  error handlers), `config/`. `evals/` (outside `app/`) holds the versioned
+  intent-eval dataset and the manual real-model runner.
+  No `utils.py`/`helpers.py`/`constants.py`.
 - Type every public function and boundary. Wire models extend `WireModel`
   (camelCase aliases, `extra="forbid"`, every field required — absence is
   `null` or `[]`).
