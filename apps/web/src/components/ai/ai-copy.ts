@@ -11,13 +11,6 @@ import { ApiError, getApiErrorMessage } from '@/lib/api-error'
 
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string
 
-export const KIND_LABEL_KEYS: Record<PlaylistKind, MessageKey> = {
-  artist_mix: 'ai.kind.artist_mix',
-  genre_mix: 'ai.kind.genre_mix',
-  discover_artist: 'ai.kind.discover_artist',
-  discover_track: 'ai.kind.discover_track',
-}
-
 export const POPULARITY_LABEL_KEYS: Record<PopularityMode, MessageKey> = {
   popular: 'create.mix.popular',
   balanced: 'create.mix.balanced',

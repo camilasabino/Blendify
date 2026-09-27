@@ -135,11 +135,10 @@ describe('Create with AI page', () => {
     })
     await waitFor(() => expect(heading).toHaveFocus())
     const summary = heading.closest('section') as HTMLElement
-    expect(within(summary).getByText('Artist mix')).toBeVisible()
     expect(within(summary).getByText('Radiohead · Interpol')).toBeVisible()
     expect(within(summary).getByText('Deep cuts')).toBeVisible()
     expect(within(summary).getByText('Coldplay')).toBeVisible()
-    expect(within(summary).getByText('Won’t be applied')).toBeVisible()
+    expect(within(summary).getByText('Not used')).toBeVisible()
     expect(within(summary).getByText(/rainy afternoon/)).toBeVisible()
     expect(within(summary).getByRole('button', { name: 'Edit request' })).toBeEnabled()
     expect(within(summary).getByRole('button', { name: 'Start over' })).toBeEnabled()

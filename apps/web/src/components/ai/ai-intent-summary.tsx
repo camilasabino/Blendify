@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { useT } from '@/i18n/use-t'
 import {
   CATEGORY_LABEL_KEYS,
-  KIND_LABEL_KEYS,
   ORDER_LABEL_KEYS,
   POPULARITY_LABEL_KEYS,
 } from './ai-copy'
@@ -27,6 +26,17 @@ export function AiIntentSummary({
     track.artist ? t('ai.summary.trackBy', { title: track.title, artist: track.artist }) : track.title,
   )
   const avoiding = [...intent.excludeArtists, ...excludedTracks]
+  const basedOn =
+    intent.artists.length > 0
+      ? intent.artists.join(' · ')
+      : intent.seedTrack
+        ? intent.seedTrack.artist
+          ? t('ai.summary.trackBy', {
+              title: intent.seedTrack.title,
+              artist: intent.seedTrack.artist,
+            })
+          : intent.seedTrack.title
+        : null
 
   return (
     <section
@@ -46,22 +56,11 @@ export function AiIntentSummary({
       </header>
 
       <dl className="grid gap-4 sm:grid-cols-2">
-        <SummaryItem label={t('ai.summary.type')}>{t(KIND_LABEL_KEYS[intent.kind])}</SummaryItem>
-        {intent.artists.length > 0 ? (
-          <SummaryItem label={t('ai.summary.artists')}>{intent.artists.join(' · ')}</SummaryItem>
+        {basedOn ? (
+          <SummaryItem label={t('ai.summary.basedOn')}>{basedOn}</SummaryItem>
         ) : null}
         {intent.genres.length > 0 ? (
           <SummaryItem label={t('ai.summary.genres')}>{intent.genres.join(' · ')}</SummaryItem>
-        ) : null}
-        {intent.seedTrack ? (
-          <SummaryItem label={t('ai.summary.seedTrack')}>
-            {intent.seedTrack.artist
-              ? t('ai.summary.trackBy', {
-                  title: intent.seedTrack.title,
-                  artist: intent.seedTrack.artist,
-                })
-              : intent.seedTrack.title}
-          </SummaryItem>
         ) : null}
         {intent.targetTrackCount !== null ? (
           <SummaryItem label={t('ai.summary.songs')}>{intent.targetTrackCount}</SummaryItem>
