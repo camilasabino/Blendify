@@ -18,6 +18,8 @@ const READY_SESSION: AiSessionDto = {
     genres: [],
     seedTrack: null,
     targetTrackCount: 30,
+    targetDurationMinutes: null,
+    mood: null,
     popularity: 'rarities',
     orderMode: null,
     excludeArtists: ['Coldplay'],
@@ -162,6 +164,43 @@ describe('Create with AI page', () => {
     expect(within(requestCard).getByText(`“${PROMPT}”`)).toBeVisible()
     const editButton = within(requestCard).getByRole('button', { name: 'Edit request' })
     expect(editButton).toBeEnabled()
+  })
+
+  it('shows a reviewed mood and target duration without any seed', async () => {
+    const user = userEvent.setup()
+    stubApi({
+      'POST /api/ai/sessions': () =>
+        jsonResponse(
+          {
+            ...READY_SESSION,
+            intent: {
+              ...READY_SESSION.intent,
+              kind: 'genre_mix',
+              artists: [],
+              targetTrackCount: null,
+              targetDurationMinutes: 60,
+              mood: 'happy',
+              popularity: null,
+              excludeArtists: [],
+              unmetConstraints: [{ category: 'activity', userText: 'to dance at a party' }],
+            },
+          },
+          201,
+        ),
+    })
+    renderPage()
+
+    await user.type(promptField(), 'Happy music to dance at a party, for an hour')
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+    const heading = await screen.findByRole('heading', {
+      name: 'Here’s what Blendify understood',
+    })
+    const summary = heading.closest('section') as HTMLElement
+    expect(within(summary).getByText('Happy')).toBeVisible()
+    expect(within(summary).getByText('About 60 min')).toBeVisible()
+    expect(within(summary).getByText(/to dance at a party/)).toBeVisible()
+    expectNoGenerationAction()
   })
 
   it('submits with Ctrl+Enter but keeps Enter for new lines', async () => {

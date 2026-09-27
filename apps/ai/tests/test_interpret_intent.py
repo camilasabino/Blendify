@@ -88,6 +88,48 @@ def test_stops_after_bounded_invalid_model_outputs(make_client: ClientFactory) -
     assert len(provider.requests) == 2
 
 
+def test_returns_a_mood_only_intent_with_a_target_duration_and_an_activity(
+    make_client: ClientFactory,
+) -> None:
+    output = interpreted_output(
+        kind="genre_mix",
+        artists=[],
+        targetTrackCount=None,
+        targetDurationMinutes=60,
+        mood="happy",
+        popularity=None,
+        excludeArtists=[],
+        unsupportedConstraints=[{"category": "activity", "userText": "to dance at a party"}],
+    )
+
+    response = post_prompt(make_client(ScriptedModelProvider([output])))
+
+    assert response.status_code == 200
+    assert response.json()["result"] == output
+
+
+@pytest.mark.parametrize(
+    "invalid_fields",
+    [
+        {"mood": "party"},
+        {"mood": "nostalgic"},
+        {"targetDurationMinutes": -30},
+        {"targetDurationMinutes": 90.5},
+        {"targetDurationMinutes": "60"},
+    ],
+)
+def test_retries_a_duration_or_mood_outside_the_wire_contract(
+    make_client: ClientFactory, invalid_fields: dict[str, object]
+) -> None:
+    provider = ScriptedModelProvider([interpreted_output(**invalid_fields), interpreted_output()])
+
+    response = post_prompt(make_client(provider))
+
+    assert response.status_code == 200
+    assert response.json()["result"] == interpreted_output()
+    assert len(provider.requests) == 2
+
+
 @pytest.mark.parametrize(
     ("error", "status", "code"),
     [

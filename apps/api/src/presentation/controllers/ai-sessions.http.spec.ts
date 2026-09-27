@@ -12,23 +12,21 @@ import type {
   InterpretIntentRequest,
   InterpretIntentResponse,
 } from '@blendify/contracts/ai-service';
-import { AiIntentEvaluator } from '@/application/services/ai-intent-evaluator.service';
-import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
-import { Artist } from '@/domain/artist/artist.entity';
 import type { AiSession } from '@/domain/ai/ai-session';
 import { AiInterpretationError } from '@/domain/errors/ai-interpretation.error';
 import { AI_SESSION_REPOSITORY } from '@/domain/repositories/ai-session.repository.port';
 import { CATALOG_PROVIDER_FACTORY } from '@/domain/repositories/catalog-provider.port';
+import { DISCOVERY_CATALOG } from '@/domain/repositories/discovery-catalog.port';
 import { INTENT_INTERPRETER } from '@/domain/repositories/intent-interpreter.port';
 import { USER_REPOSITORY } from '@/domain/repositories/user.repository.port';
 import { User } from '@/domain/user/user.entity';
-import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { AiServiceIntentInterpreterAdapter } from '@/infrastructure/ai/ai-service-intent-interpreter.adapter';
 import { AuthService } from '@/infrastructure/auth/auth.service';
 import { JwtStrategy } from '@/infrastructure/auth/jwt.strategy';
 import { SpotifyAuthClient } from '@/infrastructure/spotify/spotify-auth.client';
+import { createSpotifyQuotaError } from '@/infrastructure/spotify/spotify-quota-error';
 import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
 import { OriginCsrfGuard } from '@/presentation/guards/origin-csrf.guard';
 import { createBodyParser } from '@/presentation/http/body-limits';
@@ -46,7 +44,7 @@ function interpreted(
   overrides: Record<string, unknown> = {},
 ): InterpretIntentResponse {
   return {
-    promptVersion: 'intent-v1',
+    promptVersion: 'intent-v2',
     result: {
       outcome: 'interpreted',
       intent: {
@@ -55,6 +53,8 @@ function interpreted(
         genres: [],
         seedTracks: [],
         targetTrackCount: 30,
+        targetDurationMinutes: null,
+        mood: null,
         popularity: 'rarities',
         orderMode: null,
         excludeArtists: ['Coldplay'],
@@ -68,6 +68,15 @@ function interpreted(
   };
 }
 
+function unavailableProvider() {
+  return jest.fn(() => {
+    throw createSpotifyQuotaError({
+      retryAfterSeconds: 3_600,
+      reason: 'QUOTA_EXCEEDED',
+    });
+  });
+}
+
 function createWorld() {
   const stored = new Map<string, AiSession>();
   return {
@@ -78,15 +87,14 @@ function createWorld() {
         [InterpretIntentRequest]
       >(() => Promise.resolve(interpreted())),
     },
-    catalog: {
-      searchArtists: jest.fn((name: string) =>
-        Promise.resolve([
-          Artist.create({ id: ArtistId.create(name.toLowerCase()), name }),
-        ]),
-      ),
-      searchTracks: jest.fn(() => Promise.resolve([])),
-      resolveTrack: jest.fn(() => Promise.resolve(null)),
-      getArtistsByIds: jest.fn(() => Promise.resolve([])),
+    catalogFactory: { forMarket: unavailableProvider() },
+    discovery: {
+      isConfigured: unavailableProvider(),
+      getSimilarArtists: unavailableProvider(),
+      getSimilarTracks: unavailableProvider(),
+      getTopArtistsForTag: unavailableProvider(),
+      getTopTracksForTag: unavailableProvider(),
+      getTopTracksForArtist: unavailableProvider(),
     },
     sessions: {
       save: jest.fn((token: string, session: AiSession) => {
@@ -145,12 +153,8 @@ async function createApp(
       { provide: APP_GUARD, useClass: OriginCsrfGuard },
       interpreter,
       { provide: AI_SESSION_REPOSITORY, useValue: world.sessions },
-      {
-        provide: CATALOG_PROVIDER_FACTORY,
-        useValue: { forMarket: () => world.catalog },
-      },
-      AiIntentResolver,
-      AiIntentEvaluator,
+      { provide: CATALOG_PROVIDER_FACTORY, useValue: world.catalogFactory },
+      { provide: DISCOVERY_CATALOG, useValue: world.discovery },
       CreateAiSessionUseCase,
       AnswerAiClarificationUseCase,
       ...inMemoryRequestLimitProviders({
@@ -174,6 +178,13 @@ async function createApp(
   app.useGlobalFilters(new GlobalExceptionFilter());
   await app.init();
   return app;
+}
+
+function expectNoProviderCalls(world: World): void {
+  expect(world.catalogFactory.forMarket).not.toHaveBeenCalled();
+  for (const method of Object.values(world.discovery)) {
+    expect(method).not.toHaveBeenCalled();
+  }
 }
 
 describe('Create with AI sessions over HTTP', () => {
@@ -238,6 +249,170 @@ describe('Create with AI sessions over HTTP', () => {
     expect(world.interpreter.interpretIntent).toHaveBeenCalledWith({
       prompt: PROMPT,
     });
+    expectNoProviderCalls(world);
+  });
+
+  it('reviews unresolved artist names while Spotify and Last.fm are unavailable', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        artists: ['Radiohed', 'Interpol'],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession().expect(201);
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'ready',
+      intent: { artists: ['Radiohed', 'Interpol'], seedTrack: null },
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('reviews an unresolved seed track while Spotify is unavailable', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'discover_track',
+        artists: [],
+        seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession({
+      prompt: 'Start from Teardrop by Massive Attack',
+    }).expect(201);
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'ready',
+      intent: {
+        kind: 'discover_track',
+        seedTrack: { title: 'Teardrop', artist: 'Massive Attack' },
+      },
+    });
+    expect([...world.stored.values()][0].aiSafe.intent?.seedTracks).toEqual([
+      { title: 'Teardrop', artist: 'Massive Attack' },
+    ]);
+    expectNoProviderCalls(world);
+  });
+
+  it('reviews a mood-only request with an unsupported activity and no provider', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'genre_mix',
+        artists: [],
+        targetTrackCount: null,
+        mood: 'happy',
+        popularity: null,
+        excludeArtists: [],
+        unsupportedConstraints: [
+          { category: 'activity', userText: 'to dance at a party' },
+        ],
+      }),
+    );
+
+    const response = await createSession({
+      prompt: 'Happy music to dance at a party',
+    }).expect(201);
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'ready',
+      clarification: null,
+      intent: {
+        kind: 'genre_mix',
+        genres: [],
+        mood: 'happy',
+        unmetConstraints: [
+          { category: 'activity', userText: 'to dance at a party' },
+        ],
+      },
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('reviews duration and a curated genre without any provider', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['pop'],
+        targetTrackCount: null,
+        targetDurationMinutes: 60,
+        popularity: null,
+        excludeArtists: [],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession({
+      prompt: 'Pop music for an hour',
+    }).expect(201);
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'ready',
+      intent: { genres: ['Pop'], targetDurationMinutes: 60, mood: null },
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('reviews explicit genres and a mood without merging them', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['pop'],
+        mood: 'happy',
+        excludeArtists: [],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession({ prompt: 'Happy pop music' }).expect(
+      201,
+    );
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'ready',
+      intent: { genres: ['Pop'], mood: 'happy' },
+    });
+    expect([...world.stored.values()][0].aiSafe.intent).toMatchObject({
+      genres: ['pop'],
+      mood: 'happy',
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('asks about an unknown genre from the local catalog only', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['definitely not a genre'],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession().expect(201);
+
+    expect(AiSessionSchema.parse(response.body).clarification).toMatchObject({
+      reason: 'unknown_genres',
+      names: ['definitely not a genre'],
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('asks the user to fix a zero duration', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({ targetDurationMinutes: 0 }),
+    );
+
+    const response = await createSession().expect(201);
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'needs_clarification',
+      intent: null,
+      clarification: { reason: 'invalid_duration', options: [] },
+    });
   });
 
   it('does not expose internal session state', async () => {
@@ -245,7 +420,7 @@ describe('Create with AI sessions over HTTP', () => {
     const serialized = JSON.stringify(response.body);
 
     expect(serialized).not.toContain(PROMPT);
-    expect(serialized).not.toContain('intent-v1');
+    expect(serialized).not.toContain('intent-v2');
     expect(serialized).not.toContain('"radiohead"');
   });
 
@@ -297,6 +472,7 @@ describe('Create with AI sessions over HTTP', () => {
       intent: { kind: 'discover_artist', artists: ['Radiohead'] },
     });
     expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
+    expectNoProviderCalls(world);
   });
 
   it('turns an over-limit count into a clarification instead of an error', async () => {
@@ -398,6 +574,6 @@ describe('Create with AI sessions over HTTP', () => {
     const response = await createSession().expect(503);
 
     expect(response.body).toMatchObject({ code: 'AI_UNAVAILABLE' });
-    expect(world.catalog.searchArtists).not.toHaveBeenCalled();
+    expectNoProviderCalls(world);
   });
 });

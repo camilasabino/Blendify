@@ -10,39 +10,38 @@ import {
   type AiIntent,
   type AiIntentClarification,
 } from '@/domain/ai/ai-intent';
-import type { AiSession, ResolvedAiSeeds } from '@/domain/ai/ai-session';
+import { resolveCuratedGenreSeeds } from '@/domain/ai/ai-genre-seeds';
+import type { AiSession } from '@/domain/ai/ai-session';
 
 export function toAiSessionResponse(
   token: string,
   session: AiSession,
 ): AiSessionDto {
   const intent = session.aiSafe.intent;
-  const resolvedSeeds = session.execution?.resolvedSeeds;
-  const isReady = !session.clarification && intent && resolvedSeeds;
+  const isReady = intent !== null && session.clarification === null;
 
   return {
     sessionId: token,
     expiresAt: session.expiresAt,
     status: isReady ? 'ready' : 'needs_clarification',
-    intent: isReady ? toIntentSummary(intent, resolvedSeeds) : null,
+    intent: isReady ? toIntentSummary(intent) : null,
     clarification: session.clarification
       ? toClarification(session.clarification)
       : null,
   };
 }
 
-function toIntentSummary(
-  intent: AiIntent,
-  seeds: ResolvedAiSeeds,
-): AiIntentSummary {
+function toIntentSummary(intent: AiIntent): AiIntentSummary {
   return {
     kind: intent.kind,
-    artists: seeds.artists.map((artist) => artist.name),
-    genres: seeds.genres.map((genre) => genre.name),
-    seedTrack: seeds.track
-      ? { title: seeds.track.name, artist: seeds.track.artistName }
-      : null,
+    artists: intent.artists,
+    genres: resolveCuratedGenreSeeds(intent.genres).genres.map(
+      (genre) => genre.name,
+    ),
+    seedTrack: intent.seedTracks[0] ?? null,
     targetTrackCount: intent.targetTrackCount,
+    targetDurationMinutes: intent.targetDurationMinutes,
+    mood: intent.mood,
     popularity: intent.popularity,
     orderMode: intent.orderMode,
     excludeArtists: intent.excludeArtists,

@@ -196,6 +196,13 @@ describe('AI provider-content firewall', () => {
       },
     ],
     [
+      'provider track durations for duration fitting',
+      {
+        targetDurationMinutes: 60,
+        candidateTrackDurationsMs: [215_000, 330_000, 248_000],
+      },
+    ],
+    [
       'a generated playlist',
       {
         name: 'Blendify · Mix',

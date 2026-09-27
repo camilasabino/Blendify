@@ -8,6 +8,7 @@ import type { IntentClarification } from '@blendify/contracts/ai-service';
 import { normalizeArtistName } from '@/domain/artist/artist-name-match';
 import { MAX_ARTISTS, MAX_TRACKS } from '@/domain/constants';
 import { constraintCapability } from './ai-capability-matrix';
+import { resolveCuratedGenreSeeds } from './ai-genre-seeds';
 import type {
   AiClarificationOption,
   AiIntent,
@@ -23,6 +24,8 @@ import {
 } from './ai-seeds';
 
 const MAX_KEEP_SEED_OPTIONS = 5;
+const MIN_TARGET_DURATION_MINUTES = 1;
+const MOOD_ONLY_KIND: PlaylistKind = 'genre_mix';
 
 export function normalizeAiIntent(intent: AiIntent): AiIntent {
   const normalized: AiIntent = {
@@ -35,6 +38,9 @@ export function normalizeAiIntent(intent: AiIntent): AiIntent {
   };
   const seedTypes = presentSeedTypes(normalized);
 
+  if (seedTypes.length === 0 && normalized.mood !== null) {
+    return { ...normalized, kind: MOOD_ONLY_KIND };
+  }
   if (seedTypes.length !== 1) {
     return normalized;
   }
@@ -54,7 +60,7 @@ export function findIntentClarification(
 ): AiIntentClarification | null {
   const seedTypes = presentSeedTypes(intent);
 
-  if (seedTypes.length === 0) {
+  if (seedTypes.length === 0 && intent.mood === null) {
     const hasConstraints = intent.unsupportedConstraints.length > 0;
     return clarify(
       hasConstraints ? 'unsupported_constraint' : 'ambiguous_request',
@@ -71,10 +77,17 @@ export function findIntentClarification(
     });
   }
 
+  const seedClarification =
+    seedTypes.length === 1
+      ? seedLimitClarification(intent, seedTypes[0])
+      : null;
+
   return (
-    seedLimitClarification(intent, seedTypes[0]) ??
+    seedClarification ??
     trackCountClarification(intent) ??
-    orderingClarification(intent)
+    durationClarification(intent) ??
+    orderingClarification(intent) ??
+    unknownGenresClarification(intent)
   );
 }
 
@@ -132,6 +145,28 @@ function trackCountClarification(
     limit: MAX_TRACKS,
     options: [{ type: 'set_track_count', trackCount: MAX_TRACKS }],
   });
+}
+
+function durationClarification(intent: AiIntent): AiIntentClarification | null {
+  if (
+    intent.targetDurationMinutes === null ||
+    intent.targetDurationMinutes >= MIN_TARGET_DURATION_MINUTES
+  ) {
+    return null;
+  }
+
+  return clarify('invalid_duration');
+}
+
+function unknownGenresClarification(
+  intent: AiIntent,
+): AiIntentClarification | null {
+  const { unknown } = resolveCuratedGenreSeeds(intent.genres);
+
+  if (unknown.length === 0) {
+    return null;
+  }
+  return clarify('unknown_genres', { seedType: 'genre', names: unknown });
 }
 
 function orderingClarification(intent: AiIntent): AiIntentClarification | null {

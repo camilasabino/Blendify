@@ -64,6 +64,8 @@
               { "title": "Enjoy the Silence", "artist": null }
             ],
             "targetTrackCount": 30,
+            "targetDurationMinutes": null,
+            "mood": null,
             "popularity": "rarities",
             "orderMode": "random",
             "excludeArtists": ["Coldplay"],
@@ -92,6 +94,8 @@
             "genres": ["classic rock"],
             "seedTracks": [],
             "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
             "popularity": null,
             "orderMode": null,
             "excludeArtists": [],
@@ -136,6 +140,8 @@
             "genres": [],
             "seedTracks": [],
             "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
             "popularity": null,
             "orderMode": null,
             "excludeArtists": [],
@@ -165,6 +171,8 @@
               }
             ],
             "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
             "popularity": null,
             "orderMode": null,
             "excludeArtists": [],
@@ -188,6 +196,8 @@
             "genres": [],
             "seedTracks": [],
             "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
             "popularity": null,
             "orderMode": null,
             "excludeArtists": [],
@@ -211,6 +221,8 @@
             "genres": ["jazz"],
             "seedTracks": [],
             "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
             "popularity": "obscure",
             "orderMode": null,
             "excludeArtists": [],
@@ -234,11 +246,228 @@
             "genres": ["jazz"],
             "seedTracks": [],
             "targetTrackCount": 0,
+            "targetDurationMinutes": null,
+            "mood": null,
             "popularity": null,
             "orderMode": null,
             "excludeArtists": [],
             "excludeTracks": [],
             "unsupportedConstraints": []
+          }
+        }
+      }
+    },
+    {
+      "name": "mood-only intent with a target duration and an unsupported activity",
+      "schema": "InterpretIntentResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "targetDurationMinutes": 60,
+            "mood": "happy",
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": [
+              { "category": "activity", "userText": "to dance at a party" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "intent with a stated zero duration left for NestJS to reject",
+      "schema": "InterpretIntentResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "targetDurationMinutes": 0,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": [
+              { "category": "activity", "userText": "to dance at a party" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "intent with a negative target duration",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "targetDurationMinutes": -30,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": [
+              { "category": "activity", "userText": "to dance at a party" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "intent with a fractional target duration",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "targetDurationMinutes": 90.5,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": [
+              { "category": "activity", "userText": "to dance at a party" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "intent with a target duration above the wire sanity bound",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "targetDurationMinutes": 10081,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": [
+              { "category": "activity", "userText": "to dance at a party" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "intent with a mood outside the closed vocabulary",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": "nostalgic",
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": [
+              { "category": "activity", "userText": "to dance at a party" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "intent with an activity sent as a mood",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": "party",
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": [
+              { "category": "activity", "userText": "to dance at a party" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "intent omitting the mood instead of sending null",
+      "schema": "InterpretIntentResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "intent-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "genre_mix",
+            "artists": [],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": [],
+            "excludeTracks": [],
+            "unsupportedConstraints": [
+              { "category": "activity", "userText": "to dance at a party" }
+            ]
           }
         }
       }
@@ -257,6 +486,8 @@
             "genres": ["jazz"],
             "seedTracks": [],
             "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
             "popularity": null,
             "orderMode": null,
             "excludeArtists": [],

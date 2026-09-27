@@ -2,7 +2,6 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { AiInterpretationError } from '@/domain/errors/ai-interpretation.error';
-import { CATALOG_PROVIDER_FACTORY } from '@/domain/repositories/catalog-provider.port';
 import {
   INTENT_INTERPRETER,
   type IntentInterpreterPort,
@@ -17,15 +16,14 @@ import { AiModule } from './ai.module';
 @Module({
   providers: [
     { provide: RedisCacheService, useValue: {} },
-    { provide: CATALOG_PROVIDER_FACTORY, useValue: {} },
     ...inMemoryRequestLimitProviders(),
   ],
-  exports: [RedisCacheService, CATALOG_PROVIDER_FACTORY, RequestLimiter],
+  exports: [RedisCacheService, RequestLimiter],
 })
 class StubInfrastructureModule {}
 
 describe('AiModule', () => {
-  it('resolves without AI service configuration and reports AI unavailable', async () => {
+  it('resolves without AI service configuration or any catalog provider and reports AI unavailable', async () => {
     const module = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [] }),

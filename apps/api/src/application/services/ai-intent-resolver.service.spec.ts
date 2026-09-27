@@ -29,6 +29,8 @@ function intent(overrides: Partial<AiIntent>): AiIntent {
     genres: [],
     seedTracks: [],
     targetTrackCount: null,
+    targetDurationMinutes: null,
+    mood: null,
     popularity: null,
     orderMode: null,
     excludeArtists: [],
@@ -82,7 +84,7 @@ describe('AiIntentResolver', () => {
   });
 
   it.each(['definitely not a genre', 'custom:anything'])(
-    'asks about an unknown genre: %s',
+    'reports an unknown genre: %s',
     async (name) => {
       const { resolver } = createResolver();
 
@@ -90,13 +92,10 @@ describe('AiIntentResolver', () => {
         intent({ kind: 'genre_mix', genres: ['shoegaze', name] }),
       );
 
-      expect(resolution).toMatchObject({
-        status: 'unresolved',
-        clarification: {
-          reason: 'unknown_genres',
-          seedType: 'genre',
-          names: [name],
-        },
+      expect(resolution).toEqual({
+        status: 'not_found',
+        seedType: 'genre',
+        names: [name],
       });
     },
   );
@@ -125,16 +124,17 @@ describe('AiIntentResolver', () => {
     ]);
   });
 
-  it('asks about artists the catalog cannot match', async () => {
+  it('reports artists the catalog cannot match', async () => {
     const { resolver } = createResolver();
 
     const resolution = await resolver.resolve(
       intent({ artists: ['Radiohead', 'Nobody Known'] }),
     );
 
-    expect(resolution).toMatchObject({
-      status: 'unresolved',
-      clarification: { reason: 'artists_not_found', names: ['Nobody Known'] },
+    expect(resolution).toEqual({
+      status: 'not_found',
+      seedType: 'artist',
+      names: ['Nobody Known'],
     });
   });
 
@@ -207,11 +207,11 @@ describe('AiIntentResolver', () => {
       track('silence', 'Silence', 'Someone Else'),
     ]);
     await expect(resolver.resolve(request)).resolves.toMatchObject({
-      status: 'unresolved',
+      status: 'not_found',
     });
   });
 
-  it('asks about a seed track the catalog cannot match', async () => {
+  it('reports a seed track the catalog cannot match', async () => {
     const { resolver } = createResolver();
 
     const resolution = await resolver.resolve(
@@ -221,12 +221,10 @@ describe('AiIntentResolver', () => {
       }),
     );
 
-    expect(resolution).toMatchObject({
-      status: 'unresolved',
-      clarification: {
-        reason: 'tracks_not_found',
-        names: ['Imaginary Song — Nobody Known'],
-      },
+    expect(resolution).toEqual({
+      status: 'not_found',
+      seedType: 'track',
+      names: ['Imaginary Song — Nobody Known'],
     });
   });
 });

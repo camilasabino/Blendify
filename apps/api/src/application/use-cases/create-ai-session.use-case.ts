@@ -6,6 +6,7 @@ import {
 } from '@/domain/ai/ai-intent-rules';
 import {
   AI_SESSION_RECORD_VERSION,
+  withReviewedIntent,
   type AiSession,
 } from '@/domain/ai/ai-session';
 import {
@@ -16,10 +17,6 @@ import {
   INTENT_INTERPRETER,
   type IntentInterpreterPort,
 } from '@/domain/repositories/intent-interpreter.port';
-import {
-  AiIntentEvaluator,
-  withEvaluation,
-} from '@/application/services/ai-intent-evaluator.service';
 
 export const AI_SESSION_TTL_MS = 30 * 60_000;
 const AI_SESSION_TOKEN_BYTES = 32;
@@ -38,7 +35,6 @@ export class CreateAiSessionUseCase {
     private readonly interpreter: IntentInterpreterPort,
     @Inject(AI_SESSION_REPOSITORY)
     private readonly sessions: AiSessionRepositoryPort,
-    private readonly evaluator: AiIntentEvaluator,
   ) {}
 
   async execute(command: {
@@ -58,7 +54,6 @@ export class CreateAiSessionUseCase {
       promptVersion: interpretation.promptVersion,
       aiSafe: { intent: null },
       clarification: null,
-      execution: null,
       createdAt: createdAt.toISOString(),
       updatedAt: createdAt.toISOString(),
       expiresAt: new Date(
@@ -75,9 +70,10 @@ export class CreateAiSessionUseCase {
         ),
       };
     } else {
-      const intent = normalizeAiIntent(interpretation.result.intent);
-      const evaluation = await this.evaluator.evaluate(intent);
-      session = withEvaluation({ ...base, aiSafe: { intent } }, evaluation);
+      session = withReviewedIntent(
+        base,
+        normalizeAiIntent(interpretation.result.intent),
+      );
     }
 
     const token = randomBytes(AI_SESSION_TOKEN_BYTES).toString('base64url');

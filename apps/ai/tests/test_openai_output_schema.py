@@ -64,6 +64,8 @@ def test_bounds_dropped_for_the_model_are_still_enforced_by_the_wire_model() -> 
             "genres": [],
             "seedTracks": [],
             "targetTrackCount": None,
+            "targetDurationMinutes": None,
+            "mood": None,
             "popularity": None,
             "orderMode": None,
             "excludeArtists": [],

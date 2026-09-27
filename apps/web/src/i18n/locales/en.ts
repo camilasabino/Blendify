@@ -497,10 +497,8 @@ export const en = {
     'Blendify can’t reliably order songs this way. Choose an order instead:',
   'ai.clarify.unknownGenres':
     'Blendify doesn’t recognize these genres: {names}. Try another name.',
-  'ai.clarify.artistsNotFound':
-    'Couldn’t find these artists: {names}. Check the spelling.',
-  'ai.clarify.tracksNotFound':
-    'Couldn’t find this song: {names}. Add the artist or check the title.',
+  'ai.clarify.invalidDuration':
+    'That duration doesn’t work. Ask for a length of at least one minute.',
   'ai.clarify.optionsLabel': 'Choose an option',
   'ai.clarify.orEdit': 'Or edit your request above and submit it again.',
   'ai.clarify.edit': 'Edit your request above and submit it again.',
@@ -525,6 +523,15 @@ export const en = {
   'ai.summary.basedOn': 'Based on',
   'ai.summary.genres': 'Genres',
   'ai.summary.songs': 'Songs',
+  'ai.summary.duration': 'Length',
+  'ai.summary.durationValue': 'About {minutes} min',
+  'ai.summary.mood': 'Mood',
+  'ai.mood.happy': 'Happy',
+  'ai.mood.calm': 'Calm',
+  'ai.mood.energetic': 'Energetic',
+  'ai.mood.sad': 'Sad',
+  'ai.mood.romantic': 'Romantic',
+  'ai.mood.dark': 'Dark',
   'ai.summary.avoiding': 'Avoiding',
   'ai.summary.trackBy': '{title} by {artist}',
   'ai.summary.unmet': 'Not used',

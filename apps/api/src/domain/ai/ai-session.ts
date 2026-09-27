@@ -1,22 +1,7 @@
 import type { AiIntent, AiIntentClarification } from './ai-intent';
+import { findIntentClarification } from './ai-intent-rules';
 
-export const AI_SESSION_RECORD_VERSION = 1;
-
-export interface ResolvedAiSeed {
-  id: string;
-  name: string;
-}
-
-export interface ResolvedAiTrackSeed extends ResolvedAiSeed {
-  artistId: string;
-  artistName: string;
-}
-
-export interface ResolvedAiSeeds {
-  artists: ResolvedAiSeed[];
-  genres: ResolvedAiSeed[];
-  track: ResolvedAiTrackSeed | null;
-}
+export const AI_SESSION_RECORD_VERSION = 2;
 
 export interface AiSession {
   version: typeof AI_SESSION_RECORD_VERSION;
@@ -25,10 +10,20 @@ export interface AiSession {
   promptVersion: string;
   aiSafe: { intent: AiIntent | null };
   clarification: AiIntentClarification | null;
-  execution: { resolvedSeeds: ResolvedAiSeeds } | null;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;
+}
+
+export function withReviewedIntent(
+  session: AiSession,
+  intent: AiIntent,
+): AiSession {
+  return {
+    ...session,
+    aiSafe: { intent },
+    clarification: findIntentClarification(intent),
+  };
 }
 
 export function isReadableBy(

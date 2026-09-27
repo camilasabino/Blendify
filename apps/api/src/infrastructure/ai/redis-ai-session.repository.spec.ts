@@ -11,10 +11,9 @@ const SESSION: AiSession = {
   version: AI_SESSION_RECORD_VERSION,
   ownerUserId: null,
   originalPrompt: 'Shoegaze and dream pop',
-  promptVersion: 'intent-v1',
+  promptVersion: 'intent-v2',
   aiSafe: { intent: null },
   clarification: null,
-  execution: null,
   createdAt: '2026-09-27T12:00:00.000Z',
   updatedAt: '2026-09-27T12:00:00.000Z',
   expiresAt: '2026-09-27T12:30:00.000Z',
@@ -58,6 +57,16 @@ describe('RedisAiSessionRepository', () => {
 
   it('ignores records written with another session format', async () => {
     const { repository } = createRepository({ ...SESSION, version: 0 });
+
+    await expect(repository.find(TOKEN)).resolves.toBeNull();
+  });
+
+  it('ignores M1 records that carried provider-resolved execution state', async () => {
+    const { repository } = createRepository({
+      ...SESSION,
+      version: 1,
+      execution: { resolvedSeeds: { artists: [], genres: [], track: null } },
+    });
 
     await expect(repository.find(TOKEN)).resolves.toBeNull();
   });

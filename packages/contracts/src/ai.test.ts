@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AI_MOODS,
   AI_PROMPT_MAX_LENGTH,
   AiSessionSchema,
   AnswerAiClarificationRequestSchema,
@@ -18,6 +19,8 @@ const READY_SESSION = {
     genres: [],
     seedTrack: null,
     targetTrackCount: 30,
+    targetDurationMinutes: null,
+    mood: null,
     popularity: 'rarities',
     orderMode: null,
     excludeArtists: ['Coldplay'],
@@ -66,6 +69,92 @@ describe('AI session contracts', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('carries a mood-only review with a target duration and no seeds', () => {
+    const moodOnly = {
+      ...READY_SESSION,
+      intent: {
+        ...READY_SESSION.intent,
+        kind: 'genre_mix',
+        artists: [],
+        targetTrackCount: null,
+        targetDurationMinutes: 60,
+        mood: 'happy',
+        popularity: null,
+        excludeArtists: [],
+        unmetConstraints: [
+          { category: 'activity', userText: 'to dance at a party' },
+        ],
+      },
+    };
+
+    expect(AiSessionSchema.parse(moodOnly)).toEqual(moodOnly);
+  });
+
+  it('carries an unresolved seed track as user-authored names only', () => {
+    const trackReview = {
+      ...READY_SESSION,
+      intent: {
+        ...READY_SESSION.intent,
+        kind: 'discover_track',
+        artists: [],
+        seedTrack: { title: 'Teardrop', artist: 'Massive Attack' },
+      },
+    };
+
+    expect(AiSessionSchema.parse(trackReview)).toEqual(trackReview);
+    expect(
+      AiSessionSchema.safeParse({
+        ...trackReview,
+        intent: {
+          ...trackReview.intent,
+          seedTrack: { ...trackReview.intent.seedTrack, id: '4uLU6hMCjMI75M1A2tKUQC' },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each(AI_MOODS)('accepts the %s mood in the summary', (mood) => {
+    const result = AiSessionSchema.safeParse({
+      ...READY_SESSION,
+      intent: { ...READY_SESSION.intent, mood },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it.each(['nostalgic', 'party', 'workout'])(
+    'rejects %s outside the closed mood vocabulary',
+    (mood) => {
+      const result = AiSessionSchema.safeParse({
+        ...READY_SESSION,
+        intent: { ...READY_SESSION.intent, mood },
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
+
+  it.each([0, -30, 45.5])('rejects a summarized target duration of %s', (minutes) => {
+    const result = AiSessionSchema.safeParse({
+      ...READY_SESSION,
+      intent: { ...READY_SESSION.intent, targetDurationMinutes: minutes },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each(['artists_not_found', 'tracks_not_found'])(
+    'no longer reports the provider-backed %s clarification at review time',
+    (reason) => {
+      const result = AiSessionSchema.safeParse({
+        ...CLARIFICATION_SESSION,
+        clarification: { ...CLARIFICATION_SESSION.clarification, reason },
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
 
   it('rejects a summarized track count above the product limit', () => {
     const result = AiSessionSchema.safeParse({

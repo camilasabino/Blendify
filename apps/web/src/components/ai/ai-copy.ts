@@ -1,6 +1,7 @@
 import type {
   AiClarification,
   AiClarificationOption,
+  AiMood,
   AiUnsupportedConstraintCategory,
   PlaylistKind,
   PopularityMode,
@@ -21,6 +22,15 @@ export const ORDER_LABEL_KEYS: Record<TrackOrderMode, MessageKey> = {
   artist: 'create.order.artist',
   title: 'create.order.title',
   random: 'create.order.random',
+}
+
+export const MOOD_LABEL_KEYS: Record<AiMood, MessageKey> = {
+  happy: 'ai.mood.happy',
+  calm: 'ai.mood.calm',
+  energetic: 'ai.mood.energetic',
+  sad: 'ai.mood.sad',
+  romantic: 'ai.mood.romantic',
+  dark: 'ai.mood.dark',
 }
 
 export const CATEGORY_LABEL_KEYS: Record<AiUnsupportedConstraintCategory, MessageKey> = {
@@ -69,14 +79,12 @@ export function clarificationMessage(clarification: AiClarification, t: Translat
       return tooManySeedsMessage(clarification, t)
     case 'track_count_over_limit':
       return t('ai.clarify.trackCount', { limit })
+    case 'invalid_duration':
+      return t('ai.clarify.invalidDuration')
     case 'unsupported_ordering':
       return t('ai.clarify.ordering')
     case 'unknown_genres':
       return t('ai.clarify.unknownGenres', { names })
-    case 'artists_not_found':
-      return t('ai.clarify.artistsNotFound', { names })
-    case 'tracks_not_found':
-      return t('ai.clarify.tracksNotFound', { names })
   }
 }
 

@@ -15,6 +15,8 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     genres: [],
     seedTracks: [],
     targetTrackCount: 30,
+    targetDurationMinutes: null,
+    mood: null,
     popularity: 'rarities',
     orderMode: null,
     excludeArtists: ['Coldplay'],
@@ -74,6 +76,50 @@ describe('normalizeAiIntent', () => {
         }),
       ).kind,
     ).toBe('discover_track');
+  });
+
+  it('treats a mood-only request as a genre-based playlist', () => {
+    const normalized = normalizeAiIntent(
+      intent({ kind: 'artist_mix', artists: [], mood: 'happy' }),
+    );
+
+    expect(normalized).toMatchObject({
+      kind: 'genre_mix',
+      genres: [],
+      mood: 'happy',
+    });
+  });
+
+  it('keeps explicit genres and the mood as separate values', () => {
+    const request = intent({
+      kind: 'genre_mix',
+      artists: [],
+      genres: ['pop'],
+      mood: 'happy',
+    });
+
+    expect(normalizeAiIntent(request)).toMatchObject({
+      kind: 'genre_mix',
+      genres: ['pop'],
+      mood: 'happy',
+    });
+    expect(findIntentClarification(normalizeAiIntent(request))).toBeNull();
+  });
+
+  it('keeps the seed kind when a mood comes with an artist or track seed', () => {
+    expect(
+      normalizeAiIntent(intent({ kind: 'genre_mix', mood: 'sad' })),
+    ).toMatchObject({ kind: 'artist_mix', mood: 'sad' });
+    expect(
+      normalizeAiIntent(
+        intent({
+          kind: 'artist_mix',
+          artists: [],
+          seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
+          mood: 'dark',
+        }),
+      ),
+    ).toMatchObject({ kind: 'discover_track', mood: 'dark' });
   });
 
   it('keeps the requested kind when seed types are mixed', () => {
@@ -192,6 +238,115 @@ describe('findIntentClarification', () => {
       'set_order_mode',
       'set_order_mode',
     ]);
+  });
+
+  it('accepts a mood-only request without asking for an artist, song or genre', () => {
+    expect(
+      findIntentClarification(
+        intent({ kind: 'genre_mix', artists: [], mood: 'happy' }),
+      ),
+    ).toBeNull();
+  });
+
+  it('keeps a mood request executable when its activity is not supported', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          mood: 'happy',
+          unsupportedConstraints: [
+            { category: 'activity', userText: 'to dance at a party' },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('still asks when only an activity was stated', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          unsupportedConstraints: [
+            { category: 'activity', userText: 'for my workout' },
+          ],
+        }),
+      )?.reason,
+    ).toBe('unsupported_constraint');
+  });
+
+  it('applies domain limits to a mood-only request', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          mood: 'calm',
+          targetTrackCount: MAX_TRACKS + 1,
+        }),
+      )?.reason,
+    ).toBe('track_count_over_limit');
+  });
+
+  it('accepts a target duration together with a track count', () => {
+    expect(
+      findIntentClarification(
+        intent({ targetTrackCount: 30, targetDurationMinutes: 60 }),
+      ),
+    ).toBeNull();
+  });
+
+  it('asks the user to fix a zero duration instead of guessing one', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['jazz'],
+          targetDurationMinutes: 0,
+        }),
+      ),
+    ).toMatchObject({ reason: 'invalid_duration', options: [] });
+  });
+
+  it('validates genres against the local curated catalog', () => {
+    expect(
+      findIntentClarification(
+        intent({ kind: 'genre_mix', artists: [], genres: ['Pop', 'shoegaze'] }),
+      ),
+    ).toBeNull();
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['shoegaze', 'definitely not a genre', 'custom:anything'],
+        }),
+      ),
+    ).toMatchObject({
+      reason: 'unknown_genres',
+      seedType: 'genre',
+      names: ['definitely not a genre', 'custom:anything'],
+    });
+  });
+
+  it('never asks whether a named artist or song exists', () => {
+    expect(
+      findIntentClarification(
+        intent({ artists: ['Radiohed', 'Nobody Known'] }),
+      ),
+    ).toBeNull();
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'discover_track',
+          artists: [],
+          seedTracks: [{ title: 'Imaginary Song', artist: 'Nobody Known' }],
+        }),
+      ),
+    ).toBeNull();
   });
 
   it('does not block on deferred constraints or an already chosen order', () => {

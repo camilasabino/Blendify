@@ -12,14 +12,21 @@ from app.models.intent import (
     PlaylistIntent,
 )
 
-DATASET_PATH = Path(__file__).resolve().parent / "intent-eval-v1.json"
+DATASET_PATH = Path(__file__).resolve().parent / "intent-eval-v2.json"
 
 EvalLanguage = Literal["en", "es", "pt"]
 ExpectationStatus = Literal["passed", "failed", "unchecked"]
 Interpretation = InterpretedIntent | ClarificationNeeded
 
 NAME_LIST_EXPECTATIONS = ("artists", "genres", "excludeArtists")
-SCALAR_EXPECTATIONS = ("kind", "targetTrackCount", "popularity", "orderMode")
+SCALAR_EXPECTATIONS = (
+    "kind",
+    "targetTrackCount",
+    "targetDurationMinutes",
+    "mood",
+    "popularity",
+    "orderMode",
+)
 TRACK_EXPECTATIONS = ("seedTrackTitles", "seedTrackArtists", "excludeTrackTitles")
 CATEGORY_EXPECTATIONS = ("unsupportedCategories", "unsupportedCategoriesWithin")
 EXPECTATION_KEYS = frozenset(
@@ -129,6 +136,8 @@ def _check_scalars(expect: dict[str, Any], intent: PlaylistIntent) -> list[str]:
     actual_by_key = {
         "kind": intent.kind,
         "targetTrackCount": intent.target_track_count,
+        "targetDurationMinutes": intent.target_duration_minutes,
+        "mood": intent.mood,
         "popularity": intent.popularity,
         "orderMode": intent.order_mode,
     }

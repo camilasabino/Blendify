@@ -213,6 +213,24 @@
                       "genre_mix"
                     ]
                   },
+                  "mood": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "calm",
+                          "dark",
+                          "energetic",
+                          "happy",
+                          "romantic",
+                          "sad"
+                        ]
+                      }
+                    ]
+                  },
                   "orderMode": {
                     "anyOf": [
                       {
@@ -274,6 +292,18 @@
                       ]
                     }
                   },
+                  "targetDurationMinutes": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10080
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "targetTrackCount": {
                     "anyOf": [
                       {
@@ -326,9 +356,11 @@
                   "excludeTracks",
                   "genres",
                   "kind",
+                  "mood",
                   "orderMode",
                   "popularity",
                   "seedTracks",
+                  "targetDurationMinutes",
                   "targetTrackCount",
                   "unsupportedConstraints"
                 ]

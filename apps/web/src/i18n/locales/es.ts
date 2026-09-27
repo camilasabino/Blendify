@@ -510,10 +510,8 @@ export const es: Record<MessageKey, string> = {
     'Blendify no puede ordenar las canciones de esa forma con confianza. Elige otro orden:',
   'ai.clarify.unknownGenres':
     'Blendify no reconoce estos géneros: {names}. Prueba con otro nombre.',
-  'ai.clarify.artistsNotFound':
-    'No se encontraron estos artistas: {names}. Revisa cómo están escritos.',
-  'ai.clarify.tracksNotFound':
-    'No se encontró esta canción: {names}. Agrega el artista o revisa el título.',
+  'ai.clarify.invalidDuration':
+    'Esa duración no sirve. Pide una duración de al menos un minuto.',
   'ai.clarify.optionsLabel': 'Elige una opción',
   'ai.clarify.orEdit': 'O edita tu pedido arriba y envíalo de nuevo.',
   'ai.clarify.edit': 'Edita tu pedido arriba y envíalo de nuevo.',
@@ -538,6 +536,15 @@ export const es: Record<MessageKey, string> = {
   'ai.summary.basedOn': 'Basado en',
   'ai.summary.genres': 'Géneros',
   'ai.summary.songs': 'Canciones',
+  'ai.summary.duration': 'Duración',
+  'ai.summary.durationValue': 'Unos {minutes} min',
+  'ai.summary.mood': 'Estado de ánimo',
+  'ai.mood.happy': 'Alegre',
+  'ai.mood.calm': 'Tranquilo',
+  'ai.mood.energetic': 'Enérgico',
+  'ai.mood.sad': 'Triste',
+  'ai.mood.romantic': 'Romántico',
+  'ai.mood.dark': 'Oscuro',
   'ai.summary.avoiding': 'Evitando',
   'ai.summary.trackBy': '{title} de {artist}',
   'ai.summary.unmet': 'No se usarán',

@@ -1,6 +1,6 @@
 from app.providers.model_provider import ModelIntentRequest
 
-INTENT_PROMPT_VERSION = "intent-v1"
+INTENT_PROMPT_VERSION = "intent-v2"
 
 INTENT_SYSTEM_PROMPT = """\
 You interpret one playlist request for Blendify into the structured response schema.
@@ -9,16 +9,17 @@ artist, song or genre exists, and nothing has been created or executed.
 
 Outcome
 - Return "interpreted" with an intent whenever the request names at least one artist,
-  song or genre, even if it also contains requirements Blendify cannot fulfil.
-- Return "needs_clarification" only when it names none of them:
+  song or genre, or asks for one of the moods listed under mood, even if it also contains
+  requirements Blendify cannot fulfil.
+- Return "needs_clarification" only when it has none of them:
   - "not_a_playlist_request": the message does not ask for a playlist;
   - "unsupported_constraint": it only states requirements listed under
-    unsupportedConstraints (for example only a mood or an activity); list them;
+    unsupportedConstraints (for example only an activity); list them;
   - "ambiguous_request": any other playlist request with nothing usable.
 
 Playlist kind (exactly one)
 - "artist_mix": songs by the named artists themselves.
-- "genre_mix": songs from the named genres.
+- "genre_mix": songs from the named genres, or a mood with no artist, song or genre.
 - "discover_artist": music similar to one named artist ("like", "similar to", "inspired by").
 - "discover_track": music similar to one named song, or starting from one song.
 Keep every named artist, genre and song in its list, even if it does not fit the kind
@@ -26,13 +27,27 @@ or seems like too many. Never drop, merge or truncate them; Blendify resolves co
 
 Names
 - Copy artist, song and genre names as the user wrote them; fix only obvious casing.
-  Never translate names. Never add artists, songs or genres the user did not name.
+  Never translate names. Never add artists, songs or genres the user did not name, and
+  never add genres to express a mood.
 - Set a song's artist only when the user states it; otherwise null.
 - Never output identifiers, URIs or URLs.
 
 Fields
 - targetTrackCount: only an explicit number of songs or tracks; otherwise null.
   Never derive it from a duration.
+- targetDurationMinutes: the total playlist length the user asks for, in whole minutes
+  ("an hour" = 60, "hour and a half" = 90, "90 minutes" = 90, "about 45 minutes" = 45);
+  0 when the stated length is zero or negative; otherwise null. Never derive it from a
+  number of songs. Keep both when the user gives a number of songs and a length.
+- mood: how the user wants the music to feel, only when it clearly is one of "happy",
+  "calm", "energetic", "sad", "romantic" or "dark", or a close synonym of one (upbeat or
+  cheerful is happy; relaxing or chill is calm; melancholic is sad; gloomy is dark);
+  otherwise null. If several are stated, keep the most prominent one and report the rest
+  under unsupportedConstraints. "energetic" is how the music feels throughout; energy
+  that changes over the playlist is not a mood.
+- An activity or occasion (running, workout, studying, focus, sleep, parties, dancing)
+  is never a mood: report it under unsupportedConstraints and set mood only if the user
+  also states a mood ("happy music for a party" is mood "happy" plus an activity).
 - popularity: "popular" for hits, well-known or mainstream songs; "rarities" for deep
   cuts, rarer, lesser-known, less mainstream, obscure or B-sides; "balanced" only for an
   explicit mix of both; otherwise null.
@@ -40,10 +55,11 @@ Fields
   song title; "random" for shuffled or random order; otherwise null.
 - excludeArtists / excludeTracks: artists or songs the user wants left out.
 - unsupportedConstraints: every other requirement, each with the closest category:
-  duration (total length), era (decades, years, release dates), energy, mood, activity
-  (running, studying, parties), tempo (speed, BPM), progression (how the playlist should
-  change from start to end), artist_attribute (gender, nationality, age or any other fact
-  about artists), other (anything else, such as a limit of songs per artist or lyrics
+  duration (a length that cannot be given in minutes, such as "a long playlist"), era
+  (decades, years, release dates), energy, mood (a feeling outside the mood list), activity
+  (running, studying, parties, dancing), tempo (speed, BPM), progression (how the playlist
+  should change from start to end), artist_attribute (gender, nationality, age or any other
+  fact about artists), other (anything else, such as a limit of songs per artist or lyrics
   language). userText is a short quote of the user's own words. Never drop such a
   requirement and never express it through another field. Genres are not constraints.
 

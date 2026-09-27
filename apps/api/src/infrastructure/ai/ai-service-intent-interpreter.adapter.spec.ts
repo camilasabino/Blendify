@@ -35,6 +35,8 @@ const interpretation: InterpretIntentResponse = {
       genres: ['indie rock'],
       seedTracks: [],
       targetTrackCount: 30,
+      targetDurationMinutes: null,
+      mood: null,
       popularity: null,
       orderMode: null,
       excludeArtists: [],

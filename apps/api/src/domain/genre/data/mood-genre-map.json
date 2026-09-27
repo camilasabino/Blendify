@@ -1,0 +1,14 @@
+{
+  "happy": ["dance-pop", "disco", "funk", "motown", "power-pop"],
+  "calm": ["ambient", "chill-out", "lo-fi-beats", "bossa-nova", "indie-folk"],
+  "energetic": [
+    "edm",
+    "electro-house",
+    "drum-and-bass",
+    "hard-rock",
+    "pop-punk"
+  ],
+  "sad": ["slowcore", "sad-rap", "emo", "blues", "singer-songwriter"],
+  "romantic": ["r-b", "quiet-storm", "neo-soul", "bolero", "soft-rock"],
+  "dark": ["gothic-rock", "post-punk", "dark-ambient", "doom-metal", "trip-hop"]
+}

@@ -427,6 +427,14 @@ export const AI_UNSUPPORTED_CONSTRAINT_CATEGORIES = [
   'artist_attribute',
   'other',
 ] as const;
+export const AI_MOODS = [
+  'happy',
+  'calm',
+  'energetic',
+  'sad',
+  'romantic',
+  'dark',
+] as const;
 export const AI_SESSION_STATUSES = ['ready', 'needs_clarification'] as const;
 export const AI_SEED_TYPES = ['artist', 'genre', 'track'] as const;
 export const AI_CLARIFICATION_REASONS = [
@@ -436,16 +444,16 @@ export const AI_CLARIFICATION_REASONS = [
   'mixed_seed_types',
   'too_many_seeds',
   'track_count_over_limit',
+  'invalid_duration',
   'unsupported_ordering',
   'unknown_genres',
-  'artists_not_found',
-  'tracks_not_found',
 ] as const;
 
 export const AiUnsupportedConstraintCategorySchema = z.enum(
   AI_UNSUPPORTED_CONSTRAINT_CATEGORIES,
 );
 export const AiSeedTypeSchema = z.enum(AI_SEED_TYPES);
+export const AiMoodSchema = z.enum(AI_MOODS);
 
 export const AiTrackReferenceSchema = z.strictObject({
   title: z.string().min(1).max(200),
@@ -463,6 +471,8 @@ export const AiIntentSummarySchema = z.strictObject({
   genres: z.array(z.string().min(1).max(200)),
   seedTrack: AiTrackReferenceSchema.nullable(),
   targetTrackCount: z.number().int().min(1).max(MAX_TRACKS).nullable(),
+  targetDurationMinutes: z.number().int().positive().nullable(),
+  mood: AiMoodSchema.nullable(),
   popularity: PopularityModeSchema.nullable(),
   orderMode: TrackOrderModeSchema.nullable(),
   excludeArtists: z.array(z.string().min(1).max(200)),
@@ -574,6 +584,7 @@ export type AiUnsupportedConstraintCategory = z.infer<
   typeof AiUnsupportedConstraintCategorySchema
 >;
 export type AiSeedType = z.infer<typeof AiSeedTypeSchema>;
+export type AiMood = z.infer<typeof AiMoodSchema>;
 export type AiTrackReference = z.infer<typeof AiTrackReferenceSchema>;
 export type AiUnmetConstraint = z.infer<typeof AiUnmetConstraintSchema>;
 export type AiIntentSummary = z.infer<typeof AiIntentSummarySchema>;

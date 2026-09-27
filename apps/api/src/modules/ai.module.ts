@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AiIntentEvaluator } from '@/application/services/ai-intent-evaluator.service';
-import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
 import { AI_SESSION_REPOSITORY } from '@/domain/repositories/ai-session.repository.port';
@@ -22,8 +20,6 @@ import { AiSessionsController } from '@/presentation/controllers/ai-sessions.con
       provide: AI_SESSION_REPOSITORY,
       useExisting: RedisAiSessionRepository,
     },
-    AiIntentResolver,
-    AiIntentEvaluator,
     CreateAiSessionUseCase,
     AnswerAiClarificationUseCase,
   ],

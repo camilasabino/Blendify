@@ -4,16 +4,12 @@ import {
   applyClarificationOption,
   normalizeAiIntent,
 } from '@/domain/ai/ai-intent-rules';
-import { isReadableBy } from '@/domain/ai/ai-session';
+import { isReadableBy, withReviewedIntent } from '@/domain/ai/ai-session';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
 import {
   AI_SESSION_REPOSITORY,
   type AiSessionRepositoryPort,
 } from '@/domain/repositories/ai-session.repository.port';
-import {
-  AiIntentEvaluator,
-  withEvaluation,
-} from '@/application/services/ai-intent-evaluator.service';
 import type { AiSessionCommandResult } from './create-ai-session.use-case';
 
 @Injectable()
@@ -21,7 +17,6 @@ export class AnswerAiClarificationUseCase {
   constructor(
     @Inject(AI_SESSION_REPOSITORY)
     private readonly sessions: AiSessionRepositoryPort,
-    private readonly evaluator: AiIntentEvaluator,
   ) {}
 
   async execute(command: {
@@ -53,10 +48,9 @@ export class AnswerAiClarificationUseCase {
     const intent = normalizeAiIntent(
       applyClarificationOption(currentIntent, option),
     );
-    const evaluation = await this.evaluator.evaluate(intent);
-    const updated = withEvaluation(
-      { ...session, aiSafe: { intent }, updatedAt: new Date().toISOString() },
-      evaluation,
+    const updated = withReviewedIntent(
+      { ...session, updatedAt: new Date().toISOString() },
+      intent,
     );
 
     await this.sessions.save(command.token, updated, remainingMs);

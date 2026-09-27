@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   AI_PROMPT_MAX_LENGTH,
   AI_UNSUPPORTED_CONSTRAINT_CATEGORIES,
+  AiMoodSchema,
   PlaylistKindSchema,
   PopularityModeSchema,
   TrackOrderModeSchema,
@@ -11,6 +12,7 @@ export const AI_INTENT_PROMPT_MAX_LENGTH = AI_PROMPT_MAX_LENGTH;
 export const AI_INTENT_NAME_MAX_LENGTH = 200;
 export const AI_INTENT_LIST_MAX_ITEMS = 25;
 export const AI_INTENT_TARGET_TRACK_COUNT_MAX = 1_000;
+export const AI_INTENT_TARGET_DURATION_MINUTES_MAX = 10_080;
 export const AI_INTENT_USER_TEXT_MAX_LENGTH = 300;
 export const AI_PROMPT_VERSION_MAX_LENGTH = 64;
 export const AI_SERVICE_ERROR_MESSAGE_MAX_LENGTH = 300;
@@ -61,6 +63,13 @@ export const PlaylistIntentSchema = z.strictObject({
     .min(1)
     .max(AI_INTENT_TARGET_TRACK_COUNT_MAX)
     .nullable(),
+  targetDurationMinutes: z
+    .number()
+    .int()
+    .min(0)
+    .max(AI_INTENT_TARGET_DURATION_MINUTES_MAX)
+    .nullable(),
+  mood: AiMoodSchema.nullable(),
   popularity: PopularityModeSchema.nullable(),
   orderMode: TrackOrderModeSchema.nullable(),
   excludeArtists: IntentNameListSchema,

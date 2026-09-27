@@ -1,6 +1,3 @@
-import { AiIntentEvaluator } from '@/application/services/ai-intent-evaluator.service';
-import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
-import { Artist } from '@/domain/artist/artist.entity';
 import type { AiIntent } from '@/domain/ai/ai-intent';
 import { findIntentClarification } from '@/domain/ai/ai-intent-rules';
 import {
@@ -9,7 +6,6 @@ import {
 } from '@/domain/ai/ai-session';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
 import type { AiSessionRepositoryPort } from '@/domain/repositories/ai-session.repository.port';
-import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { AnswerAiClarificationUseCase } from './answer-ai-clarification.use-case';
 
 const TOKEN = 'session-token';
@@ -22,6 +18,8 @@ const DISCOVER_INTENT: AiIntent = {
   genres: [],
   seedTracks: [],
   targetTrackCount: null,
+  targetDurationMinutes: 45,
+  mood: 'dark',
   popularity: null,
   orderMode: null,
   excludeArtists: [],
@@ -34,10 +32,9 @@ function storedSession(overrides: Partial<AiSession> = {}): AiSession {
     version: AI_SESSION_RECORD_VERSION,
     ownerUserId: null,
     originalPrompt: 'Music like Radiohead and Interpol',
-    promptVersion: 'intent-v1',
+    promptVersion: 'intent-v2',
     aiSafe: { intent: DISCOVER_INTENT },
     clarification: findIntentClarification(DISCOVER_INTENT),
-    execution: null,
     createdAt: NOW.toISOString(),
     updatedAt: NOW.toISOString(),
     expiresAt: EXPIRES_AT.toISOString(),
@@ -54,21 +51,8 @@ function createUseCase(session: AiSession | null) {
     }),
     find: jest.fn(() => Promise.resolve(session)),
   };
-  const catalog = {
-    searchArtists: jest.fn((name: string) =>
-      Promise.resolve([
-        Artist.create({ id: ArtistId.create(name.toLowerCase()), name }),
-      ]),
-    ),
-    searchTracks: jest.fn(),
-    resolveTrack: jest.fn(),
-    getArtistsByIds: jest.fn(),
-  };
-  const evaluator = new AiIntentEvaluator(
-    new AiIntentResolver({ forMarket: () => catalog }),
-  );
   return {
-    useCase: new AnswerAiClarificationUseCase(sessions, evaluator),
+    useCase: new AnswerAiClarificationUseCase(sessions),
     saved,
   };
 }
@@ -82,7 +66,7 @@ describe('AnswerAiClarificationUseCase', () => {
     jest.useRealTimers();
   });
 
-  it('applies an offered option and resolves the updated intent without a model call', async () => {
+  it('applies an offered option and reviews the updated intent without a model call', async () => {
     const { useCase, saved } = createUseCase(storedSession());
 
     const { session } = await useCase.execute({
@@ -91,11 +75,12 @@ describe('AnswerAiClarificationUseCase', () => {
       userId: null,
     });
 
-    expect(session.aiSafe.intent?.artists).toEqual(['Interpol']);
+    expect(session.aiSafe.intent).toMatchObject({
+      artists: ['Interpol'],
+      targetDurationMinutes: 45,
+      mood: 'dark',
+    });
     expect(session.clarification).toBeNull();
-    expect(session.execution?.resolvedSeeds.artists).toEqual([
-      { id: 'interpol', name: 'Interpol' },
-    ]);
     expect(saved[0].ttlMs).toBe(EXPIRES_AT.getTime() - NOW.getTime());
     expect(saved[0].session.expiresAt).toBe(EXPIRES_AT.toISOString());
   });
@@ -147,7 +132,10 @@ describe('AnswerAiClarificationUseCase', () => {
       userId: 'user-1',
     });
 
-    expect(session.aiSafe.intent?.kind).toBe('artist_mix');
-    expect(session.execution?.resolvedSeeds.artists).toHaveLength(2);
+    expect(session.aiSafe.intent).toMatchObject({
+      kind: 'artist_mix',
+      artists: ['Radiohead', 'Interpol'],
+    });
+    expect(session.clarification).toBeNull();
   });
 });

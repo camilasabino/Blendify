@@ -7,11 +7,13 @@ from app.models.wire import WireModel
 AI_INTENT_NAME_MAX_LENGTH = 200
 AI_INTENT_LIST_MAX_ITEMS = 25
 AI_INTENT_TARGET_TRACK_COUNT_MAX = 1_000
+AI_INTENT_TARGET_DURATION_MINUTES_MAX = 10_080
 AI_INTENT_USER_TEXT_MAX_LENGTH = 300
 
 PlaylistKind = Literal["artist_mix", "genre_mix", "discover_artist", "discover_track"]
 PopularityMode = Literal["popular", "balanced", "rarities"]
 TrackOrderMode = Literal["artist", "title", "random"]
+Mood = Literal["happy", "calm", "energetic", "sad", "romantic", "dark"]
 UnsupportedConstraintCategory = Literal[
     "duration",
     "era",
@@ -40,6 +42,9 @@ UserText = Annotated[
     ),
 ]
 TargetTrackCount = Annotated[int, Field(ge=1, le=AI_INTENT_TARGET_TRACK_COUNT_MAX, strict=True)]
+TargetDurationMinutes = Annotated[
+    int, Field(ge=0, le=AI_INTENT_TARGET_DURATION_MINUTES_MAX, strict=True)
+]
 
 
 class IntentTrackReference(WireModel):
@@ -58,6 +63,8 @@ class PlaylistIntent(WireModel):
     genres: Annotated[list[IntentName], Field(max_length=AI_INTENT_LIST_MAX_ITEMS)]
     seed_tracks: Annotated[list[IntentTrackReference], Field(max_length=AI_INTENT_LIST_MAX_ITEMS)]
     target_track_count: TargetTrackCount | None
+    target_duration_minutes: TargetDurationMinutes | None
+    mood: Mood | None
     popularity: PopularityMode | None
     order_mode: TrackOrderMode | None
     exclude_artists: Annotated[list[IntentName], Field(max_length=AI_INTENT_LIST_MAX_ITEMS)]

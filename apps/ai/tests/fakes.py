@@ -43,6 +43,8 @@ def interpreted_output(**intent_overrides: object) -> dict[str, object]:
         "genres": [],
         "seedTracks": [],
         "targetTrackCount": 30,
+        "targetDurationMinutes": None,
+        "mood": None,
         "popularity": "rarities",
         "orderMode": None,
         "excludeArtists": ["Coldplay"],

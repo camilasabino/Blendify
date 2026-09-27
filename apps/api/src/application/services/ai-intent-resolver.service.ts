@@ -1,22 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { AiClarificationReason, AiSeedType } from '@blendify/contracts';
+import type { AiSeedType } from '@blendify/contracts';
 import {
   normalizeArtistName,
   pickStrictArtistMatch,
 } from '@/domain/artist/artist-name-match';
-import type {
-  AiIntent,
-  AiIntentClarification,
-  AiTrackReference,
-} from '@/domain/ai/ai-intent';
+import { resolveCuratedGenreSeeds } from '@/domain/ai/ai-genre-seeds';
+import type { AiIntent, AiTrackReference } from '@/domain/ai/ai-intent';
 import type {
   ResolvedAiSeed,
   ResolvedAiSeeds,
   ResolvedAiTrackSeed,
-} from '@/domain/ai/ai-session';
+} from '@/domain/ai/ai-resolved-seeds';
 import { seedTypeOfKind } from '@/domain/ai/ai-seeds';
 import { cleanDiscoveryTrackTitle } from '@/domain/discovery/similar-track-query';
-import { findCuratedGenre } from '@/domain/genre/curated-genres';
 import {
   CATALOG_PROVIDER_FACTORY,
   type CatalogProviderFactoryPort,
@@ -26,17 +22,10 @@ import type { Track } from '@/domain/track/track.entity';
 
 const ARTIST_MATCH_CANDIDATES = 5;
 const TRACK_TITLE_MATCH_CANDIDATES = 10;
-const CUSTOM_GENRE_PREFIX = 'custom:';
 
 export type AiIntentResolution =
   | { status: 'resolved'; seeds: ResolvedAiSeeds }
-  | { status: 'unresolved'; clarification: AiIntentClarification };
-
-const NOT_FOUND_REASON: Record<AiSeedType, AiClarificationReason> = {
-  artist: 'artists_not_found',
-  genre: 'unknown_genres',
-  track: 'tracks_not_found',
-};
+  | { status: 'not_found'; seedType: AiSeedType; names: string[] };
 
 @Injectable()
 export class AiIntentResolver {
@@ -59,20 +48,10 @@ export class AiIntentResolver {
   }
 
   private resolveGenres(names: string[]): AiIntentResolution {
-    const genres: ResolvedAiSeed[] = [];
-    const missing: string[] = [];
+    const { genres, unknown } = resolveCuratedGenreSeeds(names);
 
-    for (const name of names) {
-      const genre = findSupportedGenre(name);
-      if (genre) {
-        genres.push(genre);
-      } else {
-        missing.push(name);
-      }
-    }
-
-    if (missing.length > 0) {
-      return notFound('genre', missing);
+    if (unknown.length > 0) {
+      return notFound('genre', unknown);
     }
     return { status: 'resolved', seeds: { artists: [], genres, track: null } };
   }
@@ -122,15 +101,6 @@ export class AiIntentResolver {
   }
 }
 
-function findSupportedGenre(name: string): ResolvedAiSeed | null {
-  if (name.trim().toLowerCase().startsWith(CUSTOM_GENRE_PREFIX)) {
-    return null;
-  }
-
-  const genre = findCuratedGenre(name);
-  return genre ? { id: genre.id, name: genre.name } : null;
-}
-
 async function findTrack(
   catalog: CatalogProviderPort,
   reference: AiTrackReference,
@@ -167,15 +137,5 @@ function toTrackSeed(track: Track): ResolvedAiTrackSeed {
 }
 
 function notFound(seedType: AiSeedType, names: string[]): AiIntentResolution {
-  return {
-    status: 'unresolved',
-    clarification: {
-      reason: NOT_FOUND_REASON[seedType],
-      seedType,
-      limit: null,
-      names,
-      unsupportedConstraints: [],
-      options: [],
-    },
-  };
+  return { status: 'not_found', seedType, names };
 }

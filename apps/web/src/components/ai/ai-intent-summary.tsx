@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useT } from '@/i18n/use-t'
 import {
   CATEGORY_LABEL_KEYS,
+  MOOD_LABEL_KEYS,
   ORDER_LABEL_KEYS,
   POPULARITY_LABEL_KEYS,
 } from './ai-copy'
@@ -60,8 +61,16 @@ export function AiIntentSummary({
         {intent.genres.length > 0 ? (
           <SummaryItem label={t('ai.summary.genres')}>{intent.genres.join(' · ')}</SummaryItem>
         ) : null}
+        {intent.mood ? (
+          <SummaryItem label={t('ai.summary.mood')}>{t(MOOD_LABEL_KEYS[intent.mood])}</SummaryItem>
+        ) : null}
         {intent.targetTrackCount !== null ? (
           <SummaryItem label={t('ai.summary.songs')}>{intent.targetTrackCount}</SummaryItem>
+        ) : null}
+        {intent.targetDurationMinutes !== null ? (
+          <SummaryItem label={t('ai.summary.duration')}>
+            {t('ai.summary.durationValue', { minutes: intent.targetDurationMinutes })}
+          </SummaryItem>
         ) : null}
         {intent.popularity ? (
           <SummaryItem label={t('create.reach')}>

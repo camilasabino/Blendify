@@ -1,13 +1,9 @@
 import { Logger } from '@nestjs/common';
 import type { InterpretIntentResponse } from '@blendify/contracts/ai-service';
-import { AiIntentEvaluator } from '@/application/services/ai-intent-evaluator.service';
-import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
-import { Artist } from '@/domain/artist/artist.entity';
 import type { AiSession } from '@/domain/ai/ai-session';
 import { AiInterpretationError } from '@/domain/errors/ai-interpretation.error';
 import type { AiSessionRepositoryPort } from '@/domain/repositories/ai-session.repository.port';
 import type { IntentInterpreterPort } from '@/domain/repositories/intent-interpreter.port';
-import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import {
   AI_SESSION_TTL_MS,
   CreateAiSessionUseCase,
@@ -20,7 +16,7 @@ function interpreted(
   overrides: Record<string, unknown> = {},
 ): InterpretIntentResponse {
   return {
-    promptVersion: 'intent-v1',
+    promptVersion: 'intent-v2',
     result: {
       outcome: 'interpreted',
       intent: {
@@ -29,6 +25,8 @@ function interpreted(
         genres: [],
         seedTracks: [],
         targetTrackCount: 30,
+        targetDurationMinutes: null,
+        mood: null,
         popularity: 'rarities',
         orderMode: null,
         excludeArtists: ['Coldplay'],
@@ -59,21 +57,8 @@ function createUseCase(response: InterpretIntentResponse | Error) {
     }),
     find: jest.fn(() => Promise.resolve(null)),
   };
-  const catalog = {
-    searchArtists: jest.fn((name: string) =>
-      Promise.resolve([
-        Artist.create({ id: ArtistId.create(name.toLowerCase()), name }),
-      ]),
-    ),
-    searchTracks: jest.fn(),
-    resolveTrack: jest.fn(),
-    getArtistsByIds: jest.fn(),
-  };
-  const evaluator = new AiIntentEvaluator(
-    new AiIntentResolver({ forMarket: () => catalog }),
-  );
-  const useCase = new CreateAiSessionUseCase(interpreter, sessions, evaluator);
-  return { useCase, interpreter, saved, catalog };
+  const useCase = new CreateAiSessionUseCase(interpreter, sessions);
+  return { useCase, interpreter, saved };
 }
 
 describe('CreateAiSessionUseCase', () => {
@@ -97,7 +82,7 @@ describe('CreateAiSessionUseCase', () => {
     });
   });
 
-  it('stores a bounded session with separate AI-safe and execution state', async () => {
+  it('stores a bounded review session with unresolved names and no execution state', async () => {
     const { useCase, saved } = createUseCase(interpreted());
 
     const result = await useCase.execute({ prompt: PROMPT, userId: 'user-1' });
@@ -109,19 +94,63 @@ describe('CreateAiSessionUseCase', () => {
     expect(session).toMatchObject({
       ownerUserId: 'user-1',
       originalPrompt: PROMPT,
-      promptVersion: 'intent-v1',
+      promptVersion: 'intent-v2',
       clarification: null,
       createdAt: NOW.toISOString(),
       expiresAt: new Date(NOW.getTime() + AI_SESSION_TTL_MS).toISOString(),
       aiSafe: { intent: { artists: ['Radiohead', 'Interpol'] } },
-      execution: {
-        resolvedSeeds: {
-          artists: [
-            { id: 'radiohead', name: 'Radiohead' },
-            { id: 'interpol', name: 'Interpol' },
-          ],
-        },
-      },
+    });
+    expect(session).not.toHaveProperty('execution');
+  });
+
+  it('keeps an unresolved seed track as the user-authored names', async () => {
+    const { useCase } = createUseCase(
+      interpreted({
+        kind: 'discover_track',
+        artists: [],
+        seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
+      }),
+    );
+
+    const { session } = await useCase.execute({
+      prompt: 'Start from Teardrop by Massive Attack',
+      userId: null,
+    });
+
+    expect(session.clarification).toBeNull();
+    expect(session.aiSafe.intent?.seedTracks).toEqual([
+      { title: 'Teardrop', artist: 'Massive Attack' },
+    ]);
+  });
+
+  it('preserves mood, target duration and track count through the session', async () => {
+    const { useCase, saved } = createUseCase(
+      interpreted({
+        kind: 'genre_mix',
+        artists: [],
+        targetTrackCount: 30,
+        targetDurationMinutes: 60,
+        mood: 'happy',
+        excludeArtists: [],
+        unsupportedConstraints: [
+          { category: 'activity', userText: 'to dance at a party' },
+        ],
+      }),
+    );
+
+    await useCase.execute({ prompt: 'Happy music', userId: null });
+
+    const [{ session }] = saved;
+    expect(session.clarification).toBeNull();
+    expect(session.aiSafe.intent).toMatchObject({
+      kind: 'genre_mix',
+      genres: [],
+      targetTrackCount: 30,
+      targetDurationMinutes: 60,
+      mood: 'happy',
+      unsupportedConstraints: [
+        { category: 'activity', userText: 'to dance at a party' },
+      ],
     });
   });
 
@@ -136,8 +165,8 @@ describe('CreateAiSessionUseCase', () => {
   });
 
   it('keeps a model clarification without resolving anything', async () => {
-    const { useCase, catalog } = createUseCase({
-      promptVersion: 'intent-v1',
+    const { useCase } = createUseCase({
+      promptVersion: 'intent-v2',
       result: {
         outcome: 'needs_clarification',
         clarification: {
@@ -156,19 +185,14 @@ describe('CreateAiSessionUseCase', () => {
 
     expect(session.aiSafe.intent).toBeNull();
     expect(session.clarification?.reason).toBe('unsupported_constraint');
-    expect(catalog.searchArtists).not.toHaveBeenCalled();
   });
 
-  it('turns an over-limit request into a clarification before any catalog call', async () => {
-    const { useCase, catalog } = createUseCase(
-      interpreted({ targetTrackCount: 200 }),
-    );
+  it('turns an over-limit request into a clarification', async () => {
+    const { useCase } = createUseCase(interpreted({ targetTrackCount: 200 }));
 
     const { session } = await useCase.execute({ prompt: PROMPT, userId: null });
 
     expect(session.clarification?.reason).toBe('track_count_over_limit');
-    expect(session.execution).toBeNull();
-    expect(catalog.searchArtists).not.toHaveBeenCalled();
   });
 
   it('propagates interpretation failures without storing a session', async () => {
