@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { StrictMode, useState } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfirmDialog } from './dialog'
@@ -153,5 +153,49 @@ describe('ConfirmDialog while busy', () => {
     fireEvent(dialog, new Event('cancel', { cancelable: true }))
 
     expect(onCancel).toHaveBeenCalledOnce()
+  })
+})
+
+function MountOnDemandExample({ onCancel }: Readonly<{ onCancel: () => void }>) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Open
+      </button>
+      {open ? (
+        <ConfirmDialog
+          open
+          title="Remove playlist?"
+          description="This cannot be undone."
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          danger
+          onConfirm={vi.fn()}
+          onCancel={() => {
+            setOpen(false)
+            onCancel()
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
+
+describe('ConfirmDialog under StrictMode', () => {
+  it('does not self-cancel when it first mounts', async () => {
+    const user = userEvent.setup()
+    const onCancel = vi.fn()
+    render(
+      <StrictMode>
+        <MountOnDemandExample onCancel={onCancel} />
+      </StrictMode>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Open' }))
+
+    expect(await screen.findByRole('button', { name: 'Remove' })).toBeInTheDocument()
+    expect(document.querySelector('dialog')).toHaveAttribute('open')
+    expect(onCancel).not.toHaveBeenCalled()
   })
 })

@@ -34,6 +34,7 @@ function Dialog({
 }: DialogProps) {
   const titleId = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const suppressCloseEventRef = useRef(false)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -53,7 +54,10 @@ function Dialog({
 
     return () => {
       window.cancelAnimationFrame(frame)
-      if (dialog.open) dialog.close()
+      if (dialog.open) {
+        suppressCloseEventRef.current = true
+        dialog.close()
+      }
       if (trigger?.isConnected) trigger.focus()
     }
   }, [open, initialFocusRef])
@@ -77,6 +81,10 @@ function Dialog({
         if (dismissible) onClose()
       }}
       onClose={(event) => {
+        if (suppressCloseEventRef.current) {
+          suppressCloseEventRef.current = false
+          return
+        }
         if (!open) return
         if (dismissible) {
           onClose()
