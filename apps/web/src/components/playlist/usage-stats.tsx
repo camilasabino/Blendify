@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Music2 } from 'lucide-react'
 import type { RankedSeedUsage, UserUsageStats } from '@/lib/api'
 import { GenreIcon } from '@/components/genres/genre-icon'
@@ -23,7 +23,7 @@ function StatCard({
   )
 }
 
-function ArtistAvatar() {
+function ArtistAvatarFallback() {
   return (
     <span
       className="flex size-8 shrink-0 items-center justify-center rounded-full bg-charcoal-700 text-accent-fg ring-1 ring-divider"
@@ -34,8 +34,26 @@ function ArtistAvatar() {
   )
 }
 
-function artistRankLeading() {
-  return <ArtistAvatar />
+function ArtistAvatar({ item }: Readonly<{ item: RankedSeedUsage }>) {
+  const [imageFailed, setImageFailed] = useState(false)
+
+  if (!item.imageUrl || imageFailed) {
+    return <ArtistAvatarFallback />
+  }
+
+  return (
+    <img
+      src={item.imageUrl}
+      alt=""
+      loading="lazy"
+      className="size-8 shrink-0 rounded-full object-cover ring-1 ring-divider"
+      onError={() => setImageFailed(true)}
+    />
+  )
+}
+
+function artistRankLeading(item: RankedSeedUsage) {
+  return <ArtistAvatar item={item} />
 }
 
 function genreRankLeading(item: RankedSeedUsage) {
