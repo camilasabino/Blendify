@@ -474,7 +474,7 @@ export const es: Record<MessageKey, string> = {
   'ai.suggestion.genres': 'Shoegaze y dream pop, unas 40 canciones',
   'ai.suggestion.discoverArtist': 'Música parecida a Björk',
   'ai.suggestion.discoverTrack': 'Empezar desde Teardrop de Massive Attack',
-  'ai.submit': 'Crear playlist',
+  'ai.submit': 'Revisar pedido',
   'ai.submitting': 'Leyendo tu pedido…',
   'ai.interpreting': 'Leyendo tu pedido…',
   'ai.error.unavailable':

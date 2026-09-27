@@ -462,7 +462,7 @@ export const en = {
   'ai.suggestion.genres': 'Shoegaze and dream pop, around 40 songs',
   'ai.suggestion.discoverArtist': 'Music similar to Björk',
   'ai.suggestion.discoverTrack': 'Start from Teardrop by Massive Attack',
-  'ai.submit': 'Create playlist',
+  'ai.submit': 'Review request',
   'ai.submitting': 'Reading your request…',
   'ai.interpreting': 'Reading your request…',
   'ai.error.unavailable':

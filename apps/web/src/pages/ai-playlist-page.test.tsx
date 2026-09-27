@@ -54,6 +54,10 @@ function promptField() {
   return screen.getByRole('textbox', { name: 'Playlist request' })
 }
 
+function expectNoGenerationAction() {
+  expect(screen.queryByRole('button', { name: /create playlist/i })).toBeNull()
+}
+
 function sessionCalls(calls: FetchCall[]) {
   return calls.filter((call) => call.url.startsWith('/api/ai/sessions'))
 }
@@ -72,7 +76,7 @@ describe('Create with AI page', () => {
       screen.getByRole('heading', { level: 1, name: 'Describe the playlist you want' }),
     ).toBeVisible()
     expect(promptField()).toHaveValue('')
-    expect(screen.getByRole('button', { name: 'Create playlist' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Review request' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Music similar to Björk' })).toBeVisible()
   })
 
@@ -93,7 +97,7 @@ describe('Create with AI page', () => {
     const { calls } = stubApi({})
     renderPage()
 
-    await user.click(screen.getByRole('button', { name: 'Create playlist' }))
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
 
     expect(screen.getByText('Describe the playlist you want first.')).toBeVisible()
     expect(promptField()).toHaveAttribute('aria-invalid', 'true')
@@ -112,7 +116,7 @@ describe('Create with AI page', () => {
     renderPage()
 
     await user.type(promptField(), PROMPT)
-    await user.click(screen.getByRole('button', { name: 'Create playlist' }))
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
 
     const busyButton = screen.getByRole('button', { name: 'Reading your request…' })
     expect(busyButton).toBeDisabled()
@@ -137,6 +141,9 @@ describe('Create with AI page', () => {
     expect(within(summary).getByText('Coldplay')).toBeVisible()
     expect(within(summary).getByText('Won’t be applied')).toBeVisible()
     expect(within(summary).getByText(/rainy afternoon/)).toBeVisible()
+    expect(within(summary).getByRole('button', { name: 'Edit request' })).toBeEnabled()
+    expect(within(summary).getByRole('button', { name: 'Start over' })).toBeEnabled()
+    expectNoGenerationAction()
   })
 
   it('submits with Ctrl+Enter but keeps Enter for new lines', async () => {
@@ -165,7 +172,7 @@ describe('Create with AI page', () => {
     renderPage()
 
     await user.type(promptField(), 'Music like Radiohead and Interpol')
-    await user.click(screen.getByRole('button', { name: 'Create playlist' }))
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
 
     const heading = await screen.findByRole('heading', { name: 'One thing to confirm' })
     await waitFor(() => expect(heading).toHaveFocus())
@@ -173,6 +180,7 @@ describe('Create with AI page', () => {
       screen.getByText('Discover starts from one artist. Choose one, or mix them instead.'),
     ).toBeVisible()
     expect(screen.getByRole('button', { name: 'Mix these artists instead' })).toBeVisible()
+    expectNoGenerationAction()
 
     await user.click(screen.getByRole('button', { name: 'Start from Interpol' }))
 
@@ -200,13 +208,36 @@ describe('Create with AI page', () => {
     renderPage()
 
     await user.type(promptField(), PROMPT)
-    await user.click(screen.getByRole('button', { name: 'Create playlist' }))
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Create with AI is temporarily unavailable. Mix and Discover still work.',
     )
     expect(promptField()).toHaveValue(PROMPT)
-    expect(screen.getByRole('button', { name: 'Create playlist' })).toBeEnabled()
+    expect(promptField()).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Review request' })).toBeEnabled()
+  })
+
+  it('edits the request from the summary and reviews it again', async () => {
+    const user = userEvent.setup()
+    const { calls } = stubApi({ 'POST /api/ai/sessions': () => jsonResponse(READY_SESSION, 201) })
+    renderPage()
+
+    await user.type(promptField(), PROMPT)
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit request' }))
+
+    expect(promptField()).toHaveFocus()
+    expect(promptField()).toHaveValue(PROMPT)
+
+    await user.type(promptField(), ', around 40 songs')
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+    await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
+    expect(sessionCalls(calls).map((call) => call.body)).toEqual([
+      { prompt: PROMPT },
+      { prompt: `${PROMPT}, around 40 songs` },
+    ])
   })
 
   it('starts over from the summary', async () => {
@@ -215,7 +246,7 @@ describe('Create with AI page', () => {
     renderPage()
 
     await user.type(promptField(), PROMPT)
-    await user.click(screen.getByRole('button', { name: 'Create playlist' }))
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
     await user.click(await screen.findByRole('button', { name: 'Start over' }))
 
     expect(promptField()).toHaveValue('')
@@ -224,8 +255,8 @@ describe('Create with AI page', () => {
   })
 
   it.each([
-    ['es', 'Describe la playlist que quieres', 'Crear playlist', 'Pedido de playlist'],
-    ['pt', 'Descreva a playlist que você quer', 'Criar playlist', 'Pedido de playlist'],
+    ['es', 'Describe la playlist que quieres', 'Revisar pedido', 'Pedido de playlist'],
+    ['pt', 'Descreva a playlist que você quer', 'Revisar pedido', 'Pedido de playlist'],
   ] as const)('renders fixed copy in %s', (locale, title, submit, label) => {
     stubApi({})
     renderPage()

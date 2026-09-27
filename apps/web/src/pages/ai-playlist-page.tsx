@@ -29,6 +29,12 @@ export function AiPlaylistPage() {
     heading.current?.focus()
   }, [session])
 
+  useEffect(() => {
+    if (error) {
+      textareaRef.current?.focus()
+    }
+  }, [error])
+
   function changePrompt(next: string) {
     setPrompt(next)
     setValidationError(null)
