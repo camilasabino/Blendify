@@ -47,3 +47,5 @@ apps/web/test-results/
 # Internal development docs (specs, progress, follow-ups) stay local
 docs/specs/
 docs/followups/
+.claude/handoffs/
+.claude/settings.local.json
