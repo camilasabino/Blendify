@@ -171,7 +171,9 @@ describe('AI track selection', () => {
 describe('AI target duration policy', () => {
   it('plans a bounded candidate pool from the requested minutes', () => {
     expect(candidateTrackCountForDuration(1)).toBe(1);
-    expect(candidateTrackCountForDuration(60)).toBe(20);
+    expect(candidateTrackCountForDuration(60)).toBe(30);
+    expect(candidateTrackCountForDuration(90)).toBe(45);
+    expect(candidateTrackCountForDuration(150)).toBe(MAX_TRACKS);
     expect(candidateTrackCountForDuration(10_080)).toBe(MAX_TRACKS);
   });
 

@@ -182,8 +182,9 @@ settings.
 it into the bundle. A production build fails when it is missing, not an
 absolute origin (no path, query or trailing slash), or not `https` (plain
 `http` is accepted only for `127.0.0.1` / `[::1]` local builds)
-(`apps/web/config/api-url.ts`). It is the only `VITE_*` variable; never put a
-secret in a `VITE_*` variable.
+(`apps/web/config/api-url.ts`). The only other `VITE_*` variable is the optional
+`VITE_AI_CREATION_ENABLED` (see [AI service](#19-ai-service-not-deployed)); never
+put a secret in a `VITE_*` variable.
 
 ## 4. API (Railway)
 
@@ -639,6 +640,7 @@ set in Railway service variables (sealed) and declared there with
 | Variable | Required | Secret | Value |
 |---|---|---|---|
 | `VITE_API_URL` | Yes (build fails otherwise) | No, public | `https://api.blendify.camilasabino.dev` |
+| `VITE_AI_CREATION_ENABLED` | No (production builds hide `/app/ai` unless it is `true`) | No, public | Unset until the AI service is deployed |
 
 ### 8.1.1 GitHub Actions secrets and variables (repository level)
 
@@ -1143,6 +1145,19 @@ without redeploying `ai`: `RATE_LIMIT_OVERRIDES=interpret=1/3600` on `api`.
 Kill switch: unset `AI_SERVICE_URL` on `api`. The API then reports AI as
 unavailable without any network call; Mix, Discover, Library, publishing and
 transfer do not depend on the AI service.
+
+Other Create with AI endpoints on `api` (none of them call the AI service):
+clarification answers (`POST /api/ai/sessions/:id/clarification`) use the
+existing `resolve` bucket; `Create playlist` (`POST /api/ai/sessions/:id/generate`)
+uses the existing `generation` bucket and generation concurrency limits, like
+Mix and Discover; `GET /api/ai/sessions/:id` is a Redis-only read without a
+bucket. AI sessions live only in Redis with a 30-minute TTL (no PostgreSQL
+history).
+
+Web entry point: `/app/ai` is compiled into production builds only when the
+Cloudflare build variable `VITE_AI_CREATION_ENABLED=true` is set (development
+builds show it by default). Enable it only after `ai` is deployed and `api` has
+`AI_SERVICE_URL`; to hide the entry point again, rebuild without it.
 
 
 ### Real-model evals (manual, paid)

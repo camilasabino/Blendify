@@ -60,6 +60,7 @@ class CaseResult:
     model_latency_ms: int
     input_tokens: int
     output_tokens: int
+    failed_output: dict[str, Any] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,12 +182,15 @@ async def _run_case(
     first_record = len(metered.records)
     failures: list[str] | None
     error: str | None = None
+    failed_output: dict[str, Any] | None = None
 
     try:
         response = await interpreter.interpret(
             InterpretIntentRequest.model_validate({"prompt": case.prompt})
         )
         failures = check_case(case.expect, response.result)
+        if failures:
+            failed_output = response.result.model_dump(mode="json", by_alias=True)
     except AiServiceError as service_error:
         error = service_error.code
         failures = None
@@ -204,6 +208,7 @@ async def _run_case(
         model_latency_ms=sum(record.latency_ms for record in records),
         input_tokens=sum(usage.input_tokens for usage in usages),
         output_tokens=sum(usage.output_tokens for usage in usages),
+        failed_output=failed_output,
     )
 
 

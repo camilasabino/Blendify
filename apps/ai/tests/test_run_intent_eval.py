@@ -203,6 +203,18 @@ async def test_run_accounts_for_requests_retries_and_tokens() -> None:
 
 
 @pytest.mark.anyio
+async def test_run_keeps_the_normalized_output_only_for_failed_cases() -> None:
+    plan = EvalPlan(model="fake", dataset_version="test", cases=[MATCHING_CASE, MISMATCHING_CASE])
+    provider = ScriptedModelProvider([interpreted_output(), interpreted_output()])
+
+    report = await run_eval(plan, provider)
+    matching, mismatching = report["results"]  # type: ignore[misc]
+
+    assert matching["failed_output"] is None
+    assert mismatching["failed_output"] == interpreted_output()
+
+
+@pytest.mark.anyio
 async def test_run_never_exceeds_the_attempt_bound_per_case() -> None:
     plan = EvalPlan(model="fake", dataset_version="test", cases=[MATCHING_CASE, MISMATCHING_CASE])
     provider = ScriptedModelProvider([{"outcome": "invalid"}] * 4)

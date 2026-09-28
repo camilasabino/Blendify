@@ -900,7 +900,7 @@ describe('GenerateAiPlaylistUseCase', () => {
     const { session: result } = await run(world);
 
     expect(world.generator.execute.mock.calls[0][0]).toMatchObject({
-      tracksPerSeed: 10,
+      tracksPerSeed: 15,
     });
     expect(result.execution).toMatchObject({
       result: {

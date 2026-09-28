@@ -187,7 +187,7 @@ describe('buildAiExecutionPlan', () => {
       seeds({ genres: [{ id: 'shoegaze', name: 'Shoegaze' }] }),
     );
 
-    expect(plan.request).toMatchObject({ tracksPerSeed: 20 });
+    expect(plan.request).toMatchObject({ tracksPerSeed: 30 });
     expect(plan.targetTrackCount).toBeNull();
     expect(plan.targetDurationMinutes).toBe(60);
   });

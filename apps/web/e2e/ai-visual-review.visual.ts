@@ -279,4 +279,11 @@ test.describe('Create with AI visual review', () => {
     await expect(page.getByRole('button', { name: 'Check again' })).toBeVisible()
     await capture(page, '17-taking-longer')
   })
+
+  test('18 restored reviewed', async ({ page }) => {
+    await openRestored(page, reviewedState(unsupportedIntent))
+    await expect(page.getByRole('button', { name: 'Create playlist' })).toBeVisible()
+    await expect(page.getByText('Not used')).toBeVisible()
+    await capture(page, '18-restored-reviewed')
+  })
 })
