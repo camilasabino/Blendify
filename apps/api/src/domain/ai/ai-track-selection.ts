@@ -48,23 +48,37 @@ function closestDurationCount(
   prioritized: readonly Track[],
   targetMinutes: number,
 ): number {
-  let bestCount = Math.min(1, prioritized.length);
-  let bestDistance = Number.POSITIVE_INFINITY;
-  let total = 0;
+  return closestDurationPrefix(prioritized, targetMinutes, {
+    count: 0,
+    durationMs: 0,
+  });
+}
+
+export function closestDurationPrefix(
+  prioritized: readonly Track[],
+  targetMinutes: number,
+  start: { count: number; durationMs: number },
+): number {
+  let bestCount = start.count;
+  let bestDistance =
+    start.count === 0
+      ? Number.POSITIVE_INFINITY
+      : durationDistanceMs(start.durationMs, targetMinutes);
+  let total = start.durationMs;
 
   prioritized.forEach((track, index) => {
     total += track.durationMs;
     const distance = durationDistanceMs(total, targetMinutes);
     if (distance < bestDistance) {
       bestDistance = distance;
-      bestCount = index + 1;
+      bestCount = start.count + index + 1;
     }
   });
 
   return bestCount;
 }
 
-function keepPriority(tracks: readonly Track[]): Track[] {
+export function keepPriority(tracks: readonly Track[]): Track[] {
   const byArtist = new Map<string, Track[]>();
 
   for (const track of tracks) {
@@ -89,32 +103,45 @@ function keepPriority(tracks: readonly Track[]): Track[] {
   return prioritized;
 }
 
-function exclusionMatcher(exclusions: AiExclusions): (track: Track) => boolean {
-  const artistKeys = new Set(
-    exclusions.artists.map(normalizeArtistName).filter(Boolean),
-  );
+export function exclusionMatcher(
+  exclusions: AiExclusions,
+): (track: Track) => boolean {
+  const matches = matchingExclusions(exclusions);
+  return (track) => matches(track).length > 0;
+}
+
+export function matchingExclusions(
+  exclusions: AiExclusions,
+): (track: Track) => string[] {
+  const artistRules = exclusions.artists
+    .map((name) => ({ label: name, key: normalizeArtistName(name) }))
+    .filter((rule) => rule.key);
   const trackRules = exclusions.tracks.map((reference) => ({
+    label: reference.title,
     title: baseTitleKey(reference.title),
     artist: reference.artist ? normalizeArtistName(reference.artist) : null,
   }));
 
   return (track) => {
     const creditedArtists = creditedArtistKeys(track);
-
-    if (creditedArtists.some((artist) => artistKeys.has(artist))) {
-      return true;
-    }
-
     const title = baseTitleKey(track.name);
-    return trackRules.some(
-      (rule) =>
-        rule.title === title &&
-        (rule.artist === null || creditedArtists.includes(rule.artist)),
-    );
+
+    return [
+      ...artistRules
+        .filter((rule) => creditedArtists.includes(rule.key))
+        .map((rule) => rule.label),
+      ...trackRules
+        .filter(
+          (rule) =>
+            rule.title === title &&
+            (rule.artist === null || creditedArtists.includes(rule.artist)),
+        )
+        .map((rule) => rule.label),
+    ];
   };
 }
 
-function creditedArtistKeys(track: Track): string[] {
+export function creditedArtistKeys(track: Track): string[] {
   const names = [track.artistName, ...track.artists.map((a) => a.name)];
   return names.map(normalizeArtistName).filter(Boolean);
 }

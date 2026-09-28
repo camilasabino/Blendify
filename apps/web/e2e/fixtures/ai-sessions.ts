@@ -93,6 +93,7 @@ function state(
     clarification: null,
     execution,
     destination,
+    refinement: null,
   }
 }
 
@@ -105,6 +106,7 @@ export function clarificationState(): AiSessionStateDto {
     clarification,
     execution: null,
     destination: null,
+    refinement: null,
   }
 }
 

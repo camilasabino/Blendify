@@ -69,7 +69,7 @@ async function openRestored(page: Page, sessionState: AiSessionStateDto | null) 
 async function openReviewedLive(page: Page, sessionState: AiSessionStateDto) {
   await blockUnmockedRequests(page)
   await page.route('**/api/ai/sessions', (route) =>
-    route.fulfill({ status: 201, json: { ...sessionState, execution: undefined, destination: undefined } }),
+    route.fulfill({ status: 201, json: { ...sessionState, execution: undefined, destination: undefined, refinement: undefined } }),
   )
   await page.goto('/app/ai')
   await page.getByRole('textbox', { name: 'Playlist request' }).fill(AI_REVIEW_PROMPT)

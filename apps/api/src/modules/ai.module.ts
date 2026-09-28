@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
+import { AiRefinementCandidateBuilder } from '@/application/services/ai-refinement-candidate.service';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
 import { GenerateAiPlaylistUseCase } from '@/application/use-cases/generate-ai-playlist.use-case';
@@ -44,6 +45,7 @@ import { TransfersModule } from './transfers.module';
     PublishPlaylistService,
     PublishAiPlaylistUseCase,
     TransferAiPlaylistUseCase,
+    AiRefinementCandidateBuilder,
     ProposeAiRefinementUseCase,
   ],
   exports: [INTENT_INTERPRETER],

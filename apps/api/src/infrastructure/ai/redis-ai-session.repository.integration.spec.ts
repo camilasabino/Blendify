@@ -32,6 +32,96 @@ function session(destination: AiSessionDestination | null): AiSession {
   };
 }
 
+const TRACK = {
+  id: '6LgJvl0Xdtc73RJ1mmpotq',
+  name: 'Provider song',
+  artistId: '4Z8W4fKeB5YxbusRsdQVPb',
+  artistName: 'Radiohead',
+  durationMs: 215_000,
+  popularity: 61,
+  uri: 'spotify:track:6LgJvl0Xdtc73RJ1mmpotq',
+};
+const RESULT = {
+  playlist: {
+    name: 'Blendify · Mix · Radiohead',
+    description: '',
+    seeds: [
+      {
+        type: 'artist' as const,
+        id: '4Z8W4fKeB5YxbusRsdQVPb',
+        name: 'Radiohead',
+      },
+    ],
+    tracks: [TRACK],
+  },
+  recipe: {
+    version: 1 as const,
+    kind: 'artist_mix' as const,
+    tracksPerSeed: 1,
+    seeds: [{ id: '4Z8W4fKeB5YxbusRsdQVPb', name: 'Radiohead' }],
+    popularity: 'balanced' as const,
+    orderMode: 'random' as const,
+  },
+  durationMs: 215_000,
+  unmetConstraints: [],
+};
+
+function withPendingCandidate(base: AiSession): AiSession {
+  const candidateTrack = { ...TRACK, id: '3SVAN3BRByDmHOhKyIDxfC' };
+  return {
+    ...base,
+    execution: {
+      status: 'generated',
+      startedAt: base.createdAt,
+      completedAt: base.createdAt,
+      result: RESULT,
+    },
+    pendingRefinement: {
+      status: 'proposed',
+      promptVersion: 'refinement-v2',
+      proposedAt: base.updatedAt,
+      aiSafe: {
+        intent: {
+          kind: 'artist_mix',
+          artists: ['Radiohead'],
+          genres: [],
+          seedTracks: [],
+          targetTrackCount: null,
+          targetDurationMinutes: null,
+          mood: null,
+          popularity: 'rarities',
+          orderMode: null,
+          excludeArtists: [],
+          excludeTracks: [],
+          unsupportedConstraints: [],
+        },
+        preservation: EMPTY_AI_PRESERVATION,
+        notApplied: [],
+      },
+      candidate: {
+        status: 'ready',
+        result: {
+          ...RESULT,
+          playlist: { ...RESULT.playlist, tracks: [candidateTrack] },
+        },
+        preservedPositions: [],
+        diff: {
+          tracks: {
+            added: [{ trackId: candidateTrack.id, position: 1 }],
+            removed: [{ trackId: TRACK.id, position: 1 }],
+            moved: [],
+            retainedCount: 0,
+            replacedCount: 1,
+            before: { trackCount: 1, durationMs: 215_000 },
+            after: { trackCount: 1, durationMs: 215_000 },
+          },
+          intent: [{ field: 'popularity', from: 'balanced', to: 'rarities' }],
+        },
+      },
+    },
+  };
+}
+
 function publishing(attemptId: string): AiSessionDestination {
   return {
     status: 'publishing',
@@ -146,6 +236,66 @@ describeWithRedis(
       await expect(
         repository.acquireRefinementLock(token, 5_000),
       ).resolves.not.toBeNull();
+    });
+    it('persists a pending candidate next to the unchanged applied preview and restores both', async () => {
+      const token = randomUUID();
+      const pending = withPendingCandidate(session(null));
+
+      await repository.save(token, pending, 60_000);
+      const restored = await repository.find(token);
+
+      expect(restored).toEqual(pending);
+      expect(restored?.execution).toEqual(pending.execution);
+      expect(
+        restored?.pendingRefinement?.status === 'proposed' &&
+          restored.pendingRefinement.candidate,
+      ).toEqual(
+        pending.pendingRefinement?.status === 'proposed' &&
+          pending.pendingRefinement.candidate,
+      );
+    });
+
+    it('lets a newer refinement take over an expired lease while the stale attempt can neither write its candidate nor release the newer lease', async () => {
+      const token = randomUUID();
+      const read = { ...session(null), refinementAttempts: 1 };
+      await repository.save(token, read, 60_000);
+      const stale = await repository.acquireRefinementLock(token, 50);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const newer = await repository.acquireRefinementLock(token, 5_000);
+      expect(newer).not.toBeNull();
+      const reserved = {
+        ...read,
+        refinementAttempts: 2,
+        updatedAt: new Date(Date.parse(read.updatedAt) + 1).toISOString(),
+      };
+      await expect(
+        repository.saveIfUnchanged(token, reserved, read.updatedAt, 60_000),
+      ).resolves.toBe(true);
+
+      await expect(
+        repository.renewRefinementLock(token, stale ?? '', 5_000),
+      ).resolves.toBe(false);
+      await expect(
+        repository.saveIfUnchanged(
+          token,
+          withPendingCandidate(read),
+          read.updatedAt,
+          60_000,
+        ),
+      ).resolves.toBe(false);
+      await repository.releaseRefinementLock(token, stale ?? '');
+      await expect(
+        repository.acquireRefinementLock(token, 5_000),
+      ).resolves.toBeNull();
+      await expect(repository.find(token)).resolves.toEqual(reserved);
+
+      const settled = withPendingCandidate(reserved);
+      await expect(
+        repository.saveIfUnchanged(token, settled, reserved.updatedAt, 60_000),
+      ).resolves.toBe(true);
+      await expect(repository.find(token)).resolves.toEqual(settled);
+      await repository.releaseRefinementLock(token, newer ?? '');
     });
   },
 );

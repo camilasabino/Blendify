@@ -12,12 +12,10 @@ import type {
 } from './ai-intent';
 import type { AiPreservation } from './ai-intent-patch';
 import { findIntentClarification } from './ai-intent-rules';
-import type {
-  AiRefinementClarification,
-  AiRefinementEvaluation,
-} from './ai-refinement';
+import type { AiRefinementClarification } from './ai-refinement';
+import type { AiRefinementDiff } from './ai-refinement-diff';
 
-export const AI_SESSION_RECORD_VERSION = 6;
+export const AI_SESSION_RECORD_VERSION = 7;
 export const AI_GENERATION_INTERRUPTED_CODE = 'AI_GENERATION_INTERRUPTED';
 
 export interface AiGenerationFailure {
@@ -89,6 +87,26 @@ export interface AiSessionAiSafeState {
   preservation: AiPreservation;
 }
 
+export type AiRefinementCandidate =
+  | {
+      status: 'ready';
+      result: AiGenerationResult;
+      preservedPositions: number[];
+      diff: AiRefinementDiff;
+    }
+  | { status: 'failed'; failure: AiGenerationFailure };
+
+export type AiRefinementOutcome =
+  | {
+      status: 'proposed';
+      intent: AiIntent;
+      preservation: AiPreservation;
+      notApplied: AiUnsupportedConstraint[];
+      candidate: AiRefinementCandidate;
+    }
+  | { status: 'needs_clarification'; clarification: AiRefinementClarification }
+  | { status: 'unchanged' };
+
 export type AiPendingRefinement =
   | {
       status: 'proposed';
@@ -99,6 +117,7 @@ export type AiPendingRefinement =
         preservation: AiPreservation;
         notApplied: AiUnsupportedConstraint[];
       };
+      candidate: AiRefinementCandidate;
     }
   | {
       status: 'needs_clarification';
@@ -367,7 +386,7 @@ export function withRefinementAttempt(
 
 export function withPendingRefinement(
   session: AiSession,
-  evaluation: AiRefinementEvaluation,
+  outcome: AiRefinementOutcome,
   promptVersion: string,
   now: Date,
 ): AiSession {
@@ -375,38 +394,35 @@ export function withPendingRefinement(
 
   return {
     ...session,
-    pendingRefinement: pendingRefinementOf(
-      evaluation,
-      promptVersion,
-      proposedAt,
-    ),
+    pendingRefinement: pendingRefinementOf(outcome, promptVersion, proposedAt),
     updatedAt: proposedAt,
   };
 }
 
 function pendingRefinementOf(
-  evaluation: AiRefinementEvaluation,
+  outcome: AiRefinementOutcome,
   promptVersion: string,
   proposedAt: string,
 ): AiPendingRefinement {
-  switch (evaluation.status) {
+  switch (outcome.status) {
     case 'proposed':
       return {
         status: 'proposed',
         promptVersion,
         proposedAt,
         aiSafe: {
-          intent: evaluation.intent,
-          preservation: evaluation.preservation,
-          notApplied: evaluation.notApplied,
+          intent: outcome.intent,
+          preservation: outcome.preservation,
+          notApplied: outcome.notApplied,
         },
+        candidate: outcome.candidate,
       };
     case 'needs_clarification':
       return {
         status: 'needs_clarification',
         promptVersion,
         proposedAt,
-        clarification: evaluation.clarification,
+        clarification: outcome.clarification,
       };
     case 'unchanged':
       return { status: 'unchanged', promptVersion, proposedAt };

@@ -2,6 +2,7 @@ import type {
   AiClarification,
   AiClarificationOption as AiClarificationOptionDto,
   AiIntentSummary,
+  AiRefinementCandidateDto,
   AiSessionDto,
 } from '@blendify/contracts';
 import {
@@ -11,7 +12,7 @@ import {
   type AiIntentClarification,
 } from '@/domain/ai/ai-intent';
 import { resolveCuratedGenreSeeds } from '@/domain/ai/ai-genre-seeds';
-import type { AiSession } from '@/domain/ai/ai-session';
+import type { AiGenerationResult, AiSession } from '@/domain/ai/ai-session';
 
 export function toAiSessionResponse(
   token: string,
@@ -47,6 +48,25 @@ export function toIntentSummary(intent: AiIntent): AiIntentSummary {
     excludeArtists: intent.excludeArtists,
     excludeTracks: intent.excludeTracks,
     unmetConstraints: intent.unsupportedConstraints,
+  };
+}
+
+export function toGeneratedPreview(
+  result: AiGenerationResult,
+): AiRefinementCandidateDto {
+  const { name, description, seeds, tracks, coverArtwork } = result.playlist;
+
+  return {
+    playlist: {
+      name,
+      description,
+      seeds,
+      tracks,
+      ...(coverArtwork ? { coverArtwork } : {}),
+    },
+    trackCount: tracks.length,
+    durationMs: result.durationMs,
+    unmetConstraints: result.unmetConstraints,
   };
 }
 

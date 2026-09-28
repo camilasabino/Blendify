@@ -71,6 +71,13 @@ export class AiSessionError extends Error {
     );
   }
 
+  static destinationBlockedByRefinement(): AiSessionError {
+    return new AiSessionError(
+      'AI_DESTINATION_UNAVAILABLE',
+      'Apply or cancel the proposed changes before saving or transferring this playlist.',
+    );
+  }
+
   static refinementUnavailable(): AiSessionError {
     return new AiSessionError(
       'AI_REFINEMENT_UNAVAILABLE',

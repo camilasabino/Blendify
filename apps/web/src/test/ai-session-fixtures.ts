@@ -88,11 +88,11 @@ export function aiGeneration(
 }
 
 export function reviewedAiSessionState(intent: AiIntentSummary = aiIntent): AiSessionStateDto {
-  return { ...reviewedAiSession(intent), execution: null, destination: null }
+  return { ...reviewedAiSession(intent), execution: null, destination: null, refinement: null }
 }
 
 export function generatingAiSessionState(): AiSessionStateDto {
-  return { ...reviewedAiSession(), execution: { status: 'generating' }, destination: null }
+  return { ...reviewedAiSession(), execution: { status: 'generating' }, destination: null, refinement: null }
 }
 
 export function generatedAiSessionState(
@@ -110,6 +110,7 @@ export function generatedAiSessionState(
       transferAvailable: generation.transferAvailable,
     },
     destination,
+    refinement: null,
   }
 }
 
@@ -118,6 +119,7 @@ export function failedAiSessionState(error: AiGenerationFailureDto): AiSessionSt
     ...reviewedAiSession(),
     execution: { status: 'generation_failed', error },
     destination: null,
+    refinement: null,
   }
 }
 

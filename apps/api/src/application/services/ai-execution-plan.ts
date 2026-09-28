@@ -1,10 +1,12 @@
 import {
   DISCOVER_TRACK_TARGETS,
   type DiscoverTrackTarget,
-  type PopularityMode,
-  type TrackOrderMode,
 } from '@blendify/contracts';
-import type { AiIntent } from '@/domain/ai/ai-intent';
+import {
+  AI_DEFAULT_ORDER_MODE,
+  AI_DEFAULT_POPULARITY,
+  type AiIntent,
+} from '@/domain/ai/ai-intent';
 import {
   moodExecutionFor,
   type AiMoodExecution,
@@ -16,8 +18,6 @@ import { maxTracksPerSeedForCount } from '@/domain/constants';
 import { moodGenreIds } from '@/domain/genre/mood-genres';
 import type { PlaylistGenerationRequest } from '@/application/use-cases/generate-playlist.use-case';
 
-const DEFAULT_POPULARITY: PopularityMode = 'balanced';
-const DEFAULT_ORDER_MODE: TrackOrderMode = 'random';
 const DEFAULT_ARTIST_MIX_TRACKS_PER_SEED = 10;
 const DEFAULT_GENRE_MIX_TRACKS_PER_SEED = 25;
 const DEFAULT_DISCOVER_TRACK_TARGET: DiscoverTrackTarget = 30;
@@ -33,11 +33,12 @@ export interface AiExecutionPlan {
 export function buildAiExecutionPlan(
   intent: AiIntent,
   seeds: ResolvedAiSeeds,
+  candidateCount: number | null = candidateTrackCount(intent),
 ): AiExecutionPlan {
   const explicitGenreIds = seeds.genres.map((genre) => genre.id);
 
   return {
-    request: generationRequest(intent, seeds, candidateTrackCount(intent)),
+    request: generationRequest(intent, seeds, candidateCount),
     targetTrackCount: intent.targetTrackCount,
     targetDurationMinutes: intent.targetDurationMinutes,
     exclusions: {
@@ -52,7 +53,7 @@ export function buildAiExecutionPlan(
   };
 }
 
-function candidateTrackCount(intent: AiIntent): number | null {
+export function candidateTrackCount(intent: AiIntent): number | null {
   if (intent.targetTrackCount !== null) {
     return intent.targetTrackCount;
   }
@@ -70,8 +71,8 @@ function generationRequest(
   const settings = {
     name: '',
     description: '',
-    popularity: intent.popularity ?? DEFAULT_POPULARITY,
-    orderMode: intent.orderMode ?? DEFAULT_ORDER_MODE,
+    popularity: intent.popularity ?? AI_DEFAULT_POPULARITY,
+    orderMode: intent.orderMode ?? AI_DEFAULT_ORDER_MODE,
   };
 
   switch (intent.kind) {

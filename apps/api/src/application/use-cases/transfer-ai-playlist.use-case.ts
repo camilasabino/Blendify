@@ -56,6 +56,7 @@ export class TransferAiPlaylistUseCase {
     if (hasPreparedTransfer(session)) {
       return { token: command.token, session };
     }
+    requireNoPendingRefinement(session);
 
     const playlist = toAiTransferPlaylist(
       result,
@@ -92,13 +93,16 @@ export class TransferAiPlaylistUseCase {
       if (hasPreparedTransfer(current)) {
         return { token: command.token, session: current };
       }
+      requireNoPendingRefinement(current);
 
       const transfer = await this.gateway.createTransfer(playlist);
       if (lease.isLost) {
         throw AiSessionError.destinationInProgress();
       }
+      const latest = await this.find(command);
+      requireNoPendingRefinement(latest);
       const prepared = withTransferPrepared(
-        current,
+        latest,
         {
           url: transfer.url,
           expiresAt: transfer.expiresAt.toISOString(),
@@ -123,6 +127,12 @@ export class TransferAiPlaylistUseCase {
       throw AiSessionError.notFound();
     }
     await this.sessions.save(token, session, ttlMs);
+  }
+}
+
+function requireNoPendingRefinement(session: AiSession): void {
+  if (session.pendingRefinement !== null) {
+    throw AiSessionError.destinationBlockedByRefinement();
   }
 }
 

@@ -24,6 +24,16 @@ export function isDurationWithinTolerance(
   );
 }
 
+export function isDurationBelowTolerance(
+  actualMs: number,
+  targetMinutes: number,
+): boolean {
+  return (
+    actualMs < targetMinutes * MS_PER_MINUTE &&
+    !isDurationWithinTolerance(actualMs, targetMinutes)
+  );
+}
+
 export function durationDistanceMs(
   actualMs: number,
   targetMinutes: number,

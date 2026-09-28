@@ -82,6 +82,7 @@ export class PublishAiPlaylistUseCase {
     if (hasSettledSpotifyDestination(session)) {
       return { token: command.token, session };
     }
+    requireNoPendingRefinement(session);
 
     const user = await this.users.findById(command.userId);
     if (!user) {
@@ -110,6 +111,7 @@ export class PublishAiPlaylistUseCase {
           current.destination.attemptId,
         );
       }
+      requireNoPendingRefinement(current);
       return await this.publishOnce(command, current, playlist, user, lease);
     } finally {
       await lease.release();
@@ -142,7 +144,7 @@ export class PublishAiPlaylistUseCase {
     }
     const attemptId = randomUUID();
     let working = withPublishStarted(current, attemptId, new Date());
-    await this.save(command.token, working);
+    await this.start(command, working, current);
     const remote: { created: AiSpotifyPlaylistLink | null } = { created: null };
     const startedAt = Date.now();
 
@@ -243,12 +245,27 @@ export class PublishAiPlaylistUseCase {
     return findReadableAiSession(this.sessions, command.token, command.userId);
   }
 
-  private async save(token: string, session: AiSession): Promise<void> {
-    const ttlMs = remainingTtlMs(session);
+  private async start(
+    command: PublishAiPlaylistCommand,
+    started: AiSession,
+    current: AiSession,
+  ): Promise<void> {
+    const ttlMs = remainingTtlMs(current);
     if (ttlMs <= 0) {
       throw AiSessionError.notFound();
     }
-    await this.sessions.save(token, session, ttlMs);
+    if (
+      await this.sessions.saveIfUnchanged(
+        command.token,
+        started,
+        current.updatedAt,
+        ttlMs,
+      )
+    ) {
+      return;
+    }
+    requireNoPendingRefinement(await this.find(command));
+    throw AiSessionError.destinationInProgress();
   }
 
   private async persist(
@@ -313,6 +330,12 @@ export class PublishAiPlaylistUseCase {
     } else {
       this.logger.warn(line);
     }
+  }
+}
+
+function requireNoPendingRefinement(session: AiSession): void {
+  if (session.pendingRefinement !== null) {
+    throw AiSessionError.destinationBlockedByRefinement();
   }
 }
 

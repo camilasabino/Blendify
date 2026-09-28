@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AI_MOODS,
   AI_PROMPT_MAX_LENGTH,
+  AI_REFINEMENT_CLARIFICATION_REASONS,
   AI_REFINEMENT_MAX_LENGTH,
   AiGenerationSchema,
   AiGenerationStreamEventSchema,
@@ -327,6 +328,7 @@ describe('AI session state contract', () => {
   const generated = {
     ...READY_SESSION,
     execution: { status: 'generated', ...outcome },
+    refinement: null,
   };
 
   it('restores every public session state', () => {
@@ -386,7 +388,8 @@ describe('AI session state contract', () => {
         },
       },
     ]) {
-      expect(AiSessionStateSchema.parse(state)).toEqual(state);
+      const restored = { refinement: null, ...state };
+      expect(AiSessionStateSchema.parse(restored)).toEqual(restored);
     }
   });
 
@@ -451,6 +454,7 @@ describe('AI session state contract', () => {
           ...READY_SESSION,
           execution,
           destination: null,
+          refinement: null,
         }).success,
       ).toBe(false);
     }
@@ -459,6 +463,7 @@ describe('AI session state contract', () => {
         ...READY_SESSION,
         execution: undefined,
         destination: null,
+        refinement: null,
       }).success,
     ).toBe(false);
   });
@@ -538,19 +543,158 @@ describe('AI destination requests', () => {
 });
 
 describe('AI refinement contracts', () => {
+  const CANDIDATE = {
+    playlist: GENERATION.playlist,
+    trackCount: GENERATION.trackCount,
+    durationMs: GENERATION.durationMs,
+    unmetConstraints: GENERATION.unmetConstraints,
+  };
+  const DIFF = {
+    tracks: {
+      added: [{ trackId: '4uLU6hMCjMI75M1A2tKUQC', position: 2 }],
+      removed: [{ trackId: '6LgJvl0Xdtc73RJ1mmpotq', position: 3 }],
+      moved: [{ trackId: '3SVAN3BRByDmHOhKyIDxfC', from: 2, to: 3 }],
+      retainedCount: 2,
+      replacedCount: 1,
+      before: { trackCount: 3, durationMs: 645_000 },
+      after: { trackCount: 3, durationMs: 650_000 },
+    },
+    intent: [
+      { field: 'popularity', from: 'balanced', to: 'rarities' },
+      { field: 'targetTrackCount', from: 30, to: null },
+      { field: 'genres', added: ['Argentine Rock'], removed: [] },
+      {
+        field: 'excludeTracks',
+        added: [{ title: 'Yellow', artist: 'Coldplay' }],
+        removed: [],
+      },
+    ],
+    preservedPositions: [1],
+  };
   const PROPOSED = {
     sessionId: 'opaque-session-token',
     expiresAt: '2026-09-27T12:30:00.000Z',
     refinement: {
-      status: 'proposed',
+      status: 'candidate_ready',
       intent: { ...READY_SESSION.intent, popularity: 'rarities' },
       preservation: { firstTracks: 5, positions: [8], artists: ['Radiohead'] },
       notApplied: [{ category: 'activity', userText: 'for running' }],
+      candidate: CANDIDATE,
+      diff: DIFF,
     },
   };
 
-  it('accepts a proposed refinement with AI-safe intent and preservation only', () => {
+  it('accepts a ready candidate with its preview and deterministic diff', () => {
     expect(AiRefinementResultSchema.parse(PROPOSED)).toEqual(PROPOSED);
+  });
+
+  it('accepts a failed candidate with a normalized generation error only', () => {
+    const { candidate: _candidate, diff: _diff, ...proposal } =
+      PROPOSED.refinement;
+    const failed = {
+      ...PROPOSED,
+      refinement: {
+        ...proposal,
+        status: 'candidate_failed',
+        error: {
+          code: 'SPOTIFY_RATE_LIMITED',
+          category: 'provider_rate_limited',
+          retryAfterSeconds: 30,
+          seedNotFound: null,
+        },
+      },
+    };
+
+    expect(AiRefinementResultSchema.parse(failed)).toEqual(failed);
+    expect(
+      AiRefinementResultSchema.safeParse({
+        ...failed,
+        refinement: {
+          ...failed.refinement,
+          error: { ...failed.refinement.error, providerResponse: {} },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('restores a pending candidate next to the applied preview', () => {
+    const state = {
+      ...READY_SESSION,
+      execution: {
+        status: 'generated',
+        ...CANDIDATE,
+        transferAvailable: false,
+      },
+      destination: null,
+      refinement: PROPOSED.refinement,
+    };
+
+    expect(AiSessionStateSchema.parse(state)).toEqual(state);
+  });
+
+  it.each([
+    ['the execution plan', { executionPlan: {} }],
+    ['the lease or attempt', { attemptId: 'attempt-1' }],
+    ['the raw model patch', { patch: {} }],
+    ['the refinement text', { refinement: 'Make it less mainstream' }],
+    ['candidate pool scores', { candidatePool: [{ id: 'x', score: 1 }] }],
+  ])('keeps %s out of the refinement result', (_label, extra) => {
+    const result = AiRefinementResultSchema.safeParse({
+      ...PROPOSED,
+      refinement: { ...PROPOSED.refinement, ...extra },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('keeps transfer and recipe details out of the candidate preview', () => {
+    for (const candidate of [
+      { ...CANDIDATE, transferAvailable: true },
+      { ...CANDIDATE, recipe: {} },
+    ]) {
+      expect(
+        AiRefinementResultSchema.safeParse({
+          ...PROPOSED,
+          refinement: { ...PROPOSED.refinement, candidate },
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('bounds diff positions and rejects unknown intent change fields', () => {
+    const withTracks = (tracks: object) => ({
+      ...PROPOSED,
+      refinement: {
+        ...PROPOSED.refinement,
+        diff: { ...DIFF, tracks: { ...DIFF.tracks, ...tracks } },
+      },
+    });
+
+    expect(
+      AiRefinementResultSchema.safeParse(
+        withTracks({ added: [{ trackId: 'x', position: MAX_TRACKS + 1 }] }),
+      ).success,
+    ).toBe(false);
+    expect(
+      AiRefinementResultSchema.safeParse(
+        withTracks({ moved: [{ trackId: 'x', from: 0, to: 1 }] }),
+      ).success,
+    ).toBe(false);
+    expect(
+      AiRefinementResultSchema.safeParse({
+        ...PROPOSED,
+        refinement: {
+          ...PROPOSED.refinement,
+          diff: { ...DIFF, intent: [{ field: 'title', from: 'a', to: 'b' }] },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a preserved artist that is not in the current playlist as a clarification reason', () => {
+    expect(AI_REFINEMENT_CLARIFICATION_REASONS).toContain(
+      'preserved_artist_not_found',
+    );
   });
 
   it('accepts a refinement clarification without offering options', () => {
@@ -587,20 +731,6 @@ describe('AI refinement contracts', () => {
         refinement: { status: 'unchanged' },
       }).success,
     ).toBe(true);
-  });
-
-  it.each([
-    ['a candidate playlist', { playlist: { tracks: [] } }],
-    ['a track diff', { diff: { added: [], removed: [] } }],
-    ['the raw model patch', { patch: {} }],
-    ['the refinement text', { refinement: 'Make it less mainstream' }],
-  ])('keeps %s out of the refinement result', (_label, extra) => {
-    const result = AiRefinementResultSchema.safeParse({
-      ...PROPOSED,
-      refinement: { ...PROPOSED.refinement, ...extra },
-    });
-
-    expect(result.success).toBe(false);
   });
 
   it('bounds preserved positions by the playlist track limit', () => {

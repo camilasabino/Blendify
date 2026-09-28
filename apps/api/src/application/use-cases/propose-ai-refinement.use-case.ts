@@ -1,11 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { evaluateRefinement } from '@/domain/ai/ai-refinement';
+import type { AiIntent } from '@/domain/ai/ai-intent';
+import {
+  evaluateRefinement,
+  type AiRefinementEvaluation,
+} from '@/domain/ai/ai-refinement';
 import {
   generatedResultOf,
   refinementBlocker,
   withPendingRefinement,
   withRefinementAttempt,
+  type AiRefinementOutcome,
   type AiSession,
 } from '@/domain/ai/ai-session';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
@@ -20,7 +25,12 @@ import {
 import {
   findReadableAiSession,
   remainingTtlMs,
+  requireGeneratedResult,
 } from '@/application/services/ai-session-access';
+import {
+  AiRefinementCandidateBuilder,
+  type AiRefinementCandidateOutcome,
+} from '@/application/services/ai-refinement-candidate.service';
 import {
   AiSessionLease,
   type AiSessionLeaseEvent,
@@ -49,6 +59,7 @@ export class ProposeAiRefinementUseCase {
     private readonly sessions: AiSessionRepositoryPort,
     @Inject(REFINEMENT_PLANNER)
     private readonly planner: RefinementPlannerPort,
+    private readonly candidates: AiRefinementCandidateBuilder,
     config: ConfigService,
   ) {
     this.refinementsPerSession = parseAiRefinementsPerSession(
@@ -110,9 +121,16 @@ export class ProposeAiRefinementUseCase {
       interpretation: plan.result,
       playlistTrackCount: generatedTrackCount(settled),
     });
+    const { outcome, strategy } = await this.outcomeOf(
+      evaluation,
+      requiredIntent(intent),
+      settled,
+      lease,
+    );
+    this.requireAuthority(lease);
     const proposed = withPendingRefinement(
       settled,
-      evaluation,
+      outcome,
       plan.promptVersion,
       new Date(),
     );
@@ -121,10 +139,17 @@ export class ProposeAiRefinementUseCase {
     this.logger.log(
       JSON.stringify({
         event: 'ai.refinement.proposed',
-        status: evaluation.status,
+        status: outcome.status,
         clarificationReason:
-          evaluation.status === 'needs_clarification'
-            ? evaluation.clarification.reason
+          outcome.status === 'needs_clarification'
+            ? outcome.clarification.reason
+            : null,
+        strategy,
+        candidate:
+          outcome.status === 'proposed' ? outcome.candidate.status : null,
+        failureCode:
+          outcome.status === 'proposed' && outcome.candidate.status === 'failed'
+            ? outcome.candidate.failure.code
             : null,
         promptVersion: plan.promptVersion,
         attempt: proposed.refinementAttempts,
@@ -132,6 +157,38 @@ export class ProposeAiRefinementUseCase {
       }),
     );
     return { token: command.token, session: proposed };
+  }
+
+  private async outcomeOf(
+    evaluation: AiRefinementEvaluation,
+    current: AiIntent,
+    settled: AiSession,
+    lease: AiSessionLease,
+  ): Promise<{ outcome: AiRefinementOutcome; strategy: string | null }> {
+    if (evaluation.status !== 'proposed') {
+      return { outcome: evaluation, strategy: null };
+    }
+
+    const built: AiRefinementCandidateOutcome = await this.candidates.build({
+      current,
+      proposed: evaluation.intent,
+      preservation: evaluation.preservation,
+      currentResult: requireGeneratedResult(settled),
+      checkpoint: () => this.requireAuthority(lease),
+    });
+    if (built.status === 'needs_clarification') {
+      return { outcome: built, strategy: null };
+    }
+    return {
+      outcome: { ...evaluation, candidate: built.candidate },
+      strategy: built.strategy,
+    };
+  }
+
+  private requireAuthority(lease: AiSessionLease): void {
+    if (lease.isLost) {
+      throw this.superseded();
+    }
   }
 
   private assertRefinable(session: AiSession): void {

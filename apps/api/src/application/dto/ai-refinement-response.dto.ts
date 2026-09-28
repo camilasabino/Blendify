@@ -3,7 +3,7 @@ import type {
   AiRefinementResultDto,
 } from '@blendify/contracts';
 import type { AiPendingRefinement, AiSession } from '@/domain/ai/ai-session';
-import { toIntentSummary } from './ai-session-response.dto';
+import { toGeneratedPreview, toIntentSummary } from './ai-session-response.dto';
 
 export function toAiRefinementResponse(
   token: string,
@@ -20,15 +20,33 @@ export function toAiRefinementResponse(
   };
 }
 
-function toRefinement(pending: AiPendingRefinement): AiRefinementDto {
+export function toRefinement(pending: AiPendingRefinement): AiRefinementDto {
   switch (pending.status) {
-    case 'proposed':
-      return {
-        status: 'proposed',
+    case 'proposed': {
+      const proposal = {
         intent: toIntentSummary(pending.aiSafe.intent),
         preservation: pending.aiSafe.preservation,
         notApplied: pending.aiSafe.notApplied,
       };
+      const { candidate } = pending;
+      if (candidate.status === 'failed') {
+        return {
+          status: 'candidate_failed',
+          ...proposal,
+          error: { ...candidate.failure },
+        };
+      }
+      return {
+        status: 'candidate_ready',
+        ...proposal,
+        candidate: toGeneratedPreview(candidate.result),
+        diff: {
+          tracks: candidate.diff.tracks,
+          intent: candidate.diff.intent,
+          preservedPositions: candidate.preservedPositions,
+        },
+      };
+    }
     case 'needs_clarification':
       return {
         status: 'needs_clarification',

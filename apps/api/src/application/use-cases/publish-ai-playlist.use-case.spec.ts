@@ -2,6 +2,7 @@ import type { PlaylistDetail } from '@blendify/contracts';
 import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import {
   AI_SESSION_RECORD_VERSION,
+  type AiPendingRefinement,
   type AiSession,
   type AiSessionDestination,
 } from '@/domain/ai/ai-session';
@@ -102,6 +103,15 @@ function setup(initial: AiSession) {
       stored = next;
       return Promise.resolve();
     }),
+    saveIfUnchanged: jest.fn(
+      (_token: string, next: AiSession, expectedUpdatedAt: string) => {
+        if (stored.updatedAt !== expectedUpdatedAt) {
+          return Promise.resolve(false);
+        }
+        stored = next;
+        return Promise.resolve(true);
+      },
+    ),
     savePublishOutcome: jest.fn(
       (_token: string, next: AiSession, attemptId: string) => {
         const current = stored.destination;
@@ -186,6 +196,9 @@ function setup(initial: AiSession) {
     pending,
     claims,
     stored: () => stored,
+    replace: (next: AiSession) => {
+      stored = next;
+    },
     loseClaim: () => claims.delete(TOKEN),
   };
 }
@@ -421,5 +434,112 @@ describe('PublishAiPlaylistUseCase', () => {
     await expect(first).rejects.toThrow('createPlaylist failed');
     expect(world.stored().destination).toBeNull();
     expect(world.claims.has(TOKEN)).toBe(false);
+  });
+  describe('while a refinement is pending', () => {
+    const PENDING: AiPendingRefinement[] = [
+      {
+        status: 'proposed',
+        promptVersion: 'refinement-v2',
+        proposedAt: new Date().toISOString(),
+        aiSafe: {
+          intent: {
+            kind: 'artist_mix',
+            artists: ['Radiohead'],
+            genres: [],
+            seedTracks: [],
+            targetTrackCount: null,
+            targetDurationMinutes: null,
+            mood: null,
+            popularity: 'rarities',
+            orderMode: null,
+            excludeArtists: [],
+            excludeTracks: [],
+            unsupportedConstraints: [],
+          },
+          preservation: EMPTY_AI_PRESERVATION,
+          notApplied: [],
+        },
+        candidate: {
+          status: 'failed',
+          failure: {
+            code: 'CATALOG_UNAVAILABLE',
+            category: 'provider_unavailable',
+            retryAfterSeconds: null,
+            seedNotFound: null,
+          },
+        },
+      },
+      {
+        status: 'needs_clarification',
+        promptVersion: 'refinement-v2',
+        proposedAt: new Date().toISOString(),
+        clarification: {
+          reason: 'conflicting_changes',
+          seedType: null,
+          limit: null,
+          names: [],
+          unsupportedConstraints: [],
+        },
+      },
+      {
+        status: 'unchanged',
+        promptVersion: 'refinement-v2',
+        proposedAt: new Date().toISOString(),
+      },
+    ];
+
+    it.each(PENDING.map((pending) => [pending.status, pending] as const))(
+      'refuses to publish a session with a %s refinement without claiming or calling Spotify',
+      async (_status, pendingRefinement) => {
+        const world = setup({ ...generatedSession(), pendingRefinement });
+
+        await expect(world.useCase.execute(COMMAND)).rejects.toMatchObject({
+          code: 'AI_DESTINATION_UNAVAILABLE',
+        });
+        expect(world.sessions.acquireDestinationClaim).not.toHaveBeenCalled();
+        expect(world.publish).not.toHaveBeenCalled();
+        expect(world.stored().destination).toBeNull();
+        expect(world.stored().pendingRefinement).toBe(pendingRefinement);
+      },
+    );
+
+    it('refuses to start when a refinement lands after the claim, without calling Spotify', async () => {
+      const world = setup(generatedSession());
+      const withPending = {
+        ...world.stored(),
+        pendingRefinement: PENDING[0],
+        updatedAt: new Date(Date.now() + 1).toISOString(),
+      };
+      world.sessions.acquireDestinationClaim.mockImplementationOnce(() => {
+        world.replace(withPending);
+        return Promise.resolve('claim-1');
+      });
+
+      await expect(world.useCase.execute(COMMAND)).rejects.toMatchObject({
+        code: 'AI_DESTINATION_UNAVAILABLE',
+      });
+      expect(world.publish).not.toHaveBeenCalled();
+      expect(world.stored()).toBe(withPending);
+    });
+
+    it('never overwrites a refinement written between the claim re-read and the start', async () => {
+      const world = setup(generatedSession());
+      const withPending = {
+        ...world.stored(),
+        pendingRefinement: PENDING[0],
+        updatedAt: new Date(Date.now() + 1).toISOString(),
+      };
+      world.sessions.saveIfUnchanged.mockImplementationOnce(() => {
+        world.replace(withPending);
+        return Promise.resolve(false);
+      });
+
+      await expect(world.useCase.execute(COMMAND)).rejects.toMatchObject({
+        code: 'AI_DESTINATION_UNAVAILABLE',
+      });
+      expect(world.publish).not.toHaveBeenCalled();
+      expect(world.stored()).toBe(withPending);
+      expect(world.claims.has(TOKEN)).toBe(false);
+    });
   });
 });

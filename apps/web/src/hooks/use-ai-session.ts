@@ -76,7 +76,7 @@ function aiSessionQueryKey(sessionId: string | null) {
 }
 
 function reviewedState(session: AiSession): AiSessionState {
-  return { ...session, execution: null, destination: null }
+  return { ...session, execution: null, destination: null, refinement: null }
 }
 
 function generatedState(generation: AiGeneration): AiSessionState {
@@ -95,6 +95,7 @@ function generatedState(generation: AiGeneration): AiSessionState {
       transferAvailable: generation.transferAvailable,
     },
     destination: null,
+    refinement: null,
   }
 }
 

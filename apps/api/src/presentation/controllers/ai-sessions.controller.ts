@@ -240,9 +240,10 @@ export class AiSessionsController {
   @Post(':sessionId/refinements')
   @HttpCode(HttpStatus.OK)
   @RateLimit('interpret')
+  @LimitGenerationConcurrency()
   @ApiOperation({
     summary:
-      'Interpret a refinement of the generated Create with AI playlist without applying it',
+      'Interpret a refinement and build a pending candidate playlist without applying it',
   })
   async refine(
     @Param('sessionId') sessionId: string,

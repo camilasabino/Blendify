@@ -1,8 +1,10 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
+  IntentPatch,
   PlanRefinementRequest,
   PlanRefinementResponse,
+  PreservationPatch,
 } from '@blendify/contracts/ai-service';
 import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import type { AiIntent } from '@/domain/ai/ai-intent';
@@ -17,11 +19,24 @@ import {
   AiSessionError,
   type AiSessionErrorCode,
 } from '@/domain/errors/ai-session.error';
+import { Artist } from '@/domain/artist/artist.entity';
+import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
 import type { AiSessionRepositoryPort } from '@/domain/repositories/ai-session.repository.port';
+import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
+import { createSpotifyQuotaError } from '@/infrastructure/spotify/spotify-quota-error';
 import {
   AI_REFINEMENT_LEASE_MS,
+  AI_REFINEMENT_LEASE_RENEW_INTERVAL_MS,
   DEFAULT_AI_REFINEMENTS_PER_SESSION,
 } from '@/application/services/ai-refinement.policy';
+import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
+import { AiRefinementCandidateBuilder } from '@/application/services/ai-refinement-candidate.service';
+import type {
+  GeneratePlaylistUseCase,
+  PlaylistGenerationRequest,
+} from './generate-playlist.use-case';
 import { ProposeAiRefinementUseCase } from './propose-ai-refinement.use-case';
 
 const TOKEN = 'session-token';
@@ -103,6 +118,42 @@ function storedSession(overrides: Partial<AiSession> = {}): AiSession {
     expiresAt: EXPIRES_AT,
     ...overrides,
   };
+}
+
+const CURRENT_TRACK_IDS = [
+  '6LgJvl0Xdtc73RJ1mmpotq',
+  '3SVAN3BRByDmHOhKyIDxfC',
+  '0ofHAoxe9vBkTCp2UQIavz',
+];
+
+function generatedTrack(id: string): Track {
+  return Track.create({
+    id: TrackId.create(id),
+    name: `Rarity ${id}`,
+    artistId: ArtistId.create('4Z8W4fKeB5YxbusRsdQVPb'),
+    artistName: 'Radiohead',
+    durationMs: 200_000,
+    popularity: 20,
+    uri: `spotify:track:${id}`,
+  });
+}
+
+function freshGeneration(ids = ['new-1', 'new-2', 'new-3']): GeneratedPlaylist {
+  return GeneratedPlaylist.create({
+    name: 'Blendify · Mix · Radiohead',
+    generation: {
+      version: 1,
+      kind: 'artist_mix',
+      tracksPerSeed: 3,
+      seeds: [{ id: '4Z8W4fKeB5YxbusRsdQVPb', name: 'Radiohead' }],
+      popularity: 'rarities',
+      orderMode: 'random',
+    },
+    seeds: [
+      { type: 'artist', id: '4Z8W4fKeB5YxbusRsdQVPb', name: 'Radiohead' },
+    ],
+    tracks: ids.map(generatedTrack),
+  });
 }
 
 const UNCHANGED_PATCH = {
@@ -203,18 +254,47 @@ function createWorld(
       [PlanRefinementRequest]
     >(() => Promise.resolve(lessMainstream())),
   };
+  const catalog = {
+    searchArtists: jest.fn((name: string) =>
+      Promise.resolve([
+        Artist.create({
+          id: ArtistId.create(`${name.toLowerCase()}-id`),
+          name,
+        }),
+      ]),
+    ),
+    searchTracks: jest.fn(() => Promise.resolve([])),
+    resolveTrack: jest.fn(() => Promise.resolve(null)),
+    getArtistsByIds: jest.fn(() => Promise.resolve([])),
+  };
+  const catalogs = { forMarket: jest.fn(() => catalog) };
+  const generator = {
+    execute: jest.fn<Promise<GeneratedPlaylist>, [PlaylistGenerationRequest]>(
+      () => Promise.resolve(freshGeneration()),
+    ),
+  };
+  const candidates = new AiRefinementCandidateBuilder(
+    new AiIntentResolver(catalogs),
+    generator as unknown as GeneratePlaylistUseCase,
+  );
   const useCase = new ProposeAiRefinementUseCase(
     sessions,
     planner,
+    candidates,
     new ConfigService(config),
   );
   return {
     useCase,
     sessions,
     planner,
+    catalogs,
+    generator,
     store,
     holdLock: () => {
       lock = 'someone-else';
+    },
+    takeOverLock: () => {
+      lock = 'lock-2';
     },
   };
 }
@@ -297,7 +377,7 @@ describe('ProposeAiRefinementUseCase', () => {
 
     const { session } = await execute(world);
 
-    expect(session.pendingRefinement).toEqual({
+    expect(session.pendingRefinement).toMatchObject({
       status: 'proposed',
       promptVersion: 'refinement-v1',
       proposedAt: NOW.toISOString(),
@@ -306,6 +386,7 @@ describe('ProposeAiRefinementUseCase', () => {
         preservation: { firstTracks: 2, positions: [], artists: [] },
         notApplied: [],
       },
+      candidate: { status: 'ready', preservedPositions: [1, 2] },
     });
     expect(session.aiSafe).toEqual({
       intent: INTENT,
@@ -609,11 +690,377 @@ describe('ProposeAiRefinementUseCase', () => {
       event: 'ai.refinement.proposed',
       status: 'proposed',
       clarificationReason: null,
+      strategy: 'regenerate',
+      candidate: 'ready',
+      failureCode: null,
       promptVersion: 'refinement-v1',
       attempt: 1,
       durationMs: expect.any(Number) as number,
     });
     expect(logged).not.toContain(REFINEMENT);
     expect(logged).not.toContain('Radiohead');
+  });
+  describe('candidate execution', () => {
+    function interpretedPlan(
+      patch: Partial<IntentPatch>,
+      preservation: Partial<PreservationPatch> = {},
+    ): PlanRefinementResponse {
+      return plan({
+        outcome: 'interpreted',
+        patch: { ...UNCHANGED_PATCH, ...patch },
+        preservation: { ...UNCHANGED_PRESERVATION, ...preservation },
+        unsupportedConstraints: [],
+      });
+    }
+
+    function pendingCandidate(session: AiSession) {
+      const pending = session.pendingRefinement;
+      if (pending?.status !== 'proposed') {
+        throw new Error('Expected a proposed refinement.');
+      }
+      return pending.candidate;
+    }
+
+    function candidateTrackIds(session: AiSession): string[] {
+      const candidate = pendingCandidate(session);
+      if (candidate.status !== 'ready') {
+        throw new Error('Expected a ready candidate.');
+      }
+      return candidate.result.playlist.tracks.map((track) => track.id);
+    }
+
+    it('builds the candidate from the proposed intent with preserved first tracks, leaving the applied preview intact', async () => {
+      const world = createWorld();
+
+      const { session } = await execute(world);
+
+      expect(candidateTrackIds(session)).toEqual([
+        CURRENT_TRACK_IDS[0],
+        CURRENT_TRACK_IDS[1],
+        'new-1',
+      ]);
+      expect(world.generator.execute).toHaveBeenCalledTimes(1);
+      expect(world.generator.execute.mock.calls[0][0]).toMatchObject({
+        kind: 'artist_mix',
+        popularity: 'rarities',
+        artistIds: ['radiohead-id'],
+      });
+      expect(session.execution).toBe(GENERATED);
+      expect(session.aiSafe.intent).toEqual(INTENT);
+      expect(session.destination).toBeNull();
+    });
+
+    it('stores a deterministic diff and the preserved positions with the candidate', async () => {
+      const world = createWorld();
+
+      const { session } = await execute(world);
+
+      const candidate = pendingCandidate(session);
+      expect(candidate).toMatchObject({
+        status: 'ready',
+        preservedPositions: [1, 2],
+        diff: {
+          tracks: {
+            added: [{ trackId: 'new-1', position: 3 }],
+            removed: [{ trackId: CURRENT_TRACK_IDS[2], position: 3 }],
+            moved: [],
+            retainedCount: 2,
+            replacedCount: 1,
+          },
+          intent: [
+            { field: 'artists', added: [], removed: ['Interpol'] },
+            { field: 'popularity', from: 'balanced', to: 'rarities' },
+          ],
+        },
+      });
+    });
+
+    it('reorders the current tracks for an order-only refinement with zero provider calls', async () => {
+      const world = createWorld();
+      world.planner.planRefinement.mockResolvedValue(
+        interpretedPlan({ orderMode: { operation: 'set', value: 'title' } }),
+      );
+
+      const { session } = await execute(world);
+
+      expect(candidateTrackIds(session)).toEqual(CURRENT_TRACK_IDS);
+      expect(pendingCandidate(session)).toMatchObject({
+        status: 'ready',
+        result: { recipe: { orderMode: 'title', popularity: 'balanced' } },
+      });
+      expect(world.catalogs.forMarket).not.toHaveBeenCalled();
+      expect(world.generator.execute).not.toHaveBeenCalled();
+    });
+
+    it('trims a count decrease with zero provider calls', async () => {
+      const world = createWorld();
+      world.planner.planRefinement.mockResolvedValue(
+        interpretedPlan({ targetTrackCount: { operation: 'set', value: 2 } }),
+      );
+
+      const { session } = await execute(world);
+
+      expect(candidateTrackIds(session)).toHaveLength(2);
+      expect(world.generator.execute).not.toHaveBeenCalled();
+    });
+
+    it('fills a count increase from one bounded generation, keeping every current track', async () => {
+      const world = createWorld();
+      world.planner.planRefinement.mockResolvedValue(
+        interpretedPlan({ targetTrackCount: { operation: 'set', value: 5 } }),
+      );
+
+      const { session } = await execute(world);
+
+      expect(candidateTrackIds(session)).toEqual([
+        ...CURRENT_TRACK_IDS,
+        'new-1',
+        'new-2',
+      ]);
+      expect(world.generator.execute).toHaveBeenCalledTimes(1);
+      expect(world.generator.execute.mock.calls[0][0]).toMatchObject({
+        popularity: 'balanced',
+        tracksPerSeed: 4,
+      });
+    });
+
+    it('never runs a second generation when the pool cannot fill the candidate', async () => {
+      const world = createWorld();
+      world.generator.execute.mockResolvedValue(
+        freshGeneration([CURRENT_TRACK_IDS[0]]),
+      );
+      world.planner.planRefinement.mockResolvedValue(
+        interpretedPlan({ targetTrackCount: { operation: 'set', value: 10 } }),
+      );
+
+      const { session } = await execute(world);
+
+      expect(world.generator.execute).toHaveBeenCalledTimes(1);
+      expect(pendingCandidate(session)).toMatchObject({
+        status: 'ready',
+        result: {
+          unmetConstraints: [{ type: 'track_count', requested: 10, actual: 3 }],
+        },
+      });
+    });
+
+    it.each([
+      [
+        'a preserved artist that the refinement excludes',
+        interpretedPlan(
+          { excludeArtists: { add: ['Provider artist name'], remove: [] } },
+          { artists: { add: ['Provider artist name'], remove: [] } },
+        ),
+        'conflicting_changes',
+      ],
+      [
+        'more preserved tracks than the new count',
+        interpretedPlan(
+          { targetTrackCount: { operation: 'set', value: 2 } },
+          { firstTracks: { operation: 'set', value: 3 } },
+        ),
+        'conflicting_changes',
+      ],
+      [
+        'a preserved artist missing from the playlist',
+        interpretedPlan(
+          {},
+          { artists: { add: ['Massive Attack'], remove: [] } },
+        ),
+        'preserved_artist_not_found',
+      ],
+    ])(
+      'returns a typed clarification for %s without generating',
+      async (_label, response, reason) => {
+        const world = createWorld();
+        world.planner.planRefinement.mockResolvedValue(response);
+
+        const { session } = await execute(world);
+
+        expect(session.pendingRefinement).toMatchObject({
+          status: 'needs_clarification',
+          clarification: { reason },
+        });
+        expect(world.generator.execute).not.toHaveBeenCalled();
+        expect(world.catalogs.forMarket).not.toHaveBeenCalled();
+        expect(session.execution).toBe(GENERATED);
+      },
+    );
+
+    it('stores a typed provider failure and keeps the applied preview', async () => {
+      const world = createWorld();
+      world.generator.execute.mockRejectedValue(
+        createSpotifyQuotaError({
+          retryAfterSeconds: 120,
+          reason: 'RATE_LIMITED',
+        }),
+      );
+
+      const { session } = await execute(world);
+
+      expect(pendingCandidate(session)).toEqual({
+        status: 'failed',
+        failure: expect.objectContaining({
+          category: 'provider_rate_limited',
+          retryAfterSeconds: 120,
+        }) as object,
+      });
+      expect(session.execution).toBe(GENERATED);
+      expect(session.aiSafe.intent).toEqual(INTENT);
+      expect(world.planner.planRefinement).toHaveBeenCalledTimes(1);
+    });
+
+    it('stores a typed seed-not-found failure when a proposed artist cannot be resolved', async () => {
+      const world = createWorld();
+      world.planner.planRefinement.mockResolvedValue(
+        interpretedPlan({ artists: { add: ['Radiohed'], remove: [] } }),
+      );
+      world.catalogs.forMarket.mockReturnValue({
+        searchArtists: jest.fn(() => Promise.resolve([])),
+        searchTracks: jest.fn(() => Promise.resolve([])),
+        resolveTrack: jest.fn(() => Promise.resolve(null)),
+        getArtistsByIds: jest.fn(() => Promise.resolve([])),
+      } as never);
+
+      const { session } = await execute(world);
+
+      expect(pendingCandidate(session)).toEqual({
+        status: 'failed',
+        failure: {
+          code: 'AI_SEED_NOT_FOUND',
+          category: 'seed_not_found',
+          retryAfterSeconds: null,
+          seedNotFound: {
+            seedType: 'artist',
+            names: ['Radiohead', 'Interpol', 'Radiohed'],
+          },
+        },
+      });
+      expect(world.generator.execute).not.toHaveBeenCalled();
+    });
+
+    it('interprets a new refinement against the applied intent while a candidate is pending, without candidate data', async () => {
+      const world = createWorld();
+      await execute(world);
+      world.planner.planRefinement.mockClear();
+
+      await execute(world);
+
+      const [[request]] = world.planner.planRefinement.mock.calls;
+      expect(request).toEqual({
+        intent: INTENT,
+        preservation: EMPTY_AI_PRESERVATION,
+        refinement: REFINEMENT,
+      });
+      const serialized = JSON.stringify(request);
+      for (const providerValue of [
+        ...CURRENT_TRACK_IDS,
+        'new-1',
+        'Rarity',
+        'spotify:track',
+        'rarities',
+      ]) {
+        expect(serialized).not.toContain(providerValue);
+      }
+    });
+
+    describe('stale attempts', () => {
+      function deferredGeneration() {
+        let resolve: (playlist: GeneratedPlaylist) => void = () => undefined;
+        let reject: (error: unknown) => void = () => undefined;
+        const promise = new Promise<GeneratedPlaylist>((res, rej) => {
+          resolve = res;
+          reject = rej;
+        });
+        return { promise, resolve, reject };
+      }
+
+      async function loseLeaseDuringGeneration(
+        world: ReturnType<typeof createWorld>,
+      ) {
+        const generation = deferredGeneration();
+        world.generator.execute.mockReturnValue(generation.promise);
+        world.sessions.renewRefinementLock.mockResolvedValue(false);
+        const running = execute(world);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(world.generator.execute).toHaveBeenCalledTimes(1);
+
+        world.takeOverLock();
+        await jest.advanceTimersByTimeAsync(
+          AI_REFINEMENT_LEASE_RENEW_INTERVAL_MS,
+        );
+        return { running, generation };
+      }
+
+      it('never persists a late candidate success after losing the lease', async () => {
+        const world = createWorld();
+        const before = world.store.get(TOKEN);
+        const { running, generation } = await loseLeaseDuringGeneration(world);
+
+        generation.resolve(freshGeneration());
+
+        expect(await errorCode(running)).toBe('AI_REFINEMENT_SUPERSEDED');
+        expect(world.store.get(TOKEN)?.pendingRefinement).toBeNull();
+        expect(world.store.get(TOKEN)?.execution).toBe(before?.execution);
+      });
+
+      it('never persists a late candidate failure after losing the lease', async () => {
+        const world = createWorld();
+        const { running, generation } = await loseLeaseDuringGeneration(world);
+
+        generation.reject(
+          createSpotifyQuotaError({ retryAfterSeconds: 1, reason: 'X' }),
+        );
+
+        expect(await errorCode(running)).toBe('AI_REFINEMENT_SUPERSEDED');
+        expect(world.store.get(TOKEN)?.pendingRefinement).toBeNull();
+      });
+
+      it('never releases the lease of the attempt that took over', async () => {
+        const world = createWorld();
+        const { running, generation } = await loseLeaseDuringGeneration(world);
+
+        generation.resolve(freshGeneration());
+        await errorCode(running);
+
+        expect(world.sessions.releaseRefinementLock).toHaveBeenCalledWith(
+          TOKEN,
+          'lock-1',
+        );
+        expect(await world.sessions.acquireRefinementLock(TOKEN, 1)).toBeNull();
+      });
+
+      it('lets only the newer attempt own the pending state when the session changed during generation', async () => {
+        const world = createWorld();
+        world.generator.execute.mockImplementation(() => {
+          const current = world.store.get(TOKEN) as AiSession;
+          world.store.set(TOKEN, {
+            ...current,
+            refinementAttempts: current.refinementAttempts + 1,
+            updatedAt: new Date(NOW.getTime() + 5).toISOString(),
+          });
+          return Promise.resolve(freshGeneration());
+        });
+
+        expect(await errorCode(execute(world))).toBe(
+          'AI_REFINEMENT_SUPERSEDED',
+        );
+        expect(world.store.get(TOKEN)?.pendingRefinement).toBeNull();
+      });
+
+      it('keeps a healthy long generation owned through heartbeat renewals', async () => {
+        const world = createWorld();
+        const generation = deferredGeneration();
+        world.generator.execute.mockReturnValue(generation.promise);
+        const running = execute(world);
+        await jest.advanceTimersByTimeAsync(AI_REFINEMENT_LEASE_MS * 3);
+
+        generation.resolve(freshGeneration());
+        const { session } = await running;
+
+        expect(world.sessions.renewRefinementLock).toHaveBeenCalled();
+        expect(pendingCandidate(session).status).toBe('ready');
+      });
+    });
   });
 });

@@ -2,6 +2,7 @@ import type {
   AiClarificationReason,
   AiSeedType,
   PlaylistKind,
+  PopularityMode,
   TrackOrderMode,
 } from '@blendify/contracts';
 import type {
@@ -13,6 +14,9 @@ import type {
 export type AiIntent = PlaylistIntent;
 export type AiTrackReference = IntentTrackReference;
 export type AiUnsupportedConstraint = UnsupportedConstraint;
+
+export const AI_DEFAULT_POPULARITY: PopularityMode = 'balanced';
+export const AI_DEFAULT_ORDER_MODE: TrackOrderMode = 'random';
 
 export type AiClarificationOption =
   | { type: 'set_kind'; kind: PlaylistKind }

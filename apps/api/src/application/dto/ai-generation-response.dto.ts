@@ -12,8 +12,10 @@ import {
   type AiSessionExecution,
 } from '@/domain/ai/ai-session';
 import { toAiTransferPlaylist } from '@/application/services/ai-transfer-playlist';
+import { toRefinement } from './ai-refinement-response.dto';
 import {
   toAiSessionResponse,
+  toGeneratedPreview,
   toIntentSummary,
 } from './ai-session-response.dto';
 
@@ -55,6 +57,9 @@ export function toAiSessionStateResponse(
       ? toExecution(session.execution, options)
       : null,
     destination: destination ? toDestination(destination) : null,
+    refinement: session.pendingRefinement
+      ? toRefinement(session.pendingRefinement)
+      : null,
   };
 }
 
@@ -112,20 +117,10 @@ function toGenerationOutcome(
   result: AiGenerationResult,
   options: AiDestinationOptions,
 ) {
-  const { name, description, seeds, tracks, coverArtwork } = result.playlist;
-
   return {
-    playlist: {
-      name,
-      description,
-      seeds,
-      tracks,
-      ...(coverArtwork ? { coverArtwork } : {}),
-    },
-    trackCount: tracks.length,
-    durationMs: result.durationMs,
-    unmetConstraints: result.unmetConstraints,
+    ...toGeneratedPreview(result),
     transferAvailable:
-      options.transferEnabled && toAiTransferPlaylist(result, name) !== null,
+      options.transferEnabled &&
+      toAiTransferPlaylist(result, result.playlist.name) !== null,
   };
 }

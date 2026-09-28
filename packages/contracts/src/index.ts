@@ -547,6 +547,7 @@ export const AI_REFINEMENT_CLARIFICATION_REASONS = [
   'ambiguous_genres',
   'conflicting_changes',
   'preserved_track_out_of_range',
+  'preserved_artist_not_found',
 ] as const;
 
 export const AiPreservationSchema = z.strictObject({
@@ -561,26 +562,6 @@ export const AiRefinementClarificationSchema = z.strictObject({
   limit: z.number().int().positive().nullable(),
   names: z.array(z.string().min(1).max(200)),
   unsupportedConstraints: z.array(AiUnmetConstraintSchema),
-});
-
-export const AiRefinementSchema = z.discriminatedUnion('status', [
-  z.strictObject({
-    status: z.literal('proposed'),
-    intent: AiIntentSummarySchema,
-    preservation: AiPreservationSchema,
-    notApplied: z.array(AiUnmetConstraintSchema),
-  }),
-  z.strictObject({
-    status: z.literal('needs_clarification'),
-    clarification: AiRefinementClarificationSchema,
-  }),
-  z.strictObject({ status: z.literal('unchanged') }),
-]);
-
-export const AiRefinementResultSchema = z.strictObject({
-  sessionId: z.string().min(1),
-  expiresAt: z.iso.datetime(),
-  refinement: AiRefinementSchema,
 });
 
 export const AI_MOOD_UNMET_REASONS = [
@@ -658,6 +639,146 @@ export const AiGenerationFailureSchema = z
     { path: ['seedNotFound'] },
   );
 
+const PlaylistPositionSchema = z.number().int().min(1).max(MAX_TRACKS);
+const TrackCountSchema = z.number().int().min(0).max(MAX_TRACKS);
+const ProviderTrackIdSchema = z.string().min(1);
+
+const AiPlaylistTotalsSchema = z.strictObject({
+  trackCount: TrackCountSchema,
+  durationMs: z.number().int().nonnegative(),
+});
+
+export const AiRefinementTrackDiffSchema = z.strictObject({
+  added: z
+    .array(
+      z.strictObject({
+        trackId: ProviderTrackIdSchema,
+        position: PlaylistPositionSchema,
+      }),
+    )
+    .max(MAX_TRACKS),
+  removed: z
+    .array(
+      z.strictObject({
+        trackId: ProviderTrackIdSchema,
+        position: PlaylistPositionSchema,
+      }),
+    )
+    .max(MAX_TRACKS),
+  moved: z
+    .array(
+      z.strictObject({
+        trackId: ProviderTrackIdSchema,
+        from: PlaylistPositionSchema,
+        to: PlaylistPositionSchema,
+      }),
+    )
+    .max(MAX_TRACKS),
+  retainedCount: TrackCountSchema,
+  replacedCount: TrackCountSchema,
+  before: AiPlaylistTotalsSchema,
+  after: AiPlaylistTotalsSchema,
+});
+
+const AiNameListChangeShape = {
+  added: z.array(z.string().min(1).max(200)),
+  removed: z.array(z.string().min(1).max(200)),
+};
+const AiTrackListChangeShape = {
+  added: z.array(AiTrackReferenceSchema),
+  removed: z.array(AiTrackReferenceSchema),
+};
+const AiCountChangeShape = {
+  from: z.number().int().positive().nullable(),
+  to: z.number().int().positive().nullable(),
+};
+
+export const AiIntentChangeSchema = z.discriminatedUnion('field', [
+  z.strictObject({
+    field: z.literal('kind'),
+    from: PlaylistKindSchema,
+    to: PlaylistKindSchema,
+  }),
+  z.strictObject({ field: z.literal('artists'), ...AiNameListChangeShape }),
+  z.strictObject({ field: z.literal('genres'), ...AiNameListChangeShape }),
+  z.strictObject({ field: z.literal('seedTracks'), ...AiTrackListChangeShape }),
+  z.strictObject({
+    field: z.literal('targetTrackCount'),
+    ...AiCountChangeShape,
+  }),
+  z.strictObject({
+    field: z.literal('targetDurationMinutes'),
+    ...AiCountChangeShape,
+  }),
+  z.strictObject({
+    field: z.literal('mood'),
+    from: AiMoodSchema.nullable(),
+    to: AiMoodSchema.nullable(),
+  }),
+  z.strictObject({
+    field: z.literal('popularity'),
+    from: PopularityModeSchema.nullable(),
+    to: PopularityModeSchema.nullable(),
+  }),
+  z.strictObject({
+    field: z.literal('orderMode'),
+    from: TrackOrderModeSchema.nullable(),
+    to: TrackOrderModeSchema.nullable(),
+  }),
+  z.strictObject({
+    field: z.literal('excludeArtists'),
+    ...AiNameListChangeShape,
+  }),
+  z.strictObject({
+    field: z.literal('excludeTracks'),
+    ...AiTrackListChangeShape,
+  }),
+]);
+
+export const AiRefinementDiffSchema = z.strictObject({
+  tracks: AiRefinementTrackDiffSchema,
+  intent: z.array(AiIntentChangeSchema),
+  preservedPositions: z.array(PlaylistPositionSchema).max(MAX_TRACKS),
+});
+
+export const AiRefinementCandidateSchema = z.strictObject({
+  playlist: AiGeneratedPlaylistSchema,
+  trackCount: z.number().int().nonnegative(),
+  durationMs: z.number().int().nonnegative(),
+  unmetConstraints: z.array(AiGenerationUnmetConstraintSchema),
+});
+
+const aiProposedRefinementShape = {
+  intent: AiIntentSummarySchema,
+  preservation: AiPreservationSchema,
+  notApplied: z.array(AiUnmetConstraintSchema),
+};
+
+export const AiRefinementSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('candidate_ready'),
+    ...aiProposedRefinementShape,
+    candidate: AiRefinementCandidateSchema,
+    diff: AiRefinementDiffSchema,
+  }),
+  z.strictObject({
+    status: z.literal('candidate_failed'),
+    ...aiProposedRefinementShape,
+    error: AiGenerationFailureSchema,
+  }),
+  z.strictObject({
+    status: z.literal('needs_clarification'),
+    clarification: AiRefinementClarificationSchema,
+  }),
+  z.strictObject({ status: z.literal('unchanged') }),
+]);
+
+export const AiRefinementResultSchema = z.strictObject({
+  sessionId: z.string().min(1),
+  expiresAt: z.iso.datetime(),
+  refinement: AiRefinementSchema,
+});
+
 export const AiSessionExecutionSchema = z.discriminatedUnion('status', [
   z.strictObject({ status: z.literal('generating') }),
   z.strictObject({
@@ -690,6 +811,7 @@ export const AiSessionDestinationSchema = z.discriminatedUnion('status', [
 export const AiSessionStateSchema = AiSessionSchema.extend({
   execution: AiSessionExecutionSchema.nullable(),
   destination: AiSessionDestinationSchema.nullable(),
+  refinement: AiRefinementSchema.nullable(),
 });
 
 export const AiGenerationStreamEventSchema = z.discriminatedUnion('type', [
@@ -786,6 +908,14 @@ export type AiRefinementClarificationReason =
   (typeof AI_REFINEMENT_CLARIFICATION_REASONS)[number];
 export type AiRefinementClarificationDto = z.infer<
   typeof AiRefinementClarificationSchema
+>;
+export type AiRefinementTrackDiffDto = z.infer<
+  typeof AiRefinementTrackDiffSchema
+>;
+export type AiIntentChangeDto = z.infer<typeof AiIntentChangeSchema>;
+export type AiRefinementDiffDto = z.infer<typeof AiRefinementDiffSchema>;
+export type AiRefinementCandidateDto = z.infer<
+  typeof AiRefinementCandidateSchema
 >;
 export type AiRefinementDto = z.infer<typeof AiRefinementSchema>;
 export type AiRefinementResultDto = z.infer<typeof AiRefinementResultSchema>;
