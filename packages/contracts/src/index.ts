@@ -454,6 +454,7 @@ export const AI_CLARIFICATION_REASONS = [
   'invalid_duration',
   'unsupported_ordering',
   'unknown_genres',
+  'ambiguous_genres',
 ] as const;
 
 export const AiUnsupportedConstraintCategorySchema = z.enum(
@@ -543,6 +544,7 @@ export const AI_REFINEMENT_CLARIFICATION_REASONS = [
   'invalid_duration',
   'unsupported_ordering',
   'unknown_genres',
+  'ambiguous_genres',
   'conflicting_changes',
   'preserved_track_out_of_range',
 ] as const;

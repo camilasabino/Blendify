@@ -88,6 +88,8 @@ export function clarificationMessage(clarification: AiClarification, t: Translat
       return t('ai.clarify.ordering')
     case 'unknown_genres':
       return t('ai.clarify.unknownGenres', { names })
+    case 'ambiguous_genres':
+      return t('ai.clarify.ambiguousGenres', { names })
   }
 }
 

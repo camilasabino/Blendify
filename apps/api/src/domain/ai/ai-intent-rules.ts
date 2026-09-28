@@ -6,9 +6,9 @@ import {
 } from '@blendify/contracts';
 import type { IntentClarification } from '@blendify/contracts/ai-service';
 import { normalizeArtistName } from '@/domain/artist/artist-name-match';
-import { MAX_ARTISTS, MAX_TRACKS } from '@/domain/constants';
+import { MAX_ARTISTS, MAX_GENRES, MAX_TRACKS } from '@/domain/constants';
 import { constraintCapability } from './ai-capability-matrix';
-import { resolveCuratedGenreSeeds } from './ai-genre-seeds';
+import { aiGenreKey, resolveCuratedGenreSeeds } from './ai-genre-seeds';
 import type {
   AiClarificationOption,
   AiIntent,
@@ -31,7 +31,7 @@ export function normalizeAiIntent(intent: AiIntent): AiIntent {
   const normalized: AiIntent = {
     ...intent,
     artists: uniqueNames(intent.artists),
-    genres: uniqueNames(intent.genres),
+    genres: uniqueByKey(intent.genres, aiGenreKey),
     seedTracks: uniqueTracks(intent.seedTracks),
     excludeArtists: uniqueNames(intent.excludeArtists),
     excludeTracks: uniqueTracks(intent.excludeTracks),
@@ -87,7 +87,7 @@ export function findIntentClarification(
     trackCountClarification(intent) ??
     durationClarification(intent) ??
     orderingClarification(intent) ??
-    unknownGenresClarification(intent)
+    genreClarification(intent)
   );
 }
 
@@ -158,15 +158,20 @@ function durationClarification(intent: AiIntent): AiIntentClarification | null {
   return clarify('invalid_duration');
 }
 
-function unknownGenresClarification(
-  intent: AiIntent,
-): AiIntentClarification | null {
-  const { unknown } = resolveCuratedGenreSeeds(intent.genres);
+function genreClarification(intent: AiIntent): AiIntentClarification | null {
+  const { unknown, ambiguous } = resolveCuratedGenreSeeds(intent.genres);
 
-  if (unknown.length === 0) {
-    return null;
+  if (unknown.length > 0) {
+    return clarify('unknown_genres', { seedType: 'genre', names: unknown });
   }
-  return clarify('unknown_genres', { seedType: 'genre', names: unknown });
+  if (ambiguous.length > 0) {
+    return clarify('ambiguous_genres', {
+      seedType: 'genre',
+      limit: MAX_GENRES,
+      names: ambiguous,
+    });
+  }
+  return null;
 }
 
 function orderingClarification(intent: AiIntent): AiIntentClarification | null {
@@ -241,10 +246,17 @@ export function aiTrackKey(track: AiTrackReference): string {
 }
 
 function uniqueNames(names: string[]): string[] {
+  return uniqueByKey(names, aiNameKey);
+}
+
+function uniqueByKey(
+  names: string[],
+  keyOf: (name: string) => string,
+): string[] {
   const seen = new Set<string>();
 
   return names.filter((name) => {
-    const key = aiNameKey(name);
+    const key = keyOf(name);
     if (seen.has(key)) {
       return false;
     }

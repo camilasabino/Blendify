@@ -24,11 +24,19 @@ from tests.fakes import interpreted_output
 HISTORICAL_V1_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v1.json"
 HISTORICAL_V1_CASE_COUNT = 27
 HISTORICAL_V2_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v2.json"
+HISTORICAL_V2_CASE_COUNT = 63
 HISTORICAL_V2_DATASET_SHA256 = "e48d430825cf60d4cf1142f5c9e32206b2415269ce9df5189b2682e411201d68"
+HISTORICAL_V3_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v3.json"
+HISTORICAL_V3_DATASET_SHA256 = "6ef41274bf59d7be2d750c48a9cb2242037899e4e68f8af1c9d1881029e583dc"
 DATASET_VERSION, CASES = load_dataset()
 ALL_DATASET_CASES = [
     case
-    for path in (HISTORICAL_V1_DATASET_PATH, HISTORICAL_V2_DATASET_PATH, DATASET_PATH)
+    for path in (
+        HISTORICAL_V1_DATASET_PATH,
+        HISTORICAL_V2_DATASET_PATH,
+        HISTORICAL_V3_DATASET_PATH,
+        DATASET_PATH,
+    )
     for case in load_dataset(path)[1]
 ]
 KINDS = set(PlaylistKind.__args__)
@@ -41,7 +49,7 @@ PROVIDER_CONTENT_PATTERN = re.compile(r"spotify:|open\.spotify|https?://|\b[0-9A
 def test_dataset_is_versioned_with_unique_case_ids() -> None:
     ids = [case.id for case in CASES]
 
-    assert DATASET_VERSION == "intent-eval-v3"
+    assert DATASET_VERSION == "intent-eval-v4"
     assert len(ids) == len(set(ids))
 
 
@@ -60,7 +68,114 @@ def test_historical_v2_dataset_is_preserved_for_baseline_comparison() -> None:
     assert digest == HISTORICAL_V2_DATASET_SHA256
     assert version == "intent-eval-v2"
     assert DATASET_PATH != HISTORICAL_V2_DATASET_PATH
-    assert len(CASES) == len(cases)
+    assert len(cases) == HISTORICAL_V2_CASE_COUNT
+
+
+def test_historical_v3_dataset_stays_frozen_and_inside_v4() -> None:
+    digest = hashlib.sha256(HISTORICAL_V3_DATASET_PATH.read_bytes()).hexdigest()
+    version, cases = load_dataset(HISTORICAL_V3_DATASET_PATH)
+    current = {case.id: case for case in CASES}
+
+    assert digest == HISTORICAL_V3_DATASET_SHA256
+    assert version == "intent-eval-v3"
+    assert DATASET_PATH != HISTORICAL_V3_DATASET_PATH
+    for case in cases:
+        assert current[case.id] == case
+
+
+GENRE_COVERAGE = {
+    "es": {
+        "es-genre-place-rock-de-argentina": ["argentine rock"],
+        "es-genre-place-rock-argentino": ["argentine rock"],
+        "es-genre-place-hour": ["argentine rock"],
+        "es-artist-nationality-artists-of-rock": ["rock"],
+        "es-artist-nationality-rock-by-artists": ["rock"],
+        "es-genre-instrumental": ["instrumental"],
+        "es-genre-instrumental-calm": ["instrumental"],
+        "es-genre-instrumental-acoustic-guitar": ["instrumental acoustic guitar"],
+        "es-genre-acoustic": ["acoustic"],
+        "es-genre-unknown-fictional": ["glorptrance"],
+    },
+    "en": {
+        "en-genre-place-argentine-rock": ["argentine rock"],
+        "en-artist-nationality-rock-by-artists": ["rock"],
+        "en-genre-instrumental": ["instrumental"],
+        "en-genre-instrumental-calm": ["instrumental"],
+        "en-genre-instrumental-acoustic-guitar": ["instrumental acoustic guitar"],
+        "en-genre-broad-exact": ["latin"],
+        "en-genre-unknown-fictional": ["glorptrance"],
+    },
+    "pt": {
+        "pt-genre-place-rock-argentino": ["argentine rock"],
+        "pt-artist-nationality-rock-by-artists": ["rock"],
+        "pt-genre-instrumental": ["instrumental"],
+        "pt-genre-instrumental-calm": ["instrumental"],
+    },
+}
+
+
+@pytest.mark.parametrize("language", sorted(GENRE_COVERAGE))
+def test_dataset_covers_genre_semantics_in_each_language(language: str) -> None:
+    by_id = {case.id: case for case in CASES}
+
+    for case_id, genres in GENRE_COVERAGE[language].items():
+        case = by_id[case_id]
+        assert case.language == language
+        assert case.expect["genres"] == genres
+
+
+LOCAL_GENRE_ALTERNATIVES = {
+    "es-genre-local-pop-argentino": ("es", "pop argentino", "argentine pop"),
+    "es-genre-local-trap-argentino": ("es", "trap argentino", "argentine trap"),
+    "es-genre-local-folklore-argentino": ("es", "folklore argentino", "argentine folklore"),
+    "en-genre-local-argentine-pop": ("en", "argentine pop", "pop argentino"),
+    "en-genre-local-brazilian-funk": ("en", "brazilian funk", "funk carioca"),
+    "pt-genre-local-trap-brasileiro": ("pt", "trap brasileiro", "brazilian trap"),
+    "pt-genre-local-mpb": ("pt", "mpb", "brazilian popular music"),
+}
+
+
+@pytest.mark.parametrize("case_id", sorted(LOCAL_GENRE_ALTERNATIVES))
+def test_dataset_accepts_a_local_genre_name_or_its_supported_english_form(case_id: str) -> None:
+    case = next(case for case in CASES if case.id == case_id)
+    language, *forms = LOCAL_GENRE_ALTERNATIVES[case_id]
+
+    assert case.language == language
+    assert "genres" not in case.expect
+    assert case.expect["genresOneOf"] == [[form] for form in forms]
+    assert case.expect["unsupportedCategories"] == []
+
+
+def test_check_accepts_any_listed_genre_alternative() -> None:
+    expect = {"outcome": "interpreted", "genresOneOf": [["pop argentino"], ["argentine pop"]]}
+
+    assert check_case(expect, interpretation(genres=["Argentine Pop"])) == []
+    assert check_case(expect, interpretation(genres=["pop argentino"])) == []
+    assert [
+        failure.split(":")[0]
+        for failure in check_case(expect, interpretation(genres=["argentine rock"]))
+    ] == ["genresOneOf"]
+
+
+def test_dataset_separates_a_style_place_from_an_artist_nationality() -> None:
+    nationality = [case for case in CASES if "-artist-nationality-" in case.id]
+    place = [case for case in CASES if "-genre-place-" in case.id]
+
+    assert {case.language for case in nationality} == {"en", "es", "pt"}
+    for case in nationality:
+        assert case.expect["genres"] == ["rock"]
+        assert case.expect["unsupportedCategories"] == ["artist_attribute"]
+    for case in place:
+        assert "artist_attribute" not in case.expect["unsupportedCategories"]
+
+
+def test_dataset_never_duplicates_a_genre_style_as_unsupported() -> None:
+    instrumental = [case for case in CASES if case.expect.get("genres") == ["instrumental"]]
+
+    assert {case.language for case in instrumental} == {"en", "es", "pt"}
+    for case in instrumental:
+        assert case.expect["unsupportedCategories"] == []
+    assert {case.expect.get("mood") for case in instrumental} == {None, "calm"}
 
 
 def test_dataset_covers_every_mood_in_each_supported_language() -> None:

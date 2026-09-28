@@ -507,6 +507,8 @@ export const pt: Record<MessageKey, string> = {
     'O Blendify não consegue ordenar as músicas desse jeito com confiança. Escolha outra ordem:',
   'ai.clarify.unknownGenres':
     'O Blendify não reconhece estes gêneros: {names}. Tente outro nome.',
+  'ai.clarify.ambiguousGenres':
+    'Estes gêneros são amplos demais para um único mix: {names}. Cite um gênero ou estilo mais específico.',
   'ai.clarify.invalidDuration':
     'Essa duração não funciona. Peça uma duração de pelo menos um minuto.',
   'ai.clarify.optionsLabel': 'Escolha uma opção',

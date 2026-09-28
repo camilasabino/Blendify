@@ -7,6 +7,7 @@ import type {
   TrackListPatch,
 } from '@blendify/contracts/ai-service';
 import type { AiIntent, AiTrackReference } from './ai-intent';
+import { aiGenreKey } from './ai-genre-seeds';
 import { aiNameKey, aiTrackKey } from './ai-intent-rules';
 
 export type AiIntentPatch = IntentPatch;
@@ -30,7 +31,7 @@ export function applyIntentPatch(
     ...intent,
     kind: patch.kind?.value ?? intent.kind,
     artists: applyNames(intent.artists, patch.artists),
-    genres: applyNames(intent.genres, patch.genres),
+    genres: applyNames(intent.genres, patch.genres, aiGenreKey),
     seedTracks: applyTracks(intent.seedTracks, patch.seedTracks),
     targetTrackCount: applyValue(
       intent.targetTrackCount,
@@ -68,7 +69,7 @@ export function conflictingPatchLabels(
 ): string[] {
   return [
     ...nameConflicts(patch.artists),
-    ...nameConflicts(patch.genres),
+    ...nameConflicts(patch.genres, aiGenreKey),
     ...trackConflicts(patch.seedTracks),
     ...nameConflicts(patch.excludeArtists),
     ...trackConflicts(patch.excludeTracks),
@@ -84,11 +85,15 @@ function applyValue<T>(current: T | null, patch: ValuePatch<T>): T | null {
   return patch.operation === 'set' ? patch.value : null;
 }
 
-function applyNames(current: string[], patch: NameListPatch): string[] {
-  const removed = new Set(patch.remove.map(aiNameKey));
-  const kept = current.filter((name) => !removed.has(aiNameKey(name)));
+function applyNames(
+  current: string[],
+  patch: NameListPatch,
+  keyOf: (name: string) => string = aiNameKey,
+): string[] {
+  const removed = new Set(patch.remove.map(keyOf));
+  const kept = current.filter((name) => !removed.has(keyOf(name)));
 
-  return uniqueByKey([...kept, ...patch.add], aiNameKey);
+  return uniqueByKey([...kept, ...patch.add], keyOf);
 }
 
 function applyTracks(
@@ -134,9 +139,12 @@ function uniqueByKey<T>(items: T[], keyOf: (item: T) => string): T[] {
   });
 }
 
-function nameConflicts(patch: NameListPatch): string[] {
-  const removed = new Set(patch.remove.map(aiNameKey));
-  return patch.add.filter((name) => removed.has(aiNameKey(name)));
+function nameConflicts(
+  patch: NameListPatch,
+  keyOf: (name: string) => string = aiNameKey,
+): string[] {
+  const removed = new Set(patch.remove.map(keyOf));
+  return patch.add.filter((name) => removed.has(keyOf(name)));
 }
 
 function trackConflicts(patch: TrackListPatch): string[] {

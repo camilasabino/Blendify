@@ -115,6 +115,51 @@ describe('AiIntentResolver', () => {
     },
   );
 
+  it('resolves semantic genre expressions to canonical seeds without provider calls', async () => {
+    const { catalog, resolver } = createResolver();
+
+    const resolution = await resolver.resolve(
+      intent({
+        kind: 'genre_mix',
+        genres: ['argentine rock', 'acoustic guitar'],
+        mood: 'calm',
+      }),
+    );
+
+    expect(resolution).toEqual({
+      status: 'resolved',
+      seeds: {
+        artists: [],
+        genres: [
+          { id: 'argentine-rock', name: 'Argentine Rock' },
+          { id: 'acoustic-guitar-cover', name: 'Acoustic Guitar Cover' },
+          {
+            id: 'instrumental-acoustic-guitar',
+            name: 'Instrumental Acoustic Guitar',
+          },
+        ],
+        track: null,
+      },
+    });
+    expect(catalog.searchArtists).not.toHaveBeenCalled();
+    expect(catalog.searchTracks).not.toHaveBeenCalled();
+  });
+
+  it('never executes an ambiguous genre expression', async () => {
+    const { catalog, resolver } = createResolver();
+
+    const resolution = await resolver.resolve(
+      intent({ kind: 'genre_mix', genres: ['shoegaze', 'acoustic'] }),
+    );
+
+    expect(resolution).toEqual({
+      status: 'not_found',
+      seedType: 'genre',
+      names: ['acoustic'],
+    });
+    expect(catalog.searchArtists).not.toHaveBeenCalled();
+  });
+
   it('resolves artists sequentially with a strict name match', async () => {
     const { catalog, resolver } = createResolver();
 

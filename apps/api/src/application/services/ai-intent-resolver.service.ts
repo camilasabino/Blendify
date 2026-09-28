@@ -51,10 +51,10 @@ export class AiIntentResolver {
   }
 
   private resolveGenres(names: string[]): AiIntentResolution {
-    const { genres, unknown } = resolveCuratedGenreSeeds(names);
+    const { genres, unknown, ambiguous } = resolveCuratedGenreSeeds(names);
 
-    if (unknown.length > 0) {
-      return notFound('genre', unknown);
+    if (unknown.length > 0 || ambiguous.length > 0) {
+      return notFound('genre', [...unknown, ...ambiguous]);
     }
     return { status: 'resolved', seeds: { artists: [], genres, track: null } };
   }

@@ -714,6 +714,119 @@ describe('Create with AI sessions over HTTP', () => {
     expectNoProviderCalls(world);
   });
 
+  it('reviews a geographic genre as its canonical curated genre', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['argentine rock'],
+        targetTrackCount: null,
+        targetDurationMinutes: 60,
+        excludeArtists: [],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession({
+      prompt: '1h de canciones de rock de argentina',
+    }).expect(201);
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'ready',
+      intent: {
+        genres: ['Argentine Rock'],
+        targetDurationMinutes: 60,
+        unmetConstraints: [],
+      },
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('reviews instrumental music as curated genres next to its mood', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['instrumental'],
+        mood: 'calm',
+        excludeArtists: [],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession({
+      prompt: 'música instrumental relajante',
+    }).expect(201);
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'ready',
+      clarification: null,
+      intent: {
+        genres: [
+          'Instrumental Hip Hop',
+          'Instrumental Rock',
+          'Instrumental Funk',
+          'Instrumental Soul',
+          'Instrumental Acoustic Guitar',
+        ],
+        mood: 'calm',
+        unmetConstraints: [],
+      },
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('reviews an English form of a local genre as the local catalog genre', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['argentine pop'],
+        excludeArtists: [],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession({ prompt: 'Pop argentino' }).expect(
+      201,
+    );
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'ready',
+      intent: { genres: ['Pop Argentino'], unmetConstraints: [] },
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('asks for a more specific genre when a style is too broad to execute', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['acoustic'],
+        mood: 'calm',
+        excludeArtists: [],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession({
+      prompt: 'música acústica relajante',
+    }).expect(201);
+
+    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      status: 'needs_clarification',
+      intent: null,
+      clarification: {
+        reason: 'ambiguous_genres',
+        seedType: 'genre',
+        names: ['acoustic'],
+        options: [],
+      },
+    });
+    expectNoProviderCalls(world);
+  });
+
   it('asks the user to fix a zero duration', async () => {
     world.interpreter.interpretIntent.mockResolvedValue(
       interpreted({ targetDurationMinutes: 0 }),

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -26,11 +27,19 @@ from tests.fakes import (
 )
 
 DATASET_VERSION, CASES = load_dataset()
+HISTORICAL_V1_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v1.json"
+HISTORICAL_V1_DATASET_SHA256 = "05a16b4a7888c4d8a6e1a8b1da08d0d5e9542b78039f9560f066aa5457dccc17"
 CASES_BY_ID = {case.id: case for case in CASES}
 CATEGORIES = set(UnsupportedConstraintCategory.__args__)
 PROVIDER_CONTENT_PATTERN = re.compile(r"spotify:|open\.spotify|https?://|\b[0-9A-Za-z]{22}\b")
 REQUIRED_COVERAGE = {
     "en": [
+        "en-add-genre-place",
+        "en-add-genre-instrumental",
+        "en-remove-genre",
+        "en-remove-local-genre-named-in-english",
+        "en-more-instrumental-characteristic",
+        "en-more-of-existing-genre",
         "en-less-mainstream",
         "en-less-mainstream-from-popular",
         "en-less-mainstream-from-balanced",
@@ -52,6 +61,11 @@ REQUIRED_COVERAGE = {
         "en-combination",
     ],
     "es": [
+        "es-add-genre-place",
+        "es-add-genre-instrumental",
+        "es-remove-genre",
+        "es-remove-local-genre",
+        "es-artist-nationality-is-not-a-genre",
         "es-less-mainstream",
         "es-less-commercial-from-popular",
         "es-remove-seed-artist",
@@ -62,6 +76,9 @@ REQUIRED_COVERAGE = {
         "es-combination",
     ],
     "pt": [
+        "pt-add-genre-place",
+        "pt-add-genre-instrumental",
+        "pt-remove-local-genre",
         "pt-less-popular",
         "pt-less-popular-from-popular",
         "pt-exclude-artist",
@@ -79,9 +96,48 @@ def parsed(output: dict[str, object]) -> Any:
 def test_dataset_is_a_new_versioned_refinement_dataset_with_unique_ids() -> None:
     ids = [case.id for case in CASES]
 
-    assert DATASET_VERSION == "refinement-eval-v1"
-    assert DATASET_PATH.name == "refinement-eval-v1.json"
+    assert DATASET_VERSION == "refinement-eval-v2"
+    assert DATASET_PATH.name == "refinement-eval-v2.json"
     assert len(ids) == len(set(ids))
+
+
+def test_historical_v1_dataset_stays_frozen_and_inside_v2() -> None:
+    digest = hashlib.sha256(HISTORICAL_V1_DATASET_PATH.read_bytes()).hexdigest()
+    version, cases = load_dataset(HISTORICAL_V1_DATASET_PATH)
+
+    assert digest == HISTORICAL_V1_DATASET_SHA256
+    assert version == "refinement-eval-v1"
+    for case in cases:
+        assert CASES_BY_ID[case.id] == case
+
+
+def test_genre_refinements_expect_normalized_additions_and_literal_removals() -> None:
+    for case_id in ("es-add-genre-place", "en-add-genre-place", "pt-add-genre-place"):
+        assert CASES_BY_ID[case_id].expect["add"] == {"genres": ["argentine rock"]}
+    for case_id in ("es-remove-genre", "en-remove-genre"):
+        case = CASES_BY_ID[case_id]
+        assert case.expect["remove"] == {"genres": ["indie rock"]}
+        assert "indie rock" in case.request.intent.genres
+
+
+def test_local_genre_removals_copy_the_current_intent_spelling() -> None:
+    for case_id, genre in (
+        ("es-remove-local-genre", "pop argentino"),
+        ("en-remove-local-genre-named-in-english", "pop argentino"),
+        ("pt-remove-local-genre", "mpb"),
+    ):
+        case = CASES_BY_ID[case_id]
+        assert case.expect["remove"] == {"genres": [genre]}
+        assert genre in case.request.intent.genres
+
+
+def test_relative_characteristics_never_expect_a_genre_change() -> None:
+    for case_id in ("en-more-instrumental-characteristic", "en-more-of-existing-genre"):
+        expect = CASES_BY_ID[case_id].expect
+        assert expect["changedWithin"] == []
+        assert expect["unsupportedCategories"] == ["other"]
+    nationality = CASES_BY_ID["es-artist-nationality-is-not-a-genre"].expect
+    assert nationality["unsupportedCategories"] == ["artist_attribute"]
 
 
 @pytest.mark.parametrize("language", sorted(REQUIRED_COVERAGE))
@@ -314,8 +370,8 @@ def test_preflight_states_the_refinement_run_bounds() -> None:
 
     assert plan.request_budget == len(CASES) * MAX_OUTPUT_VALIDATION_ATTEMPTS
     assert "Paid real-model refinement eval" in preflight
-    assert "refinement-v1" in preflight
-    assert "refinement-eval-v1" in preflight
+    assert "refinement-v2" in preflight
+    assert "refinement-eval-v2" in preflight
     assert all(case.request.refinement not in preflight for case in CASES)
 
 
@@ -332,7 +388,7 @@ async def test_fake_refinement_run_reports_failed_output_only_for_failed_cases()
     passed, failed = report["results"]  # type: ignore[misc]
 
     assert report["suite"] == "refinement"
-    assert report["promptVersion"] == "refinement-v1"
+    assert report["promptVersion"] == "refinement-v2"
     assert report["providerRequests"] == 3
     assert report["casesRequiringRetry"] == ["en-less-mainstream"]
     assert report["passed"] == 1

@@ -8,15 +8,21 @@ from app.prompts.intent import (
 )
 from app.prompts.intent_v1 import INTENT_V1_PROMPT_VERSION, INTENT_V1_SYSTEM_PROMPT
 from app.prompts.intent_v2 import INTENT_V2_PROMPT_VERSION, INTENT_V2_SYSTEM_PROMPT
+from app.prompts.intent_v3 import INTENT_V3_PROMPT_VERSION, INTENT_V3_SYSTEM_PROMPT
 
 INTENT_V1_BASELINE_SHA256 = "6f765db08aaf50eee3d7934fccbf8ebcbc132a18ee53d9acd1fd78b3dc4fbcb5"
 INTENT_V2_BASELINE_SHA256 = "274418d1f63e9f9ef65fe99f62af3027dffeece6783f933afe86c786ad3e64c2"
+INTENT_V3_BASELINE_SHA256 = "4a523cd6a58f3ef21e0812fa209e4466289dc768eb682358474ac1bde7d8cf8f"
 
 
-def test_current_prompt_is_intent_v3() -> None:
+def flat(prompt: str) -> str:
+    return " ".join(prompt.split())
+
+
+def test_current_prompt_is_intent_v4() -> None:
     request = build_intent_model_request("Pop music for an hour")
 
-    assert INTENT_PROMPT_VERSION == "intent-v3"
+    assert INTENT_PROMPT_VERSION == "intent-v4"
     assert request.prompt_version == INTENT_PROMPT_VERSION
     assert request.system_prompt == INTENT_SYSTEM_PROMPT
     assert request.user_prompt == "Pop music for an hour"
@@ -36,6 +42,61 @@ def test_intent_v2_stays_frozen_for_the_historical_baseline() -> None:
     assert INTENT_V2_PROMPT_VERSION == "intent-v2"
     assert digest == INTENT_V2_BASELINE_SHA256
     assert INTENT_V2_SYSTEM_PROMPT != INTENT_SYSTEM_PROMPT
+
+
+def test_intent_v3_stays_frozen_for_the_accepted_m2_baseline() -> None:
+    digest = hashlib.sha256(INTENT_V3_SYSTEM_PROMPT.encode()).hexdigest()
+
+    assert INTENT_V3_PROMPT_VERSION == "intent-v3"
+    assert digest == INTENT_V3_BASELINE_SHA256
+    assert INTENT_V3_SYSTEM_PROMPT != INTENT_SYSTEM_PROMPT
+
+
+def test_current_prompt_keeps_artist_and_song_names_untranslated() -> None:
+    prompt = flat(INTENT_SYSTEM_PROMPT)
+
+    assert "Copy artist and song names as the user wrote them" in prompt
+    assert "Never translate them and never replace them with other names" in prompt
+    assert "Copy artist, song and genre names" not in prompt
+
+
+def test_current_prompt_normalizes_genre_expressions_by_meaning() -> None:
+    prompt = flat(INTENT_SYSTEM_PROMPT)
+
+    for rule in (
+        "A genre is a style of music, not a proper name",
+        '"rock de argentina" and "rock argentino" are "argentine rock"',
+        '"música instrumental" is "instrumental"',
+        "Keep a genre name that is already established in the user's language as written",
+        "Never make a genre broader or narrower, and never guess which genres exist",
+    ):
+        assert rule in prompt
+
+
+def test_current_prompt_separates_a_style_place_from_an_artist_nationality() -> None:
+    prompt = flat(INTENT_SYSTEM_PROMPT)
+
+    assert "A place or nationality that describes the style is part of the genre" in prompt
+    assert "describes the people who make the music is an artist_attribute" in prompt
+    for example in ('"rock by Argentine artists"', '"artistas argentinos de rock"'):
+        assert example in prompt
+    assert "a country name alone never makes a genre" in prompt
+
+
+def test_current_prompt_lets_a_characteristic_be_the_requested_genre() -> None:
+    prompt = flat(INTENT_SYSTEM_PROMPT)
+
+    assert "When the user asks for one as the kind of music itself" in prompt
+    assert '"Música instrumental relajante" is genre "instrumental" plus mood "calm"' in prompt
+    assert "never reported again under unsupportedConstraints" in prompt
+
+
+def test_current_prompt_never_receives_the_curated_catalog() -> None:
+    catalog_only_labels = ("Instrumental Acoustic Guitar", "calming instrumental", "argentine-rock")
+
+    for label in catalog_only_labels:
+        assert label not in INTENT_SYSTEM_PROMPT
+    assert "spotify-genres" not in INTENT_SYSTEM_PROMPT
 
 
 def test_current_prompt_teaches_every_mood_of_the_closed_vocabulary() -> None:

@@ -239,6 +239,18 @@ describe('evaluateRefinement', () => {
       'unknown_genres',
     ],
     [
+      'a style too broad to execute without truncation',
+      interpreted({ genres: { add: ['acoustic'], remove: [] } }),
+      intent({ kind: 'genre_mix', artists: [], genres: ['shoegaze'] }),
+      'ambiguous_genres',
+    ],
+    [
+      'a curated broad style that no longer fits beside the current genres',
+      interpreted({ genres: { add: ['instrumental'], remove: [] } }),
+      intent({ kind: 'genre_mix', artists: [], genres: ['shoegaze'] }),
+      'ambiguous_genres',
+    ],
+    [
       'removing every seed',
       interpreted({ artists: { add: [], remove: ['Radiohead', 'Interpol'] } }),
       intent(),
@@ -320,5 +332,99 @@ describe('evaluateRefinement', () => {
     );
 
     expect(current).toEqual(snapshot);
+  });
+});
+
+describe('genre refinement through the deterministic curated resolver', () => {
+  const genreIntent = (genres: string[]) =>
+    intent({ kind: 'genre_mix', artists: [], genres });
+
+  it('adds a semantic genre expression that resolves to a curated genre', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: ['argentine rock'], remove: [] } }),
+        genreIntent(['indie rock']),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['indie rock', 'argentine rock'] },
+    });
+  });
+
+  it('removes a genre by its canonical curated identity', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: [], remove: ['Argentine-Rock'] } }),
+        genreIntent(['argentine rock', 'indie rock']),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['indie rock'] },
+    });
+    expect(
+      evaluate(
+        interpreted({ genres: { add: [], remove: ['Indie Rock'] } }),
+        genreIntent(['argentine rock', 'indie rock']),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['argentine rock'] },
+    });
+  });
+
+  it('treats adding a genre already present under another spelling as unchanged', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: ['Argentine Rock'], remove: [] } }),
+        genreIntent(['argentine rock']),
+      ),
+    ).toEqual({ status: 'unchanged' });
+  });
+
+  it('removes a local genre named by its English form', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: [], remove: ['Argentine pop'] } }),
+        genreIntent(['pop argentino', 'indie rock']),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['indie rock'] },
+    });
+  });
+
+  it('treats adding the English form of a present local genre as unchanged', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: ['argentine trap'], remove: [] } }),
+        genreIntent(['trap argentino']),
+      ),
+    ).toEqual({ status: 'unchanged' });
+  });
+
+  it('swaps a genre for instrumental music through its curated genres', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: ['instrumental'], remove: ['rock'] } }),
+        genreIntent(['rock']),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['instrumental'] },
+    });
+  });
+
+  it('flags adding and removing the same canonical genre as a conflict', () => {
+    expect(
+      evaluate(
+        interpreted({
+          genres: { add: ['argentine-rock'], remove: ['Argentine Rock'] },
+        }),
+        genreIntent(['argentine rock', 'indie rock']),
+      ),
+    ).toMatchObject({
+      status: 'needs_clarification',
+      clarification: { reason: 'conflicting_changes' },
+    });
   });
 });

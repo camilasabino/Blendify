@@ -16,7 +16,7 @@ from app.models.refinement import (
 )
 from evals.intent_eval import EvalLanguage, normalize_name
 
-DATASET_PATH = Path(__file__).resolve().parent / "refinement-eval-v1.json"
+DATASET_PATH = Path(__file__).resolve().parent / "refinement-eval-v2.json"
 
 RefinementResult = InterpretedRefinement | RefinementClarificationNeeded
 ListPatch = NameListPatch | TrackListPatch | PositionListPatch

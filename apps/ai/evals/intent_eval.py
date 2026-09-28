@@ -12,13 +12,14 @@ from app.models.intent import (
     PlaylistIntent,
 )
 
-DATASET_PATH = Path(__file__).resolve().parent / "intent-eval-v3.json"
+DATASET_PATH = Path(__file__).resolve().parent / "intent-eval-v4.json"
 
 EvalLanguage = Literal["en", "es", "pt"]
 ExpectationStatus = Literal["passed", "failed", "unchecked"]
 Interpretation = InterpretedIntent | ClarificationNeeded
 
 NAME_LIST_EXPECTATIONS = ("artists", "genres", "excludeArtists")
+GENRE_ALTERNATIVES_EXPECTATION = "genresOneOf"
 SCALAR_EXPECTATIONS = (
     "kind",
     "targetTrackCount",
@@ -34,6 +35,7 @@ EXPECTATION_KEYS = frozenset(
         "outcome",
         "clarificationReason",
         *NAME_LIST_EXPECTATIONS,
+        GENRE_ALTERNATIVES_EXPECTATION,
         *SCALAR_EXPECTATIONS,
         *TRACK_EXPECTATIONS,
         *CATEGORY_EXPECTATIONS,
@@ -124,12 +126,22 @@ def _check_names(expect: dict[str, Any], intent: PlaylistIntent) -> list[str]:
         "genres": intent.genres,
         "excludeArtists": intent.exclude_artists,
     }
-    return [
+    failures = [
         failure
         for key in NAME_LIST_EXPECTATIONS
         if key in expect
         for failure in _compare_sets(key, expect[key], actual_by_key[key])
     ]
+    alternatives = expect.get(GENRE_ALTERNATIVES_EXPECTATION)
+    if alternatives is not None and all(
+        _compare_sets(GENRE_ALTERNATIVES_EXPECTATION, genres, intent.genres)
+        for genres in alternatives
+    ):
+        actual = sorted(map(str, map(normalize_name, intent.genres)))
+        failures.append(
+            f"{GENRE_ALTERNATIVES_EXPECTATION}: expected one of {alternatives}, got {actual}"
+        )
+    return failures
 
 
 def _check_scalars(expect: dict[str, Any], intent: PlaylistIntent) -> list[str]:

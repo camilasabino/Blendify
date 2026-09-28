@@ -51,6 +51,18 @@ describe('AI capability matrix', () => {
 });
 
 describe('normalizeAiIntent', () => {
+  it('removes genres that resolve to the same canonical curated genre', () => {
+    const normalized = normalizeAiIntent(
+      intent({
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['Argentine Rock', 'argentine-rock', 'acoustic guitar'],
+      }),
+    );
+
+    expect(normalized.genres).toEqual(['Argentine Rock', 'acoustic guitar']);
+  });
+
   it('removes duplicate names without reordering them', () => {
     const normalized = normalizeAiIntent(
       intent({
@@ -330,6 +342,107 @@ describe('findIntentClarification', () => {
       seedType: 'genre',
       names: ['definitely not a genre', 'custom:anything'],
     });
+  });
+
+  it('executes a genre whose geography is part of the style', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['argentine rock'],
+          targetTrackCount: null,
+          targetDurationMinutes: 60,
+          popularity: null,
+          excludeArtists: [],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('keeps an artist nationality as a deferred attribute next to the genre', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['rock'],
+          unsupportedConstraints: [
+            { category: 'artist_attribute', userText: 'artistas argentinos' },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('executes a style family expansion that fits the genre limit', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['acoustic guitar'],
+          mood: 'calm',
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('executes instrumental through its curated genres with a mood', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['instrumental'],
+          mood: 'calm',
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('asks for a more specific genre instead of truncating a broad style', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['acoustic'],
+          mood: 'calm',
+        }),
+      ),
+    ).toEqual({
+      reason: 'ambiguous_genres',
+      seedType: 'genre',
+      limit: MAX_GENRES,
+      names: ['acoustic'],
+      unsupportedConstraints: [],
+      options: [],
+    });
+  });
+
+  it('asks for a more specific genre when a curated family cannot fit beside other genres', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['jazz', 'instrumental'],
+        }),
+      ),
+    ).toMatchObject({ reason: 'ambiguous_genres', names: ['instrumental'] });
+  });
+
+  it('reports unknown genres before ambiguous ones', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['acoustic', 'zorblax wave'],
+        }),
+      ),
+    ).toMatchObject({ reason: 'unknown_genres', names: ['zorblax wave'] });
   });
 
   it('never asks whether a named artist or song exists', () => {

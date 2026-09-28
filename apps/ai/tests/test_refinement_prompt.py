@@ -3,15 +3,18 @@ import json
 
 from app.models.intent import Mood, UnsupportedConstraintCategory
 from app.models.refinement import PlanRefinementRequest
-from app.prompts.intent import INTENT_PROMPT_VERSION, INTENT_SYSTEM_PROMPT
+from app.prompts.intent import INTENT_SYSTEM_PROMPT
+from app.prompts.intent_v3 import INTENT_V3_PROMPT_VERSION, INTENT_V3_SYSTEM_PROMPT
 from app.prompts.refinement import (
     REFINEMENT_PROMPT_VERSION,
     REFINEMENT_SYSTEM_PROMPT,
     build_refinement_model_request,
 )
+from app.prompts.refinement_v1 import REFINEMENT_V1_PROMPT_VERSION, REFINEMENT_V1_SYSTEM_PROMPT
 from tests.fakes import current_intent, empty_preservation
 
 INTENT_V3_BASELINE_SHA256 = "4a523cd6a58f3ef21e0812fa209e4466289dc768eb682358474ac1bde7d8cf8f"
+REFINEMENT_V1_BASELINE_SHA256 = "6772d9e633197be47590eeea6503892a2f10e3f97b648696007f831d93a20bf7"
 
 
 def plan_request(refinement: str) -> PlanRefinementRequest:
@@ -23,17 +26,49 @@ def plan_request(refinement: str) -> PlanRefinementRequest:
 def test_refinement_has_its_own_prompt_version() -> None:
     request = build_refinement_model_request(plan_request("Remove Coldplay"))
 
-    assert REFINEMENT_PROMPT_VERSION == "refinement-v1"
+    assert REFINEMENT_PROMPT_VERSION == "refinement-v2"
     assert request.prompt_version == REFINEMENT_PROMPT_VERSION
     assert request.system_prompt == REFINEMENT_SYSTEM_PROMPT
     assert REFINEMENT_SYSTEM_PROMPT != INTENT_SYSTEM_PROMPT
 
 
-def test_intent_v3_stays_frozen_and_current_for_first_turns() -> None:
-    digest = hashlib.sha256(INTENT_SYSTEM_PROMPT.encode()).hexdigest()
+def test_intent_v3_stays_frozen_for_the_accepted_m2_baseline() -> None:
+    digest = hashlib.sha256(INTENT_V3_SYSTEM_PROMPT.encode()).hexdigest()
 
-    assert INTENT_PROMPT_VERSION == "intent-v3"
+    assert INTENT_V3_PROMPT_VERSION == "intent-v3"
     assert digest == INTENT_V3_BASELINE_SHA256
+
+
+def test_refinement_v1_stays_frozen_for_the_m4a_contract() -> None:
+    digest = hashlib.sha256(REFINEMENT_V1_SYSTEM_PROMPT.encode()).hexdigest()
+
+    assert REFINEMENT_V1_PROMPT_VERSION == "refinement-v1"
+    assert digest == REFINEMENT_V1_BASELINE_SHA256
+    assert REFINEMENT_V1_SYSTEM_PROMPT != REFINEMENT_SYSTEM_PROMPT
+
+
+def test_normalizes_added_genres_like_the_first_turn() -> None:
+    prompt = " ".join(REFINEMENT_SYSTEM_PROMPT.split())
+
+    for rule in (
+        "A genre is a style of music, not a proper name",
+        '"rock argentino" and "rock de argentina" are "argentine rock"',
+        "never guess which genres exist",
+        "To remove a genre, copy it as it appears in the current intent",
+        "One that describes the people who make the music is an artist_attribute",
+        '[genres indie rock] "Sumale rock argentino": genres add "argentine rock"',
+        '[genres indie rock, shoegaze] "Sacá indie rock": genres remove "indie rock"',
+    ):
+        assert rule in prompt
+    assert "Copy artist, song and genre names" not in prompt
+
+
+def test_keeps_a_relative_characteristic_out_of_the_genres() -> None:
+    prompt = " ".join(REFINEMENT_SYSTEM_PROMPT.split())
+
+    assert '"make it more instrumental"' in prompt
+    assert '"add some instrumental music"' in prompt
+    assert '[genres rock] "Make it more instrumental": needs_clarification' in prompt
 
 
 def test_user_message_is_only_the_serialized_ai_safe_request() -> None:

@@ -499,6 +499,8 @@ export const en = {
     'Blendify can’t reliably order songs this way. Choose an order instead:',
   'ai.clarify.unknownGenres':
     'Blendify doesn’t recognize these genres: {names}. Try another name.',
+  'ai.clarify.ambiguousGenres':
+    'These genres are too broad for one mix: {names}. Name a more specific genre or style.',
   'ai.clarify.invalidDuration':
     'That duration doesn’t work. Ask for a length of at least one minute.',
   'ai.clarify.optionsLabel': 'Choose an option',
