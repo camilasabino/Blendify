@@ -2,12 +2,11 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { AiClarification } from '@/components/ai/ai-clarification'
 import { aiErrorMessage } from '@/components/ai/ai-copy'
 import { AiCurrentRequest } from '@/components/ai/ai-current-request'
-import { AiGeneratedPlaylist } from '@/components/ai/ai-generated-playlist'
+import { AiGeneratedView } from '@/components/ai/ai-generated-view'
 import { generationRequestErrorMessage } from '@/components/ai/ai-generation-copy'
 import { AiGenerationFailure } from '@/components/ai/ai-generation-failure'
 import { AiGenerationProgress } from '@/components/ai/ai-generation-progress'
 import { AiIntentSummary } from '@/components/ai/ai-intent-summary'
-import { AiPlaylistDestination } from '@/components/ai/ai-playlist-destination'
 import { AiPromptForm } from '@/components/ai/ai-prompt-form'
 import { AiReviewActions } from '@/components/ai/ai-review-actions'
 import { ErrorState } from '@/components/ui/feedback'
@@ -82,6 +81,11 @@ export function AiPlaylistPage() {
     generate,
     publish,
     prepareTransfer,
+    refine,
+    applyRefinement,
+    dismissRefinement,
+    refinementSettlement,
+    clearRefinementError,
     checkStatus,
     reset,
   } = useAiSession()
@@ -220,28 +224,21 @@ export function AiPlaylistPage() {
       ) : null}
 
       {isCompact && flow.phase === 'generated' ? (
-        <AiGeneratedPlaylist
-          intent={flow.intent}
-          result={flow.result}
-          title={playlistTitle}
+        <AiGeneratedView
+          flow={flow}
+          mode={mode}
+          playlistTitle={playlistTitle}
           onTitleChange={renamePlaylist}
-          isTitleLocked={flow.destination !== null || flow.isPublishing}
-          destination={flow.destination}
           headingRef={targets.result}
           onStartOver={startOver}
-        >
-          <AiPlaylistDestination
-            mode={mode}
-            intentKind={flow.intent.kind}
-            title={playlistTitle?.trim() || flow.result.playlist.name}
-            destination={flow.destination}
-            transferAvailable={flow.result.transferAvailable}
-            isPublishing={flow.isPublishing}
-            publishError={flow.publishError}
-            onPublish={publish}
-            onPrepareTransfer={prepareTransfer}
-          />
-        </AiGeneratedPlaylist>
+          onPublish={publish}
+          onPrepareTransfer={prepareTransfer}
+          onRefine={refine}
+          onApply={applyRefinement}
+          onDismiss={dismissRefinement}
+          settlement={refinementSettlement}
+          onClearRefinementError={clearRefinementError}
+        />
       ) : null}
 
       {isCompact && flow.phase === 'generation_failed' ? (

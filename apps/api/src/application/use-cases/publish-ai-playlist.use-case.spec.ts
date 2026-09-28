@@ -438,6 +438,7 @@ describe('PublishAiPlaylistUseCase', () => {
   describe('while a refinement is pending', () => {
     const PENDING: AiPendingRefinement[] = [
       {
+        id: 'refinement-1',
         status: 'proposed',
         promptVersion: 'refinement-v2',
         proposedAt: new Date().toISOString(),
@@ -470,6 +471,7 @@ describe('PublishAiPlaylistUseCase', () => {
         },
       },
       {
+        id: 'refinement-2',
         status: 'needs_clarification',
         promptVersion: 'refinement-v2',
         proposedAt: new Date().toISOString(),
@@ -482,6 +484,7 @@ describe('PublishAiPlaylistUseCase', () => {
         },
       },
       {
+        id: 'refinement-3',
         status: 'unchanged',
         promptVersion: 'refinement-v2',
         proposedAt: new Date().toISOString(),
@@ -494,7 +497,7 @@ describe('PublishAiPlaylistUseCase', () => {
         const world = setup({ ...generatedSession(), pendingRefinement });
 
         await expect(world.useCase.execute(COMMAND)).rejects.toMatchObject({
-          code: 'AI_DESTINATION_UNAVAILABLE',
+          code: 'AI_REFINEMENT_PENDING',
         });
         expect(world.sessions.acquireDestinationClaim).not.toHaveBeenCalled();
         expect(world.publish).not.toHaveBeenCalled();
@@ -516,7 +519,7 @@ describe('PublishAiPlaylistUseCase', () => {
       });
 
       await expect(world.useCase.execute(COMMAND)).rejects.toMatchObject({
-        code: 'AI_DESTINATION_UNAVAILABLE',
+        code: 'AI_REFINEMENT_PENDING',
       });
       expect(world.publish).not.toHaveBeenCalled();
       expect(world.stored()).toBe(withPending);
@@ -535,7 +538,7 @@ describe('PublishAiPlaylistUseCase', () => {
       });
 
       await expect(world.useCase.execute(COMMAND)).rejects.toMatchObject({
-        code: 'AI_DESTINATION_UNAVAILABLE',
+        code: 'AI_REFINEMENT_PENDING',
       });
       expect(world.publish).not.toHaveBeenCalled();
       expect(world.stored()).toBe(withPending);

@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
   AiClarification,
+  AiCurrentPreservationDto,
   AiGenerationFailureDto,
+  AiRefinementDto,
+  CreateAiRefinementRequest,
   AiIntentSummary,
   AiSessionDestinationDto,
   GenerationProgress,
@@ -59,6 +62,10 @@ export type AiFlowState =
       destination: AiSessionDestinationDto | null
       isPublishing: boolean
       publishError: unknown
+      preservation: AiCurrentPreservationDto | null
+      refinement: AiRefinementDto | null
+      refinementActivity: AiRefinementActivity | null
+      refinementError: unknown
     }
   | {
       phase: 'generation_failed'
@@ -69,6 +76,28 @@ export type AiFlowState =
 
 export type AiFlowPhase = AiFlowState['phase']
 
+export type AiRefinementActivity = 'refining' | 'applying' | 'dismissing'
+
+export type AiRefinementSettlement = 'applied' | 'dismissed'
+
+const EMPTY_CURRENT_PRESERVATION: AiCurrentPreservationDto = {
+  firstTracks: null,
+  positions: [],
+  artists: [],
+  preservedPositions: [],
+}
+
+const SESSION_REFRESH_CODES = new Set([
+  'AI_DESTINATION_IN_PROGRESS',
+  'AI_REFINEMENT_PENDING',
+  'AI_REFINEMENT_UNAVAILABLE',
+  'AI_REFINEMENT_IN_PROGRESS',
+  'AI_REFINEMENT_SUPERSEDED',
+  'AI_REFINEMENT_STALE',
+  'AI_REFINEMENT_NOT_APPLICABLE',
+  'AI_PLAYLIST_NOT_GENERATED',
+])
+
 type GenerationRun = { sessionId: string; epoch: number; signal: AbortSignal }
 
 function aiSessionQueryKey(sessionId: string | null) {
@@ -76,7 +105,13 @@ function aiSessionQueryKey(sessionId: string | null) {
 }
 
 function reviewedState(session: AiSession): AiSessionState {
-  return { ...session, execution: null, destination: null, refinement: null }
+  return {
+    ...session,
+    execution: null,
+    destination: null,
+    preservation: null,
+    refinement: null,
+  }
 }
 
 function generatedState(generation: AiGeneration): AiSessionState {
@@ -95,6 +130,7 @@ function generatedState(generation: AiGeneration): AiSessionState {
       transferAvailable: generation.transferAvailable,
     },
     destination: null,
+    preservation: EMPTY_CURRENT_PRESERVATION,
     refinement: null,
   }
 }
@@ -103,8 +139,8 @@ function isSessionNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.code === 'AI_SESSION_NOT_FOUND'
 }
 
-function isDestinationInProgress(error: unknown): boolean {
-  return error instanceof ApiError && error.code === 'AI_DESTINATION_IN_PROGRESS'
+function needsSessionRefresh(error: unknown): boolean {
+  return error instanceof ApiError && error.code !== undefined && SESSION_REFRESH_CODES.has(error.code)
 }
 
 function sessionFlowState(
@@ -118,6 +154,8 @@ function sessionFlowState(
     generationError: unknown
     isPublishing: boolean
     publishError: unknown
+    refinementActivity: AiRefinementActivity | null
+    refinementError: unknown
   },
 ): AiFlowState {
   if (session.clarification) {
@@ -152,6 +190,10 @@ function sessionFlowState(
         destination: session.destination,
         isPublishing: context.isPublishing,
         publishError: context.publishError,
+        preservation: session.preservation,
+        refinement: session.refinement,
+        refinementActivity: context.refinementActivity,
+        refinementError: context.refinementError,
       }
     case 'generation_failed':
       return {
@@ -278,9 +320,65 @@ export function useAiSession() {
         expire(error)
         return
       }
-      if (isDestinationInProgress(error)) {
+      if (needsSessionRefresh(error)) {
         void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(id) })
       }
+    },
+  })
+
+  const refinementBusy = useRef(false)
+  const [refinementSettlement, setRefinementSettlement] =
+    useState<AiRefinementSettlement | null>(null)
+
+  const handleRefinementError = useCallback(
+    (error: unknown, id: string) => {
+      if (isSessionNotFound(error)) {
+        expire(error)
+        return
+      }
+      if (needsSessionRefresh(error)) {
+        void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(id) })
+      }
+    },
+    [expire, queryClient],
+  )
+
+  const refinement = useMutation({
+    mutationFn: ({ sessionId: id, input }: { sessionId: string; input: CreateAiRefinementRequest }) =>
+      api.refineAiPlaylist(id, input),
+    onSuccess: (result) => {
+      queryClient.setQueryData<AiSessionState>(aiSessionQueryKey(result.sessionId), (current) =>
+        current
+          ? { ...current, expiresAt: result.expiresAt, refinement: result.refinement }
+          : current,
+      )
+    },
+    onError: (error, { sessionId: id }) => handleRefinementError(error, id),
+    onSettled: () => {
+      refinementBusy.current = false
+    },
+  })
+
+  const settlement = useMutation({
+    mutationFn: ({
+      sessionId: id,
+      refinementId,
+      action,
+    }: {
+      sessionId: string
+      refinementId: string
+      action: AiRefinementSettlement
+    }) =>
+      action === 'applied'
+        ? api.applyAiRefinement(id, refinementId)
+        : api.dismissAiRefinement(id, refinementId),
+    onSuccess: (state, { action }) => {
+      queryClient.setQueryData(aiSessionQueryKey(state.sessionId), state)
+      setRefinementSettlement(action)
+    },
+    onError: (error, { sessionId: id }) => handleRefinementError(error, id),
+    onSettled: () => {
+      refinementBusy.current = false
     },
   })
 
@@ -333,7 +431,19 @@ export function useAiSession() {
       generationError,
       isPublishing: publication.isPending,
       publishError: publication.isPending ? null : publication.error,
+      refinementActivity: refinementActivity(),
+      refinementError: refinement.error ?? settlement.error,
     })
+  }
+
+  function refinementActivity(): AiRefinementActivity | null {
+    if (refinement.isPending) {
+      return 'refining'
+    }
+    if (!settlement.isPending) {
+      return null
+    }
+    return settlement.variables.action === 'applied' ? 'applying' : 'dismissing'
   }
 
   function clearGeneration() {
@@ -342,6 +452,10 @@ export function useAiSession() {
     }
     generation.reset()
     publication.reset()
+    refinement.reset()
+    settlement.reset()
+    refinementBusy.current = false
+    setRefinementSettlement(null)
     setProgress(null)
     setGenerationError(null)
     setStatusChecks(0)
@@ -385,6 +499,34 @@ export function useAiSession() {
     publication.mutate({ sessionId, input })
   }
 
+  function refine(input: CreateAiRefinementRequest) {
+    if (refinementBusy.current || !sessionId || session?.refinement) {
+      return
+    }
+    refinementBusy.current = true
+    refinement.reset()
+    settlement.reset()
+    setRefinementSettlement(null)
+    refinement.mutate({ sessionId, input })
+  }
+
+  function settleRefinement(action: AiRefinementSettlement) {
+    const refinementId = session?.refinement?.id
+    if (refinementBusy.current || !sessionId || !refinementId) {
+      return
+    }
+    refinementBusy.current = true
+    refinement.reset()
+    settlement.reset()
+    setRefinementSettlement(null)
+    settlement.mutate({ sessionId, refinementId, action })
+  }
+
+  function clearRefinementError() {
+    refinement.reset()
+    settlement.reset()
+  }
+
   async function prepareTransfer(name: string): Promise<PlaylistTransferDto> {
     if (!sessionId) {
       throw new ApiError('Create with AI session missing', 404)
@@ -399,6 +541,8 @@ export function useAiSession() {
     } catch (error) {
       if (isSessionNotFound(error)) {
         expire(error)
+      } else if (needsSessionRefresh(error)) {
+        void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(sessionId) })
       }
       throw error
     }
@@ -431,6 +575,11 @@ export function useAiSession() {
     generate,
     publish,
     prepareTransfer,
+    refine,
+    applyRefinement: () => settleRefinement('applied'),
+    dismissRefinement: () => settleRefinement('dismissed'),
+    refinementSettlement,
+    clearRefinementError,
     checkStatus,
     reset,
   }

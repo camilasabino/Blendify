@@ -49,7 +49,7 @@ function generation(state: AiSessionStateDto) {
 async function generateLive(page: Page) {
   const reviewed = reviewedState()
   await page.route('**/api/ai/sessions', (route) =>
-    route.fulfill({ status: 201, json: { ...reviewed, execution: undefined, destination: undefined, refinement: undefined } }),
+    route.fulfill({ status: 201, json: { ...reviewed, execution: undefined, destination: undefined, preservation: undefined, refinement: undefined } }),
   )
   const stream = mockGenerationStream(page, `${SESSION_URL}/generate`, [
     { type: 'result', playlist: generation(generatedState()) },

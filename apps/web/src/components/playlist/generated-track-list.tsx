@@ -1,10 +1,11 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import type { TrackDto } from '@blendify/contracts'
 import { SpotifyLink } from '@/components/brand/spotify-link'
 import { TrackListToggle } from '@/components/playlist/track-list-disclosure'
 import { useTrackListDisclosure } from '@/hooks/use-track-list-disclosure'
 import { useT } from '@/i18n/use-t'
 import {
+  cn,
   formatCreditedArtists,
   formatDuration,
   toSpotifyUrl,
@@ -28,8 +29,12 @@ function TrackSpotifyLink({ track }: Readonly<{ track: TrackDto }>) {
 
 export function GeneratedTrackList({
   tracks,
+  label,
+  accessory,
 }: Readonly<{
   tracks: TrackDto[]
+  label?: string
+  accessory?: (track: TrackDto, position: number) => ReactNode
 }>) {
   const t = useT()
   const listId = useId()
@@ -41,7 +46,7 @@ export function GeneratedTrackList({
 
   return (
     <div className="overflow-hidden rounded-card border border-divider bg-card">
-      <ol id={listId} aria-label={t('guestResult.trackList')}>
+      <ol id={listId} aria-label={label ?? t('guestResult.trackList')}>
         {disclosure.visible.map((track, trackIndex) => (
           <li
             key={`${track.id}-${trackIndex}`}
@@ -57,7 +62,13 @@ export function GeneratedTrackList({
                 {track.albumName ? ` · ${track.albumName}` : ''}
               </p>
             </div>
-            <span className="shrink-0 text-xs tabular-nums text-cream-400">
+            {accessory ? accessory(track, trackIndex + 1) : null}
+            <span
+              className={cn(
+                'shrink-0 text-xs tabular-nums text-cream-400',
+                accessory && 'max-sm:hidden',
+              )}
+            >
               {formatDuration(track.durationMs)}
             </span>
             <TrackSpotifyLink track={track} />

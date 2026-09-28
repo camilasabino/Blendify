@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  AiRefinementIdSchema,
   AnswerAiClarificationRequestSchema,
   CreateAiRefinementRequestSchema,
   CreateAiSessionRequestSchema,
@@ -38,7 +39,9 @@ import { toAiRefinementResponse } from '@/application/dto/ai-refinement-response
 import { toAiSessionResponse } from '@/application/dto/ai-session-response.dto';
 import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
+import { ApplyAiRefinementUseCase } from '@/application/use-cases/apply-ai-refinement.use-case';
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
+import { DismissAiRefinementUseCase } from '@/application/use-cases/dismiss-ai-refinement.use-case';
 import { GenerateAiPlaylistUseCase } from '@/application/use-cases/generate-ai-playlist.use-case';
 import { GetAiSessionUseCase } from '@/application/use-cases/get-ai-session.use-case';
 import { ProposeAiRefinementUseCase } from '@/application/use-cases/propose-ai-refinement.use-case';
@@ -72,6 +75,8 @@ export class AiSessionsController {
     private readonly publishPlaylist: PublishAiPlaylistUseCase,
     private readonly transferPlaylist: TransferAiPlaylistUseCase,
     private readonly proposeRefinement: ProposeAiRefinementUseCase,
+    private readonly applyRefinement: ApplyAiRefinementUseCase,
+    private readonly dismissRefinement: DismissAiRefinementUseCase,
     private readonly transferGate: GuestTransferGate,
   ) {}
 
@@ -259,8 +264,64 @@ export class AiSessionsController {
       token: sessionId,
       userId: currentUserId(req),
       refinement: body.refinement,
+      preservePositions: body.preservePositions,
     });
     return toAiRefinementResponse(token, session);
+  }
+
+  @Post(':sessionId/refinements/:refinementId/apply')
+  @HttpCode(HttpStatus.OK)
+  @RateLimit('resolve')
+  @ApiOperation({
+    summary:
+      'Make the reviewed pending candidate the current playlist without regenerating it',
+  })
+  async apply(
+    @Param('sessionId') sessionId: string,
+    @Param('refinementId') refinementId: string,
+    @Req() req: Request,
+  ): Promise<AiSessionStateDto> {
+    return this.settle(this.applyRefinement, sessionId, refinementId, req);
+  }
+
+  @Post(':sessionId/refinements/:refinementId/dismiss')
+  @HttpCode(HttpStatus.OK)
+  @RateLimit('resolve')
+  @ApiOperation({
+    summary: 'Discard the pending refinement and keep the current playlist',
+  })
+  async dismiss(
+    @Param('sessionId') sessionId: string,
+    @Param('refinementId') refinementId: string,
+    @Req() req: Request,
+  ): Promise<AiSessionStateDto> {
+    return this.settle(this.dismissRefinement, sessionId, refinementId, req);
+  }
+
+  private async settle(
+    useCase: ApplyAiRefinementUseCase | DismissAiRefinementUseCase,
+    sessionId: string,
+    refinementId: string,
+    req: Request,
+  ): Promise<AiSessionStateDto> {
+    if (!SESSION_TOKEN_PATTERN.test(sessionId)) {
+      throw AiSessionError.notFound();
+    }
+    if (!AiRefinementIdSchema.safeParse(refinementId).success) {
+      throw AiSessionError.refinementStale();
+    }
+
+    const userId = currentUserId(req);
+    const { token, session } = await useCase.execute({
+      token: sessionId,
+      userId,
+      refinementId,
+    });
+    return toAiSessionStateResponse(
+      token,
+      session,
+      this.destinationOptions(userId),
+    );
   }
 
   private destinationOptions(userId: string | null) {

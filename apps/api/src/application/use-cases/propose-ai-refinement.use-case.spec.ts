@@ -9,7 +9,12 @@ import type {
 import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import type { AiIntent } from '@/domain/ai/ai-intent';
 import {
+  diffIntents,
+  diffPlaylistTracks,
+} from '@/domain/ai/ai-refinement-diff';
+import {
   AI_SESSION_RECORD_VERSION,
+  type AiPendingRefinement,
   type AiSession,
   type AiSessionDestination,
   type AiSessionExecution,
@@ -296,6 +301,12 @@ function createWorld(
     takeOverLock: () => {
       lock = 'lock-2';
     },
+    dismissPending: () => {
+      const current = store.get(TOKEN);
+      if (current) {
+        store.set(TOKEN, { ...current, pendingRefinement: null });
+      }
+    },
   };
 }
 
@@ -469,10 +480,11 @@ describe('ProposeAiRefinementUseCase', () => {
     );
   });
 
-  it('interprets every refinement against the latest applied intent, replacing the pending one', async () => {
+  it('interprets every refinement against the latest applied intent once the pending one is dismissed', async () => {
     const world = createWorld();
 
     await execute(world);
+    world.dismissPending();
     await execute(world);
 
     const requests = world.planner.planRefinement.mock.calls.map(
@@ -634,12 +646,119 @@ describe('ProposeAiRefinementUseCase', () => {
     },
   );
 
+  describe('while a refinement is pending', () => {
+    const base = {
+      id: 'pending-b',
+      promptVersion: 'refinement-v2',
+      proposedAt: GENERATED_AT,
+    };
+    const proposed = {
+      ...base,
+      status: 'proposed' as const,
+      aiSafe: {
+        intent: { ...INTENT, popularity: 'rarities' as const },
+        preservation: EMPTY_AI_PRESERVATION,
+        notApplied: [],
+      },
+    };
+    const pendingStates: [string, AiPendingRefinement][] = [
+      [
+        'candidate_ready',
+        {
+          ...proposed,
+          candidate: {
+            status: 'ready',
+            result: GENERATED.result,
+            preservedPositions: [],
+            diff: {
+              tracks: diffPlaylistTracks(
+                GENERATED.result.playlist.tracks,
+                GENERATED.result.playlist.tracks,
+              ),
+              intent: diffIntents(INTENT, proposed.aiSafe.intent),
+            },
+          },
+        },
+      ],
+      [
+        'candidate_failed',
+        {
+          ...proposed,
+          candidate: {
+            status: 'failed',
+            failure: {
+              code: 'NO_TRACKS_FOUND',
+              category: 'insufficient_results',
+              retryAfterSeconds: null,
+              seedNotFound: null,
+            },
+          },
+        },
+      ],
+      [
+        'needs_clarification',
+        {
+          ...base,
+          status: 'needs_clarification',
+          clarification: {
+            reason: 'preserved_artist_not_found',
+            seedType: 'artist',
+            limit: null,
+            names: ['Portishead'],
+            unsupportedConstraints: [],
+          },
+        },
+      ],
+      ['unchanged', { ...base, status: 'unchanged' }],
+    ];
+
+    it.each(pendingStates)(
+      'refuses a new refinement while %s is pending without planner, provider or write calls',
+      async (_label, pendingRefinement) => {
+        const session = storedSession({
+          pendingRefinement,
+          updatedAt: '2026-09-28T11:58:00.000Z',
+        });
+        const world = createWorld(session);
+
+        expect(await errorCode(execute(world))).toBe('AI_REFINEMENT_PENDING');
+        expect(world.planner.planRefinement).not.toHaveBeenCalled();
+        expect(world.catalogs.forMarket).not.toHaveBeenCalled();
+        expect(world.generator.execute).not.toHaveBeenCalled();
+        expect(world.sessions.acquireRefinementLock).not.toHaveBeenCalled();
+        expect(world.sessions.saveIfUnchanged).not.toHaveBeenCalled();
+        expect(world.store.get(TOKEN)).toBe(session);
+      },
+    );
+
+    it('refuses a refinement whose pending state appears after the lease is acquired', async () => {
+      const world = createWorld();
+      const [, pendingRefinement] = pendingStates[0];
+      world.sessions.acquireRefinementLock.mockImplementationOnce(() => {
+        const current = world.store.get(TOKEN) as AiSession;
+        world.store.set(TOKEN, { ...current, pendingRefinement });
+        return Promise.resolve<string | null>('lock-1');
+      });
+
+      expect(await errorCode(execute(world))).toBe('AI_REFINEMENT_PENDING');
+      expect(world.planner.planRefinement).not.toHaveBeenCalled();
+      expect(world.generator.execute).not.toHaveBeenCalled();
+      expect(world.sessions.saveIfUnchanged).not.toHaveBeenCalled();
+      expect(world.store.get(TOKEN)?.pendingRefinement).toBe(pendingRefinement);
+      expect(world.sessions.releaseRefinementLock).toHaveBeenCalledWith(
+        TOKEN,
+        'lock-1',
+      );
+    });
+  });
+
   it('reads the per-session limit from configuration', async () => {
     const world = createWorld(storedSession({ refinementAttempts: 1 }), {
       AI_REFINEMENTS_PER_SESSION: '2',
     });
 
     await execute(world);
+    world.dismissPending();
 
     expect(await errorCode(execute(world))).toBe('AI_REFINEMENT_LIMIT_REACHED');
     expect(world.planner.planRefinement).toHaveBeenCalledTimes(1);
@@ -939,9 +1058,10 @@ describe('ProposeAiRefinementUseCase', () => {
       expect(world.generator.execute).not.toHaveBeenCalled();
     });
 
-    it('interprets a new refinement against the applied intent while a candidate is pending, without candidate data', async () => {
+    it('interprets the next refinement against the applied intent after a candidate is dismissed, without candidate data', async () => {
       const world = createWorld();
       await execute(world);
+      world.dismissPending();
       world.planner.planRefinement.mockClear();
 
       await execute(world);

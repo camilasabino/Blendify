@@ -51,6 +51,9 @@ const AI_SESSION_ERROR_STATUS: Record<AiSessionErrorCode, number> = {
   AI_REFINEMENT_IN_PROGRESS: HttpStatus.CONFLICT,
   AI_REFINEMENT_LIMIT_REACHED: HttpStatus.CONFLICT,
   AI_REFINEMENT_SUPERSEDED: HttpStatus.CONFLICT,
+  AI_REFINEMENT_PENDING: HttpStatus.CONFLICT,
+  AI_REFINEMENT_STALE: HttpStatus.CONFLICT,
+  AI_REFINEMENT_NOT_APPLICABLE: HttpStatus.CONFLICT,
 };
 
 export function toApiErrorResponse(exception: unknown): ApiErrorResponse {

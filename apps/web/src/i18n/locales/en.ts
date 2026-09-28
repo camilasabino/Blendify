@@ -597,6 +597,174 @@ export const en = {
   'ai.destination.failed': 'Couldn’t save the playlist to Spotify. Try again.',
   'ai.destination.reconnect':
     'Spotify needs you to connect again before saving this playlist. The preview stays here.',
+  'ai.refine.open':
+    'Refine playlist',
+  'ai.refine.openHint':
+    'Change this preview before you save it. Nothing changes until you apply the proposal.',
+  'ai.refine.title':
+    'Refine playlist',
+  'ai.refine.label':
+    'What would you like to change?',
+  'ai.refine.hint':
+    'Describe the change in your own words. Blendify shows the proposed playlist before anything changes.',
+  'ai.refine.placeholder':
+    'For example: make it less mainstream and remove Coldplay',
+  'ai.refine.required':
+    'Describe what you’d like to change first.',
+  'ai.refine.examplesLabel':
+    'Try an example',
+  'ai.refine.example.lessMainstream':
+    'Make it less mainstream',
+  'ai.refine.example.removeArtist':
+    'Remove Coldplay',
+  'ai.refine.example.keepFirst':
+    'Keep the first five songs',
+  'ai.refine.example.trackCount':
+    'Make it 20 songs',
+  'ai.refine.submit':
+    'Propose changes',
+  'ai.refine.refining':
+    'Refining playlist…',
+  'ai.refine.cancel':
+    'Cancel',
+  'ai.refine.keepHint':
+    'Select songs below to keep them in their current position.',
+  'ai.refine.keepSelected':
+    'Songs selected to keep: {count}',
+  'ai.refine.keptAlready':
+    'Songs already kept in place: {count}',
+  'ai.refine.keepLabel':
+    'Keep',
+  'ai.refine.keepTrack':
+    'Keep “{track}” in place',
+  'ai.refine.kept':
+    'Kept',
+  'ai.refine.keptTrack':
+    '“{track}” is kept in place by an earlier change',
+  'ai.refine.applied':
+    'Changes applied. This is now your current playlist.',
+  'ai.refine.dismissed':
+    'Your current playlist is unchanged.',
+  'ai.refine.pendingDestination':
+    'Finish or dismiss the current refinement before saving this playlist.',
+  'ai.refine.review.title':
+    'Proposed changes',
+  'ai.refine.review.subtitle':
+    'Nothing has changed yet. Apply the changes to update your playlist, or cancel to keep the current one.',
+  'ai.refine.review.apply':
+    'Apply changes',
+  'ai.refine.review.applying':
+    'Applying changes…',
+  'ai.refine.review.cancel':
+    'Cancel',
+  'ai.refine.review.dismissing':
+    'Discarding…',
+  'ai.refine.review.proposedPlaylist':
+    'Proposed playlist',
+  'ai.refine.review.proposedTrackList':
+    'Songs in the proposed playlist',
+  'ai.refine.review.notApplied':
+    'Not applied',
+  'ai.refine.review.notAppliedHint':
+    'These parts of your refinement aren’t supported, so they weren’t applied.',
+  'ai.refine.diff.settings':
+    'Settings',
+  'ai.refine.diff.tracks':
+    'Playlist',
+  'ai.refine.diff.to':
+    'changed to',
+  'ai.refine.diff.added':
+    'Added',
+  'ai.refine.diff.removed':
+    'Removed',
+  'ai.refine.diff.moved':
+    'Moved',
+  'ai.refine.diff.retained':
+    'Retained',
+  'ai.refine.diff.replacements':
+    'Replacements',
+  'ai.refine.diff.kept':
+    'Kept in place',
+  'ai.refine.diff.songCount':
+    'Songs',
+  'ai.refine.diff.length':
+    'Length',
+  'ai.refine.diff.movedFrom':
+    'Moved from position {from} to {to}',
+  'ai.refine.diff.addedItems':
+    'Added: {items}',
+  'ai.refine.diff.removedItems':
+    'Removed: {items}',
+  'ai.refine.diff.notSet':
+    'Not set',
+  'ai.refine.diff.noMood':
+    'No mood',
+  'ai.refine.diff.defaultOrder':
+    'Default order',
+  'ai.refine.diff.details':
+    'Show song changes',
+  'ai.refine.field.kind':
+    'Playlist type',
+  'ai.refine.field.artists':
+    'Artists',
+  'ai.refine.field.genres':
+    'Genres',
+  'ai.refine.field.seedTracks':
+    'Starting song',
+  'ai.refine.field.excludeArtists':
+    'Avoiding artists',
+  'ai.refine.field.excludeTracks':
+    'Avoiding songs',
+  'ai.refine.kind.artist_mix':
+    'Artist mix',
+  'ai.refine.kind.genre_mix':
+    'Genre mix',
+  'ai.refine.kind.discover_artist':
+    'Discover from an artist',
+  'ai.refine.kind.discover_track':
+    'Discover from a song',
+  'ai.refine.failed.title':
+    'Couldn’t prepare these changes',
+  'ai.refine.failed.hint':
+    'Your current playlist hasn’t changed.',
+  'ai.refine.dismiss':
+    'Dismiss',
+  'ai.refine.clarify.title':
+    'This change needs another try',
+  'ai.refine.tryAgain':
+    'Try a different refinement',
+  'ai.refine.continue':
+    'Continue with current playlist',
+  'ai.refine.unchanged.title':
+    'No changes needed',
+  'ai.refine.unchanged.body':
+    'Your playlist already matches that request, so Blendify didn’t change anything.',
+  'ai.refine.clarify.conflicting':
+    'Some of these changes contradict each other. Try a different refinement.',
+  'ai.refine.clarify.conflictingNamed':
+    'These changes contradict each other or the songs you’re keeping: {names}.',
+  'ai.refine.clarify.conflictingLimit':
+    'The songs you’re keeping don’t fit in a playlist of {limit} songs.',
+  'ai.refine.clarify.outOfRange':
+    'This playlist has {limit} songs, so Blendify can’t keep a song beyond that position.',
+  'ai.refine.clarify.artistNotKept':
+    'There are no songs by {names} in the current playlist to keep.',
+  'ai.refine.error.inProgress':
+    'This playlist is already being refined. Wait a moment and try again.',
+  'ai.refine.error.limit':
+    'This playlist can’t be refined any further. Save it as it is or start over.',
+  'ai.refine.error.superseded':
+    'This playlist changed while Blendify was reading your refinement. Try again.',
+  'ai.refine.error.unavailable':
+    'This playlist was already saved or transferred, so it can’t be refined. Start over to create another version.',
+  'ai.refine.error.pending':
+    'Another change to this playlist is waiting for your review. Apply or dismiss it before refining again.',
+  'ai.refine.error.stale':
+    'That proposal is no longer current. Blendify loaded the latest version of your playlist.',
+  'ai.refine.error.generic':
+    'Couldn’t refine the playlist. Try again.',
+  'ai.refine.error.settle':
+    'Couldn’t update the playlist. Try again.',
 } as const
 
 export type MessageKey = keyof typeof en

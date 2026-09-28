@@ -1,6 +1,7 @@
 import {
   AiGenerationSchema,
   AiGenerationStreamEventSchema,
+  AiRefinementResultSchema,
   AiSessionSchema,
   AiSessionStateSchema,
   GeneratedPlaylistSchema,
@@ -9,6 +10,8 @@ import {
   PlaylistDetailSchema,
   PlaylistTransferSchema,
   type AiGenerationDto,
+  type AiRefinementResultDto,
+  type CreateAiRefinementRequest,
   type AiSessionDto,
   type AiSessionStateDto,
   type PublishAiPlaylistRequest,
@@ -136,14 +139,32 @@ async function requestAiSession(
 async function requestAiSessionState(
   path: string,
   body?: PublishAiPlaylistRequest | TransferAiPlaylistRequest,
+  method: 'GET' | 'POST' = body ? 'POST' : 'GET',
 ): Promise<AiSessionState> {
   const parsed = AiSessionStateSchema.safeParse(
-    await request<unknown>(path, body ? { method: 'POST', body } : {}),
+    await request<unknown>(path, body ? { method, body } : { method }),
   )
   if (!parsed.success) {
     throw new ApiError('Invalid Create with AI response', 502)
   }
   return parsed.data
+}
+
+async function requestAiRefinement(
+  path: string,
+  body: CreateAiRefinementRequest,
+): Promise<AiRefinementResultDto> {
+  const parsed = AiRefinementResultSchema.safeParse(
+    await request<unknown>(path, { method: 'POST', body }),
+  )
+  if (!parsed.success) {
+    throw new ApiError('Invalid Create with AI response', 502)
+  }
+  return parsed.data
+}
+
+function refinementPath(sessionId: string, refinementId: string, action: 'apply' | 'dismiss') {
+  return `/api/ai/sessions/${encodeURIComponent(sessionId)}/refinements/${encodeURIComponent(refinementId)}/${action}`
 }
 
 const AI_GENERATION: GenerationContract<AiGeneration> = {
@@ -444,6 +465,18 @@ export const api = {
       `/api/ai/sessions/${encodeURIComponent(sessionId)}/transfer`,
       input,
     ),
+
+  refineAiPlaylist: (sessionId: string, input: CreateAiRefinementRequest) =>
+    requestAiRefinement(
+      `/api/ai/sessions/${encodeURIComponent(sessionId)}/refinements`,
+      input,
+    ),
+
+  applyAiRefinement: (sessionId: string, refinementId: string) =>
+    requestAiSessionState(refinementPath(sessionId, refinementId, 'apply'), undefined, 'POST'),
+
+  dismissAiRefinement: (sessionId: string, refinementId: string) =>
+    requestAiSessionState(refinementPath(sessionId, refinementId, 'dismiss'), undefined, 'POST'),
 
   generateAiPlaylist: (sessionId: string, options: GenerationOptions = {}) =>
     requestGeneration(

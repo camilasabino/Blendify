@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import {
   AI_SESSION_RECORD_VERSION,
@@ -8,6 +8,8 @@ import {
 } from '@/domain/ai/ai-session';
 import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import { RedisConnection } from '@/infrastructure/cache/redis-connection';
+import { ApplyAiRefinementUseCase } from '@/application/use-cases/apply-ai-refinement.use-case';
+import { DismissAiRefinementUseCase } from '@/application/use-cases/dismiss-ai-refinement.use-case';
 import { RedisAiSessionRepository } from './redis-ai-session.repository';
 
 const redisUrl = process.env.REDIS_TEST_URL;
@@ -77,6 +79,7 @@ function withPendingCandidate(base: AiSession): AiSession {
       result: RESULT,
     },
     pendingRefinement: {
+      id: 'refinement-1',
       status: 'proposed',
       promptVersion: 'refinement-v2',
       proposedAt: base.updatedAt,
@@ -296,6 +299,131 @@ describeWithRedis(
       ).resolves.toBe(true);
       await expect(repository.find(token)).resolves.toEqual(settled);
       await repository.releaseRefinementLock(token, newer ?? '');
+    });
+    describe('settling a pending refinement', () => {
+      const command = (token: string, refinementId = 'refinement-1') => ({
+        token,
+        userId: 'user-1',
+        refinementId,
+      });
+
+      function sessionTtlMs(token: string): Promise<number> {
+        const digest = createHash('sha256').update(token).digest('hex');
+        const client = connection.readyClient();
+        if (!client) {
+          throw new Error('Redis is not ready');
+        }
+        return client.pttl(`blendify:ai:session:${digest}`);
+      }
+
+      function candidateOf(stored: AiSession) {
+        const pending = stored.pendingRefinement;
+        if (
+          pending?.status !== 'proposed' ||
+          pending.candidate.status !== 'ready'
+        ) {
+          throw new Error('Expected a ready pending candidate');
+        }
+        return { ...pending, result: pending.candidate.result };
+      }
+
+      it('applies a persisted candidate in one write, keeps the TTL bounded and restores it', async () => {
+        const token = randomUUID();
+        const pending = withPendingCandidate(session(null));
+        const candidate = candidateOf(pending);
+        await repository.save(token, pending, 60_000);
+
+        await new ApplyAiRefinementUseCase(repository).execute(command(token));
+
+        const restored = await repository.find(token);
+        expect(restored).toMatchObject({
+          aiSafe: {
+            intent: candidate.aiSafe.intent,
+            preservation: candidate.aiSafe.preservation,
+          },
+          execution: { status: 'generated', result: candidate.result },
+          pendingRefinement: null,
+          destination: null,
+          originalPrompt: pending.originalPrompt,
+          refinementAttempts: pending.refinementAttempts,
+          expiresAt: pending.expiresAt,
+        });
+        const ttl = await sessionTtlMs(token);
+        expect(ttl).toBeGreaterThan(0);
+        expect(ttl).toBeLessThanOrEqual(
+          Date.parse(pending.expiresAt) - Date.now() + 1_000,
+        );
+      });
+
+      it('dismisses a persisted candidate and restores the unchanged current playlist', async () => {
+        const token = randomUUID();
+        const pending = withPendingCandidate(session(null));
+        await repository.save(token, pending, 60_000);
+
+        await new DismissAiRefinementUseCase(repository).execute(
+          command(token),
+        );
+
+        const restored = await repository.find(token);
+        expect(restored).toMatchObject({
+          aiSafe: pending.aiSafe,
+          execution: pending.execution,
+          pendingRefinement: null,
+        });
+        expect(await sessionTtlMs(token)).toBeGreaterThan(0);
+      });
+
+      it('rejects a stale refinement id and leaves the newer pending refinement untouched', async () => {
+        const token = randomUUID();
+        const base = withPendingCandidate(session(null));
+        const newer: AiSession = {
+          ...base,
+          pendingRefinement: {
+            ...(base.pendingRefinement as NonNullable<
+              AiSession['pendingRefinement']
+            >),
+            id: 'refinement-2',
+          },
+        };
+        await repository.save(token, newer, 60_000);
+
+        for (const useCase of [
+          new ApplyAiRefinementUseCase(repository),
+          new DismissAiRefinementUseCase(repository),
+        ]) {
+          await expect(useCase.execute(command(token))).rejects.toMatchObject({
+            code: 'AI_REFINEMENT_STALE',
+          });
+        }
+        await expect(repository.find(token)).resolves.toEqual(newer);
+      });
+
+      it('lets exactly one of a racing apply and dismiss settle the candidate', async () => {
+        const token = randomUUID();
+        const pending = withPendingCandidate(session(null));
+        const candidate = candidateOf(pending);
+        await repository.save(token, pending, 60_000);
+
+        const outcomes = await Promise.allSettled([
+          new ApplyAiRefinementUseCase(repository).execute(command(token)),
+          new DismissAiRefinementUseCase(repository).execute(command(token)),
+        ]);
+
+        expect(
+          outcomes.filter((outcome) => outcome.status === 'fulfilled'),
+        ).toHaveLength(1);
+        const restored = await repository.find(token);
+        expect(restored?.pendingRefinement).toBeNull();
+        const applied = outcomes[0].status === 'fulfilled';
+        expect(restored?.execution).toEqual(
+          applied
+            ? expect.objectContaining({ result: candidate.result })
+            : pending.execution,
+        );
+        expect(restored?.aiSafe.intent).toEqual(
+          applied ? candidate.aiSafe.intent : pending.aiSafe.intent,
+        );
+      });
     });
   },
 );

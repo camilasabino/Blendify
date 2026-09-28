@@ -10,7 +10,10 @@ export type AiSessionErrorCode =
   | 'AI_REFINEMENT_UNAVAILABLE'
   | 'AI_REFINEMENT_IN_PROGRESS'
   | 'AI_REFINEMENT_LIMIT_REACHED'
-  | 'AI_REFINEMENT_SUPERSEDED';
+  | 'AI_REFINEMENT_SUPERSEDED'
+  | 'AI_REFINEMENT_PENDING'
+  | 'AI_REFINEMENT_STALE'
+  | 'AI_REFINEMENT_NOT_APPLICABLE';
 
 export class AiSessionError extends Error {
   private constructor(
@@ -73,8 +76,29 @@ export class AiSessionError extends Error {
 
   static destinationBlockedByRefinement(): AiSessionError {
     return new AiSessionError(
-      'AI_DESTINATION_UNAVAILABLE',
-      'Apply or cancel the proposed changes before saving or transferring this playlist.',
+      'AI_REFINEMENT_PENDING',
+      'Finish or dismiss the current refinement before saving or transferring this playlist.',
+    );
+  }
+
+  static refinementPending(): AiSessionError {
+    return new AiSessionError(
+      'AI_REFINEMENT_PENDING',
+      'Apply or dismiss the current refinement before requesting another one.',
+    );
+  }
+
+  static refinementStale(): AiSessionError {
+    return new AiSessionError(
+      'AI_REFINEMENT_STALE',
+      'This refinement is no longer the current one. Review the latest version of the playlist.',
+    );
+  }
+
+  static refinementNotApplicable(): AiSessionError {
+    return new AiSessionError(
+      'AI_REFINEMENT_NOT_APPLICABLE',
+      'Only a ready proposed playlist can be applied.',
     );
   }
 

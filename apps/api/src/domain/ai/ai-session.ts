@@ -15,7 +15,7 @@ import { findIntentClarification } from './ai-intent-rules';
 import type { AiRefinementClarification } from './ai-refinement';
 import type { AiRefinementDiff } from './ai-refinement-diff';
 
-export const AI_SESSION_RECORD_VERSION = 7;
+export const AI_SESSION_RECORD_VERSION = 8;
 export const AI_GENERATION_INTERRUPTED_CODE = 'AI_GENERATION_INTERRUPTED';
 
 export interface AiGenerationFailure {
@@ -109,6 +109,7 @@ export type AiRefinementOutcome =
 
 export type AiPendingRefinement =
   | {
+      id: string;
       status: 'proposed';
       promptVersion: string;
       proposedAt: string;
@@ -120,15 +121,27 @@ export type AiPendingRefinement =
       candidate: AiRefinementCandidate;
     }
   | {
+      id: string;
       status: 'needs_clarification';
       promptVersion: string;
       proposedAt: string;
       clarification: AiRefinementClarification;
     }
-  | { status: 'unchanged'; promptVersion: string; proposedAt: string };
+  | {
+      id: string;
+      status: 'unchanged';
+      promptVersion: string;
+      proposedAt: string;
+    };
 
 export type AiRefinementBlocker =
-  'not_reviewed' | 'not_generated' | 'destination_exists';
+  | 'not_reviewed'
+  | 'not_generated'
+  | 'destination_exists'
+  | 'refinement_pending';
+
+export type AiRefinementSettlementBlocker =
+  'stale' | 'not_applicable' | 'destination_exists';
 
 export interface AiSession {
   version: typeof AI_SESSION_RECORD_VERSION;
@@ -370,6 +383,9 @@ export function refinementBlocker(
   if (session.destination !== null) {
     return 'destination_exists';
   }
+  if (session.pendingRefinement !== null) {
+    return 'refinement_pending';
+  }
   return null;
 }
 
@@ -387,26 +403,88 @@ export function withRefinementAttempt(
 export function withPendingRefinement(
   session: AiSession,
   outcome: AiRefinementOutcome,
-  promptVersion: string,
+  pending: { id: string; promptVersion: string },
   now: Date,
 ): AiSession {
   const proposedAt = now.toISOString();
 
   return {
     ...session,
-    pendingRefinement: pendingRefinementOf(outcome, promptVersion, proposedAt),
+    pendingRefinement: pendingRefinementOf(outcome, {
+      ...pending,
+      proposedAt,
+    }),
     updatedAt: proposedAt,
   };
 }
 
+export function refinementApplyBlocker(
+  session: AiSession,
+  refinementId: string,
+): AiRefinementSettlementBlocker | null {
+  const pending = session.pendingRefinement;
+  if (pending?.id !== refinementId) {
+    return 'stale';
+  }
+  if (session.destination !== null) {
+    return 'destination_exists';
+  }
+  if (pending.status !== 'proposed' || pending.candidate.status !== 'ready') {
+    return 'not_applicable';
+  }
+  return null;
+}
+
+export function refinementDismissBlocker(
+  session: AiSession,
+  refinementId: string,
+): AiRefinementSettlementBlocker | null {
+  return session.pendingRefinement?.id === refinementId ? null : 'stale';
+}
+
+export function withAppliedRefinement(
+  session: AiSession,
+  now: Date,
+): AiSession {
+  const pending = session.pendingRefinement;
+  if (pending?.status !== 'proposed' || pending.candidate.status !== 'ready') {
+    throw new Error('Only a ready refinement candidate can be applied.');
+  }
+
+  return {
+    ...session,
+    aiSafe: {
+      intent: pending.aiSafe.intent,
+      preservation: pending.aiSafe.preservation,
+    },
+    execution: {
+      status: 'generated',
+      startedAt: pending.proposedAt,
+      completedAt: pending.proposedAt,
+      result: pending.candidate.result,
+    },
+    pendingRefinement: null,
+    updatedAt: now.toISOString(),
+  };
+}
+
+export function withDismissedRefinement(
+  session: AiSession,
+  now: Date,
+): AiSession {
+  return { ...session, pendingRefinement: null, updatedAt: now.toISOString() };
+}
+
 function pendingRefinementOf(
   outcome: AiRefinementOutcome,
-  promptVersion: string,
-  proposedAt: string,
+  pending: { id: string; promptVersion: string; proposedAt: string },
 ): AiPendingRefinement {
+  const { id, promptVersion, proposedAt } = pending;
+
   switch (outcome.status) {
     case 'proposed':
       return {
+        id,
         status: 'proposed',
         promptVersion,
         proposedAt,
@@ -419,12 +497,13 @@ function pendingRefinementOf(
       };
     case 'needs_clarification':
       return {
+        id,
         status: 'needs_clarification',
         promptVersion,
         proposedAt,
         clarification: outcome.clarification,
       };
     case 'unchanged':
-      return { status: 'unchanged', promptVersion, proposedAt };
+      return { id, status: 'unchanged', promptVersion, proposedAt };
   }
 }

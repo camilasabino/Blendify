@@ -1,6 +1,6 @@
 import { useId, type ReactNode, type RefObject } from 'react'
 import { CircleCheck } from 'lucide-react'
-import type { AiIntentSummary, AiSessionDestinationDto } from '@blendify/contracts'
+import type { AiIntentSummary, AiSessionDestinationDto, TrackDto } from '@blendify/contracts'
 import { LastFmAttribution } from '@/components/brand/lastfm-attribution'
 import { SpotifyLogo } from '@/components/brand/spotify-mark'
 import { GeneratedTrackList } from '@/components/playlist/generated-track-list'
@@ -24,6 +24,8 @@ type AiGeneratedPlaylistProps = Readonly<{
   destination: AiSessionDestinationDto | null
   headingRef: RefObject<HTMLHeadingElement | null>
   onStartOver: () => void
+  showTracks?: boolean
+  trackAccessory?: (track: TrackDto, position: number) => ReactNode
   children: ReactNode
 }>
 
@@ -36,6 +38,8 @@ export function AiGeneratedPlaylist({
   destination,
   headingRef,
   onStartOver,
+  showTracks = true,
+  trackAccessory,
   children,
 }: AiGeneratedPlaylistProps) {
   const t = useT()
@@ -86,7 +90,7 @@ export function AiGeneratedPlaylist({
         </div>
       </div>
 
-      <AiUnmetConstraints constraints={result.unmetConstraints} />
+      {showTracks ? <AiUnmetConstraints constraints={result.unmetConstraints} /> : null}
 
       <div className="space-y-2">
         {isSpotifyDestination(destination) ? null : (
@@ -102,7 +106,9 @@ export function AiGeneratedPlaylist({
 
       {children}
 
-      <GeneratedTrackList tracks={playlist.tracks} />
+      {showTracks ? (
+        <GeneratedTrackList tracks={playlist.tracks} accessory={trackAccessory} />
+      ) : null}
 
       <div className="flex flex-wrap gap-2 border-t border-divider pt-4">
         <Button type="button" variant="ghost" size="sm" onClick={onStartOver}>

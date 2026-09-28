@@ -606,4 +606,172 @@ export const pt: Record<MessageKey, string> = {
     'Não foi possível salvar a playlist no Spotify. Tente de novo.',
   'ai.destination.reconnect':
     'O Spotify precisa que você se conecte de novo antes de salvar esta playlist. A prévia continua aqui.',
+  'ai.refine.open':
+    'Refinar playlist',
+  'ai.refine.openHint':
+    'Mude esta prévia antes de salvá-la. Nada muda até você aplicar a proposta.',
+  'ai.refine.title':
+    'Refinar playlist',
+  'ai.refine.label':
+    'O que você gostaria de mudar?',
+  'ai.refine.hint':
+    'Descreva a mudança com suas palavras. O Blendify mostra a playlist proposta antes de mudar qualquer coisa.',
+  'ai.refine.placeholder':
+    'Por exemplo: menos conhecida e sem Coldplay',
+  'ai.refine.required':
+    'Primeiro descreva o que você gostaria de mudar.',
+  'ai.refine.examplesLabel':
+    'Experimente um exemplo',
+  'ai.refine.example.lessMainstream':
+    'Deixe menos conhecida',
+  'ai.refine.example.removeArtist':
+    'Tire o Coldplay',
+  'ai.refine.example.keepFirst':
+    'Mantenha as cinco primeiras músicas',
+  'ai.refine.example.trackCount':
+    'Deixe com 20 músicas',
+  'ai.refine.submit':
+    'Propor mudanças',
+  'ai.refine.refining':
+    'Refinando a playlist…',
+  'ai.refine.cancel':
+    'Cancelar',
+  'ai.refine.keepHint':
+    'Selecione músicas abaixo para mantê-las na posição atual.',
+  'ai.refine.keepSelected':
+    'Músicas selecionadas para manter: {count}',
+  'ai.refine.keptAlready':
+    'Músicas já mantidas no lugar: {count}',
+  'ai.refine.keepLabel':
+    'Manter',
+  'ai.refine.keepTrack':
+    'Manter “{track}” no lugar',
+  'ai.refine.kept':
+    'Mantida',
+  'ai.refine.keptTrack':
+    '“{track}” é mantida no lugar por uma mudança anterior',
+  'ai.refine.applied':
+    'Mudanças aplicadas. Esta agora é a sua playlist atual.',
+  'ai.refine.dismissed':
+    'Sua playlist atual não mudou.',
+  'ai.refine.pendingDestination':
+    'Conclua ou descarte o refinamento atual antes de salvar esta playlist.',
+  'ai.refine.review.title':
+    'Mudanças propostas',
+  'ai.refine.review.subtitle':
+    'Nada mudou ainda. Aplique as mudanças para atualizar sua playlist ou cancele para ficar com a atual.',
+  'ai.refine.review.apply':
+    'Aplicar mudanças',
+  'ai.refine.review.applying':
+    'Aplicando mudanças…',
+  'ai.refine.review.cancel':
+    'Cancelar',
+  'ai.refine.review.dismissing':
+    'Descartando…',
+  'ai.refine.review.proposedPlaylist':
+    'Playlist proposta',
+  'ai.refine.review.proposedTrackList':
+    'Músicas da playlist proposta',
+  'ai.refine.review.notApplied':
+    'Não aplicado',
+  'ai.refine.review.notAppliedHint':
+    'Estas partes do seu refinamento ainda não são compatíveis, então não foram aplicadas.',
+  'ai.refine.diff.settings':
+    'Configurações',
+  'ai.refine.diff.tracks':
+    'Playlist',
+  'ai.refine.diff.to':
+    'muda para',
+  'ai.refine.diff.added':
+    'Adicionadas',
+  'ai.refine.diff.removed':
+    'Removidas',
+  'ai.refine.diff.moved':
+    'Movidas',
+  'ai.refine.diff.retained':
+    'Mantidas',
+  'ai.refine.diff.replacements':
+    'Substituições',
+  'ai.refine.diff.kept':
+    'Mantidas no lugar',
+  'ai.refine.diff.songCount':
+    'Músicas',
+  'ai.refine.diff.length':
+    'Duração',
+  'ai.refine.diff.movedFrom':
+    'Movida da posição {from} para a {to}',
+  'ai.refine.diff.addedItems':
+    'Adicionado: {items}',
+  'ai.refine.diff.removedItems':
+    'Removido: {items}',
+  'ai.refine.diff.notSet':
+    'Não definido',
+  'ai.refine.diff.noMood':
+    'Sem clima',
+  'ai.refine.diff.defaultOrder':
+    'Ordem padrão',
+  'ai.refine.diff.details':
+    'Ver mudanças nas músicas',
+  'ai.refine.field.kind':
+    'Tipo de playlist',
+  'ai.refine.field.artists':
+    'Artistas',
+  'ai.refine.field.genres':
+    'Gêneros',
+  'ai.refine.field.seedTracks':
+    'Música de partida',
+  'ai.refine.field.excludeArtists':
+    'Artistas evitados',
+  'ai.refine.field.excludeTracks':
+    'Músicas evitadas',
+  'ai.refine.kind.artist_mix':
+    'Mix de artistas',
+  'ai.refine.kind.genre_mix':
+    'Mix de gêneros',
+  'ai.refine.kind.discover_artist':
+    'Descobrir a partir de um artista',
+  'ai.refine.kind.discover_track':
+    'Descobrir a partir de uma música',
+  'ai.refine.failed.title':
+    'Não foi possível preparar estas mudanças',
+  'ai.refine.failed.hint':
+    'Sua playlist atual não mudou.',
+  'ai.refine.dismiss':
+    'Descartar',
+  'ai.refine.clarify.title':
+    'Esta mudança precisa de outra tentativa',
+  'ai.refine.tryAgain':
+    'Tentar outro refinamento',
+  'ai.refine.continue':
+    'Continuar com a playlist atual',
+  'ai.refine.unchanged.title':
+    'Nenhuma mudança necessária',
+  'ai.refine.unchanged.body':
+    'Sua playlist já atende a esse pedido, então o Blendify não mudou nada.',
+  'ai.refine.clarify.conflicting':
+    'Algumas destas mudanças se contradizem. Tente outro refinamento.',
+  'ai.refine.clarify.conflictingNamed':
+    'Estas mudanças se contradizem entre si ou com as músicas que você está mantendo: {names}.',
+  'ai.refine.clarify.conflictingLimit':
+    'As músicas que você está mantendo não cabem em uma playlist de {limit} músicas.',
+  'ai.refine.clarify.outOfRange':
+    'Esta playlist tem {limit} músicas, então o Blendify não pode manter uma música além dessa posição.',
+  'ai.refine.clarify.artistNotKept':
+    'Não há músicas de {names} na playlist atual para manter.',
+  'ai.refine.error.inProgress':
+    'Esta playlist já está sendo refinada. Aguarde um momento e tente de novo.',
+  'ai.refine.error.limit':
+    'Esta playlist não pode mais ser refinada. Salve-a assim ou comece de novo.',
+  'ai.refine.error.superseded':
+    'Esta playlist mudou enquanto o Blendify lia seu refinamento. Tente de novo.',
+  'ai.refine.error.unavailable':
+    'Esta playlist já foi salva ou transferida, então não pode ser refinada. Comece de novo para criar outra versão.',
+  'ai.refine.error.pending':
+    'Há outra mudança nesta playlist aguardando sua revisão. Aplique ou descarte antes de refinar de novo.',
+  'ai.refine.error.stale':
+    'Essa proposta não é mais a atual. O Blendify carregou a versão mais recente da sua playlist.',
+  'ai.refine.error.generic':
+    'Não foi possível refinar a playlist. Tente de novo.',
+  'ai.refine.error.settle':
+    'Não foi possível atualizar a playlist. Tente de novo.',
 }

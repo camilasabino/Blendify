@@ -3,7 +3,12 @@ import type { AiSessionStateDto } from '@blendify/contracts'
 import { expect, test } from './fixtures/test'
 import { mockAuthenticatedSession, mockGuestSession } from './fixtures/api-mocks'
 import {
+  AI_REFINEMENT_ID,
   AI_REVIEW_PROMPT,
+  appliedState,
+  candidateRefinement,
+  pendingState,
+  refinementResult,
   AI_REVIEW_SESSION_ID,
   clarificationState,
   failedState,
@@ -69,7 +74,7 @@ async function openRestored(page: Page, sessionState: AiSessionStateDto | null) 
 async function openReviewedLive(page: Page, sessionState: AiSessionStateDto) {
   await blockUnmockedRequests(page)
   await page.route('**/api/ai/sessions', (route) =>
-    route.fulfill({ status: 201, json: { ...sessionState, execution: undefined, destination: undefined, refinement: undefined } }),
+    route.fulfill({ status: 201, json: { ...sessionState, execution: undefined, destination: undefined, preservation: undefined, refinement: undefined } }),
   )
   await page.goto('/app/ai')
   await page.getByRole('textbox', { name: 'Playlist request' }).fill(AI_REVIEW_PROMPT)
@@ -414,5 +419,147 @@ test.describe('Create with AI visual review', () => {
     )
     await expect(page.getByRole('heading', { name: 'Couldn’t finish saving to Spotify' })).toBeVisible()
     await capture(page, '27-spotify-incomplete')
+  })
+  test.describe('refinement', () => {
+    const REFINE_URL = `${SESSION_URL}/refinements`
+    const candidate = () => candidateRefinement(generatedState({ withArtwork: true }))
+
+    async function openComposer(page: Page, sessionState = generatedState({ withArtwork: true })) {
+      await openRestored(page, sessionState)
+      await page.getByRole('button', { name: 'Refine playlist' }).click()
+      const textarea = page.getByRole('textbox', { name: 'What would you like to change?' })
+      await expect(textarea).toBeFocused()
+      return textarea
+    }
+
+    test('28 refine CTA', async ({ page }) => {
+      await openRestored(page, generatedState({ withArtwork: true }))
+      await expect(page.getByRole('button', { name: 'Refine playlist' })).toBeVisible()
+      await capture(page, '28-refine-cta')
+    })
+
+    test('29 refinement composer', async ({ page }) => {
+      const textarea = await openComposer(page)
+      await textarea.fill('Make it less mainstream, add some Argentine rock and remove Coldplay')
+      await capture(page, '29-refinement-composer')
+    })
+
+    test('30 refinement composer with kept songs', async ({ page }) => {
+      const base = generatedState({ withArtwork: true })
+      await openComposer(page, {
+        ...base,
+        preservation: { firstTracks: 2, positions: [4], artists: [], preservedPositions: [1, 2, 4] },
+      })
+      await page.getByRole('checkbox', { name: /Keep “Northbound Static”/ }).check()
+      await capture(page, '30-refinement-keep-controls')
+    })
+
+    test('31 refining', async ({ page }) => {
+      const textarea = await openComposer(page)
+      await page.route(REFINE_URL, () => new Promise<void>(() => undefined))
+      await textarea.fill('Make it less mainstream')
+      await page.getByRole('button', { name: 'Propose changes' }).click()
+      await expect(page.getByRole('button', { name: 'Refining playlist…' })).toBeDisabled()
+      await capture(page, '31-refining')
+    })
+
+    test('32 candidate ready with diff', async ({ page }) => {
+      await openRestored(page, pendingState(candidate(), generatedState({ withArtwork: true })))
+      await expect(page.getByRole('heading', { name: 'Proposed changes' })).toBeVisible()
+      await capture(page, '32-candidate-ready')
+    })
+
+    test('33 candidate song changes expanded', async ({ page }) => {
+      await openRestored(page, pendingState(candidate(), generatedState({ withArtwork: true })))
+      await page.getByText('Show song changes').click()
+      await page.getByRole('button', { name: /Show all/ }).click()
+      await expect(page.getByText('Proposed Horizon 1').first()).toBeVisible()
+      await capture(page, '33-candidate-song-changes')
+    })
+
+    test('34 applying', async ({ page }) => {
+      await openRestored(page, pendingState(candidate(), generatedState({ withArtwork: true })))
+      await page.route(`${REFINE_URL}/${AI_REFINEMENT_ID}/apply`, () => new Promise<void>(() => undefined))
+      await page.getByRole('button', { name: 'Apply changes' }).click()
+      await expect(page.getByRole('button', { name: 'Applying changes…' })).toBeDisabled()
+      await capture(page, '34-applying')
+    })
+
+    test('35 applied', async ({ page }) => {
+      const base = generatedState({ withArtwork: true })
+      await blockUnmockedRequests(page)
+      await restoreSession(page, pendingState(candidate(), base))
+      await page.route(`${REFINE_URL}/${AI_REFINEMENT_ID}/apply`, (route) =>
+        route.fulfill({ json: appliedState(candidate(), base) }),
+      )
+      await page.goto('/app/ai')
+      await page.getByRole('button', { name: 'Apply changes' }).click()
+      await expect(page.getByRole('button', { name: 'Refine playlist' })).toBeVisible()
+      await capture(page, '35-applied')
+    })
+
+    test('36 needs clarification', async ({ page }) => {
+      const textarea = await openComposer(page)
+      await page.route(REFINE_URL, (route) =>
+        route.fulfill({
+          json: refinementResult({
+            id: AI_REFINEMENT_ID,
+            status: 'needs_clarification',
+            clarification: {
+              reason: 'preserved_artist_not_found',
+              seedType: null,
+              limit: null,
+              names: ['Björk'],
+              unsupportedConstraints: [],
+            },
+          }),
+        }),
+      )
+      await textarea.fill('Keep the Björk songs')
+      await page.getByRole('button', { name: 'Propose changes' }).click()
+      await expect(page.getByRole('heading', { name: 'This change needs another try' })).toBeVisible()
+      await capture(page, '36-refinement-clarification')
+    })
+
+    test('37 unchanged', async ({ page }) => {
+      await openRestored(
+        page,
+        pendingState({ id: AI_REFINEMENT_ID, status: 'unchanged' }, generatedState({ withArtwork: true })),
+      )
+      await expect(page.getByRole('heading', { name: 'No changes needed' })).toBeVisible()
+      await capture(page, '37-refinement-unchanged')
+    })
+
+    test('38 candidate failed', async ({ page }) => {
+      const proposal = candidate()
+      await openRestored(
+        page,
+        pendingState(
+          {
+            id: AI_REFINEMENT_ID,
+            status: 'candidate_failed',
+            intent: proposal.intent,
+            preservation: proposal.preservation,
+            notApplied: [],
+            error: {
+              code: 'SPOTIFY_RATE_LIMITED',
+              category: 'provider_rate_limited',
+              retryAfterSeconds: 120,
+              seedNotFound: null,
+            },
+          },
+          generatedState({ withArtwork: true }),
+        ),
+      )
+      await expect(page.getByRole('heading', { name: 'Couldn’t prepare these changes' })).toBeVisible()
+      await capture(page, '38-candidate-failed')
+    })
+
+    test('39 Spotify Mode candidate ready', async ({ page }) => {
+      await openRestoredSpotify(page, pendingState(candidate(), generatedState({ withArtwork: true })))
+      await expect(page.getByRole('heading', { name: 'Proposed changes' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Save to Spotify' })).toHaveCount(0)
+      await capture(page, '39-spotify-candidate-ready')
+    })
   })
 })

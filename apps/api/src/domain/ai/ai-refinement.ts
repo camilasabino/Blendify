@@ -3,7 +3,11 @@ import type {
   AiRefinementClarificationReason,
   AiSeedType,
 } from '@blendify/contracts';
-import type { RefinementInterpretation } from '@blendify/contracts/ai-service';
+import type {
+  PositionListPatch,
+  PreservationPatch,
+  RefinementInterpretation,
+} from '@blendify/contracts/ai-service';
 import { constraintCapability } from './ai-capability-matrix';
 import type {
   AiIntent,
@@ -41,6 +45,7 @@ export interface AiRefinementInput {
   preservation: AiPreservation;
   interpretation: RefinementInterpretation;
   playlistTrackCount: number;
+  explicitPositions?: PositionListPatch;
 }
 
 export function evaluateRefinement(
@@ -55,9 +60,13 @@ export function evaluateRefinement(
     });
   }
 
+  const preservationPatch = withExplicitPositions(
+    interpretation.preservation,
+    input.explicitPositions,
+  );
   const conflicts = conflictingPatchLabels(
     interpretation.patch,
-    interpretation.preservation,
+    preservationPatch,
   );
   if (conflicts.length > 0) {
     return clarify('conflicting_changes', { names: conflicts });
@@ -83,7 +92,7 @@ export function evaluateRefinement(
 
   const preservation = applyPreservationPatch(
     input.preservation,
-    interpretation.preservation,
+    preservationPatch,
   );
   if (!fitsPlaylist(preservation, input.playlistTrackCount)) {
     return clarify('preserved_track_out_of_range', {
@@ -104,6 +113,26 @@ export function evaluateRefinement(
     });
   }
   return { status: 'unchanged' };
+}
+
+function withExplicitPositions(
+  patch: PreservationPatch,
+  explicit: PositionListPatch | undefined,
+): PreservationPatch {
+  if (!explicit) {
+    return patch;
+  }
+  return {
+    ...patch,
+    positions: {
+      add: uniquePositions([...patch.positions.add, ...explicit.add]),
+      remove: uniquePositions([...patch.positions.remove, ...explicit.remove]),
+    },
+  };
+}
+
+function uniquePositions(positions: number[]): number[] {
+  return [...new Set(positions)];
 }
 
 function fitsPlaylist(

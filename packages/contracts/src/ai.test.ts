@@ -3,9 +3,12 @@ import {
   AI_MOODS,
   AI_PROMPT_MAX_LENGTH,
   AI_REFINEMENT_CLARIFICATION_REASONS,
+  AI_REFINEMENT_ID_MAX_LENGTH,
   AI_REFINEMENT_MAX_LENGTH,
+  AiCurrentPreservationSchema,
   AiGenerationSchema,
   AiGenerationStreamEventSchema,
+  AiRefinementIdSchema,
   AiRefinementResultSchema,
   AiSessionSchema,
   AiSessionStateSchema,
@@ -328,6 +331,12 @@ describe('AI session state contract', () => {
   const generated = {
     ...READY_SESSION,
     execution: { status: 'generated', ...outcome },
+    preservation: {
+      firstTracks: null,
+      positions: [],
+      artists: [],
+      preservedPositions: [],
+    },
     refinement: null,
   };
 
@@ -388,7 +397,7 @@ describe('AI session state contract', () => {
         },
       },
     ]) {
-      const restored = { refinement: null, ...state };
+      const restored = { refinement: null, preservation: null, ...state };
       expect(AiSessionStateSchema.parse(restored)).toEqual(restored);
     }
   });
@@ -454,6 +463,7 @@ describe('AI session state contract', () => {
           ...READY_SESSION,
           execution,
           destination: null,
+          preservation: null,
           refinement: null,
         }).success,
       ).toBe(false);
@@ -463,6 +473,7 @@ describe('AI session state contract', () => {
         ...READY_SESSION,
         execution: undefined,
         destination: null,
+        preservation: null,
         refinement: null,
       }).success,
     ).toBe(false);
@@ -575,6 +586,7 @@ describe('AI refinement contracts', () => {
     sessionId: 'opaque-session-token',
     expiresAt: '2026-09-27T12:30:00.000Z',
     refinement: {
+      id: '5f0c7a8e-2d4b-4f7a-9d1e-3b6c8a2f4e10',
       status: 'candidate_ready',
       intent: { ...READY_SESSION.intent, popularity: 'rarities' },
       preservation: { firstTracks: 5, positions: [8], artists: ['Radiohead'] },
@@ -626,10 +638,54 @@ describe('AI refinement contracts', () => {
         transferAvailable: false,
       },
       destination: null,
+      preservation: {
+        firstTracks: 2,
+        positions: [5],
+        artists: ['Radiohead'],
+        preservedPositions: [1, 2, 4, 5],
+      },
       refinement: PROPOSED.refinement,
     };
 
     expect(AiSessionStateSchema.parse(state)).toEqual(state);
+  });
+
+  it('identifies every pending refinement with an opaque id only', () => {
+    const { id: _id, ...withoutId } = PROPOSED.refinement;
+
+    expect(
+      AiRefinementResultSchema.safeParse({ ...PROPOSED, refinement: withoutId })
+        .success,
+    ).toBe(false);
+    for (const id of ['', 'a'.repeat(AI_REFINEMENT_ID_MAX_LENGTH + 1), 'a/b', 'a b']) {
+      expect(
+        AiRefinementResultSchema.safeParse({
+          ...PROPOSED,
+          refinement: { ...PROPOSED.refinement, id },
+        }).success,
+      ).toBe(false);
+    }
+    expect(AiRefinementIdSchema.safeParse(PROPOSED.refinement.id).success).toBe(true);
+  });
+
+  it('keeps the current preservation to constraints and effective positions', () => {
+    const current = {
+      firstTracks: null,
+      positions: [2],
+      artists: [],
+      preservedPositions: [2],
+    };
+
+    expect(AiCurrentPreservationSchema.parse(current)).toEqual(current);
+    expect(
+      AiCurrentPreservationSchema.safeParse({ ...current, trackIds: ['x'] }).success,
+    ).toBe(false);
+    expect(
+      AiCurrentPreservationSchema.safeParse({
+        ...current,
+        preservedPositions: [MAX_TRACKS + 1],
+      }).success,
+    ).toBe(false);
   });
 
   it.each([
@@ -701,6 +757,7 @@ describe('AI refinement contracts', () => {
     const clarification = {
       ...PROPOSED,
       refinement: {
+        id: 'clarification-1',
         status: 'needs_clarification',
         clarification: {
           reason: 'conflicting_changes',
@@ -728,7 +785,7 @@ describe('AI refinement contracts', () => {
     expect(
       AiRefinementResultSchema.safeParse({
         ...PROPOSED,
-        refinement: { status: 'unchanged' },
+        refinement: { id: 'unchanged-1', status: 'unchanged' },
       }).success,
     ).toBe(true);
   });
@@ -767,6 +824,24 @@ describe('AI refinement contracts', () => {
         refinement: 'Remove Coldplay',
         positions: [1, 2],
       }).success,
+    ).toBe(false);
+  });
+
+  it('accepts only bounded 1-based positions as explicit preservation changes', () => {
+    const request = (preservePositions: unknown) =>
+      CreateAiRefinementRequestSchema.safeParse({
+        refinement: 'Remove Coldplay',
+        preservePositions,
+      }).success;
+
+    expect(request({ add: [1, MAX_TRACKS], remove: [3] })).toBe(true);
+    expect(request({ add: [0], remove: [] })).toBe(false);
+    expect(request({ add: [MAX_TRACKS + 1], remove: [] })).toBe(false);
+    expect(request({ add: [1.5], remove: [] })).toBe(false);
+    expect(request({ add: [1] })).toBe(false);
+    expect(request({ add: [], remove: [], trackIds: ['spotify:track:1'] })).toBe(false);
+    expect(
+      request({ add: Array.from({ length: MAX_TRACKS + 1 }, () => 1), remove: [] }),
     ).toBe(false);
   });
 });

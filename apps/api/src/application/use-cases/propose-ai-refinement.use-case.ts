@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { PositionListPatch } from '@blendify/contracts/ai-service';
 import { ConfigService } from '@nestjs/config';
 import type { AiIntent } from '@/domain/ai/ai-intent';
 import {
@@ -47,6 +49,7 @@ export interface ProposeAiRefinementCommand {
   token: string;
   userId: string | null;
   refinement: string;
+  preservePositions?: PositionListPatch;
 }
 
 @Injectable()
@@ -120,6 +123,7 @@ export class ProposeAiRefinementUseCase {
       preservation,
       interpretation: plan.result,
       playlistTrackCount: generatedTrackCount(settled),
+      explicitPositions: command.preservePositions,
     });
     const { outcome, strategy } = await this.outcomeOf(
       evaluation,
@@ -131,7 +135,7 @@ export class ProposeAiRefinementUseCase {
     const proposed = withPendingRefinement(
       settled,
       outcome,
-      plan.promptVersion,
+      { id: randomUUID(), promptVersion: plan.promptVersion },
       new Date(),
     );
     await this.saveOrSupersede(command.token, proposed, settled);
@@ -199,6 +203,8 @@ export class ProposeAiRefinementUseCase {
         throw AiSessionError.playlistNotGenerated();
       case 'destination_exists':
         throw AiSessionError.refinementUnavailable();
+      case 'refinement_pending':
+        throw AiSessionError.refinementPending();
       case null:
         break;
     }

@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
 import { AiRefinementCandidateBuilder } from '@/application/services/ai-refinement-candidate.service';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
+import { ApplyAiRefinementUseCase } from '@/application/use-cases/apply-ai-refinement.use-case';
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
+import { DismissAiRefinementUseCase } from '@/application/use-cases/dismiss-ai-refinement.use-case';
 import { GenerateAiPlaylistUseCase } from '@/application/use-cases/generate-ai-playlist.use-case';
 import { GetAiSessionUseCase } from '@/application/use-cases/get-ai-session.use-case';
 import { ProposeAiRefinementUseCase } from '@/application/use-cases/propose-ai-refinement.use-case';
@@ -47,6 +49,8 @@ import { TransfersModule } from './transfers.module';
     TransferAiPlaylistUseCase,
     AiRefinementCandidateBuilder,
     ProposeAiRefinementUseCase,
+    ApplyAiRefinementUseCase,
+    DismissAiRefinementUseCase,
   ],
   exports: [INTENT_INTERPRETER],
 })

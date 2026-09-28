@@ -427,4 +427,103 @@ describe('genre refinement through the deterministic curated resolver', () => {
       clarification: { reason: 'conflicting_changes' },
     });
   });
+  describe('explicitly selected positions', () => {
+    function evaluateWithSelection(
+      interpretation: RefinementInterpretation,
+      explicitPositions: { add: number[]; remove: number[] },
+      preservation: AiPreservation = EMPTY_AI_PRESERVATION,
+    ) {
+      return evaluateRefinement({
+        intent: intent(),
+        preservation,
+        interpretation,
+        playlistTrackCount: PLAYLIST_TRACK_COUNT,
+        explicitPositions,
+      });
+    }
+
+    it('adds selected positions to the proposed preservation next to the written patch', () => {
+      const outcome = evaluateWithSelection(
+        interpreted(
+          { popularity: { operation: 'set', value: 'rarities' } },
+          { preservation: { positions: { add: [5], remove: [] } } },
+        ),
+        { add: [2, 5], remove: [] },
+      );
+
+      expect(outcome).toMatchObject({
+        status: 'proposed',
+        preservation: { firstTracks: null, positions: [2, 5], artists: [] },
+      });
+    });
+
+    it('proposes a selection-only change even when the text changes nothing', () => {
+      expect(
+        evaluateWithSelection(
+          interpreted(),
+          { add: [], remove: [3] },
+          {
+            ...EMPTY_AI_PRESERVATION,
+            positions: [3, 4],
+          },
+        ),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: intent(),
+        preservation: { positions: [4] },
+      });
+    });
+
+    it('never lets the selection silently override the written refinement', () => {
+      expect(
+        evaluateWithSelection(
+          interpreted(
+            {},
+            { preservation: { positions: { add: [], remove: [2] } } },
+          ),
+          { add: [2], remove: [] },
+          { ...EMPTY_AI_PRESERVATION, positions: [2] },
+        ),
+      ).toEqual({
+        status: 'needs_clarification',
+        clarification: expect.objectContaining({
+          reason: 'conflicting_changes',
+          names: ['2'],
+        }) as object,
+      });
+    });
+
+    it('rejects a selected position beyond the current playlist', () => {
+      expect(
+        evaluateWithSelection(interpreted(), {
+          add: [PLAYLIST_TRACK_COUNT + 1],
+          remove: [],
+        }),
+      ).toMatchObject({
+        status: 'needs_clarification',
+        clarification: {
+          reason: 'preserved_track_out_of_range',
+          limit: PLAYLIST_TRACK_COUNT,
+        },
+      });
+    });
+
+    it('ignores the selection when the model asks for clarification', () => {
+      expect(
+        evaluateWithSelection(
+          {
+            outcome: 'needs_clarification',
+            clarification: {
+              reason: 'ambiguous_request',
+              unsupportedConstraints: [],
+            },
+          },
+          { add: [1], remove: [] },
+        ),
+      ).toMatchObject({
+        status: 'needs_clarification',
+        clarification: { reason: 'ambiguous_request' },
+      });
+    });
+  });
 });

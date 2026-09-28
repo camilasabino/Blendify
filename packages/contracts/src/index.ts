@@ -748,6 +748,13 @@ export const AiRefinementCandidateSchema = z.strictObject({
   unmetConstraints: z.array(AiGenerationUnmetConstraintSchema),
 });
 
+export const AI_REFINEMENT_ID_MAX_LENGTH = 64;
+
+export const AiRefinementIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9-]+$/)
+  .max(AI_REFINEMENT_ID_MAX_LENGTH);
+
 const aiProposedRefinementShape = {
   intent: AiIntentSummarySchema,
   preservation: AiPreservationSchema,
@@ -756,22 +763,29 @@ const aiProposedRefinementShape = {
 
 export const AiRefinementSchema = z.discriminatedUnion('status', [
   z.strictObject({
+    id: AiRefinementIdSchema,
     status: z.literal('candidate_ready'),
     ...aiProposedRefinementShape,
     candidate: AiRefinementCandidateSchema,
     diff: AiRefinementDiffSchema,
   }),
   z.strictObject({
+    id: AiRefinementIdSchema,
     status: z.literal('candidate_failed'),
     ...aiProposedRefinementShape,
     error: AiGenerationFailureSchema,
   }),
   z.strictObject({
+    id: AiRefinementIdSchema,
     status: z.literal('needs_clarification'),
     clarification: AiRefinementClarificationSchema,
   }),
-  z.strictObject({ status: z.literal('unchanged') }),
+  z.strictObject({ id: AiRefinementIdSchema, status: z.literal('unchanged') }),
 ]);
+
+export const AiCurrentPreservationSchema = AiPreservationSchema.extend({
+  preservedPositions: z.array(PlaylistPositionSchema).max(MAX_TRACKS),
+});
 
 export const AiRefinementResultSchema = z.strictObject({
   sessionId: z.string().min(1),
@@ -811,6 +825,7 @@ export const AiSessionDestinationSchema = z.discriminatedUnion('status', [
 export const AiSessionStateSchema = AiSessionSchema.extend({
   execution: AiSessionExecutionSchema.nullable(),
   destination: AiSessionDestinationSchema.nullable(),
+  preservation: AiCurrentPreservationSchema.nullable(),
   refinement: AiRefinementSchema.nullable(),
 });
 
@@ -831,8 +846,18 @@ export const AnswerAiClarificationRequestSchema = z.strictObject({
   optionId: AiClarificationOptionIdSchema,
 });
 
+const PreservedPositionListSchema = z
+  .array(PlaylistPositionSchema)
+  .max(MAX_TRACKS);
+
 export const CreateAiRefinementRequestSchema = z.strictObject({
   refinement: z.string().trim().min(1).max(AI_REFINEMENT_MAX_LENGTH),
+  preservePositions: z
+    .strictObject({
+      add: PreservedPositionListSchema,
+      remove: PreservedPositionListSchema,
+    })
+    .optional(),
 });
 
 export const PublishAiPlaylistRequestSchema = z.strictObject({
@@ -918,6 +943,9 @@ export type AiRefinementCandidateDto = z.infer<
   typeof AiRefinementCandidateSchema
 >;
 export type AiRefinementDto = z.infer<typeof AiRefinementSchema>;
+export type AiCurrentPreservationDto = z.infer<
+  typeof AiCurrentPreservationSchema
+>;
 export type AiRefinementResultDto = z.infer<typeof AiRefinementResultSchema>;
 export type CreateAiRefinementRequest = z.infer<
   typeof CreateAiRefinementRequestSchema

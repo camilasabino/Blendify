@@ -31,12 +31,14 @@ export function toRefinement(pending: AiPendingRefinement): AiRefinementDto {
       const { candidate } = pending;
       if (candidate.status === 'failed') {
         return {
+          id: pending.id,
           status: 'candidate_failed',
           ...proposal,
           error: { ...candidate.failure },
         };
       }
       return {
+        id: pending.id,
         status: 'candidate_ready',
         ...proposal,
         candidate: toGeneratedPreview(candidate.result),
@@ -49,10 +51,11 @@ export function toRefinement(pending: AiPendingRefinement): AiRefinementDto {
     }
     case 'needs_clarification':
       return {
+        id: pending.id,
         status: 'needs_clarification',
         clarification: pending.clarification,
       };
     case 'unchanged':
-      return { status: 'unchanged' };
+      return { id: pending.id, status: 'unchanged' };
   }
 }

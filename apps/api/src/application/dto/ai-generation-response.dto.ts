@@ -1,17 +1,21 @@
 import type {
+  AiCurrentPreservationDto,
   AiGenerationDto,
   AiSessionDestinationDto,
   AiSessionExecutionDto,
   AiSessionStateDto,
 } from '@blendify/contracts';
+import { resolvePreservation } from '@/domain/ai/ai-refinement-preservation';
 import {
   currentDestination,
+  generatedResultOf,
   type AiGenerationResult,
   type AiSession,
   type AiSessionDestination,
   type AiSessionExecution,
 } from '@/domain/ai/ai-session';
 import { toAiTransferPlaylist } from '@/application/services/ai-transfer-playlist';
+import { fromTrackResponse } from './playlist-response.dto';
 import { toRefinement } from './ai-refinement-response.dto';
 import {
   toAiSessionResponse,
@@ -57,9 +61,31 @@ export function toAiSessionStateResponse(
       ? toExecution(session.execution, options)
       : null,
     destination: destination ? toDestination(destination) : null,
+    preservation: toCurrentPreservation(session),
     refinement: session.pendingRefinement
       ? toRefinement(session.pendingRefinement)
       : null,
+  };
+}
+
+function toCurrentPreservation(
+  session: AiSession,
+): AiCurrentPreservationDto | null {
+  const result = generatedResultOf(session);
+  const { intent, preservation } = session.aiSafe;
+  if (!result || !intent) {
+    return null;
+  }
+
+  const resolved = resolvePreservation({
+    tracks: result.playlist.tracks.map(fromTrackResponse),
+    preservation,
+    intent,
+  });
+  return {
+    ...preservation,
+    preservedPositions:
+      resolved.status === 'resolved' ? resolved.positions : [],
   };
 }
 

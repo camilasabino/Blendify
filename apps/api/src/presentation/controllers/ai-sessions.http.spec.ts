@@ -24,6 +24,8 @@ import type {
 import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
 import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
+import { ApplyAiRefinementUseCase } from '@/application/use-cases/apply-ai-refinement.use-case';
+import { DismissAiRefinementUseCase } from '@/application/use-cases/dismiss-ai-refinement.use-case';
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
 import { GenerateAiPlaylistUseCase } from '@/application/use-cases/generate-ai-playlist.use-case';
 import { GetAiSessionUseCase } from '@/application/use-cases/get-ai-session.use-case';
@@ -157,6 +159,41 @@ function lessMainstreamPlan(): PlanRefinementResponse {
     unsupportedConstraints: [{ category: 'activity', userText: 'for running' }],
   });
 }
+
+function popularPlan(
+  preservation: Partial<PlanRefinementPreservation> = {},
+  popularity: 'popular' | 'rarities' = 'popular',
+): PlanRefinementResponse {
+  const unchangedNames = { add: [], remove: [] };
+  return refinementPlan({
+    outcome: 'interpreted',
+    patch: {
+      kind: null,
+      artists: unchangedNames,
+      genres: unchangedNames,
+      seedTracks: unchangedNames,
+      targetTrackCount: null,
+      targetDurationMinutes: null,
+      mood: null,
+      popularity: { operation: 'set', value: popularity },
+      orderMode: null,
+      excludeArtists: unchangedNames,
+      excludeTracks: unchangedNames,
+    },
+    preservation: {
+      firstTracks: null,
+      positions: { add: [], remove: [] },
+      artists: unchangedNames,
+      ...preservation,
+    },
+    unsupportedConstraints: [],
+  });
+}
+
+type PlanRefinementPreservation = Extract<
+  PlanRefinementResponse['result'],
+  { outcome: 'interpreted' }
+>['preservation'];
 
 function createWorld() {
   const stored = new Map<string, AiSession>();
@@ -331,8 +368,10 @@ function workingCatalog() {
   };
 }
 
-function generatedPlaylist(): GeneratedPlaylist {
-  const tracks = ['r1', 'r2', 'c1'].map((id) =>
+function generatedPlaylist(
+  trackIds: string[] = ['r1', 'r2', 'c1'],
+): GeneratedPlaylist {
+  const tracks = trackIds.map((id) =>
     Track.create({
       id: TrackId.create(id),
       name: `Song ${id}`,
@@ -436,6 +475,8 @@ async function createApp(
       { provide: REFINEMENT_PLANNER, useValue: world.planner },
       AiRefinementCandidateBuilder,
       ProposeAiRefinementUseCase,
+      ApplyAiRefinementUseCase,
+      DismissAiRefinementUseCase,
       ...inMemoryRequestLimitProviders({
         rateLimits: {
           ...DEFAULT_RATE_LIMITS,
@@ -1760,6 +1801,28 @@ describe('Create with AI sessions over HTTP', () => {
       return cookie ? req.set('Cookie', cookie) : req;
     }
 
+    function settle(
+      action: 'apply' | 'dismiss',
+      sessionId: string,
+      refinementId: string,
+      cookie?: string,
+    ) {
+      const req = request(server())
+        .post(
+          `${SESSIONS_PATH}/${sessionId}/refinements/${refinementId}/${action}`,
+        )
+        .set('Origin', FRONTEND);
+      return cookie ? req.set('Cookie', cookie) : req;
+    }
+
+    async function dismissPending(sessionId: string): Promise<void> {
+      const pending = world.stored.get(sessionId)?.pendingRefinement;
+      if (!pending) {
+        throw new Error('Expected a pending refinement to dismiss.');
+      }
+      await settle('dismiss', sessionId, pending.id).expect(200);
+    }
+
     async function generatedSession(cookie?: string): Promise<string> {
       useWorkingProviders();
       const created = await createSession({ prompt: PROMPT }, cookie).expect(
@@ -1796,6 +1859,7 @@ describe('Create with AI sessions over HTTP', () => {
         sessionId,
         expiresAt: world.stored.get(sessionId)?.expiresAt,
         refinement: {
+          id: world.stored.get(sessionId)?.pendingRefinement?.id,
           status: 'candidate_ready',
           intent: expect.objectContaining({
             artists: ['Radiohead'],
@@ -1928,7 +1992,7 @@ describe('Create with AI sessions over HTTP', () => {
         .expect(409);
 
       expect(refused.body).toMatchObject({
-        code: 'AI_DESTINATION_UNAVAILABLE',
+        code: 'AI_REFINEMENT_PENDING',
       });
       expectNoDestinationCalls();
       expect(world.sessions.acquireDestinationClaim).not.toHaveBeenCalled();
@@ -1948,7 +2012,7 @@ describe('Create with AI sessions over HTTP', () => {
         .expect(409);
 
       expect(refused.body).toMatchObject({
-        code: 'AI_DESTINATION_UNAVAILABLE',
+        code: 'AI_REFINEMENT_PENDING',
       });
       expectNoDestinationCalls();
       expect(world.usageStats.recordMix).not.toHaveBeenCalled();
@@ -1981,7 +2045,9 @@ describe('Create with AI sessions over HTTP', () => {
       const sessionId = await generatedSession();
 
       await refine(sessionId, { refinement: REFINEMENT }).expect(200);
+      await dismissPending(sessionId);
       await refine(sessionId, { refinement: REFINEMENT }).expect(200);
+      await dismissPending(sessionId);
       const limited = await refine(sessionId, {
         refinement: REFINEMENT,
       }).expect(429);
@@ -2002,6 +2068,7 @@ describe('Create with AI sessions over HTTP', () => {
       const sessionId = await generatedSession();
 
       await refine(sessionId, { refinement: REFINEMENT }).expect(200);
+      await dismissPending(sessionId);
       const refused = await refine(sessionId, {
         refinement: REFINEMENT,
       }).expect(409);
@@ -2077,6 +2144,567 @@ describe('Create with AI sessions over HTTP', () => {
         expect(world.planner.planRefinement).not.toHaveBeenCalled();
       },
     );
+
+    describe('apply and dismiss', () => {
+      const CANDIDATE_TRACKS = ['n1', 'n2', 'n3'];
+
+      async function proposeCandidate(
+        sessionId: string,
+        cookie?: string,
+        body: object = { refinement: 'More popular' },
+        plan: PlanRefinementResponse = popularPlan(),
+      ): Promise<string> {
+        world.planner.planRefinement.mockResolvedValueOnce(plan);
+        world.generator.execute.mockResolvedValueOnce(
+          generatedPlaylist(CANDIDATE_TRACKS),
+        );
+        const response = await refine(sessionId, body, cookie).expect(200);
+        const { refinement } = AiRefinementResultSchema.parse(response.body);
+        expect(refinement.status).toBe('candidate_ready');
+        return refinement.id;
+      }
+
+      function sideEffectCounts() {
+        return {
+          planner: world.planner.planRefinement.mock.calls.length,
+          interpreter: world.interpreter.interpretIntent.mock.calls.length,
+          generator: world.generator.execute.mock.calls.length,
+          catalog: world.catalogFactory.forMarket.mock.calls.length,
+          discovery: Object.values(world.discovery).map(
+            (method) => method.mock.calls.length,
+          ),
+          spotify: world.musicProviders.forUser.mock.calls.length,
+          soundiiz: world.soundiiz.createTransfer.mock.calls.length,
+        };
+      }
+
+      function currentTrackIds(state: { execution: unknown }): string[] {
+        const execution = state.execution as {
+          status: string;
+          playlist: { tracks: { id: string }[] };
+        };
+        return execution.playlist.tracks.map((track) => track.id);
+      }
+
+      it('makes the reviewed Guest candidate current without any model or provider call', async () => {
+        const sessionId = await generatedSession();
+        const refinementId = await proposeCandidate(sessionId);
+        const before = world.stored.get(sessionId);
+        const pending = before?.pendingRefinement;
+        const calls = sideEffectCounts();
+
+        const response = await settle('apply', sessionId, refinementId).expect(
+          200,
+        );
+
+        const state = AiSessionStateSchema.parse(response.body);
+        expect(currentTrackIds(state)).toEqual(CANDIDATE_TRACKS);
+        expect(state.intent?.popularity).toBe('popular');
+        expect(state.refinement).toBeNull();
+        expect(state.destination).toBeNull();
+        expect(sideEffectCounts()).toEqual(calls);
+        expectNoDestinationCalls();
+
+        const stored = world.stored.get(sessionId);
+        expect(pending?.status).toBe('proposed');
+        if (
+          pending?.status !== 'proposed' ||
+          pending.candidate.status !== 'ready'
+        ) {
+          throw new Error('Expected a ready pending candidate');
+        }
+        expect(stored).toMatchObject({
+          aiSafe: {
+            intent: pending.aiSafe.intent,
+            preservation: pending.aiSafe.preservation,
+          },
+          execution: { status: 'generated', result: pending.candidate.result },
+          pendingRefinement: null,
+          destination: null,
+          originalPrompt: before?.originalPrompt,
+          refinementAttempts: before?.refinementAttempts,
+          ownerUserId: null,
+          expiresAt: before?.expiresAt,
+        });
+
+        const restored = AiSessionStateSchema.parse(
+          (await readSession(sessionId).expect(200)).body,
+        );
+        expect(restored).toEqual(state);
+        expect(sideEffectCounts()).toEqual(calls);
+      });
+
+      it('publishes the applied candidate under the edited title for the Spotify owner', async () => {
+        const owner = await sessionCookie('user-1');
+        const sessionId = await generatedSession(owner);
+        const refinementId = await proposeCandidate(sessionId, owner);
+
+        await settle('apply', sessionId, refinementId, owner).expect(200);
+        await request(server())
+          .post(`${SESSIONS_PATH}/${sessionId}/publish`)
+          .set('Origin', FRONTEND)
+          .set('Cookie', owner)
+          .send({ name: 'Night run' })
+          .expect(200);
+
+        expect(world.spotify.createPlaylist).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Night run' }),
+        );
+        expect(world.spotify.addTracksToPlaylist).toHaveBeenCalledWith(
+          SPOTIFY_PLAYLIST.id,
+          CANDIDATE_TRACKS.map((id) => `spotify:track:${id}`),
+        );
+      });
+
+      it('transfers the applied candidate for a Guest', async () => {
+        const sessionId = await generatedSession();
+        const refinementId = await proposeCandidate(sessionId);
+
+        await settle('apply', sessionId, refinementId).expect(200);
+        await request(server())
+          .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+          .set('Origin', FRONTEND)
+          .send({ name: 'Night run' })
+          .expect(200);
+
+        expect(world.soundiiz.createTransfer).toHaveBeenCalledWith({
+          title: 'Night run',
+          tracks: CANDIDATE_TRACKS.map((id) => ({
+            title: `Song ${id}`,
+            artists: ['Radiohead'],
+          })),
+        });
+      });
+
+      it('keeps the current playlist after dismissing a candidate and transfers it', async () => {
+        const sessionId = await generatedSession();
+        const applied = world.stored.get(sessionId);
+        const refinementId = await proposeCandidate(sessionId);
+        const calls = sideEffectCounts();
+
+        const response = await settle(
+          'dismiss',
+          sessionId,
+          refinementId,
+        ).expect(200);
+
+        const state = AiSessionStateSchema.parse(response.body);
+        expect(currentTrackIds(state)).toEqual(['r1', 'r2']);
+        expect(state.refinement).toBeNull();
+        expect(sideEffectCounts()).toEqual(calls);
+        expect(world.stored.get(sessionId)).toMatchObject({
+          aiSafe: applied?.aiSafe,
+          execution: applied?.execution,
+          destination: null,
+          pendingRefinement: null,
+        });
+
+        await request(server())
+          .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+          .set('Origin', FRONTEND)
+          .send({ name: 'Mix' })
+          .expect(200);
+        expect(world.soundiiz.createTransfer).toHaveBeenCalledWith({
+          title: 'Mix',
+          tracks: [
+            { title: 'Song r1', artists: ['Radiohead'] },
+            { title: 'Song r2', artists: ['Radiohead'] },
+          ],
+        });
+      });
+
+      it('publishes the current playlist after the Spotify owner dismisses a candidate', async () => {
+        const owner = await sessionCookie('user-1');
+        const sessionId = await generatedSession(owner);
+        const refinementId = await proposeCandidate(sessionId, owner);
+
+        await settle('dismiss', sessionId, refinementId, owner).expect(200);
+        await request(server())
+          .post(`${SESSIONS_PATH}/${sessionId}/publish`)
+          .set('Origin', FRONTEND)
+          .set('Cookie', owner)
+          .send({ name: 'Mix' })
+          .expect(200);
+
+        expect(world.spotify.addTracksToPlaylist).toHaveBeenCalledWith(
+          SPOTIFY_PLAYLIST.id,
+          ['spotify:track:r1', 'spotify:track:r2'],
+        );
+      });
+
+      const pendingArrangements: [string, () => void][] = [
+        [
+          'candidate_ready',
+          () => {
+            world.planner.planRefinement.mockResolvedValueOnce(popularPlan());
+            world.generator.execute.mockResolvedValueOnce(
+              generatedPlaylist(CANDIDATE_TRACKS),
+            );
+          },
+        ],
+        [
+          'candidate_failed',
+          () => {
+            world.planner.planRefinement.mockResolvedValueOnce(popularPlan());
+            world.generator.execute.mockRejectedValueOnce(
+              createSpotifyQuotaError({
+                retryAfterSeconds: 60,
+                reason: 'QUOTA_EXCEEDED',
+              }),
+            );
+          },
+        ],
+        [
+          'needs_clarification',
+          () => {
+            world.planner.planRefinement.mockResolvedValueOnce(
+              refinementPlan({
+                outcome: 'needs_clarification',
+                clarification: {
+                  reason: 'ambiguous_request',
+                  unsupportedConstraints: [],
+                },
+              }),
+            );
+          },
+        ],
+        [
+          'unchanged',
+          () => {
+            world.planner.planRefinement.mockResolvedValueOnce(
+              popularPlan({}, 'rarities'),
+            );
+          },
+        ],
+      ];
+
+      it.each(pendingArrangements)(
+        'refuses a new refinement while %s is pending without any model or provider call',
+        async (status, arrange) => {
+          const sessionId = await generatedSession();
+          arrange();
+          const pending = AiRefinementResultSchema.parse(
+            (await refine(sessionId, { refinement: 'Change it' }).expect(200))
+              .body,
+          ).refinement;
+          expect(pending.status).toBe(status);
+          const stored = world.stored.get(sessionId);
+          const calls = sideEffectCounts();
+          const lockAttempts =
+            world.sessions.acquireRefinementLock.mock.calls.length;
+
+          const refused = await refine(sessionId, {
+            refinement: 'Make it less mainstream',
+          }).expect(409);
+
+          expect(refused.body).toMatchObject({ code: 'AI_REFINEMENT_PENDING' });
+          expect(sideEffectCounts()).toEqual(calls);
+          expect(world.stored.get(sessionId)).toEqual(stored);
+          expect(world.sessions.acquireRefinementLock).toHaveBeenCalledTimes(
+            lockAttempts,
+          );
+
+          const state = await request(server())
+            .get(`${SESSIONS_PATH}/${sessionId}`)
+            .set('Origin', FRONTEND)
+            .expect(200);
+          expect(AiSessionStateSchema.parse(state.body).refinement).toEqual(
+            pending,
+          );
+        },
+      );
+
+      it.each(pendingArrangements.slice(1))(
+        'dismisses a %s refinement and restores destinations with zero side effects',
+        async (status, arrange) => {
+          const sessionId = await generatedSession();
+          const applied = world.stored.get(sessionId);
+          arrange();
+          const proposed = AiRefinementResultSchema.parse(
+            (await refine(sessionId, { refinement: 'Change it' }).expect(200))
+              .body,
+          ).refinement;
+          expect(proposed.status).toBe(status);
+          const calls = sideEffectCounts();
+
+          await settle('apply', sessionId, proposed.id).expect(409);
+          const response = await settle(
+            'dismiss',
+            sessionId,
+            proposed.id,
+          ).expect(200);
+
+          expect(
+            AiSessionStateSchema.parse(response.body).refinement,
+          ).toBeNull();
+          expect(sideEffectCounts()).toEqual(calls);
+          expect(world.stored.get(sessionId)).toMatchObject({
+            aiSafe: applied?.aiSafe,
+            execution: applied?.execution,
+            destination: null,
+            pendingRefinement: null,
+          });
+          await request(server())
+            .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+            .set('Origin', FRONTEND)
+            .send({ name: 'Mix' })
+            .expect(200);
+        },
+      );
+
+      it('refuses to apply a refinement that is not a ready candidate', async () => {
+        const sessionId = await generatedSession();
+        world.planner.planRefinement.mockResolvedValueOnce(
+          refinementPlan({
+            outcome: 'needs_clarification',
+            clarification: {
+              reason: 'ambiguous_request',
+              unsupportedConstraints: [],
+            },
+          }),
+        );
+        const { refinement } = AiRefinementResultSchema.parse(
+          (await refine(sessionId, { refinement: 'Hmm' }).expect(200)).body,
+        );
+        const pending = world.stored.get(sessionId)?.pendingRefinement;
+
+        const refused = await settle('apply', sessionId, refinement.id).expect(
+          409,
+        );
+
+        expect(refused.body).toMatchObject({
+          code: 'AI_REFINEMENT_NOT_APPLICABLE',
+        });
+        expect(world.stored.get(sessionId)?.pendingRefinement).toEqual(pending);
+      });
+
+      it('rejects a stale refinement id without touching the newer pending refinement', async () => {
+        const sessionId = await generatedSession();
+        const reviewed = await proposeCandidate(sessionId);
+        await settle('dismiss', sessionId, reviewed).expect(200);
+        const newer = await proposeCandidate(sessionId, undefined, {
+          refinement: 'Even more popular',
+        });
+        const pending = world.stored.get(sessionId)?.pendingRefinement;
+        expect(newer).not.toBe(reviewed);
+
+        for (const action of ['apply', 'dismiss'] as const) {
+          const refused = await settle(action, sessionId, reviewed).expect(409);
+          expect(refused.body).toMatchObject({ code: 'AI_REFINEMENT_STALE' });
+        }
+        expect(world.stored.get(sessionId)?.pendingRefinement).toEqual(pending);
+      });
+
+      it('treats a repeated apply or dismiss as stale and keeps the settled state', async () => {
+        const sessionId = await generatedSession();
+        const applied = await proposeCandidate(sessionId);
+        await settle('apply', sessionId, applied).expect(200);
+        const afterApply = world.stored.get(sessionId);
+
+        const repeated = await settle('apply', sessionId, applied).expect(409);
+        expect(repeated.body).toMatchObject({ code: 'AI_REFINEMENT_STALE' });
+        expect(world.stored.get(sessionId)).toEqual(afterApply);
+
+        const dismissed = await proposeCandidate(
+          sessionId,
+          undefined,
+          { refinement: REFINEMENT },
+          lessMainstreamPlan(),
+        );
+        await settle('dismiss', sessionId, dismissed).expect(200);
+        const afterDismiss = world.stored.get(sessionId);
+        await settle('dismiss', sessionId, dismissed).expect(409);
+        await settle('apply', sessionId, dismissed).expect(409);
+        expect(world.stored.get(sessionId)).toEqual(afterDismiss);
+      });
+
+      it('retries the fenced write when only the refinement attempt counter moved', async () => {
+        const sessionId = await generatedSession();
+        const refinementId = await proposeCandidate(sessionId);
+        world.sessions.saveIfUnchanged.mockImplementationOnce(
+          (token: string) => {
+            const current = world.stored.get(token);
+            if (current) {
+              world.stored.set(token, {
+                ...current,
+                refinementAttempts: current.refinementAttempts + 1,
+                updatedAt: new Date(
+                  Date.parse(current.updatedAt) + 5,
+                ).toISOString(),
+              });
+            }
+            return Promise.resolve(false);
+          },
+        );
+
+        await settle('apply', sessionId, refinementId).expect(200);
+
+        expect(world.stored.get(sessionId)?.pendingRefinement).toBeNull();
+        expect(world.stored.get(sessionId)?.refinementAttempts).toBe(2);
+      });
+
+      it('hides foreign, unknown and expired sessions with the not-found error', async () => {
+        const owner = await sessionCookie('user-1');
+        const intruder = await sessionCookie('user-2');
+        const sessionId = await generatedSession(owner);
+        const refinementId = await proposeCandidate(sessionId, owner);
+        const pending = world.stored.get(sessionId)?.pendingRefinement;
+
+        for (const action of ['apply', 'dismiss'] as const) {
+          for (const response of [
+            await settle(action, sessionId, refinementId, intruder).expect(404),
+            await settle(action, sessionId, refinementId).expect(404),
+            await settle(action, 'bad$token', refinementId, owner).expect(404),
+            await settle(action, 'unknown', refinementId, owner).expect(404),
+          ]) {
+            expect(response.body).toMatchObject({
+              code: 'AI_SESSION_NOT_FOUND',
+            });
+          }
+        }
+        expect(world.stored.get(sessionId)?.pendingRefinement).toEqual(pending);
+
+        const stored = world.stored.get(sessionId);
+        if (stored) {
+          world.stored.set(sessionId, {
+            ...stored,
+            expiresAt: new Date(Date.now() - 1_000).toISOString(),
+          });
+        }
+        const expired = await settle(
+          'apply',
+          sessionId,
+          refinementId,
+          owner,
+        ).expect(404);
+        expect(expired.body).toMatchObject({ code: 'AI_SESSION_NOT_FOUND' });
+      });
+
+      it('answers a malformed refinement id or a session without a pending refinement as stale', async () => {
+        const sessionId = await generatedSession();
+
+        for (const refinementId of ['not%20valid', 'a'.repeat(65), 'missing']) {
+          const refused = await settle('apply', sessionId, refinementId).expect(
+            409,
+          );
+          expect(refused.body).toMatchObject({ code: 'AI_REFINEMENT_STALE' });
+        }
+      });
+
+      it('interprets the next refinement against the applied intent and preservation', async () => {
+        const sessionId = await generatedSession();
+        const first = AiRefinementResultSchema.parse(
+          (await refine(sessionId, { refinement: REFINEMENT }).expect(200))
+            .body,
+        ).refinement;
+        await settle('apply', sessionId, first.id).expect(200);
+        const applied = world.stored.get(sessionId);
+
+        await proposeCandidate(sessionId);
+
+        expect(world.planner.planRefinement).toHaveBeenLastCalledWith({
+          intent: applied?.aiSafe.intent,
+          preservation: { firstTracks: 2, positions: [], artists: [] },
+          refinement: 'More popular',
+        });
+        expect(applied?.aiSafe.intent?.artists).toEqual(['Radiohead']);
+        const state = AiSessionStateSchema.parse(
+          (await readSession(sessionId).expect(200)).body,
+        );
+        expect(state.preservation).toEqual({
+          firstTracks: 2,
+          positions: [],
+          artists: [],
+          preservedPositions: [1, 2],
+        });
+      });
+
+      it('keeps explicitly selected positions in the candidate and only makes them current on apply', async () => {
+        const sessionId = await generatedSession();
+        const refinementId = await proposeCandidate(sessionId, undefined, {
+          refinement: 'More popular',
+          preservePositions: { add: [2], remove: [] },
+        });
+
+        const pending = AiSessionStateSchema.parse(
+          (await readSession(sessionId).expect(200)).body,
+        );
+        expect(pending.preservation?.positions).toEqual([]);
+        expect(pending.refinement).toMatchObject({
+          status: 'candidate_ready',
+          preservation: { firstTracks: null, positions: [2], artists: [] },
+          diff: { preservedPositions: [2] },
+        });
+        const candidate =
+          pending.refinement?.status === 'candidate_ready'
+            ? pending.refinement.candidate.playlist.tracks.map(
+                (track) => track.id,
+              )
+            : [];
+        expect(candidate[1]).toBe('r2');
+        expect(world.planner.planRefinement).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            preservation: { firstTracks: null, positions: [], artists: [] },
+          }),
+        );
+
+        const applied = AiSessionStateSchema.parse(
+          (await settle('apply', sessionId, refinementId).expect(200)).body,
+        );
+        expect(applied.preservation).toEqual({
+          firstTracks: null,
+          positions: [2],
+          artists: [],
+          preservedPositions: [2],
+        });
+      });
+
+      it('asks for clarification when selected positions contradict the written refinement', async () => {
+        const sessionId = await generatedSession();
+        world.planner.planRefinement.mockResolvedValueOnce(
+          popularPlan({ positions: { add: [], remove: [2] } }),
+        );
+
+        const response = await refine(sessionId, {
+          refinement: 'Stop keeping the second song',
+          preservePositions: { add: [2], remove: [] },
+        }).expect(200);
+
+        expect(
+          AiRefinementResultSchema.parse(response.body).refinement,
+        ).toEqual(
+          expect.objectContaining({
+            status: 'needs_clarification',
+            clarification: expect.objectContaining({
+              reason: 'conflicting_changes',
+            }) as object,
+          }),
+        );
+      });
+
+      it('asks for clarification when a selected position is outside the current playlist', async () => {
+        const sessionId = await generatedSession();
+        world.planner.planRefinement.mockResolvedValueOnce(popularPlan());
+
+        const response = await refine(sessionId, {
+          refinement: 'More popular',
+          preservePositions: { add: [9], remove: [] },
+        }).expect(200);
+
+        expect(
+          AiRefinementResultSchema.parse(response.body).refinement,
+        ).toEqual(
+          expect.objectContaining({
+            status: 'needs_clarification',
+            clarification: expect.objectContaining({
+              reason: 'preserved_track_out_of_range',
+              limit: 2,
+            }) as object,
+          }),
+        );
+        expect(world.generator.execute).toHaveBeenCalledTimes(1);
+      });
+    });
 
     it('keeps the applied state when the refinement interpretation fails', async () => {
       const sessionId = await generatedSession();

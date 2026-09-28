@@ -3,6 +3,7 @@ import type {
   AiGenerationFailureDto,
   AiGenerationUnmetConstraint,
   AiIntentSummary,
+  AiRefinementDto,
   AiSessionDestinationDto,
   AiSessionStateDto,
   TrackDto,
@@ -93,6 +94,10 @@ function state(
     clarification: null,
     execution,
     destination,
+    preservation:
+      execution?.status === 'generated'
+        ? { firstTracks: null, positions: [], artists: [], preservedPositions: [] }
+        : null,
     refinement: null,
   }
 }
@@ -106,6 +111,7 @@ export function clarificationState(): AiSessionStateDto {
     clarification,
     execution: null,
     destination: null,
+    preservation: null,
     refinement: null,
   }
 }
@@ -165,4 +171,108 @@ export function generatedState(
 
 export function failedState(error: AiGenerationFailureDto): AiSessionStateDto {
   return state(reviewIntent, { status: 'generation_failed', error })
+}
+
+export const AI_REFINEMENT_ID = 'e2e-refinement-1'
+
+function proposedTrack(index: number): TrackDto {
+  return {
+    ...syntheticTrack(index),
+    id: `visual-proposed-${index}`,
+    name: `Proposed Horizon ${index}`,
+  }
+}
+
+type GeneratedExecution = Extract<
+  NonNullable<AiSessionStateDto['execution']>,
+  { status: 'generated' }
+>
+
+function generatedExecution(sessionState: AiSessionStateDto): GeneratedExecution {
+  if (sessionState.execution?.status !== 'generated') {
+    throw new Error('Expected a generated session fixture')
+  }
+  return sessionState.execution
+}
+
+export function candidateRefinement(
+  base: AiSessionStateDto = generatedState(),
+  id = AI_REFINEMENT_ID,
+): Extract<AiRefinementDto, { status: 'candidate_ready' }> {
+  const current = generatedExecution(base)
+  const kept = current.playlist.tracks.slice(0, current.playlist.tracks.length - 3)
+  const moved = kept.length > 4 ? [kept[3], kept[2], ...kept.slice(0, 2), ...kept.slice(4)] : kept
+  const tracks = [...moved, proposedTrack(1), proposedTrack(2), proposedTrack(3)]
+  const removed = current.playlist.tracks.slice(-3)
+  const durationMs = tracks.reduce((total, track) => total + track.durationMs, 0)
+  return {
+    id,
+    status: 'candidate_ready',
+    intent: { ...(base.intent ?? reviewIntent), popularity: 'popular', genres: ['Argentine Rock'] },
+    preservation: { firstTracks: null, positions: [5], artists: [] },
+    notApplied: [{ category: 'energy', userText: 'with more energy' }],
+    candidate: {
+      playlist: { ...current.playlist, tracks },
+      trackCount: tracks.length,
+      durationMs,
+      unmetConstraints: [],
+    },
+    diff: {
+      tracks: {
+        added: [1, 2, 3].map((offset) => ({
+          trackId: `visual-proposed-${offset}`,
+          position: kept.length + offset,
+        })),
+        removed: removed.map((track, index) => ({
+          trackId: track.id,
+          position: kept.length + index + 1,
+        })),
+        moved: kept.length > 4 ? [{ trackId: kept[3].id, from: 4, to: 1 }] : [],
+        retainedCount: kept.length,
+        replacedCount: 3,
+        before: { trackCount: current.trackCount, durationMs: current.durationMs },
+        after: { trackCount: tracks.length, durationMs },
+      },
+      intent: [
+        { field: 'genres', added: ['Argentine Rock'], removed: [] },
+        { field: 'popularity', from: 'rarities', to: 'popular' },
+        { field: 'excludeArtists', added: ['Soda Stereo'], removed: [] },
+      ],
+      preservedPositions: [5],
+    },
+  }
+}
+
+export function pendingState(
+  refinement: AiRefinementDto,
+  base: AiSessionStateDto = generatedState(),
+): AiSessionStateDto {
+  return { ...base, refinement }
+}
+
+export function appliedState(
+  refinement: Extract<AiRefinementDto, { status: 'candidate_ready' }>,
+  base: AiSessionStateDto = generatedState(),
+): AiSessionStateDto {
+  const current = generatedExecution(base)
+  return {
+    ...base,
+    intent: refinement.intent,
+    execution: {
+      ...current,
+      playlist: refinement.candidate.playlist,
+      trackCount: refinement.candidate.trackCount,
+      durationMs: refinement.candidate.durationMs,
+      unmetConstraints: refinement.candidate.unmetConstraints,
+    },
+    preservation: {
+      ...refinement.preservation,
+      preservedPositions: refinement.diff.preservedPositions,
+    },
+    refinement: null,
+  }
+}
+
+export function refinementResult(refinement: AiRefinementDto) {
+  return { sessionId: AI_REVIEW_SESSION_ID, expiresAt: EXPIRES_AT, refinement }
 }

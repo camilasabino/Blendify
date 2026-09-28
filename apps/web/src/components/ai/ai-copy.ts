@@ -65,7 +65,12 @@ export function aiErrorMessage(error: unknown, t: Translate): string {
   return getApiErrorMessage(error, t, 'ai.error.generic')
 }
 
-export function clarificationMessage(clarification: AiClarification, t: Translate): string {
+export type AiClarificationDetails = Pick<
+  AiClarification,
+  'reason' | 'seedType' | 'limit' | 'names'
+>
+
+export function clarificationMessage(clarification: AiClarificationDetails, t: Translate): string {
   const names = clarification.names.join(', ')
   const limit = clarification.limit ?? 0
 
@@ -93,7 +98,7 @@ export function clarificationMessage(clarification: AiClarification, t: Translat
   }
 }
 
-function tooManySeedsMessage(clarification: AiClarification, t: Translate): string {
+function tooManySeedsMessage(clarification: AiClarificationDetails, t: Translate): string {
   const count = clarification.names.length
   const limit = clarification.limit ?? 0
 

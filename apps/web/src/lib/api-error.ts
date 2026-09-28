@@ -193,6 +193,7 @@ const STATIC_ERROR_MESSAGES: Record<string, MessageKey> = {
   TRANSFER_TOKEN_INVALID: 'transfer.errorInvalid',
   TRANSFER_TOKEN_EXPIRED: 'transfer.errorExpired',
   TRANSFER_PLAYLIST_REJECTED: 'transfer.errorRejected',
+  AI_REFINEMENT_PENDING: 'ai.refine.pendingDestination',
 }
 
 function mapTransferUnavailableMessage(

@@ -3,6 +3,7 @@ import type {
   AiGenerationFailureDto,
   AiGenerationUnmetConstraint,
   AiIntentSummary,
+  AiRefinementDto,
   AiSessionDestinationDto,
   AiSessionDto,
   AiSessionStateDto,
@@ -88,11 +89,11 @@ export function aiGeneration(
 }
 
 export function reviewedAiSessionState(intent: AiIntentSummary = aiIntent): AiSessionStateDto {
-  return { ...reviewedAiSession(intent), execution: null, destination: null, refinement: null }
+  return { ...reviewedAiSession(intent), execution: null, destination: null, preservation: null, refinement: null }
 }
 
 export function generatingAiSessionState(): AiSessionStateDto {
-  return { ...reviewedAiSession(), execution: { status: 'generating' }, destination: null, refinement: null }
+  return { ...reviewedAiSession(), execution: { status: 'generating' }, destination: null, preservation: null, refinement: null }
 }
 
 export function generatedAiSessionState(
@@ -110,6 +111,7 @@ export function generatedAiSessionState(
       transferAvailable: generation.transferAvailable,
     },
     destination,
+    preservation: { firstTracks: null, positions: [], artists: [], preservedPositions: [] },
     refinement: null,
   }
 }
@@ -119,6 +121,7 @@ export function failedAiSessionState(error: AiGenerationFailureDto): AiSessionSt
     ...reviewedAiSession(),
     execution: { status: 'generation_failed', error },
     destination: null,
+    preservation: null,
     refinement: null,
   }
 }
@@ -128,4 +131,65 @@ export function storeAiSession(prompt = AI_PROMPT, playlistTitle: string | null 
     'blendify.aiSession',
     JSON.stringify({ sessionId: AI_SESSION_ID, prompt, playlistTitle }),
   )
+}
+
+export const AI_REFINEMENT_ID = 'refinement-1'
+
+export function proposedTrack(index: number): TrackDto {
+  return { ...aiTrack(index), id: `proposed-${index}`, name: `Proposed ${index}` }
+}
+
+export function candidateReadyRefinement(
+  id = AI_REFINEMENT_ID,
+): Extract<AiRefinementDto, { status: 'candidate_ready' }> {
+  const tracks = [...aiTracks(18), proposedTrack(1), proposedTrack(2)]
+  return {
+    id,
+    status: 'candidate_ready',
+    intent: { ...aiIntent, popularity: 'popular' },
+    preservation: { firstTracks: 2, positions: [], artists: [] },
+    notApplied: [{ category: 'energy', userText: 'more energetic' }],
+    candidate: {
+      playlist: { ...aiGeneration().playlist, tracks },
+      trackCount: tracks.length,
+      durationMs: tracks.length * 180_000,
+      unmetConstraints: [],
+    },
+    diff: {
+      tracks: {
+        added: [
+          { trackId: 'proposed-1', position: 19 },
+          { trackId: 'proposed-2', position: 20 },
+        ],
+        removed: [
+          { trackId: 'track-19', position: 19 },
+          { trackId: 'track-20', position: 20 },
+        ],
+        moved: [],
+        retainedCount: 18,
+        replacedCount: 2,
+        before: { trackCount: 20, durationMs: 3_600_000 },
+        after: { trackCount: 20, durationMs: 3_600_000 },
+      },
+      intent: [{ field: 'popularity', from: 'rarities', to: 'popular' }],
+      preservedPositions: [1, 2],
+    },
+  }
+}
+
+export function appliedCandidateState(): AiSessionStateDto {
+  const candidate = candidateReadyRefinement()
+  return {
+    ...generatedAiSessionState(
+      aiGeneration({ intent: candidate.intent, tracks: candidate.candidate.playlist.tracks }),
+    ),
+    preservation: {
+      ...candidate.preservation,
+      preservedPositions: candidate.diff.preservedPositions,
+    },
+  }
+}
+
+export function pendingAiSessionState(refinement: AiRefinementDto): AiSessionStateDto {
+  return { ...generatedAiSessionState(), refinement }
 }
