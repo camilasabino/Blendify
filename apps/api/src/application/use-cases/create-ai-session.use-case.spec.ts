@@ -60,6 +60,11 @@ function createUseCase(response: InterpretIntentResponse | Error) {
     releaseGenerationLock: jest.fn(() => Promise.resolve()),
     hasGenerationLock: jest.fn(() => Promise.resolve(false)),
     saveGenerationOutcome: jest.fn(() => Promise.resolve(true)),
+    acquireDestinationClaim: jest.fn(() => Promise.resolve('claim-1')),
+    releaseDestinationClaim: jest.fn(() => Promise.resolve()),
+    renewDestinationClaim: jest.fn(() => Promise.resolve(true)),
+    hasDestinationClaim: jest.fn(() => Promise.resolve(false)),
+    savePublishOutcome: jest.fn(() => Promise.resolve(true)),
     renewGenerationLock: jest.fn(() => Promise.resolve(true)),
   };
   const useCase = new CreateAiSessionUseCase(interpreter, sessions);

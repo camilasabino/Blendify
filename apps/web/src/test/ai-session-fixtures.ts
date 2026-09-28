@@ -3,6 +3,7 @@ import type {
   AiGenerationFailureDto,
   AiGenerationUnmetConstraint,
   AiIntentSummary,
+  AiSessionDestinationDto,
   AiSessionDto,
   AiSessionStateDto,
   TrackDto,
@@ -61,6 +62,7 @@ export function aiGeneration(
     intent: AiIntentSummary
     tracks: TrackDto[]
     unmetConstraints: AiGenerationUnmetConstraint[]
+    transferAvailable: boolean
   }> = {},
 ): AiGenerationDto {
   const tracks = overrides.tracks ?? aiTracks(20)
@@ -81,18 +83,22 @@ export function aiGeneration(
     trackCount: tracks.length,
     durationMs: tracks.reduce((total, track) => total + track.durationMs, 0),
     unmetConstraints: overrides.unmetConstraints ?? [],
+    transferAvailable: overrides.transferAvailable ?? true,
   }
 }
 
 export function reviewedAiSessionState(intent: AiIntentSummary = aiIntent): AiSessionStateDto {
-  return { ...reviewedAiSession(intent), execution: null }
+  return { ...reviewedAiSession(intent), execution: null, destination: null }
 }
 
 export function generatingAiSessionState(): AiSessionStateDto {
-  return { ...reviewedAiSession(), execution: { status: 'generating' } }
+  return { ...reviewedAiSession(), execution: { status: 'generating' }, destination: null }
 }
 
-export function generatedAiSessionState(generation = aiGeneration()): AiSessionStateDto {
+export function generatedAiSessionState(
+  generation = aiGeneration(),
+  destination: AiSessionDestinationDto | null = null,
+): AiSessionStateDto {
   return {
     ...reviewedAiSession(generation.intent),
     execution: {
@@ -101,12 +107,18 @@ export function generatedAiSessionState(generation = aiGeneration()): AiSessionS
       trackCount: generation.trackCount,
       durationMs: generation.durationMs,
       unmetConstraints: generation.unmetConstraints,
+      transferAvailable: generation.transferAvailable,
     },
+    destination,
   }
 }
 
 export function failedAiSessionState(error: AiGenerationFailureDto): AiSessionStateDto {
-  return { ...reviewedAiSession(), execution: { status: 'generation_failed', error } }
+  return {
+    ...reviewedAiSession(),
+    execution: { status: 'generation_failed', error },
+    destination: null,
+  }
 }
 
 export function storeAiSession(prompt = AI_PROMPT, playlistTitle: string | null = null) {

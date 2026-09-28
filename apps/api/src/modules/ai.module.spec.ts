@@ -9,7 +9,11 @@ import {
   INTENT_INTERPRETER,
   type IntentInterpreterPort,
 } from '@/domain/repositories/intent-interpreter.port';
+import { MUSIC_PROVIDER_FACTORY } from '@/domain/repositories/music-provider.factory.port';
+import { PLAYLIST_REPOSITORY } from '@/domain/repositories/playlist.repository.port';
 import { PROVIDER_QUOTA } from '@/domain/repositories/provider-quota.port';
+import { USAGE_STATS_REPOSITORY } from '@/domain/repositories/usage-stats.repository.port';
+import { USER_REPOSITORY } from '@/domain/repositories/user.repository.port';
 import { AiServiceIntentInterpreterAdapter } from '@/infrastructure/ai/ai-service-intent-interpreter.adapter';
 import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import { inMemoryRequestLimitProviders } from '@/presentation/request-limits/request-limits.testing';
@@ -23,6 +27,10 @@ import { AiModule } from './ai.module';
     { provide: CATALOG_PROVIDER_FACTORY, useValue: {} },
     { provide: DISCOVERY_CATALOG, useValue: {} },
     { provide: PROVIDER_QUOTA, useValue: {} },
+    { provide: PLAYLIST_REPOSITORY, useValue: {} },
+    { provide: USER_REPOSITORY, useValue: {} },
+    { provide: MUSIC_PROVIDER_FACTORY, useValue: {} },
+    { provide: USAGE_STATS_REPOSITORY, useValue: {} },
     ...inMemoryRequestLimitProviders(),
   ],
   exports: [
@@ -31,6 +39,10 @@ import { AiModule } from './ai.module';
     CATALOG_PROVIDER_FACTORY,
     DISCOVERY_CATALOG,
     PROVIDER_QUOTA,
+    PLAYLIST_REPOSITORY,
+    USER_REPOSITORY,
+    MUSIC_PROVIDER_FACTORY,
+    USAGE_STATS_REPOSITORY,
   ],
 })
 class StubInfrastructureModule {}

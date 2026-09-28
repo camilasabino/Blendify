@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { AiSessionStateDto } from '@blendify/contracts'
 import { expect, test } from './fixtures/test'
-import { mockGuestSession } from './fixtures/api-mocks'
+import { mockAuthenticatedSession, mockGuestSession } from './fixtures/api-mocks'
 import {
   AI_REVIEW_PROMPT,
   AI_REVIEW_SESSION_ID,
@@ -69,12 +69,22 @@ async function openRestored(page: Page, sessionState: AiSessionStateDto | null) 
 async function openReviewedLive(page: Page, sessionState: AiSessionStateDto) {
   await blockUnmockedRequests(page)
   await page.route('**/api/ai/sessions', (route) =>
-    route.fulfill({ status: 201, json: { ...sessionState, execution: undefined } }),
+    route.fulfill({ status: 201, json: { ...sessionState, execution: undefined, destination: undefined } }),
   )
   await page.goto('/app/ai')
   await page.getByRole('textbox', { name: 'Playlist request' }).fill(AI_REVIEW_PROMPT)
   await page.getByRole('button', { name: 'Review request' }).click()
 }
+
+async function openRestoredSpotify(page: Page, sessionState: AiSessionStateDto) {
+  await blockUnmockedRequests(page)
+  await mockAuthenticatedSession(page)
+  await restoreSession(page, sessionState)
+  await page.goto('/app/ai')
+}
+
+const SOUNDIIZ_URL = 'https://soundiiz.com/go/import-playlist/visualreviewtransfer'
+const SPOTIFY_URL = 'https://open.spotify.com/playlist/visual-review'
 
 function tracksDurationMs(sessionState: AiSessionStateDto): number {
   return sessionState.execution?.status === 'generated' ? sessionState.execution.durationMs : 0
@@ -285,5 +295,124 @@ test.describe('Create with AI visual review', () => {
     await expect(page.getByRole('button', { name: 'Create playlist' })).toBeVisible()
     await expect(page.getByText('Not used')).toBeVisible()
     await capture(page, '18-restored-reviewed')
+  })
+
+  test('19 Guest transfer preparing', async ({ page }) => {
+    await openRestored(page, generatedState({ withArtwork: true }))
+    await page.route(`${SESSION_URL}/transfer`, () => new Promise<void>(() => undefined))
+    await page.getByRole('button', { name: 'Prepare transfer' }).click()
+    await expect(page.getByRole('button', { name: 'Preparing transfer…' })).toBeDisabled()
+    await capture(page, '19-guest-transfer-preparing')
+  })
+
+  test('20 Guest transfer prepared', async ({ page }) => {
+    await openRestored(
+      page,
+      generatedState({
+        withArtwork: true,
+        destination: {
+          status: 'transfer_prepared',
+          transfer: { url: SOUNDIIZ_URL, expiresAt: '2099-01-01T00:00:00.000Z', trackCount: 20 },
+        },
+      }),
+    )
+    await expect(page.getByRole('link', { name: /Continue on Soundiiz/ })).toBeVisible()
+    await capture(page, '20-guest-transfer-prepared')
+  })
+
+  test('21 Guest transfer error', async ({ page }) => {
+    await openRestored(page, generatedState({ withArtwork: true }))
+    await page.route(`${SESSION_URL}/transfer`, (route) =>
+      route.fulfill({
+        status: 503,
+        json: {
+          statusCode: 503,
+          code: 'TRANSFER_PROVIDER_UNAVAILABLE',
+          message: 'Unavailable',
+          details: { retryAfterSeconds: 30 },
+        },
+      }),
+    )
+    await page.getByRole('button', { name: 'Prepare transfer' }).click()
+    await expect(page.getByText(/Soundiiz isn’t responding/)).toBeVisible()
+    await capture(page, '21-guest-transfer-error')
+  })
+
+  test('22 Spotify save CTA', async ({ page }) => {
+    await openRestoredSpotify(page, generatedState({ withArtwork: true, requestedMinutes: 60 }))
+    await expect(page.getByRole('button', { name: 'Save to Spotify' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Prepare transfer' })).toHaveCount(0)
+    await capture(page, '22-spotify-save')
+  })
+
+  test('23 Spotify saving', async ({ page }) => {
+    await openRestoredSpotify(page, generatedState({ withArtwork: true }))
+    await page.route(`${SESSION_URL}/publish`, () => new Promise<void>(() => undefined))
+    await page.getByRole('button', { name: 'Save to Spotify' }).click()
+    await expect(page.getByRole('button', { name: 'Saving to Spotify…' })).toBeDisabled()
+    await capture(page, '23-spotify-saving')
+  })
+
+  test('24 Spotify saved', async ({ page }) => {
+    await openRestoredSpotify(page, generatedState({ withArtwork: true }))
+    await page.route(`${SESSION_URL}/publish`, (route) =>
+      route.fulfill({
+        json: generatedState({
+          withArtwork: true,
+          destination: { status: 'published', spotifyUrl: SPOTIFY_URL, savedToLibrary: true },
+        }),
+      }),
+    )
+    await page.getByRole('button', { name: 'Save to Spotify' }).click()
+    await expect(page.getByRole('heading', { name: 'Saved to Spotify' })).toBeFocused()
+    await capture(page, '24-spotify-saved')
+  })
+
+  test('25 Spotify reauthorization required', async ({ page }) => {
+    await openRestoredSpotify(page, generatedState({ withArtwork: true }))
+    await page.route(`${SESSION_URL}/publish`, (route) =>
+      route.fulfill({
+        status: 401,
+        json: {
+          statusCode: 401,
+          code: 'SPOTIFY_REAUTH_REQUIRED',
+          message: 'Spotify authorization is no longer valid. Reconnect Spotify.',
+        },
+      }),
+    )
+    await page.getByRole('button', { name: 'Save to Spotify' }).click()
+    await expect(page.getByRole('button', { name: 'Connect Spotify' }).last()).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save to Spotify' })).toHaveCount(0)
+    await capture(page, '25-spotify-reconnect')
+  })
+
+  test('26 Spotify rate limited', async ({ page }) => {
+    await openRestoredSpotify(page, generatedState({ withArtwork: true }))
+    await page.route(`${SESSION_URL}/publish`, (route) =>
+      route.fulfill({
+        status: 429,
+        json: {
+          statusCode: 429,
+          code: 'SPOTIFY_RATE_LIMITED',
+          message: 'Limited',
+          details: { retryAfterSeconds: 45 },
+        },
+      }),
+    )
+    await page.getByRole('button', { name: 'Save to Spotify' }).click()
+    await expect(page.getByText(/Too many requests/)).toBeVisible()
+    await capture(page, '26-spotify-rate-limited')
+  })
+
+  test('27 Spotify publish incomplete', async ({ page }) => {
+    await openRestoredSpotify(
+      page,
+      generatedState({
+        withArtwork: true,
+        destination: { status: 'publish_incomplete', spotifyUrl: SPOTIFY_URL },
+      }),
+    )
+    await expect(page.getByRole('heading', { name: 'Couldn’t finish saving to Spotify' })).toBeVisible()
+    await capture(page, '27-spotify-incomplete')
   })
 })

@@ -8,6 +8,8 @@ import type {
 import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
 import { Playlist } from '@/domain/playlist/playlist.entity';
 import { Track } from '@/domain/track/track.entity';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import type { PlaylistTransferOffer } from '@/application/services/playlist-transfer-tokens.service';
 
 export function toTrackResponse(track: Track): TrackDto {
@@ -26,6 +28,24 @@ export function toTrackResponse(track: Track): TrackDto {
     isrc: track.isrc,
     externalUrl: track.externalUrl,
   };
+}
+
+export function fromTrackResponse(track: TrackDto): Track {
+  return Track.create({
+    id: TrackId.create(track.id),
+    name: track.name,
+    artistId: ArtistId.create(track.artistId),
+    artistName: track.artistName,
+    durationMs: track.durationMs,
+    popularity: track.popularity,
+    uri: track.uri,
+    albumName: track.albumName,
+    albumImageUrl: track.albumImageUrl ?? undefined,
+    previewUrl: track.previewUrl ?? undefined,
+    artists: track.artists,
+    isrc: track.isrc,
+    externalUrl: track.externalUrl,
+  });
 }
 
 export function toPlaylistSummary(playlist: Playlist): PlaylistSummary {

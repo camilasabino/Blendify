@@ -3,7 +3,10 @@ export type AiSessionErrorCode =
   | 'AI_CLARIFICATION_OPTION_UNAVAILABLE'
   | 'AI_SESSION_NOT_READY'
   | 'AI_GENERATION_IN_PROGRESS'
-  | 'AI_GENERATION_SUPERSEDED';
+  | 'AI_GENERATION_SUPERSEDED'
+  | 'AI_PLAYLIST_NOT_GENERATED'
+  | 'AI_DESTINATION_IN_PROGRESS'
+  | 'AI_DESTINATION_UNAVAILABLE';
 
 export class AiSessionError extends Error {
   private constructor(
@@ -40,6 +43,27 @@ export class AiSessionError extends Error {
     return new AiSessionError(
       'AI_GENERATION_IN_PROGRESS',
       'This playlist is already being created.',
+    );
+  }
+
+  static playlistNotGenerated(): AiSessionError {
+    return new AiSessionError(
+      'AI_PLAYLIST_NOT_GENERATED',
+      'Create the playlist preview before saving or transferring it.',
+    );
+  }
+
+  static destinationInProgress(): AiSessionError {
+    return new AiSessionError(
+      'AI_DESTINATION_IN_PROGRESS',
+      'This playlist is already being saved or transferred.',
+    );
+  }
+
+  static destinationUnavailable(): AiSessionError {
+    return new AiSessionError(
+      'AI_DESTINATION_UNAVAILABLE',
+      'This playlist was already sent to Spotify.',
     );
   }
 

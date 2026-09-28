@@ -24,6 +24,9 @@ import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
 import { GenerateAiPlaylistUseCase } from '@/application/use-cases/generate-ai-playlist.use-case';
 import { GetAiSessionUseCase } from '@/application/use-cases/get-ai-session.use-case';
+import { PublishAiPlaylistUseCase } from '@/application/use-cases/publish-ai-playlist.use-case';
+import { TransferAiPlaylistUseCase } from '@/application/use-cases/transfer-ai-playlist.use-case';
+import { PublishPlaylistService } from '@/application/services/publish-playlist.service';
 import {
   GeneratePlaylistUseCase,
   type PlaylistGenerationRequest,
@@ -35,10 +38,23 @@ import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
 import type { AiSession } from '@/domain/ai/ai-session';
 import { AiInterpretationError } from '@/domain/errors/ai-interpretation.error';
+import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-unknown.error';
+import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
+import { TransferError } from '@/domain/errors/transfer.error';
 import { AI_SESSION_REPOSITORY } from '@/domain/repositories/ai-session.repository.port';
 import { CATALOG_PROVIDER_FACTORY } from '@/domain/repositories/catalog-provider.port';
 import { DISCOVERY_CATALOG } from '@/domain/repositories/discovery-catalog.port';
 import { INTENT_INTERPRETER } from '@/domain/repositories/intent-interpreter.port';
+import { MUSIC_PROVIDER_FACTORY } from '@/domain/repositories/music-provider.factory.port';
+import type { ProviderPlaylist } from '@/domain/repositories/music-provider.port';
+import { PLAYLIST_REPOSITORY } from '@/domain/repositories/playlist.repository.port';
+import {
+  PLAYLIST_TRANSFER_GATEWAY,
+  type PlaylistTransfer,
+} from '@/domain/repositories/playlist-transfer.gateway.port';
+import { USAGE_STATS_REPOSITORY } from '@/domain/repositories/usage-stats.repository.port';
+import type { Playlist } from '@/domain/playlist/playlist.entity';
+import type { TransferPlaylist } from '@/domain/transfer/transfer-playlist';
 import { USER_REPOSITORY } from '@/domain/repositories/user.repository.port';
 import { User } from '@/domain/user/user.entity';
 import { AiServiceIntentInterpreterAdapter } from '@/infrastructure/ai/ai-service-intent-interpreter.adapter';
@@ -47,6 +63,7 @@ import { JwtStrategy } from '@/infrastructure/auth/jwt.strategy';
 import { SpotifyAuthClient } from '@/infrastructure/spotify/spotify-auth.client';
 import { createSpotifyQuotaError } from '@/infrastructure/spotify/spotify-quota-error';
 import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
+import { GuestTransferGate } from '@/presentation/guards/guest-transfer.gate';
 import { OriginCsrfGuard } from '@/presentation/guards/origin-csrf.guard';
 import { createBodyParser } from '@/presentation/http/body-limits';
 import { DEFAULT_RATE_LIMITS } from '@/presentation/request-limits/request-limits.config';
@@ -97,10 +114,46 @@ function unavailableProvider() {
   });
 }
 
+const SPOTIFY_PLAYLIST: ProviderPlaylist = {
+  id: 'spotify-playlist-1',
+  url: 'https://open.spotify.com/playlist/spotify-playlist-1',
+};
+const SOUNDIIZ_URL = 'https://soundiiz.com/go/import-playlist/abcdefghijklmnop';
+
 function createWorld() {
   const stored = new Map<string, AiSession>();
+  const claims = new Map<string, string>();
+  const spotify = {
+    createPlaylist: jest.fn<Promise<ProviderPlaylist>, [unknown]>(() =>
+      Promise.resolve(SPOTIFY_PLAYLIST),
+    ),
+    addTracksToPlaylist: jest.fn<Promise<void>, [string, string[]]>(() =>
+      Promise.resolve(),
+    ),
+    uploadPlaylistCover: jest.fn<Promise<void>, [string, string]>(() =>
+      Promise.resolve(),
+    ),
+    getPlaylistSnapshot: jest.fn(() => Promise.resolve(null)),
+  };
   return {
     stored,
+    claims,
+    spotify,
+    musicProviders: { forUser: jest.fn(() => spotify) },
+    playlists: {
+      save: jest.fn((playlist: Playlist) => Promise.resolve(playlist)),
+    },
+    usageStats: { recordMix: jest.fn(() => Promise.resolve()) },
+    soundiiz: {
+      createTransfer: jest.fn<Promise<PlaylistTransfer>, [TransferPlaylist]>(
+        (playlist) =>
+          Promise.resolve({
+            url: SOUNDIIZ_URL,
+            expiresAt: new Date(Date.now() + 60 * 60_000),
+            trackCount: playlist.tracks.length,
+          }),
+      ),
+    },
     interpreter: {
       interpretIntent: jest.fn<
         Promise<InterpretIntentResponse>,
@@ -143,6 +196,39 @@ function createWorld() {
         },
       ),
       renewGenerationLock: jest.fn(() => Promise.resolve(true)),
+      acquireDestinationClaim: jest.fn((token: string) => {
+        if (claims.has(token)) {
+          return Promise.resolve<string | null>(null);
+        }
+        const claimId = `claim-${claims.size + 1}`;
+        claims.set(token, claimId);
+        return Promise.resolve<string | null>(claimId);
+      }),
+      releaseDestinationClaim: jest.fn((token: string, claimId: string) => {
+        if (claims.get(token) === claimId) {
+          claims.delete(token);
+        }
+        return Promise.resolve();
+      }),
+      renewDestinationClaim: jest.fn((token: string, claimId: string) =>
+        Promise.resolve(claims.get(token) === claimId),
+      ),
+      hasDestinationClaim: jest.fn((token: string) =>
+        Promise.resolve(claims.has(token)),
+      ),
+      savePublishOutcome: jest.fn(
+        (token: string, session: AiSession, attemptId: string) => {
+          const current = stored.get(token)?.destination;
+          if (
+            current?.status !== 'publishing' ||
+            current.attemptId !== attemptId
+          ) {
+            return Promise.resolve(false);
+          }
+          stored.set(token, session);
+          return Promise.resolve(true);
+        },
+      ),
     },
     generator: {
       execute: jest.fn<
@@ -208,12 +294,19 @@ async function createApp(
     provide: INTENT_INTERPRETER,
     useValue: world.interpreter,
   },
+  options: { transferEnabled?: boolean; generationLimit?: number } = {},
 ): Promise<INestApplication> {
   const module = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({
         ignoreEnvFile: true,
-        load: [() => ({ FRONTEND_URL: FRONTEND, JWT_SECRET })],
+        load: [
+          () => ({
+            FRONTEND_URL: FRONTEND,
+            JWT_SECRET,
+            GUEST_TRANSFER_ENABLED: String(options.transferEnabled ?? true),
+          }),
+        ],
       }),
       PassportModule.register({ defaultStrategy: 'jwt' }),
       JwtModule.register({
@@ -232,10 +325,10 @@ async function createApp(
         useValue: {
           findById: (id: string) =>
             Promise.resolve(
-              id === 'user-1'
+              id === 'user-1' || id === 'user-2'
                 ? User.create({
-                    id: 'user-1',
-                    spotifyId: 'spotify-user-1',
+                    id,
+                    spotifyId: `spotify-${id}`,
                     displayName: 'Listener',
                   })
                 : null,
@@ -253,6 +346,14 @@ async function createApp(
       AiIntentResolver,
       GenerateAiPlaylistUseCase,
       GetAiSessionUseCase,
+      { provide: MUSIC_PROVIDER_FACTORY, useValue: world.musicProviders },
+      { provide: PLAYLIST_REPOSITORY, useValue: world.playlists },
+      { provide: USAGE_STATS_REPOSITORY, useValue: world.usageStats },
+      { provide: PLAYLIST_TRANSFER_GATEWAY, useValue: world.soundiiz },
+      GuestTransferGate,
+      PublishPlaylistService,
+      PublishAiPlaylistUseCase,
+      TransferAiPlaylistUseCase,
       ...inMemoryRequestLimitProviders({
         rateLimits: {
           ...DEFAULT_RATE_LIMITS,
@@ -262,7 +363,7 @@ async function createApp(
           },
           generation: {
             ...DEFAULT_RATE_LIMITS.generation,
-            limit: GENERATION_LIMIT,
+            limit: options.generationLimit ?? GENERATION_LIMIT,
           },
         },
       }),
@@ -925,7 +1026,9 @@ describe('Create with AI sessions over HTTP', () => {
       trackCount: generation.trackCount,
       durationMs: generation.durationMs,
       unmetConstraints: generation.unmetConstraints,
+      transferAvailable: true,
     });
+    expect(state.destination).toBeNull();
     expect(JSON.stringify(restored.body)).not.toMatch(
       /startedAt|attemptId|recipe|ownerUserId|originalPrompt|aiSafe|lease|"generation"/,
     );
@@ -1028,5 +1131,425 @@ describe('Create with AI sessions over HTTP', () => {
     }
     await readSession(sessionId, owner).expect(200);
     expectNoReadSideEffects(1);
+  });
+
+  describe('destination actions', () => {
+    const PUBLISH = { name: 'My edited title', persistToLibrary: true };
+
+    function publish(sessionId: string, body: object, cookie?: string) {
+      const req = request(server())
+        .post(`${SESSIONS_PATH}/${sessionId}/publish`)
+        .set('Origin', FRONTEND)
+        .send(body);
+      return cookie ? req.set('Cookie', cookie) : req;
+    }
+
+    function transfer(sessionId: string, body: object, cookie?: string) {
+      const req = request(server())
+        .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+        .set('Origin', FRONTEND)
+        .send(body);
+      return cookie ? req.set('Cookie', cookie) : req;
+    }
+
+    async function generatedSession(cookie?: string): Promise<string> {
+      useWorkingProviders();
+      const created = await createSession({ prompt: PROMPT }, cookie).expect(
+        201,
+      );
+      const sessionId = (created.body as AiSessionDto).sessionId;
+      await generate(sessionId, cookie).expect(200);
+      return sessionId;
+    }
+
+    async function restartWithGenerationLimit(limit: number): Promise<void> {
+      await app.close();
+      app = await createApp(
+        world,
+        { provide: INTENT_INTERPRETER, useValue: world.interpreter },
+        { generationLimit: limit },
+      );
+    }
+
+    function expectNoDestinationSideEffects(): void {
+      expect(world.musicProviders.forUser).not.toHaveBeenCalled();
+      expect(world.spotify.createPlaylist).not.toHaveBeenCalled();
+      expect(world.spotify.addTracksToPlaylist).not.toHaveBeenCalled();
+      expect(world.playlists.save).not.toHaveBeenCalled();
+      expect(world.usageStats.recordMix).not.toHaveBeenCalled();
+      expect(world.soundiiz.createTransfer).not.toHaveBeenCalled();
+    }
+
+    it('performs no destination side effect when generating or restoring', async () => {
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+      const guestSessionId = await generatedSession();
+
+      const restored = AiSessionStateSchema.parse(
+        (await readSession(sessionId, owner).expect(200)).body,
+      );
+      const guestRestored = AiSessionStateSchema.parse(
+        (await readSession(guestSessionId).expect(200)).body,
+      );
+
+      expect(restored.destination).toBeNull();
+      expect(restored.execution).toMatchObject({ transferAvailable: false });
+      expect(guestRestored.destination).toBeNull();
+      expect(guestRestored.execution).toMatchObject({
+        transferAvailable: true,
+      });
+      expectNoDestinationSideEffects();
+    });
+
+    it('denies Spotify publishing to Guest sessions without any side effect', async () => {
+      const sessionId = await generatedSession();
+
+      const response = await publish(sessionId, PUBLISH).expect(401);
+
+      expect(response.body).toMatchObject({ code: 'UNAUTHORIZED' });
+      expect(world.stored.get(sessionId)?.destination).toBeNull();
+      expectNoDestinationSideEffects();
+    });
+
+    it('publishes the server-held playlist under the edited name for the current user', async () => {
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+
+      const response = await publish(sessionId, PUBLISH, owner).expect(200);
+
+      const state = AiSessionStateSchema.parse(response.body);
+      expect(state.destination).toEqual({
+        status: 'published',
+        spotifyUrl: SPOTIFY_PLAYLIST.url,
+        savedToLibrary: true,
+      });
+      expect(world.musicProviders.forUser).toHaveBeenCalledWith('user-1');
+      expect(world.spotify.createPlaylist).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'spotify-user-1',
+          name: 'My edited title',
+          isPublic: false,
+        }),
+      );
+      expect(world.spotify.addTracksToPlaylist).toHaveBeenCalledWith(
+        SPOTIFY_PLAYLIST.id,
+        ['spotify:track:r1', 'spotify:track:r2'],
+      );
+      const saved = world.playlists.save.mock.calls[0][0];
+      expect(saved.name.getValue()).toBe('My edited title');
+      expect(saved.userId).toBe('user-1');
+      expect(saved.kind).toBe('artist_mix');
+      expect(world.usageStats.recordMix).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', kind: 'artist' }),
+      );
+      expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
+      expect(world.generator.execute).toHaveBeenCalledTimes(1);
+
+      const restoredBody: unknown = (
+        await readSession(sessionId, owner).expect(200)
+      ).body;
+      const restored = AiSessionStateSchema.parse(restoredBody);
+      expect(restored.destination).toEqual(state.destination);
+      expect(JSON.stringify(restoredBody)).not.toMatch(
+        /spotifyId|publishedAt|startedAt/,
+      );
+    });
+
+    it('keeps the playlist out of the Library when the user preference says so', async () => {
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+
+      const response = await publish(
+        sessionId,
+        { ...PUBLISH, persistToLibrary: false },
+        owner,
+      ).expect(200);
+
+      expect(AiSessionStateSchema.parse(response.body).destination).toEqual({
+        status: 'published',
+        spotifyUrl: SPOTIFY_PLAYLIST.url,
+        savedToLibrary: false,
+      });
+      expect(world.playlists.save).not.toHaveBeenCalled();
+      expect(world.usageStats.recordMix).toHaveBeenCalledTimes(1);
+    });
+
+    it('never accepts browser-supplied playlist contents or an invalid name', async () => {
+      await restartWithGenerationLimit(10);
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+
+      for (const body of [
+        { ...PUBLISH, tracks: [{ uri: 'spotify:track:foreign' }] },
+        { ...PUBLISH, trackUris: ['spotify:track:foreign'] },
+        { ...PUBLISH, name: '   ' },
+        { ...PUBLISH, name: 'x'.repeat(101) },
+      ]) {
+        const response = await publish(sessionId, body, owner).expect(400);
+        expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+      }
+      for (const body of [
+        { name: 'Mix', tracks: [{ title: 'Foreign', artists: ['X'] }] },
+        { name: '' },
+      ]) {
+        await transfer(sessionId, body, owner).expect(400);
+      }
+      expectNoDestinationSideEffects();
+    });
+
+    it('does not create a second Spotify playlist when publish is repeated', async () => {
+      await restartWithGenerationLimit(10);
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+
+      await publish(sessionId, PUBLISH, owner).expect(200);
+      const again = await publish(sessionId, PUBLISH, owner).expect(200);
+
+      expect(AiSessionStateSchema.parse(again.body).destination).toMatchObject({
+        status: 'published',
+      });
+      expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(1);
+      expect(world.playlists.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('lets the user retry after a failure that happened before Spotify created anything', async () => {
+      await restartWithGenerationLimit(5);
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+      world.spotify.createPlaylist.mockRejectedValueOnce(
+        createSpotifyQuotaError({
+          retryAfterSeconds: 120,
+          reason: 'rate_limit',
+        }),
+      );
+
+      const failed = await publish(sessionId, PUBLISH, owner).expect(429);
+
+      expect(failed.body).toMatchObject({
+        code: 'SPOTIFY_RATE_LIMITED',
+        details: { retryAfterSeconds: 120 },
+      });
+      expect(world.stored.get(sessionId)?.destination).toBeNull();
+      expect(world.claims.size).toBe(0);
+
+      await publish(sessionId, PUBLISH, owner).expect(200);
+      expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(2);
+      expect(world.spotify.addTracksToPlaylist).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports a partial publish with its Spotify link and never publishes it again', async () => {
+      await restartWithGenerationLimit(5);
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+      world.spotify.addTracksToPlaylist.mockRejectedValueOnce(
+        new Error('Spotify addTracksToPlaylist failed (500): boom'),
+      );
+
+      const partial = await publish(sessionId, PUBLISH, owner).expect(200);
+      const repeated = await publish(sessionId, PUBLISH, owner).expect(200);
+
+      for (const response of [partial, repeated]) {
+        expect(AiSessionStateSchema.parse(response.body).destination).toEqual({
+          status: 'publish_incomplete',
+          spotifyUrl: SPOTIFY_PLAYLIST.url,
+        });
+      }
+      expect(JSON.stringify(partial.body)).not.toContain('boom');
+      expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(1);
+      expect(world.playlists.save).not.toHaveBeenCalled();
+    });
+
+    it('treats an unknown creation outcome as uncertain instead of retryable', async () => {
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+      world.spotify.createPlaylist.mockRejectedValueOnce(
+        new ProviderOutcomeUnknownError(
+          'Spotify createPlaylist failed (undefined): timeout',
+        ),
+      );
+
+      const response = await publish(sessionId, PUBLISH, owner).expect(200);
+
+      expect(AiSessionStateSchema.parse(response.body).destination).toEqual({
+        status: 'publish_incomplete',
+        spotifyUrl: null,
+      });
+      expect(world.stored.get(sessionId)?.destination).toMatchObject({
+        status: 'publish_incomplete',
+      });
+      expect(world.claims.size).toBe(0);
+    });
+
+    it('refuses destinations for sessions that are not generated, expired or foreign', async () => {
+      const owner = await sessionCookie('user-1');
+      const other = await sessionCookie('user-2');
+      const created = await createSession({ prompt: PROMPT }, owner).expect(
+        201,
+      );
+      const reviewedId = (created.body as AiSessionDto).sessionId;
+
+      const notGenerated = await publish(reviewedId, PUBLISH, owner).expect(
+        409,
+      );
+      expect(notGenerated.body).toMatchObject({
+        code: 'AI_PLAYLIST_NOT_GENERATED',
+      });
+      await transfer(reviewedId, { name: 'Mix' }, owner).expect(409);
+      await publish(reviewedId, PUBLISH, other).expect(404);
+      await publish('unknown-session', PUBLISH, owner).expect(404);
+      await transfer('unknown-session', { name: 'Mix' }).expect(404);
+      expect(world.generator.execute).not.toHaveBeenCalled();
+      expectNoDestinationSideEffects();
+    });
+
+    it('limits Spotify publishing with the existing generation bucket', async () => {
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+
+      await publish(sessionId, PUBLISH, owner).expect(200);
+      const limited = await publish(sessionId, PUBLISH, owner).expect(429);
+
+      expect(limited.body).toMatchObject({ code: 'RATE_LIMITED' });
+      expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(1);
+    });
+
+    it('prepares a Guest Soundiiz transfer from the server-held playlist under the edited name', async () => {
+      const sessionId = await generatedSession();
+
+      const response = await transfer(sessionId, {
+        name: '  Edited for Soundiiz ',
+      }).expect(200);
+      const repeated = await transfer(sessionId, { name: 'Other' }).expect(200);
+
+      const expected = {
+        status: 'transfer_prepared',
+        transfer: {
+          url: SOUNDIIZ_URL,
+          expiresAt: expect.any(String) as string,
+          trackCount: 2,
+        },
+      };
+      expect(AiSessionStateSchema.parse(response.body).destination).toEqual(
+        expected,
+      );
+      expect(AiSessionStateSchema.parse(repeated.body).destination).toEqual(
+        expected,
+      );
+      expect(world.soundiiz.createTransfer).toHaveBeenCalledTimes(1);
+      expect(world.soundiiz.createTransfer).toHaveBeenCalledWith({
+        title: 'Edited for Soundiiz',
+        tracks: [
+          { title: 'Song r1', artists: ['Radiohead'] },
+          { title: 'Song r2', artists: ['Radiohead'] },
+        ],
+      });
+      expect(world.spotify.createPlaylist).not.toHaveBeenCalled();
+      expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
+
+      const restored = AiSessionStateSchema.parse(
+        (await readSession(sessionId).expect(200)).body,
+      );
+      expect(restored.destination).toEqual(expected);
+    });
+
+    it('keeps the Soundiiz error typed and lets the Guest retry', async () => {
+      const sessionId = await generatedSession();
+      world.soundiiz.createTransfer.mockRejectedValueOnce(
+        TransferError.providerUnavailable(30),
+      );
+
+      const failed = await transfer(sessionId, { name: 'Mix' }).expect(503);
+
+      expect(failed.body).toMatchObject({
+        code: 'TRANSFER_PROVIDER_UNAVAILABLE',
+        details: { retryAfterSeconds: 30 },
+      });
+      expect(world.stored.get(sessionId)?.destination).toBeNull();
+      await transfer(sessionId, { name: 'Mix' }).expect(200);
+      expect(world.soundiiz.createTransfer).toHaveBeenCalledTimes(2);
+    });
+
+    it('hides the transfer when Guest transfer is disabled', async () => {
+      await app.close();
+      app = await createApp(
+        world,
+        { provide: INTENT_INTERPRETER, useValue: world.interpreter },
+        { transferEnabled: false },
+      );
+      const sessionId = await generatedSession();
+
+      const restored = AiSessionStateSchema.parse(
+        (await readSession(sessionId).expect(200)).body,
+      );
+      await transfer(sessionId, { name: 'Mix' }).expect(404);
+
+      expect(restored.execution).toMatchObject({ transferAvailable: false });
+      expectNoDestinationSideEffects();
+    });
+
+    it('denies the Guest Soundiiz transfer in Spotify Mode without any side effect', async () => {
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+
+      const response = await transfer(sessionId, { name: 'Mix' }, owner).expect(
+        409,
+      );
+
+      expect(response.body).toMatchObject({
+        code: 'AI_DESTINATION_UNAVAILABLE',
+      });
+      expect(world.stored.get(sessionId)?.destination).toBeNull();
+      expect(world.claims.size).toBe(0);
+      expectNoDestinationSideEffects();
+    });
+
+    it('follows the current mode for a Guest session whose owner then connects Spotify', async () => {
+      const sessionId = await generatedSession();
+      const owner = await sessionCookie('user-1');
+
+      const denied = await transfer(sessionId, { name: 'Mix' }, owner).expect(
+        409,
+      );
+      const published = await publish(sessionId, PUBLISH, owner).expect(200);
+
+      expect(denied.body).toMatchObject({ code: 'AI_DESTINATION_UNAVAILABLE' });
+      expect(AiSessionStateSchema.parse(published.body)).toMatchObject({
+        destination: { status: 'published' },
+        execution: { transferAvailable: false },
+      });
+      expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(1);
+      expect(world.soundiiz.createTransfer).not.toHaveBeenCalled();
+
+      const guestAgain = await transfer(sessionId, { name: 'Mix' }).expect(409);
+      expect(guestAgain.body).toMatchObject({
+        code: 'AI_DESTINATION_UNAVAILABLE',
+      });
+      expect(world.soundiiz.createTransfer).not.toHaveBeenCalled();
+    });
+
+    it('asks for Spotify reauthorization when the stored authorization was revoked, and lets the user publish again after reconnecting', async () => {
+      await restartWithGenerationLimit(5);
+      const owner = await sessionCookie('user-1');
+      const sessionId = await generatedSession(owner);
+      world.spotify.createPlaylist.mockRejectedValueOnce(
+        new SpotifyReauthRequiredError(),
+      );
+
+      const failed = await publish(sessionId, PUBLISH, owner).expect(401);
+
+      expect(failed.body).toMatchObject({ code: 'SPOTIFY_REAUTH_REQUIRED' });
+      const restored = AiSessionStateSchema.parse(
+        (await readSession(sessionId, owner).expect(200)).body,
+      );
+      expect(restored.destination).toBeNull();
+      expect(restored.execution).toMatchObject({ status: 'generated' });
+      expect(world.claims.size).toBe(0);
+      expect(world.spotify.addTracksToPlaylist).not.toHaveBeenCalled();
+
+      await publish(sessionId, PUBLISH, owner).expect(200);
+      expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(2);
+      expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
+      expect(world.generator.execute).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -63,6 +63,7 @@ function session(overrides: Partial<AiSession> = {}): AiSession {
     aiSafe: { intent: reviewed },
     clarification: findIntentClarification(reviewed),
     execution: null,
+    destination: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 30 * MINUTE_MS).toISOString(),
@@ -190,6 +191,11 @@ function createWorld(initial: AiSession | null = session()) {
         return Promise.resolve(true);
       },
     ),
+    acquireDestinationClaim: jest.fn(() => Promise.resolve('claim-1')),
+    releaseDestinationClaim: jest.fn(() => Promise.resolve()),
+    renewDestinationClaim: jest.fn(() => Promise.resolve(true)),
+    hasDestinationClaim: jest.fn(() => Promise.resolve(false)),
+    savePublishOutcome: jest.fn(() => Promise.resolve(true)),
     renewGenerationLock: jest.fn(
       (token: string, leaseId: string, ttlMs: number) =>
         Promise.resolve(locks.renew(token, leaseId, ttlMs)),
@@ -948,8 +954,12 @@ describe('GenerateAiPlaylistUseCase', () => {
     );
 
     const { token, session: result } = await run(world);
-    const response = toAiGenerationResponse(token, result);
-    const state = toAiSessionStateResponse(token, result);
+    const response = toAiGenerationResponse(token, result, {
+      transferEnabled: false,
+    });
+    const state = toAiSessionStateResponse(token, result, {
+      transferEnabled: false,
+    });
 
     expect(world.generator.execute.mock.calls[0][0]).toMatchObject({
       kind: 'discover_artist',

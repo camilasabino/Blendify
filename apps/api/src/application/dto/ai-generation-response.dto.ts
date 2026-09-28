@@ -1,21 +1,30 @@
 import type {
   AiGenerationDto,
+  AiSessionDestinationDto,
   AiSessionExecutionDto,
   AiSessionStateDto,
 } from '@blendify/contracts';
-import type {
-  AiGenerationResult,
-  AiSession,
-  AiSessionExecution,
+import {
+  currentDestination,
+  type AiGenerationResult,
+  type AiSession,
+  type AiSessionDestination,
+  type AiSessionExecution,
 } from '@/domain/ai/ai-session';
+import { toAiTransferPlaylist } from '@/application/services/ai-transfer-playlist';
 import {
   toAiSessionResponse,
   toIntentSummary,
 } from './ai-session-response.dto';
 
+export interface AiDestinationOptions {
+  transferEnabled: boolean;
+}
+
 export function toAiGenerationResponse(
   token: string,
   session: AiSession,
+  options: AiDestinationOptions,
 ): AiGenerationDto {
   const intent = session.aiSafe.intent;
   const execution = session.execution;
@@ -29,26 +38,38 @@ export function toAiGenerationResponse(
     expiresAt: session.expiresAt,
     status: 'generated',
     intent: toIntentSummary(intent),
-    ...toGenerationOutcome(execution.result),
+    ...toGenerationOutcome(execution.result, options),
   };
 }
 
 export function toAiSessionStateResponse(
   token: string,
   session: AiSession,
+  options: AiDestinationOptions,
 ): AiSessionStateDto {
+  const destination = currentDestination(session, new Date());
+
   return {
     ...toAiSessionResponse(token, session),
-    execution: session.execution ? toExecution(session.execution) : null,
+    execution: session.execution
+      ? toExecution(session.execution, options)
+      : null,
+    destination: destination ? toDestination(destination) : null,
   };
 }
 
-function toExecution(execution: AiSessionExecution): AiSessionExecutionDto {
+function toExecution(
+  execution: AiSessionExecution,
+  options: AiDestinationOptions,
+): AiSessionExecutionDto {
   switch (execution.status) {
     case 'generating':
       return { status: 'generating' };
     case 'generated':
-      return { status: 'generated', ...toGenerationOutcome(execution.result) };
+      return {
+        status: 'generated',
+        ...toGenerationOutcome(execution.result, options),
+      };
     case 'generation_failed':
       return {
         status: 'generation_failed',
@@ -62,7 +83,35 @@ function toExecution(execution: AiSessionExecution): AiSessionExecutionDto {
   }
 }
 
-function toGenerationOutcome(result: AiGenerationResult) {
+function toDestination(
+  destination: AiSessionDestination,
+): AiSessionDestinationDto {
+  switch (destination.status) {
+    case 'publishing':
+      return { status: 'publishing' };
+    case 'published':
+      return {
+        status: 'published',
+        spotifyUrl: destination.spotifyPlaylist.spotifyUrl,
+        savedToLibrary: destination.savedToLibrary,
+      };
+    case 'publish_incomplete':
+      return {
+        status: 'publish_incomplete',
+        spotifyUrl: destination.spotifyPlaylist?.spotifyUrl ?? null,
+      };
+    case 'transfer_prepared':
+      return {
+        status: 'transfer_prepared',
+        transfer: { ...destination.transfer },
+      };
+  }
+}
+
+function toGenerationOutcome(
+  result: AiGenerationResult,
+  options: AiDestinationOptions,
+) {
   const { name, description, seeds, tracks, coverArtwork } = result.playlist;
 
   return {
@@ -76,5 +125,7 @@ function toGenerationOutcome(result: AiGenerationResult) {
     trackCount: tracks.length,
     durationMs: result.durationMs,
     unmetConstraints: result.unmetConstraints,
+    transferAvailable:
+      options.transferEnabled && toAiTransferPlaylist(result, name) !== null,
   };
 }

@@ -2,6 +2,7 @@ import { AiGenerationError } from '@/domain/errors/ai-generation.error';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import { TransferError } from '@/domain/errors/transfer.error';
 import { toApiErrorResponse } from './api-error-response';
 
@@ -18,6 +19,20 @@ describe('toApiErrorResponse', () => {
       code: 'CATALOG_UNAVAILABLE',
       message:
         'The music catalog is temporarily unavailable. Try again shortly.',
+    });
+  });
+
+  it('maps a revoked Spotify authorization to a typed 401 without the provider cause', () => {
+    const response = toApiErrorResponse(
+      new SpotifyReauthRequiredError({
+        cause: new Error('invalid_grant: Refresh token revoked'),
+      }),
+    );
+
+    expect(response).toEqual({
+      statusCode: 401,
+      code: 'SPOTIFY_REAUTH_REQUIRED',
+      message: 'Spotify authorization is no longer valid. Reconnect Spotify.',
     });
   });
 

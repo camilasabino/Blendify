@@ -3,6 +3,7 @@ import type {
   AiGenerationFailureDto,
   AiGenerationUnmetConstraint,
   AiIntentSummary,
+  AiSessionDestinationDto,
   AiSessionStateDto,
   TrackDto,
 } from '@blendify/contracts'
@@ -82,6 +83,7 @@ function syntheticTrack(index: number): TrackDto {
 function state(
   intent: AiIntentSummary,
   execution: AiSessionStateDto['execution'],
+  destination: AiSessionDestinationDto | null = null,
 ): AiSessionStateDto {
   return {
     sessionId: AI_REVIEW_SESSION_ID,
@@ -90,6 +92,7 @@ function state(
     intent,
     clarification: null,
     execution,
+    destination,
   }
 }
 
@@ -101,6 +104,7 @@ export function clarificationState(): AiSessionStateDto {
     intent: null,
     clarification,
     execution: null,
+    destination: null,
   }
 }
 
@@ -119,6 +123,8 @@ export function generatedState(
     requestedMinutes?: number | null
     unmetConstraints?: AiGenerationUnmetConstraint[]
     withArtwork?: boolean
+    transferAvailable?: boolean
+    destination?: AiSessionDestinationDto | null
   } = {},
 ): AiSessionStateDto {
   const tracks = Array.from({ length: options.trackCount ?? 20 }, (_, index) =>
@@ -151,7 +157,8 @@ export function generatedState(
     trackCount: tracks.length,
     durationMs: tracks.reduce((total, track) => total + track.durationMs, 0),
     unmetConstraints: options.unmetConstraints ?? [],
-  })
+    transferAvailable: options.transferAvailable ?? true,
+  }, options.destination ?? null)
 }
 
 export function failedState(error: AiGenerationFailureDto): AiSessionStateDto {

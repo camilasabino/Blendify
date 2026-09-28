@@ -185,6 +185,7 @@ describe('getApiErrorMessage', () => {
     ['PLAYBACK_UNAUTHORIZED', 'preview.sessionExpired'],
     ['PLAYBACK_INVALID', 'preview.invalidPlayback'],
     ['PLAYBACK_FAILED', 'preview.playError'],
+    ['SPOTIFY_REAUTH_REQUIRED', 'errors.spotifyReauthRequired'],
   ])('localizes playback code %s', (code, expected) => {
     expect(
       getApiErrorMessage(

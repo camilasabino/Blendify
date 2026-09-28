@@ -6,6 +6,7 @@ import axios, {
   AxiosResponse,
 } from 'axios';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-unknown.error';
 import { SpotifyTokenService } from '@/infrastructure/auth/spotify-token.service';
 import {
   attachOutboundHttpLogging,
@@ -14,6 +15,12 @@ import {
 import { createSpotifyQuotaError } from './spotify-quota-error';
 import { attachSpotifyRateLimit } from './spotify-rate-limit';
 import { SPOTIFY_NO_ACTIVE_DEVICE_REASON } from './spotify.constants';
+
+const REQUEST_NOT_SENT_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+]);
 
 type SpotifyErrorPayload = {
   error?: { message?: string; status?: number; reason?: string };
@@ -160,7 +167,14 @@ export class SpotifyApiClient {
       });
     }
 
-    return new Error(`Spotify ${operation} failed (${status}): ${message}`);
+    const failure = `Spotify ${operation} failed (${status}): ${message}`;
+    if (
+      status === undefined &&
+      !REQUEST_NOT_SENT_ERROR_CODES.has(ax.code ?? '')
+    ) {
+      return new ProviderOutcomeUnknownError(failure);
+    }
+    return new Error(failure);
   }
 }
 

@@ -188,6 +188,7 @@ const STATIC_ERROR_MESSAGES: Record<string, MessageKey> = {
   PLAYBACK_INVALID: 'preview.invalidPlayback',
   PLAYBACK_FAILED: 'preview.playError',
   CATALOG_UNAVAILABLE: 'errors.catalogUnavailable',
+  SPOTIFY_REAUTH_REQUIRED: 'errors.spotifyReauthRequired',
   [INVALID_GENERATION_RESPONSE]: 'errors.invalidGenerationResponse',
   TRANSFER_TOKEN_INVALID: 'transfer.errorInvalid',
   TRANSFER_TOKEN_EXPIRED: 'transfer.errorExpired',

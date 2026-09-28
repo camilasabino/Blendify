@@ -1,4 +1,4 @@
-import type { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import type { Track } from '@/domain/track/track.entity';
 
 const ISRC_PATTERN = /^[A-Z0-9]{12}$/;
 
@@ -14,9 +14,13 @@ export interface TransferPlaylist {
   tracks: TransferTrack[];
 }
 
-export function toTransferPlaylist(
-  playlist: GeneratedPlaylist,
-): TransferPlaylist {
+export interface TransferSource {
+  name: string;
+  description: string;
+  tracks: readonly Track[];
+}
+
+export function toTransferPlaylist(playlist: TransferSource): TransferPlaylist {
   return {
     title: playlist.name,
     ...(playlist.description ? { description: playlist.description } : {}),

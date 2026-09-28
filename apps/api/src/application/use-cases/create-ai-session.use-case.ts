@@ -55,6 +55,7 @@ export class CreateAiSessionUseCase {
       aiSafe: { intent: null },
       clarification: null,
       execution: null,
+      destination: null,
       createdAt: createdAt.toISOString(),
       updatedAt: createdAt.toISOString(),
       expiresAt: new Date(

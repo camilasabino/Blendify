@@ -31,10 +31,13 @@ import type { Track } from '@/domain/track/track.entity';
 import { toGeneratedPlaylistPreview } from '@/application/dto/playlist-response.dto';
 import { buildAiExecutionPlan } from '@/application/services/ai-execution-plan';
 import {
-  AiGenerationLease,
-  type AiGenerationLeaseEvent,
-} from '@/application/services/ai-generation-lease';
-import { GENERATION_LEASE_MS } from '@/application/services/generation-lease.policy';
+  AiSessionLease,
+  type AiSessionLeaseEvent,
+} from '@/application/services/ai-session-lease';
+import {
+  GENERATION_LEASE_MS,
+  GENERATION_LEASE_RENEW_INTERVAL_MS,
+} from '@/application/services/generation-lease.policy';
 import {
   findReadableAiSession,
   remainingTtlMs,
@@ -79,10 +82,17 @@ export class GenerateAiPlaylistUseCase {
       throw AiSessionError.generationInProgress();
     }
 
-    const lease = new AiGenerationLease(
-      this.sessions,
-      command.token,
-      leaseId,
+    const lease = new AiSessionLease(
+      {
+        renew: (ttlMs) =>
+          this.sessions.renewGenerationLock(command.token, leaseId, ttlMs),
+        release: () =>
+          this.sessions.releaseGenerationLock(command.token, leaseId),
+      },
+      {
+        leaseMs: GENERATION_LEASE_MS,
+        renewIntervalMs: GENERATION_LEASE_RENEW_INTERVAL_MS,
+      },
       (event) => this.logLeaseEvent(event),
     );
     try {
@@ -98,7 +108,7 @@ export class GenerateAiPlaylistUseCase {
       userId: string | null;
       onProgress?: ProgressReporter;
     },
-    lease: AiGenerationLease,
+    lease: AiSessionLease,
   ): Promise<AiSessionCommandResult> {
     const current = await findReadableAiSession(
       this.sessions,
@@ -144,7 +154,7 @@ export class GenerateAiPlaylistUseCase {
 
   private async generate(
     intent: AiIntent,
-    lease: AiGenerationLease,
+    lease: AiSessionLease,
     onProgress?: ProgressReporter,
   ): Promise<AiGenerationResult> {
     requireAuthority(lease);
@@ -261,7 +271,7 @@ export class GenerateAiPlaylistUseCase {
     );
   }
 
-  private logLeaseEvent(event: AiGenerationLeaseEvent): void {
+  private logLeaseEvent(event: AiSessionLeaseEvent): void {
     this.logger.warn(JSON.stringify({ event: `ai.generation.${event}` }));
   }
 
@@ -301,7 +311,7 @@ export class GenerateAiPlaylistUseCase {
   }
 }
 
-function requireAuthority(lease: AiGenerationLease): void {
+function requireAuthority(lease: AiSessionLease): void {
   if (lease.isLost) {
     throw AiSessionError.generationSuperseded();
   }

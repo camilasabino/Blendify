@@ -441,6 +441,8 @@ export const pt: Record<MessageKey, string> = {
     'O Soundiiz não está respondendo agora. Tente novamente em {wait}.',
   'errors.catalogUnavailable':
     'O catálogo de músicas está temporariamente indisponível. Tente novamente em alguns minutos.',
+  'errors.spotifyReauthRequired':
+    'Sua conexão com o Spotify não é mais válida. Conecte o Spotify de novo para continuar.',
   'errors.invalidGenerationResponse':
     'O Blendify recebeu uma resposta inesperada. Tente novamente.',
   'create.stepSize': 'Tamanho',
@@ -582,4 +584,24 @@ export const pt: Record<MessageKey, string> = {
   'ai.generationError.insufficient': 'O Blendify não encontrou músicas suficientes para este pedido. Tente outros artistas, gêneros ou outra música.',
   'ai.generationError.interrupted': 'A criação da sua playlist foi interrompida. Tente de novo.',
   'ai.generationError.failed': 'Não foi possível terminar de criar sua playlist. Tente de novo.',
+  'ai.destination.spotifyTitle': 'Salvar no Spotify',
+  'ai.destination.spotifyHint':
+    'O Blendify vai criar uma playlist privada com este título na sua conta do Spotify.',
+  'ai.destination.spotifyHintLibrary':
+    'O Blendify vai criar uma playlist privada com este título na sua conta do Spotify e adicioná-la à sua biblioteca.',
+  'ai.destination.save': 'Salvar no Spotify',
+  'ai.destination.saving': 'Salvando no Spotify…',
+  'ai.destination.saved': 'Salva no Spotify',
+  'ai.destination.savedHint': 'A playlist já está na sua conta do Spotify.',
+  'ai.destination.savedHintLibrary':
+    'A playlist já está na sua conta do Spotify e na sua biblioteca.',
+  'ai.destination.incompleteTitle': 'Não foi possível terminar de salvar no Spotify',
+  'ai.destination.incomplete':
+    'O Blendify criou a playlist no Spotify, mas não conseguiu terminar de salvá-la. Abra no Spotify para ver quais músicas foram adicionadas.',
+  'ai.destination.uncertain':
+    'O Blendify não conseguiu confirmar se a playlist foi criada no Spotify. Confira sua conta do Spotify antes de criá-la de novo.',
+  'ai.destination.failed':
+    'Não foi possível salvar a playlist no Spotify. Tente de novo.',
+  'ai.destination.reconnect':
+    'O Spotify precisa que você se conecte de novo antes de salvar esta playlist. A prévia continua aqui.',
 }

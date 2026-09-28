@@ -15,6 +15,7 @@ const SESSION: AiSession = {
   aiSafe: { intent: null },
   clarification: null,
   execution: null,
+  destination: null,
   createdAt: '2026-09-27T12:00:00.000Z',
   updatedAt: '2026-09-27T12:00:00.000Z',
   expiresAt: '2026-09-27T12:30:00.000Z',
@@ -141,6 +142,53 @@ describe('RedisAiSessionRepository', () => {
     expect(expected).toEqual({
       'execution.status': 'generating',
       'execution.attemptId': 'attempt-a',
+    });
+  });
+
+  it('claims a destination once per session under a hashed key and releases only its own claim', async () => {
+    const { cache, repository } = createRepository();
+
+    const claimId = await repository.acquireDestinationClaim(TOKEN, 90_000);
+    cache.setIfAbsent.mockResolvedValueOnce(false);
+    const second = await repository.acquireDestinationClaim(TOKEN, 90_000);
+    await repository.releaseDestinationClaim(TOKEN, claimId ?? '');
+
+    const [key, value, ttlMs] = cache.setIfAbsent.mock.calls[0];
+    expect(key).toMatch(/^blendify:ai:destination-claim:[0-9a-f]{64}$/);
+    expect(key).not.toContain(TOKEN);
+    expect(value).toBe(claimId);
+    expect(ttlMs).toBe(90_000);
+    expect(second).toBeNull();
+    expect(cache.deleteIfValue).toHaveBeenCalledWith(key, claimId);
+  });
+
+  it('renews and checks the destination lease on the same owner-checked key', async () => {
+    const { cache, repository } = createRepository();
+
+    await expect(
+      repository.renewDestinationClaim(TOKEN, 'claim-a', 30_000),
+    ).resolves.toBe(true);
+    await expect(repository.hasDestinationClaim(TOKEN)).resolves.toBe(true);
+
+    const [key, claimId, ttlMs] = cache.renewIfValue.mock.calls[0];
+    expect(key).toMatch(/^blendify:ai:destination-claim:[0-9a-f]{64}$/);
+    expect(claimId).toBe('claim-a');
+    expect(ttlMs).toBe(30_000);
+    expect(cache.exists).toHaveBeenCalledWith(key);
+  });
+
+  it('persists a publish outcome only for the attempt that still owns the destination', async () => {
+    const { cache, repository } = createRepository();
+
+    await repository.savePublishOutcome(TOKEN, SESSION, 'attempt-a', 60_000);
+
+    const [key, value, ttlMs, expected] = cache.setJsonIfFields.mock.calls[0];
+    expect(key).toMatch(/^blendify:ai:session:[0-9a-f]{64}$/);
+    expect(value).toEqual(SESSION);
+    expect(ttlMs).toBe(60_000);
+    expect(expected).toEqual({
+      'destination.status': 'publishing',
+      'destination.attemptId': 'attempt-a',
     });
   });
 });

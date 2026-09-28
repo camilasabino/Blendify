@@ -4,7 +4,10 @@ import {
   PLAYLIST_REPOSITORY,
   type PlaylistRepositoryPort,
 } from '@/domain/repositories/playlist.repository.port';
-import type { MusicProviderPort } from '@/domain/repositories/music-provider.port';
+import type {
+  MusicProviderPort,
+  ProviderPlaylist,
+} from '@/domain/repositories/music-provider.port';
 import { Playlist } from '@/domain/playlist/playlist.entity';
 import { toPlaylistDetail } from '@/application/dto/playlist-response.dto';
 import type { ProgressReporter } from './generation-progress.tracker';
@@ -26,6 +29,7 @@ export class PublishPlaylistService {
     coverImageBase64?: string;
     persistToLibrary: boolean;
     onProgress?: ProgressReporter;
+    onRemotePlaylistCreated?: (remote: ProviderPlaylist) => Promise<void>;
   }): Promise<PlaylistDetail> {
     const { playlist, provider } = input;
     const tracker = new GenerationProgressTracker(input.onProgress);
@@ -39,6 +43,7 @@ export class PublishPlaylistService {
       description: playlist.description,
       isPublic: false,
     });
+    await input.onRemotePlaylistCreated?.(remote);
     step += 1;
     tracker.report('publishing', step, steps);
 

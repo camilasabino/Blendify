@@ -434,6 +434,8 @@ export const en = {
     'Soundiiz isn’t responding right now. Try again in {wait}.',
   'errors.catalogUnavailable':
     'The music catalog is temporarily unavailable. Try again in a few minutes.',
+  'errors.spotifyReauthRequired':
+    'Your Spotify connection is no longer valid. Connect Spotify again to continue.',
   'errors.invalidGenerationResponse':
     'Blendify received an unexpected response. Please try again.',
   'create.stepSize': 'Size',
@@ -574,6 +576,25 @@ export const en = {
   'ai.generationError.insufficient': 'Blendify couldn’t find enough music for this request. Try different artists, genres or another song.',
   'ai.generationError.interrupted': 'Creating your playlist was interrupted. Try again.',
   'ai.generationError.failed': 'Couldn’t finish creating your playlist. Try again.',
+  'ai.destination.spotifyTitle': 'Save to Spotify',
+  'ai.destination.spotifyHint':
+    'Blendify will create a private playlist with this title in your Spotify account.',
+  'ai.destination.spotifyHintLibrary':
+    'Blendify will create a private playlist with this title in your Spotify account and add it to your Library.',
+  'ai.destination.save': 'Save to Spotify',
+  'ai.destination.saving': 'Saving to Spotify…',
+  'ai.destination.saved': 'Saved to Spotify',
+  'ai.destination.savedHint': 'The playlist is now in your Spotify account.',
+  'ai.destination.savedHintLibrary':
+    'The playlist is now in your Spotify account and your Library.',
+  'ai.destination.incompleteTitle': 'Couldn’t finish saving to Spotify',
+  'ai.destination.incomplete':
+    'Blendify created the playlist on Spotify but couldn’t finish saving it. Open it in Spotify to check which songs were added.',
+  'ai.destination.uncertain':
+    'Blendify couldn’t confirm whether the playlist was created on Spotify. Check your Spotify account before creating it again.',
+  'ai.destination.failed': 'Couldn’t save the playlist to Spotify. Try again.',
+  'ai.destination.reconnect':
+    'Spotify needs you to connect again before saving this playlist. The preview stays here.',
 } as const
 
 export type MessageKey = keyof typeof en

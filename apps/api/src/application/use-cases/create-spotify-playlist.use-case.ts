@@ -17,23 +17,17 @@ import {
 import {
   USAGE_STATS_REPOSITORY,
   UsageStatsRepositoryPort,
-  type SeedUsageInput,
 } from '@/domain/repositories/usage-stats.repository.port';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
-import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
 import { Playlist } from '@/domain/playlist/playlist.entity';
 import { PublishPlaylistService } from '@/application/services/publish-playlist.service';
 import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
+import { usageRecordFor } from '@/application/services/playlist-usage-record';
 import { GeneratePlaylistUseCase } from './generate-playlist.use-case';
 
 export type SpotifyPlaylistRequest =
   | z.output<typeof CreateMixRequestSchema>
   | z.output<typeof CreateDiscoverRequestSchema>;
-
-type UsageRecord = {
-  kind: 'artist' | 'genre';
-  seeds: SeedUsageInput[];
-};
 
 @Injectable()
 export class CreateSpotifyPlaylistUseCase {
@@ -98,61 +92,5 @@ export class CreateSpotifyPlaylistUseCase {
     }
 
     return response;
-  }
-}
-
-function usageRecordFor(generated: GeneratedPlaylist): UsageRecord {
-  const { generation } = generated;
-  switch (generation.kind) {
-    case 'artist_mix':
-      return {
-        kind: 'artist',
-        seeds: generation.seeds.map((seed) => ({
-          kind: 'artist',
-          seedKey: seed.id,
-          name: seed.name,
-          imageUrl: seed.imageUrl ?? null,
-        })),
-      };
-    case 'discover_artist':
-      return {
-        kind: 'artist',
-        seeds: [
-          {
-            kind: 'artist',
-            seedKey: generation.seed.id,
-            name: generation.seed.name,
-            imageUrl: generation.seed.imageUrl ?? null,
-          },
-        ],
-      };
-    case 'discover_track':
-      return {
-        kind: 'artist',
-        seeds: [
-          {
-            kind: 'artist',
-            seedKey: generation.seed.artistId,
-            name: generation.seed.artistName,
-            imageUrl: generation.seed.albumImageUrl ?? null,
-          },
-        ],
-      };
-    case 'genre_mix':
-      return {
-        kind: 'genre',
-        seeds: generated.seeds.flatMap((seed) =>
-          seed.type === 'genre'
-            ? [
-                {
-                  kind: 'genre' as const,
-                  seedKey: seed.id,
-                  name: seed.name,
-                  imageUrl: seed.imageUrl ?? null,
-                },
-              ]
-            : [],
-        ),
-      };
   }
 }

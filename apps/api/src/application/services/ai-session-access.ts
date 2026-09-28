@@ -1,4 +1,9 @@
-import { isReadableBy, type AiSession } from '@/domain/ai/ai-session';
+import {
+  generatedResultOf,
+  isReadableBy,
+  type AiGenerationResult,
+  type AiSession,
+} from '@/domain/ai/ai-session';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
 import type { AiSessionRepositoryPort } from '@/domain/repositories/ai-session.repository.port';
 
@@ -21,4 +26,12 @@ export async function findReadableAiSession(
 
 export function remainingTtlMs(session: AiSession): number {
   return Date.parse(session.expiresAt) - Date.now();
+}
+
+export function requireGeneratedResult(session: AiSession): AiGenerationResult {
+  const result = generatedResultOf(session);
+  if (!result) {
+    throw AiSessionError.playlistNotGenerated();
+  }
+  return result;
 }

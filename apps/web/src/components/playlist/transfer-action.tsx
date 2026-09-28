@@ -1,7 +1,10 @@
 import { useEffect, useId, useRef } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { ArrowRightLeft, ExternalLink, RotateCcw } from 'lucide-react'
-import type { PlaylistTransferOfferDto } from '@blendify/contracts'
+import type {
+  PlaylistTransferDto,
+  PlaylistTransferOfferDto,
+} from '@blendify/contracts'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   api,
@@ -19,7 +22,7 @@ function TransferFailure({
 }: Readonly<{
   error: unknown
   onRetry: () => void
-  onRegenerate: () => void
+  onRegenerate?: () => void
 }>) {
   const t = useT()
   const recovery = getTransferErrorRecovery(error)
@@ -28,7 +31,7 @@ function TransferFailure({
       <p role="alert" className="text-sm leading-relaxed text-danger">
         {getTransferErrorMessage(error, t)}
       </p>
-      {recovery === 'regenerate' ? (
+      {recovery === 'regenerate' && onRegenerate ? (
         <Button type="button" variant="secondary" size="sm" onClick={onRegenerate}>
           <RotateCcw aria-hidden className="size-3.5" />
           {t('transfer.regenerate')}
@@ -51,22 +54,53 @@ export function TransferAction({
   offer: PlaylistTransferOfferDto
   onRegenerate: () => void
 }>) {
+  return (
+    <SoundiizTransfer
+      prepare={() => api.createTransfer(offer.token)}
+      onRegenerate={onRegenerate}
+    />
+  )
+}
+
+export function SoundiizTransfer({
+  prepare,
+  preparedTransfer = null,
+  onRegenerate,
+}: Readonly<{
+  prepare: () => Promise<PlaylistTransferDto>
+  preparedTransfer?: PlaylistTransferDto | null
+  onRegenerate?: () => void
+}>) {
   const t = useT()
   const locale = useLocaleStore((s) => s.locale)
   const titleId = useId()
   const explainerId = useId()
   const continueRef = useRef<HTMLAnchorElement>(null)
+  const isRequesting = useRef(false)
   const transferMutation = useMutation({
-    mutationFn: () => api.createTransfer(offer.token),
+    mutationFn: prepare,
+    onSettled: () => {
+      isRequesting.current = false
+    },
   })
-  const transfer = transferMutation.data
+  const transfer = transferMutation.data ?? preparedTransfer
   const continueUrl = toSafeHttpsUrl(transfer?.url)
 
+  const preparedNowUrl = toSafeHttpsUrl(transferMutation.data?.url)
+
+  function requestTransfer() {
+    if (isRequesting.current) {
+      return
+    }
+    isRequesting.current = true
+    transferMutation.mutate()
+  }
+
   useEffect(() => {
-    if (continueUrl) {
+    if (preparedNowUrl) {
       continueRef.current?.focus()
     }
-  }, [continueUrl])
+  }, [preparedNowUrl])
 
   return (
     <section
@@ -118,7 +152,7 @@ export function TransferAction({
           className="w-full sm:w-auto"
           loading={transferMutation.isPending}
           aria-describedby={explainerId}
-          onClick={() => transferMutation.mutate()}
+          onClick={requestTransfer}
         >
           {transferMutation.isPending ? null : (
             <ArrowRightLeft aria-hidden className="size-4" />
@@ -132,7 +166,7 @@ export function TransferAction({
       {transferMutation.isError ? (
         <TransferFailure
           error={transferMutation.error}
-          onRetry={() => transferMutation.mutate()}
+          onRetry={requestTransfer}
           onRegenerate={onRegenerate}
         />
       ) : null}

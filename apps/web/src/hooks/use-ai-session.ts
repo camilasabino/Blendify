@@ -4,7 +4,10 @@ import type {
   AiClarification,
   AiGenerationFailureDto,
   AiIntentSummary,
+  AiSessionDestinationDto,
   GenerationProgress,
+  PlaylistTransferDto,
+  PublishAiPlaylistRequest,
 } from '@blendify/contracts'
 import {
   api,
@@ -49,7 +52,14 @@ export type AiFlowState =
       isStreaming: boolean
       isStalled: boolean
     }
-  | { phase: 'generated'; intent: AiIntentSummary; result: AiGeneratedExecution }
+  | {
+      phase: 'generated'
+      intent: AiIntentSummary
+      result: AiGeneratedExecution
+      destination: AiSessionDestinationDto | null
+      isPublishing: boolean
+      publishError: unknown
+    }
   | {
       phase: 'generation_failed'
       intent: AiIntentSummary
@@ -66,7 +76,7 @@ function aiSessionQueryKey(sessionId: string | null) {
 }
 
 function reviewedState(session: AiSession): AiSessionState {
-  return { ...session, execution: null }
+  return { ...session, execution: null, destination: null }
 }
 
 function generatedState(generation: AiGeneration): AiSessionState {
@@ -82,12 +92,18 @@ function generatedState(generation: AiGeneration): AiSessionState {
       trackCount: generation.trackCount,
       durationMs: generation.durationMs,
       unmetConstraints: generation.unmetConstraints,
+      transferAvailable: generation.transferAvailable,
     },
+    destination: null,
   }
 }
 
 function isSessionNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.code === 'AI_SESSION_NOT_FOUND'
+}
+
+function isDestinationInProgress(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'AI_DESTINATION_IN_PROGRESS'
 }
 
 function sessionFlowState(
@@ -99,6 +115,8 @@ function sessionFlowState(
     isStreaming: boolean
     statusChecks: number
     generationError: unknown
+    isPublishing: boolean
+    publishError: unknown
   },
 ): AiFlowState {
   if (session.clarification) {
@@ -126,7 +144,14 @@ function sessionFlowState(
         isStalled: !context.isStreaming && context.statusChecks >= MAX_STATUS_CHECKS,
       }
     case 'generated':
-      return { phase: 'generated', intent, result: session.execution }
+      return {
+        phase: 'generated',
+        intent,
+        result: session.execution,
+        destination: session.destination,
+        isPublishing: context.isPublishing,
+        publishError: context.publishError,
+      }
     case 'generation_failed':
       return {
         phase: 'generation_failed',
@@ -241,10 +266,28 @@ export function useAiSession() {
     },
   })
 
+  const publication = useMutation({
+    mutationFn: ({ sessionId: id, input }: { sessionId: string; input: PublishAiPlaylistRequest }) =>
+      api.publishAiPlaylist(id, input),
+    onSuccess: (state) => {
+      queryClient.setQueryData(aiSessionQueryKey(state.sessionId), state)
+    },
+    onError: (error, { sessionId: id }) => {
+      if (isSessionNotFound(error)) {
+        expire(error)
+        return
+      }
+      if (isDestinationInProgress(error)) {
+        void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(id) })
+      }
+    },
+  })
+
   const session = sessionQuery.data ?? null
   const isStreaming = generation.isPending
   const isWaitingForGeneration =
-    session?.execution?.status === 'generating' && !isStreaming
+    (session?.execution?.status === 'generating' && !isStreaming) ||
+    (session?.destination?.status === 'publishing' && !publication.isPending)
 
   useEffect(() => {
     if (sessionQuery.error && isSessionNotFound(sessionQuery.error)) {
@@ -287,6 +330,8 @@ export function useAiSession() {
       isStreaming,
       statusChecks,
       generationError,
+      isPublishing: publication.isPending,
+      publishError: publication.isPending ? null : publication.error,
     })
   }
 
@@ -295,6 +340,7 @@ export function useAiSession() {
       cancelStream()
     }
     generation.reset()
+    publication.reset()
     setProgress(null)
     setGenerationError(null)
     setStatusChecks(0)
@@ -331,6 +377,32 @@ export function useAiSession() {
     void refetch()
   }
 
+  function publish(input: PublishAiPlaylistRequest) {
+    if (publication.isPending || !sessionId) {
+      return
+    }
+    publication.mutate({ sessionId, input })
+  }
+
+  async function prepareTransfer(name: string): Promise<PlaylistTransferDto> {
+    if (!sessionId) {
+      throw new ApiError('Create with AI session missing', 404)
+    }
+    try {
+      const state = await api.transferAiPlaylist(sessionId, { name })
+      queryClient.setQueryData(aiSessionQueryKey(sessionId), state)
+      if (state.destination?.status !== 'transfer_prepared') {
+        throw new ApiError('Invalid Create with AI response', 502)
+      }
+      return state.destination.transfer
+    } catch (error) {
+      if (isSessionNotFound(error)) {
+        expire(error)
+      }
+      throw error
+    }
+  }
+
   function renamePlaylist(playlistTitle: string | null) {
     if (stored) {
       remember({ ...stored, playlistTitle })
@@ -356,6 +428,8 @@ export function useAiSession() {
     submit,
     choose,
     generate,
+    publish,
+    prepareTransfer,
     checkStatus,
     reset,
   }

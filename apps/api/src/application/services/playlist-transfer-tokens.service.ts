@@ -44,6 +44,13 @@ const TransferTokenPayloadSchema = z.object({
   pl: TransferPlaylistSchema,
 });
 
+export function parseTransferPlaylist(
+  playlist: TransferPlaylist,
+): TransferPlaylist | null {
+  const parsed = TransferPlaylistSchema.safeParse(playlist);
+  return parsed.success ? parsed.data : null;
+}
+
 export interface PlaylistTransferOffer {
   token: string;
   expiresAt: Date;

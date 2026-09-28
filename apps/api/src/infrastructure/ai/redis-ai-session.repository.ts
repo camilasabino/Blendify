@@ -9,6 +9,7 @@ import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 
 const AI_SESSION_KEY_PREFIX = 'blendify:ai:session';
 const AI_GENERATION_LOCK_KEY_PREFIX = 'blendify:ai:generation-lock';
+const AI_DESTINATION_CLAIM_KEY_PREFIX = 'blendify:ai:destination-claim';
 
 @Injectable()
 export class RedisAiSessionRepository implements AiSessionRepositoryPort {
@@ -36,6 +37,18 @@ export class RedisAiSessionRepository implements AiSessionRepositoryPort {
     return this.cache.setJsonIfFields(sessionKey(token), session, ttlMs, {
       'execution.status': 'generating',
       'execution.attemptId': attemptId,
+    });
+  }
+
+  savePublishOutcome(
+    token: string,
+    session: AiSession,
+    attemptId: string,
+    ttlMs: number,
+  ): Promise<boolean> {
+    return this.cache.setJsonIfFields(sessionKey(token), session, ttlMs, {
+      'destination.status': 'publishing',
+      'destination.attemptId': attemptId,
     });
   }
 
@@ -67,6 +80,35 @@ export class RedisAiSessionRepository implements AiSessionRepositoryPort {
   hasGenerationLock(token: string): Promise<boolean> {
     return this.cache.exists(generationLockKey(token));
   }
+
+  async acquireDestinationClaim(
+    token: string,
+    ttlMs: number,
+  ): Promise<string | null> {
+    const claimId = randomUUID();
+    const acquired = await this.cache.setIfAbsent(
+      destinationClaimKey(token),
+      claimId,
+      ttlMs,
+    );
+    return acquired ? claimId : null;
+  }
+
+  renewDestinationClaim(
+    token: string,
+    claimId: string,
+    ttlMs: number,
+  ): Promise<boolean> {
+    return this.cache.renewIfValue(destinationClaimKey(token), claimId, ttlMs);
+  }
+
+  releaseDestinationClaim(token: string, claimId: string): Promise<void> {
+    return this.cache.deleteIfValue(destinationClaimKey(token), claimId);
+  }
+
+  hasDestinationClaim(token: string): Promise<boolean> {
+    return this.cache.exists(destinationClaimKey(token));
+  }
 }
 
 function sessionKey(token: string): string {
@@ -75,6 +117,10 @@ function sessionKey(token: string): string {
 
 function generationLockKey(token: string): string {
   return `${AI_GENERATION_LOCK_KEY_PREFIX}:${tokenDigest(token)}`;
+}
+
+function destinationClaimKey(token: string): string {
+  return `${AI_DESTINATION_CLAIM_KEY_PREFIX}:${tokenDigest(token)}`;
 }
 
 function tokenDigest(token: string): string {

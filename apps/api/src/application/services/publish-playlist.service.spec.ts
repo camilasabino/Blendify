@@ -127,4 +127,46 @@ describe('PublishPlaylistService', () => {
     expect(result.status).toBe('COMPLETED');
     expect(result.imageUrl).toBeNull();
   });
+
+  it('reports the created Spotify playlist before adding tracks', async () => {
+    const playlist = makePlaylist();
+    const calls: string[] = [];
+    const provider = {
+      createPlaylist: jest.fn(() => {
+        calls.push('create');
+        return Promise.resolve({
+          id: 'spotify-playlist-1',
+          url: 'https://sp/1',
+        });
+      }),
+      addTracksToPlaylist: jest.fn(() => {
+        calls.push('add');
+        return Promise.reject(new Error('add failed'));
+      }),
+      uploadPlaylistCover: jest.fn(),
+      getPlaylistSnapshot: jest.fn(),
+    } as unknown as MusicProviderPort;
+    const onRemotePlaylistCreated = jest.fn(() => {
+      calls.push('created');
+      return Promise.resolve();
+    });
+
+    await expect(
+      new PublishPlaylistService({
+        save: jest.fn(),
+      } as unknown as PlaylistRepositoryPort).execute({
+        playlist,
+        provider,
+        spotifyUserId: 'spotify-user-1',
+        persistToLibrary: true,
+        onRemotePlaylistCreated,
+      }),
+    ).rejects.toThrow('add failed');
+
+    expect(onRemotePlaylistCreated).toHaveBeenCalledWith({
+      id: 'spotify-playlist-1',
+      url: 'https://sp/1',
+    });
+    expect(calls).toEqual(['create', 'created', 'add']);
+  });
 });

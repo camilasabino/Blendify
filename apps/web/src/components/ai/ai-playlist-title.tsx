@@ -19,6 +19,7 @@ type AiPlaylistTitleProps = Readonly<{
   title: string | null
   suggestedTitle: string
   onTitleChange: (title: string | null) => void
+  isLocked: boolean
   headingRef: RefObject<HTMLHeadingElement | null>
   children: ReactNode
 }>
@@ -28,6 +29,7 @@ export function AiPlaylistTitle({
   title,
   suggestedTitle,
   onTitleChange,
+  isLocked,
   headingRef,
   children,
 }: AiPlaylistTitleProps) {
@@ -60,7 +62,7 @@ export function AiPlaylistTitle({
     setIsEditing(false)
   }
 
-  if (isEditing) {
+  if (isEditing && !isLocked) {
     return (
       <div className="space-y-2">
         <form onSubmit={finishEditing} className="space-y-2">
@@ -102,17 +104,19 @@ export function AiPlaylistTitle({
         {displayTitle}
       </h2>
       {children}
-      <Button
-        ref={editButtonRef}
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="-ml-3"
-        onClick={() => setIsEditing(true)}
-      >
-        <Pencil aria-hidden className="size-3.5" />
-        {t('ai.result.editTitle')}
-      </Button>
+      {isLocked ? null : (
+        <Button
+          ref={editButtonRef}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="-ml-3"
+          onClick={() => setIsEditing(true)}
+        >
+          <Pencil aria-hidden className="size-3.5" />
+          {t('ai.result.editTitle')}
+        </Button>
+      )}
     </div>
   )
 }

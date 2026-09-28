@@ -16,5 +16,6 @@ import { TransferTokensModule } from './transfer-tokens.module';
     },
     CreatePlaylistTransferUseCase,
   ],
+  exports: [PLAYLIST_TRANSFER_GATEWAY],
 })
 export class TransfersModule {}

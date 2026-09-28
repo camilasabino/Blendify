@@ -217,8 +217,10 @@ export const GenerateDiscoverRequestSchema = z.discriminatedUnion('kind', [
   DiscoverTrackRequestSchema.omit(publicationOnlyFields),
 ]);
 
+const PlaylistNameSchema = z.string().trim().min(1).max(PLAYLIST_NAME_MAX_LENGTH);
+
 export const RenamePlaylistRequestSchema = z.object({
-  name: z.string().trim().min(1).max(PLAYLIST_NAME_MAX_LENGTH),
+  name: PlaylistNameSchema,
 }).strict();
 
 export const BulkLibraryRequestSchema = z.object({
@@ -571,6 +573,7 @@ const aiGenerationOutcomeShape = {
   trackCount: z.number().int().nonnegative(),
   durationMs: z.number().int().nonnegative(),
   unmetConstraints: z.array(AiGenerationUnmetConstraintSchema),
+  transferAvailable: z.boolean(),
 };
 
 export const AiGenerationSchema = z.strictObject({
@@ -616,8 +619,26 @@ export const AiSessionExecutionSchema = z.discriminatedUnion('status', [
   }),
 ]);
 
+export const AiSessionDestinationSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('publishing') }),
+  z.strictObject({
+    status: z.literal('published'),
+    spotifyUrl: z.string().min(1).nullable(),
+    savedToLibrary: z.boolean(),
+  }),
+  z.strictObject({
+    status: z.literal('publish_incomplete'),
+    spotifyUrl: z.string().min(1).nullable(),
+  }),
+  z.strictObject({
+    status: z.literal('transfer_prepared'),
+    transfer: PlaylistTransferSchema.strict(),
+  }),
+]);
+
 export const AiSessionStateSchema = AiSessionSchema.extend({
   execution: AiSessionExecutionSchema.nullable(),
+  destination: AiSessionDestinationSchema.nullable(),
 });
 
 export const AiGenerationStreamEventSchema = z.discriminatedUnion('type', [
@@ -635,6 +656,16 @@ export const CreateAiSessionRequestSchema = z.strictObject({
 
 export const AnswerAiClarificationRequestSchema = z.strictObject({
   optionId: AiClarificationOptionIdSchema,
+});
+
+export const PublishAiPlaylistRequestSchema = z.strictObject({
+  name: PlaylistNameSchema,
+  coverImageBase64: PlaylistMetadataSchema.shape.coverImageBase64,
+  persistToLibrary: PlaylistMetadataSchema.shape.persistToLibrary,
+});
+
+export const TransferAiPlaylistRequestSchema = z.strictObject({
+  name: PlaylistNameSchema,
 });
 
 export type ArtistDto = z.infer<typeof ArtistSchema>;
@@ -706,6 +737,7 @@ export type AiGenerationFailureCategory =
 export type AiSeedNotFound = z.infer<typeof AiSeedNotFoundSchema>;
 export type AiGenerationFailureDto = z.infer<typeof AiGenerationFailureSchema>;
 export type AiSessionExecutionDto = z.infer<typeof AiSessionExecutionSchema>;
+export type AiSessionDestinationDto = z.infer<typeof AiSessionDestinationSchema>;
 export type AiSessionStateDto = z.infer<typeof AiSessionStateSchema>;
 export type AiGenerationStreamEvent = z.infer<
   typeof AiGenerationStreamEventSchema
@@ -713,4 +745,10 @@ export type AiGenerationStreamEvent = z.infer<
 export type CreateAiSessionRequest = z.infer<typeof CreateAiSessionRequestSchema>;
 export type AnswerAiClarificationRequest = z.infer<
   typeof AnswerAiClarificationRequestSchema
+>;
+export type PublishAiPlaylistRequest = z.input<
+  typeof PublishAiPlaylistRequestSchema
+>;
+export type TransferAiPlaylistRequest = z.infer<
+  typeof TransferAiPlaylistRequestSchema
 >;

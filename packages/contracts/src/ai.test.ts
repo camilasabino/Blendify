@@ -9,6 +9,9 @@ import {
   AnswerAiClarificationRequestSchema,
   CreateAiSessionRequestSchema,
   MAX_TRACKS,
+  PLAYLIST_NAME_MAX_LENGTH,
+  PublishAiPlaylistRequestSchema,
+  TransferAiPlaylistRequestSchema,
 } from './index';
 import { AI_INTENT_PROMPT_MAX_LENGTH } from './ai-service';
 
@@ -239,6 +242,7 @@ const GENERATION = {
     { type: 'duration', requestedMinutes: 60, actualDurationMs: 290_000 },
     { type: 'mood', mood: 'calm', reason: 'seed_not_mood_based' },
   ],
+  transferAvailable: true,
 };
 
 describe('AI generation contracts', () => {
@@ -312,16 +316,46 @@ describe('AI session state contract', () => {
     trackCount: GENERATION.trackCount,
     durationMs: GENERATION.durationMs,
     unmetConstraints: GENERATION.unmetConstraints,
+    transferAvailable: GENERATION.transferAvailable,
+  };
+  const generated = {
+    ...READY_SESSION,
+    execution: { status: 'generated', ...outcome },
   };
 
   it('restores every public session state', () => {
     for (const state of [
-      { ...CLARIFICATION_SESSION, execution: null },
-      { ...READY_SESSION, execution: null },
-      { ...READY_SESSION, execution: { status: 'generating' } },
-      { ...READY_SESSION, execution: { status: 'generated', ...outcome } },
+      { ...CLARIFICATION_SESSION, execution: null, destination: null },
+      { ...READY_SESSION, execution: null, destination: null },
+      { ...READY_SESSION, execution: { status: 'generating' }, destination: null },
+      { ...generated, destination: null },
+      { ...generated, destination: { status: 'publishing' } },
+      {
+        ...generated,
+        destination: {
+          status: 'published',
+          spotifyUrl: 'https://open.spotify.com/playlist/p1',
+          savedToLibrary: true,
+        },
+      },
+      {
+        ...generated,
+        destination: { status: 'publish_incomplete', spotifyUrl: null },
+      },
+      {
+        ...generated,
+        destination: {
+          status: 'transfer_prepared',
+          transfer: {
+            url: 'https://soundiiz.com/go/import-playlist/abcdefghijklmnop',
+            expiresAt: '2026-09-28T12:00:00.000Z',
+            trackCount: 1,
+          },
+        },
+      },
       {
         ...READY_SESSION,
+        destination: null,
         execution: {
           status: 'generation_failed',
           error: {
@@ -334,6 +368,7 @@ describe('AI session state contract', () => {
       },
       {
         ...READY_SESSION,
+        destination: null,
         execution: {
           status: 'generation_failed',
           error: {
@@ -406,13 +441,92 @@ describe('AI session state contract', () => {
       },
     ]) {
       expect(
-        AiSessionStateSchema.safeParse({ ...READY_SESSION, execution })
-          .success,
+        AiSessionStateSchema.safeParse({
+          ...READY_SESSION,
+          execution,
+          destination: null,
+        }).success,
       ).toBe(false);
     }
     expect(
-      AiSessionStateSchema.safeParse({ ...READY_SESSION, execution: undefined })
-        .success,
+      AiSessionStateSchema.safeParse({
+        ...READY_SESSION,
+        execution: undefined,
+        destination: null,
+      }).success,
     ).toBe(false);
+  });
+
+  it('never exposes internal or raw provider destination details', () => {
+    for (const destination of [
+      undefined,
+      { status: 'publishing', attemptId: 'attempt-1' },
+      {
+        status: 'published',
+        spotifyUrl: 'https://open.spotify.com/playlist/p1',
+        savedToLibrary: true,
+        spotifyResponse: {},
+      },
+      { status: 'publish_incomplete', spotifyUrl: null, error: 'Spotify 500' },
+      {
+        status: 'transfer_prepared',
+        transfer: {
+          url: 'https://soundiiz.com/go/import-playlist/abcdefghijklmnop',
+          expiresAt: '2026-09-28T12:00:00.000Z',
+          trackCount: 1,
+          payload: {},
+        },
+      },
+      { status: 'transferring' },
+    ]) {
+      expect(
+        AiSessionStateSchema.safeParse({ ...generated, destination }).success,
+      ).toBe(false);
+    }
+  });
+});
+
+describe('AI destination requests', () => {
+  it('accept only the user-authored playlist name and existing publication options', () => {
+    expect(
+      PublishAiPlaylistRequestSchema.parse({ name: '  Late night  ' }),
+    ).toEqual({ name: 'Late night', persistToLibrary: true });
+    expect(
+      PublishAiPlaylistRequestSchema.parse({
+        name: 'Late night',
+        persistToLibrary: false,
+        coverImageBase64: 'aGVsbG8=',
+      }),
+    ).toEqual({
+      name: 'Late night',
+      persistToLibrary: false,
+      coverImageBase64: 'aGVsbG8=',
+    });
+    expect(TransferAiPlaylistRequestSchema.parse({ name: ' Mix ' })).toEqual({
+      name: 'Mix',
+    });
+  });
+
+  it('rejects blank or oversized names and any browser-supplied playlist contents', () => {
+    for (const schema of [
+      PublishAiPlaylistRequestSchema,
+      TransferAiPlaylistRequestSchema,
+    ]) {
+      for (const body of [
+        {},
+        { name: '   ' },
+        { name: 'x'.repeat(PLAYLIST_NAME_MAX_LENGTH + 1) },
+        { name: 'Mix', tracks: [{ uri: 'spotify:track:other' }] },
+        { name: 'Mix', trackIds: ['other'] },
+        { name: 'Mix', playlist: {} },
+      ]) {
+        expect(schema.safeParse(body).success).toBe(false);
+      }
+    }
+    expect(
+      PublishAiPlaylistRequestSchema.safeParse({
+        name: 'x'.repeat(PLAYLIST_NAME_MAX_LENGTH),
+      }).success,
+    ).toBe(true);
   });
 });

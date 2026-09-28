@@ -1,6 +1,6 @@
-import { useId, type RefObject } from 'react'
+import { useId, type ReactNode, type RefObject } from 'react'
 import { CircleCheck } from 'lucide-react'
-import type { AiIntentSummary } from '@blendify/contracts'
+import type { AiIntentSummary, AiSessionDestinationDto } from '@blendify/contracts'
 import { LastFmAttribution } from '@/components/brand/lastfm-attribution'
 import { SpotifyLogo } from '@/components/brand/spotify-mark'
 import { GeneratedTrackList } from '@/components/playlist/generated-track-list'
@@ -11,6 +11,7 @@ import type { AiGeneratedExecution } from '@/hooks/use-ai-session'
 import { useT } from '@/i18n/use-t'
 import { formatSongCount } from '@/lib/song-count'
 import { formatListeningTime } from '@/lib/utils'
+import { isSpotifyDestination } from './ai-destination-state'
 import { AiPlaylistTitle } from './ai-playlist-title'
 import { AiUnmetConstraints } from './ai-unmet-constraints'
 
@@ -19,8 +20,11 @@ type AiGeneratedPlaylistProps = Readonly<{
   result: AiGeneratedExecution
   title: string | null
   onTitleChange: (title: string | null) => void
+  isTitleLocked: boolean
+  destination: AiSessionDestinationDto | null
   headingRef: RefObject<HTMLHeadingElement | null>
   onStartOver: () => void
+  children: ReactNode
 }>
 
 export function AiGeneratedPlaylist({
@@ -28,8 +32,11 @@ export function AiGeneratedPlaylist({
   result,
   title,
   onTitleChange,
+  isTitleLocked,
+  destination,
   headingRef,
   onStartOver,
+  children,
 }: AiGeneratedPlaylistProps) {
   const t = useT()
   const { playlist } = result
@@ -66,6 +73,7 @@ export function AiGeneratedPlaylist({
             title={title}
             suggestedTitle={playlist.name}
             onTitleChange={onTitleChange}
+            isLocked={isTitleLocked}
             headingRef={headingRef}
           >
             <p className="text-sm text-cream-300">
@@ -81,7 +89,9 @@ export function AiGeneratedPlaylist({
       <AiUnmetConstraints constraints={result.unmetConstraints} />
 
       <div className="space-y-2">
-        <p className="text-sm text-cream-300">{t('ai.result.previewNote')}</p>
+        {isSpotifyDestination(destination) ? null : (
+          <p className="text-sm text-cream-300">{t('ai.result.previewNote')}</p>
+        )}
         <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-cream-400">
           <span>
             {artwork ? t('guestResult.attributionWithArtwork') : t('guestResult.attribution')}
@@ -89,6 +99,8 @@ export function AiGeneratedPlaylist({
           <SpotifyLogo />
         </p>
       </div>
+
+      {children}
 
       <GeneratedTrackList tracks={playlist.tracks} />
 

@@ -197,7 +197,7 @@ describe('Create with AI generation', () => {
     expect(calls.every((call) => !call.url.includes('/interpret'))).toBe(true)
   })
 
-  it('shows the generated playlist as a preview without publish actions', async () => {
+  it('shows the generated playlist as a preview with only the Guest destination action', async () => {
     const user = userEvent.setup()
     stubApi({
       [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(), 201),
@@ -220,7 +220,8 @@ describe('Create with AI generation', () => {
     expect(result.textContent).not.toContain('30')
     expect(screen.queryByText('Some preferences couldn’t be fully applied')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Create playlist' })).toBeNull()
-    expect(screen.queryByRole('button', { name: /save|publish|add to spotify|soundiiz/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /save|publish|add to spotify/i })).toBeNull()
+    expect(within(result).getByRole('button', { name: 'Prepare transfer' })).toBeEnabled()
     expect(screen.queryByRole('link', { name: /soundiiz/i })).toBeNull()
     expect(screen.getByText('Not used')).toBeVisible()
 

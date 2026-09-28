@@ -13,6 +13,7 @@ import {
 } from '@/domain/errors/ai-session.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import {
   TransferError,
   type TransferErrorCode,
@@ -43,6 +44,9 @@ const AI_SESSION_ERROR_STATUS: Record<AiSessionErrorCode, number> = {
   AI_SESSION_NOT_READY: HttpStatus.CONFLICT,
   AI_GENERATION_IN_PROGRESS: HttpStatus.CONFLICT,
   AI_GENERATION_SUPERSEDED: HttpStatus.CONFLICT,
+  AI_PLAYLIST_NOT_GENERATED: HttpStatus.CONFLICT,
+  AI_DESTINATION_IN_PROGRESS: HttpStatus.CONFLICT,
+  AI_DESTINATION_UNAVAILABLE: HttpStatus.CONFLICT,
 };
 
 export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
@@ -103,6 +107,14 @@ export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
   if (exception instanceof CatalogUnavailableError) {
     return {
       statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+      code: exception.code,
+      message: exception.message,
+    };
+  }
+
+  if (exception instanceof SpotifyReauthRequiredError) {
+    return {
+      statusCode: HttpStatus.UNAUTHORIZED,
       code: exception.code,
       message: exception.message,
     };

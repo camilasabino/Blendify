@@ -1,12 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AxiosInstance } from 'axios';
+import axios, { AxiosInstance } from 'axios';
+import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import {
   USER_REPOSITORY,
   type UserRepositoryPort,
 } from '@/domain/repositories/user.repository.port';
 import { createOutboundHttp } from '@/infrastructure/http/outbound-http.logging';
 import { SPOTIFY_HTTP_TIMEOUT_MS } from '@/infrastructure/spotify/spotify.constants';
+
+const REVOKED_REFRESH_TOKEN_ERROR = 'invalid_grant';
 
 @Injectable()
 export class SpotifyTokenService {
@@ -76,8 +79,26 @@ export class SpotifyTokenService {
 
       return data.access_token;
     } catch (error) {
+      if (isRevokedRefreshToken(error)) {
+        this.logger.warn(
+          `Spotify refresh token rejected for user ${userId}; reauthorization required`,
+        );
+        throw new SpotifyReauthRequiredError({ cause: error });
+      }
       this.logger.error(`Failed to refresh Spotify token for user ${userId}`);
       throw error;
     }
   }
+}
+
+function isRevokedRefreshToken(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 400) {
+    return false;
+  }
+  const data: unknown = error.response.data;
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    (data as { error?: unknown }).error === REVOKED_REFRESH_TOKEN_ERROR
+  );
 }

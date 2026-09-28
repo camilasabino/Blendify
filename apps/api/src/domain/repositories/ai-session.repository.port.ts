@@ -19,4 +19,18 @@ export interface AiSessionRepositoryPort {
   ): Promise<boolean>;
   releaseGenerationLock(token: string, leaseId: string): Promise<void>;
   hasGenerationLock(token: string): Promise<boolean>;
+  savePublishOutcome(
+    token: string,
+    session: AiSession,
+    attemptId: string,
+    ttlMs: number,
+  ): Promise<boolean>;
+  acquireDestinationClaim(token: string, ttlMs: number): Promise<string | null>;
+  renewDestinationClaim(
+    token: string,
+    claimId: string,
+    ttlMs: number,
+  ): Promise<boolean>;
+  releaseDestinationClaim(token: string, claimId: string): Promise<void>;
+  hasDestinationClaim(token: string): Promise<boolean>;
 }

@@ -11,6 +11,8 @@ import {
   type AiGenerationDto,
   type AiSessionDto,
   type AiSessionStateDto,
+  type PublishAiPlaylistRequest,
+  type TransferAiPlaylistRequest,
   type ArtistDto,
   type BulkLibraryAction,
   type BulkLibraryResult,
@@ -131,8 +133,13 @@ async function requestAiSession(
   return parsed.data
 }
 
-async function requestAiSessionState(path: string): Promise<AiSessionState> {
-  const parsed = AiSessionStateSchema.safeParse(await request<unknown>(path))
+async function requestAiSessionState(
+  path: string,
+  body?: PublishAiPlaylistRequest | TransferAiPlaylistRequest,
+): Promise<AiSessionState> {
+  const parsed = AiSessionStateSchema.safeParse(
+    await request<unknown>(path, body ? { method: 'POST', body } : {}),
+  )
   if (!parsed.success) {
     throw new ApiError('Invalid Create with AI response', 502)
   }
@@ -425,6 +432,18 @@ export const api = {
 
   getAiSession: (sessionId: string) =>
     requestAiSessionState(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
+
+  publishAiPlaylist: (sessionId: string, input: PublishAiPlaylistRequest) =>
+    requestAiSessionState(
+      `/api/ai/sessions/${encodeURIComponent(sessionId)}/publish`,
+      input,
+    ),
+
+  transferAiPlaylist: (sessionId: string, input: TransferAiPlaylistRequest) =>
+    requestAiSessionState(
+      `/api/ai/sessions/${encodeURIComponent(sessionId)}/transfer`,
+      input,
+    ),
 
   generateAiPlaylist: (sessionId: string, options: GenerationOptions = {}) =>
     requestGeneration(

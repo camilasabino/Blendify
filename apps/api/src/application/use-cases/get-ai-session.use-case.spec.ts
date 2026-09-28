@@ -4,6 +4,7 @@ import {
   AI_GENERATION_INTERRUPTED_CODE,
   AI_SESSION_RECORD_VERSION,
   type AiSession,
+  type AiSessionDestination,
   type AiSessionExecution,
 } from '@/domain/ai/ai-session';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
@@ -42,6 +43,7 @@ function session(overrides: Partial<AiSession> = {}): AiSession {
     aiSafe: { intent: reviewed },
     clarification: findIntentClarification(reviewed),
     execution: null,
+    destination: null,
     createdAt: STARTED_AT,
     updatedAt: STARTED_AT,
     expiresAt: new Date(Date.now() + 30 * MINUTE_MS).toISOString(),
@@ -49,7 +51,11 @@ function session(overrides: Partial<AiSession> = {}): AiSession {
   };
 }
 
-function createWorld(reads: Array<AiSession | null>, lockHeld = false) {
+function createWorld(
+  reads: Array<AiSession | null>,
+  lockHeld = false,
+  claimHeld = false,
+) {
   const sessions = {
     save: jest.fn(() => Promise.resolve()),
     find: jest.fn(() =>
@@ -59,6 +65,11 @@ function createWorld(reads: Array<AiSession | null>, lockHeld = false) {
     releaseGenerationLock: jest.fn(() => Promise.resolve()),
     hasGenerationLock: jest.fn(() => Promise.resolve(lockHeld)),
     saveGenerationOutcome: jest.fn(() => Promise.resolve(true)),
+    acquireDestinationClaim: jest.fn(() => Promise.resolve('claim-1')),
+    releaseDestinationClaim: jest.fn(() => Promise.resolve()),
+    renewDestinationClaim: jest.fn(() => Promise.resolve(true)),
+    hasDestinationClaim: jest.fn(() => Promise.resolve(claimHeld)),
+    savePublishOutcome: jest.fn(() => Promise.resolve(true)),
     renewGenerationLock: jest.fn(() => Promise.resolve(true)),
   } satisfies AiSessionRepositoryPort;
 
@@ -175,6 +186,67 @@ describe('GetAiSessionUseCase', () => {
     });
 
     expect(result).toBe(restarted);
+  });
+
+  describe('publishing destination', () => {
+    const publishing = (attemptId: string): AiSessionDestination => ({
+      status: 'publishing',
+      attemptId,
+      startedAt: '2026-09-26T12:00:00.000Z',
+      spotifyPlaylist: { spotifyId: 'p1', spotifyUrl: 'https://sp/p1' },
+    });
+
+    it('keeps a long-running publish in progress while its destination lease is held', async () => {
+      const stored = session({ destination: publishing('attempt-a') });
+      const world = createWorld([stored], false, true);
+
+      const { session: result } = await world.useCase.execute({
+        token: TOKEN,
+        userId: null,
+      });
+
+      expect(result.destination).toEqual(publishing('attempt-a'));
+      expect(world.sessions.save).not.toHaveBeenCalled();
+    });
+
+    it('reports a publish without a lease as incomplete, keeping its link, without persisting it', async () => {
+      const stored = session({ destination: publishing('attempt-a') });
+      const world = createWorld([stored, stored]);
+
+      const { session: result } = await world.useCase.execute({
+        token: TOKEN,
+        userId: null,
+      });
+
+      expect(result.destination).toMatchObject({
+        status: 'publish_incomplete',
+        spotifyPlaylist: { spotifyId: 'p1', spotifyUrl: 'https://sp/p1' },
+      });
+      expect(world.sessions.save).not.toHaveBeenCalled();
+      expect(world.sessions.savePublishOutcome).not.toHaveBeenCalled();
+    });
+
+    it('returns the newer state when the publish settled between reads', async () => {
+      const settled = session({
+        destination: {
+          status: 'published',
+          publishedAt: STARTED_AT,
+          spotifyPlaylist: { spotifyId: 'p1', spotifyUrl: 'https://sp/p1' },
+          savedToLibrary: true,
+        },
+      });
+      const world = createWorld([
+        session({ destination: publishing('attempt-a') }),
+        settled,
+      ]);
+
+      const { session: result } = await world.useCase.execute({
+        token: TOKEN,
+        userId: null,
+      });
+
+      expect(result).toBe(settled);
+    });
   });
 
   it('hides sessions that are missing, expired or owned by someone else', async () => {

@@ -8,7 +8,7 @@ import type {
 import type { AiIntent, AiIntentClarification } from './ai-intent';
 import { findIntentClarification } from './ai-intent-rules';
 
-export const AI_SESSION_RECORD_VERSION = 4;
+export const AI_SESSION_RECORD_VERSION = 5;
 export const AI_GENERATION_INTERRUPTED_CODE = 'AI_GENERATION_INTERRUPTED';
 
 export interface AiGenerationFailure {
@@ -40,6 +40,41 @@ export type AiSessionExecution =
       failure: AiGenerationFailure;
     };
 
+export interface AiSpotifyPlaylistLink {
+  spotifyId: string;
+  spotifyUrl: string | null;
+}
+
+export interface AiPreparedTransfer {
+  url: string;
+  expiresAt: string;
+  trackCount: number;
+}
+
+export type AiSessionDestination =
+  | {
+      status: 'publishing';
+      attemptId: string;
+      startedAt: string;
+      spotifyPlaylist: AiSpotifyPlaylistLink | null;
+    }
+  | {
+      status: 'published';
+      publishedAt: string;
+      spotifyPlaylist: AiSpotifyPlaylistLink;
+      savedToLibrary: boolean;
+    }
+  | {
+      status: 'publish_incomplete';
+      failedAt: string;
+      spotifyPlaylist: AiSpotifyPlaylistLink | null;
+    }
+  | {
+      status: 'transfer_prepared';
+      preparedAt: string;
+      transfer: AiPreparedTransfer;
+    };
+
 export interface AiSession {
   version: typeof AI_SESSION_RECORD_VERSION;
   ownerUserId: string | null;
@@ -48,6 +83,7 @@ export interface AiSession {
   aiSafe: { intent: AiIntent | null };
   clarification: AiIntentClarification | null;
   execution: AiSessionExecution | null;
+  destination: AiSessionDestination | null;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;
@@ -148,4 +184,119 @@ export function withGenerationInterrupted(
 
 function generationStartedAt(session: AiSession, fallback: string): string {
   return session.execution?.startedAt ?? fallback;
+}
+
+export function generatedResultOf(
+  session: AiSession,
+): AiGenerationResult | null {
+  if (session.execution?.status !== 'generated') {
+    return null;
+  }
+  const { result } = session.execution;
+  return result.playlist.tracks.length > 0 ? result : null;
+}
+
+export function currentDestination(
+  session: AiSession,
+  now: Date,
+): AiSessionDestination | null {
+  const { destination } = session;
+  if (
+    destination?.status === 'transfer_prepared' &&
+    Date.parse(destination.transfer.expiresAt) <= now.getTime()
+  ) {
+    return null;
+  }
+  return destination;
+}
+
+export function withDestination(
+  session: AiSession,
+  destination: AiSessionDestination | null,
+  now: Date,
+): AiSession {
+  return { ...session, destination, updatedAt: now.toISOString() };
+}
+
+export function withPublishStarted(
+  session: AiSession,
+  attemptId: string,
+  now: Date,
+): AiSession {
+  return withDestination(
+    session,
+    {
+      status: 'publishing',
+      attemptId,
+      startedAt: now.toISOString(),
+      spotifyPlaylist: null,
+    },
+    now,
+  );
+}
+
+export function withSpotifyPlaylistCreated(
+  session: AiSession,
+  spotifyPlaylist: AiSpotifyPlaylistLink,
+  now: Date,
+): AiSession {
+  const { destination } = session;
+  if (destination?.status !== 'publishing') {
+    throw new Error('Only a publishing destination can record its playlist.');
+  }
+  return withDestination(session, { ...destination, spotifyPlaylist }, now);
+}
+
+export function withPublishInterrupted(
+  session: AiSession,
+  now: Date,
+): AiSession {
+  const { destination } = session;
+  if (destination?.status !== 'publishing') {
+    return session;
+  }
+  return withPublishIncomplete(session, destination.spotifyPlaylist, now);
+}
+
+export function withPublishIncomplete(
+  session: AiSession,
+  spotifyPlaylist: AiSpotifyPlaylistLink | null,
+  now: Date,
+): AiSession {
+  return withDestination(
+    session,
+    {
+      status: 'publish_incomplete',
+      failedAt: now.toISOString(),
+      spotifyPlaylist,
+    },
+    now,
+  );
+}
+
+export function withPublished(
+  session: AiSession,
+  published: {
+    spotifyPlaylist: AiSpotifyPlaylistLink;
+    savedToLibrary: boolean;
+  },
+  now: Date,
+): AiSession {
+  return withDestination(
+    session,
+    { status: 'published', publishedAt: now.toISOString(), ...published },
+    now,
+  );
+}
+
+export function withTransferPrepared(
+  session: AiSession,
+  transfer: AiPreparedTransfer,
+  now: Date,
+): AiSession {
+  return withDestination(
+    session,
+    { status: 'transfer_prepared', preparedAt: now.toISOString(), transfer },
+    now,
+  );
 }

@@ -7,6 +7,7 @@ import { generationRequestErrorMessage } from '@/components/ai/ai-generation-cop
 import { AiGenerationFailure } from '@/components/ai/ai-generation-failure'
 import { AiGenerationProgress } from '@/components/ai/ai-generation-progress'
 import { AiIntentSummary } from '@/components/ai/ai-intent-summary'
+import { AiPlaylistDestination } from '@/components/ai/ai-playlist-destination'
 import { AiPromptForm } from '@/components/ai/ai-prompt-form'
 import { AiReviewActions } from '@/components/ai/ai-review-actions'
 import { ErrorState } from '@/components/ui/feedback'
@@ -15,6 +16,7 @@ import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
 import { LoadingState } from '@/components/ui/spinner'
 import { useAiSession, type AiFlowPhase, type AiFlowState } from '@/hooks/use-ai-session'
+import { useCapabilities } from '@/hooks/use-capabilities'
 import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useT } from '@/i18n/use-t'
 
@@ -78,9 +80,12 @@ export function AiPlaylistPage() {
     submit,
     choose,
     generate,
+    publish,
+    prepareTransfer,
     checkStatus,
     reset,
   } = useAiSession()
+  const { mode } = useCapabilities()
   const [prompt, setPrompt] = useState(submittedPrompt)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -220,9 +225,23 @@ export function AiPlaylistPage() {
           result={flow.result}
           title={playlistTitle}
           onTitleChange={renamePlaylist}
+          isTitleLocked={flow.destination !== null || flow.isPublishing}
+          destination={flow.destination}
           headingRef={targets.result}
           onStartOver={startOver}
-        />
+        >
+          <AiPlaylistDestination
+            mode={mode}
+            intentKind={flow.intent.kind}
+            title={playlistTitle?.trim() || flow.result.playlist.name}
+            destination={flow.destination}
+            transferAvailable={flow.result.transferAvailable}
+            isPublishing={flow.isPublishing}
+            publishError={flow.publishError}
+            onPublish={publish}
+            onPrepareTransfer={prepareTransfer}
+          />
+        </AiGeneratedPlaylist>
       ) : null}
 
       {isCompact && flow.phase === 'generation_failed' ? (

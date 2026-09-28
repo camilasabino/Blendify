@@ -446,6 +446,8 @@ export const es: Record<MessageKey, string> = {
     'Soundiiz no responde en este momento. Intenta de nuevo en {wait}.',
   'errors.catalogUnavailable':
     'El catálogo de música no está disponible temporalmente. Intenta de nuevo en unos minutos.',
+  'errors.spotifyReauthRequired':
+    'Tu conexión con Spotify ya no es válida. Vuelve a conectar Spotify para continuar.',
   'errors.invalidGenerationResponse':
     'Blendify recibió una respuesta inesperada. Intenta de nuevo.',
   'create.stepSize': 'Tamaño',
@@ -587,4 +589,24 @@ export const es: Record<MessageKey, string> = {
   'ai.generationError.insufficient': 'Blendify no encontró suficiente música para este pedido. Prueba con otros artistas, géneros u otra canción.',
   'ai.generationError.interrupted': 'Se interrumpió la creación de tu playlist. Vuelve a intentarlo.',
   'ai.generationError.failed': 'No se pudo terminar de crear tu playlist. Vuelve a intentarlo.',
+  'ai.destination.spotifyTitle': 'Guardar en Spotify',
+  'ai.destination.spotifyHint':
+    'Blendify creará una playlist privada con este título en tu cuenta de Spotify.',
+  'ai.destination.spotifyHintLibrary':
+    'Blendify creará una playlist privada con este título en tu cuenta de Spotify y la agregará a tu biblioteca.',
+  'ai.destination.save': 'Guardar en Spotify',
+  'ai.destination.saving': 'Guardando en Spotify…',
+  'ai.destination.saved': 'Guardada en Spotify',
+  'ai.destination.savedHint': 'La playlist ya está en tu cuenta de Spotify.',
+  'ai.destination.savedHintLibrary':
+    'La playlist ya está en tu cuenta de Spotify y en tu biblioteca.',
+  'ai.destination.incompleteTitle': 'No se pudo terminar de guardar en Spotify',
+  'ai.destination.incomplete':
+    'Blendify creó la playlist en Spotify, pero no pudo terminar de guardarla. Ábrela en Spotify para ver qué canciones se agregaron.',
+  'ai.destination.uncertain':
+    'Blendify no pudo confirmar si la playlist se creó en Spotify. Revisa tu cuenta de Spotify antes de crearla de nuevo.',
+  'ai.destination.failed':
+    'No se pudo guardar la playlist en Spotify. Vuelve a intentarlo.',
+  'ai.destination.reconnect':
+    'Spotify necesita que vuelvas a conectarte antes de guardar esta playlist. La vista previa se queda aquí.',
 }
