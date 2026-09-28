@@ -108,6 +108,37 @@ describe('English refinement copy', () => {
     ).toBe('There are no songs by Björk in the current playlist to keep.')
   })
 
+  it('explains model clarifications as refinement problems, not first-request ones', () => {
+    expect(
+      refinementClarificationMessage(
+        clarification('ambiguous_request', {
+          names: [],
+          unsupportedConstraints: [{ category: 'other', userText: 'make it shorter' }],
+        }),
+        t,
+      ),
+    ).toBe(
+      'Blendify needs more detail to make this change. Give an exact number of songs or minutes, or name what to add, remove or keep.',
+    )
+    expect(
+      refinementClarificationMessage(
+        clarification('unsupported_constraint', {
+          names: [],
+          unsupportedConstraints: [
+            { category: 'other', userText: 'no more than two songs per artist' },
+          ],
+        }),
+        t,
+      ),
+    ).toBe(
+      'Blendify can’t make these changes yet: “no more than two songs per artist”. Try a different refinement.',
+    )
+    for (const reason of ['not_a_playlist_request', 'mixed_seed_types', 'unsupported_ordering'] as const) {
+      const message = refinementClarificationMessage(clarification(reason), t)
+      expect(message, reason).not.toMatch(/\?$|:$|where to start/)
+    }
+  })
+
   it('renders canonical before and after values', () => {
     expect(intentChangeView({ field: 'popularity', from: 'balanced', to: 'rarities' }, t)).toEqual({
       key: 'popularity',

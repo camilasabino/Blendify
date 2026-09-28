@@ -91,10 +91,15 @@ describe('Create with AI refinement', () => {
     expect(textarea).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Propose changes' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Make it less mainstream' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Prepare transfer' })).toBeNull()
+    expect(
+      screen.queryByText('Finish or dismiss the current refinement before saving this playlist.'),
+    ).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('textbox', { name: 'What would you like to change?' })).toBeNull()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Refine playlist' })).toHaveFocus())
+    expect(screen.getByRole('button', { name: 'Prepare transfer' })).toBeInTheDocument()
   })
 
   it('hides Refine playlist once the playlist has a destination', async () => {
@@ -454,6 +459,22 @@ describe('Create with AI refinement', () => {
       screen.getByText('Finish or dismiss the current refinement before saving this playlist.'),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Save to Spotify' })).toBeNull()
+  })
+
+  it('drops an expired session on Apply instead of resurrecting the pending candidate', async () => {
+    const user = userEvent.setup()
+    const { calls } = await renderPage(
+      { [APPLY_ROUTE]: () => apiError(404, 'AI_SESSION_NOT_FOUND') },
+      { state: pendingAiSessionState(candidateReadyRefinement()) },
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Apply changes' }))
+
+    expect(await screen.findByText('This request expired. Submit it again.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Proposed changes' })).toBeNull()
+    expect(sessionStorage.getItem('blendify.aiSession')).toBeNull()
+    expect(calls.filter((call) => call.url.endsWith('/apply'))).toHaveLength(1)
+    expect(calls.filter((call) => call.url.endsWith('/dismiss'))).toHaveLength(0)
   })
 
   it('abandons the whole session on Start over without settling the pending refinement', async () => {

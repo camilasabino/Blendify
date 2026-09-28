@@ -525,6 +525,48 @@ describe('PublishAiPlaylistUseCase', () => {
       expect(world.stored()).toBe(withPending);
     });
 
+    it('publishes the playlist that is current under the claim, not the one read before it', async () => {
+      const world = setup(generatedSession());
+      const initial = world.stored();
+      if (initial.execution?.status !== 'generated') {
+        throw new Error('Expected a generated session');
+      }
+      const applied: AiSession = {
+        ...initial,
+        execution: {
+          ...initial.execution,
+          result: {
+            ...initial.execution.result,
+            playlist: {
+              ...initial.execution.result.playlist,
+              tracks: initial.execution.result.playlist.tracks.map((track) => ({
+                ...track,
+                id: 'b1',
+                uri: 'spotify:track:b1',
+              })),
+            },
+          },
+        },
+        updatedAt: new Date(Date.now() + 1).toISOString(),
+      };
+      world.sessions.acquireDestinationClaim.mockImplementationOnce(() => {
+        world.replace(applied);
+        return Promise.resolve('claim-1');
+      });
+
+      const publishing = world.useCase.execute(COMMAND);
+      await flush();
+
+      expect(world.publish).toHaveBeenCalledTimes(1);
+      expect(
+        world.pending[0].input.playlist.tracks.map((track) =>
+          track.id.toString(),
+        ),
+      ).toEqual(['b1']);
+      world.pending[0].succeed();
+      await publishing;
+    });
+
     it('never overwrites a refinement written between the claim re-read and the start', async () => {
       const world = setup(generatedSession());
       const withPending = {

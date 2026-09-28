@@ -78,7 +78,7 @@ export class PublishAiPlaylistUseCase {
     command: PublishAiPlaylistCommand,
   ): Promise<AiSessionCommandResult> {
     const session = await this.find(command);
-    const result = requireGeneratedResult(session);
+    requireGeneratedResult(session);
     if (hasSettledSpotifyDestination(session)) {
       return { token: command.token, session };
     }
@@ -88,7 +88,6 @@ export class PublishAiPlaylistUseCase {
     if (!user) {
       throw new BusinessRuleError('User not found', 'USER_NOT_FOUND');
     }
-    const playlist = toPlaylist(result, user, command.name);
 
     const claimId = await this.sessions.acquireDestinationClaim(
       command.token,
@@ -112,6 +111,11 @@ export class PublishAiPlaylistUseCase {
         );
       }
       requireNoPendingRefinement(current);
+      const playlist = toPlaylist(
+        requireGeneratedResult(current),
+        user,
+        command.name,
+      );
       return await this.publishOnce(command, current, playlist, user, lease);
     } finally {
       await lease.release();

@@ -14,6 +14,7 @@ import {
   PLAYLIST_TRANSFER_GATEWAY,
   type PlaylistTransferGateway,
 } from '@/domain/repositories/playlist-transfer.gateway.port';
+import type { TransferPlaylist } from '@/domain/transfer/transfer-playlist';
 import { PlaylistName } from '@/domain/value-objects/playlist-name.vo';
 import {
   findReadableAiSession,
@@ -52,19 +53,12 @@ export class TransferAiPlaylistUseCase {
     if (command.userId !== null) {
       throw AiSessionError.destinationUnavailable();
     }
-    const result = requireGeneratedResult(session);
+    requireGeneratedResult(session);
     if (hasPreparedTransfer(session)) {
       return { token: command.token, session };
     }
     requireNoPendingRefinement(session);
-
-    const playlist = toAiTransferPlaylist(
-      result,
-      PlaylistName.create(command.name).getValue(),
-    );
-    if (!playlist) {
-      throw TransferError.playlistRejected();
-    }
+    transferPlaylistOf(session, command.name);
 
     const claimId = await this.sessions.acquireDestinationClaim(
       command.token,
@@ -94,15 +88,14 @@ export class TransferAiPlaylistUseCase {
         return { token: command.token, session: current };
       }
       requireNoPendingRefinement(current);
+      const playlist = transferPlaylistOf(current, command.name);
 
       const transfer = await this.gateway.createTransfer(playlist);
       if (lease.isLost) {
         throw AiSessionError.destinationInProgress();
       }
-      const latest = await this.find(command);
-      requireNoPendingRefinement(latest);
       const prepared = withTransferPrepared(
-        latest,
+        current,
         {
           url: transfer.url,
           expiresAt: transfer.expiresAt.toISOString(),
@@ -110,7 +103,7 @@ export class TransferAiPlaylistUseCase {
         },
         new Date(),
       );
-      await this.save(command.token, prepared);
+      await this.saveIfUnchanged(command, prepared, current);
       return { token: command.token, session: prepared };
     } finally {
       await lease.release();
@@ -121,13 +114,42 @@ export class TransferAiPlaylistUseCase {
     return findReadableAiSession(this.sessions, command.token, command.userId);
   }
 
-  private async save(token: string, session: AiSession): Promise<void> {
-    const ttlMs = remainingTtlMs(session);
+  private async saveIfUnchanged(
+    command: TransferAiPlaylistCommand,
+    prepared: AiSession,
+    current: AiSession,
+  ): Promise<void> {
+    const ttlMs = remainingTtlMs(current);
     if (ttlMs <= 0) {
       throw AiSessionError.notFound();
     }
-    await this.sessions.save(token, session, ttlMs);
+    if (
+      await this.sessions.saveIfUnchanged(
+        command.token,
+        prepared,
+        current.updatedAt,
+        ttlMs,
+      )
+    ) {
+      return;
+    }
+    requireNoPendingRefinement(await this.find(command));
+    throw AiSessionError.destinationSuperseded();
   }
+}
+
+function transferPlaylistOf(
+  session: AiSession,
+  name: string,
+): TransferPlaylist {
+  const playlist = toAiTransferPlaylist(
+    requireGeneratedResult(session),
+    PlaylistName.create(name).getValue(),
+  );
+  if (!playlist) {
+    throw TransferError.playlistRejected();
+  }
+  return playlist;
 }
 
 function requireNoPendingRefinement(session: AiSession): void {

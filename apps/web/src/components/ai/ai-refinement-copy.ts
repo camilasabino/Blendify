@@ -80,6 +80,16 @@ export function refinementClarificationMessage(
   const names = clarification.names.join(', ')
 
   switch (clarification.reason) {
+    case 'ambiguous_request':
+      return t('ai.refine.clarify.ambiguous')
+    case 'unsupported_constraint':
+      return unsupportedRefinementMessage(clarification, t)
+    case 'not_a_playlist_request':
+      return t('ai.refine.clarify.notARefinement')
+    case 'mixed_seed_types':
+      return t('ai.refine.clarify.mixedSeeds')
+    case 'unsupported_ordering':
+      return t('ai.refine.clarify.ordering')
     case 'conflicting_changes':
       if (clarification.limit !== null) {
         return t('ai.refine.clarify.conflictingLimit', { limit: clarification.limit })
@@ -94,6 +104,18 @@ export function refinementClarificationMessage(
     default:
       return clarificationMessage({ ...clarification, reason: clarification.reason }, t)
   }
+}
+
+function unsupportedRefinementMessage(
+  clarification: AiRefinementClarificationDto,
+  t: Translate,
+): string {
+  const items = clarification.unsupportedConstraints
+    .map((constraint) => `“${constraint.userText}”`)
+    .join(', ')
+  return items
+    ? t('ai.refine.clarify.unsupportedNamed', { items })
+    : t('ai.refine.clarify.unsupported')
 }
 
 function trackLabel(track: AiTrackReference, t: Translate): string {

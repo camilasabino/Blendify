@@ -59,7 +59,7 @@ function result(trackIds: string[]): AiGenerationResult {
 }
 
 const RESULT_A = result(['a1', 'a2']);
-const RESULT_B = result(['b1', 'b2', 'b3']);
+const RESULT_B = result(['a1', 'b2', 'b3']);
 
 function readyPending(id = REFINEMENT_ID): AiPendingRefinement {
   return {
@@ -78,11 +78,14 @@ function readyPending(id = REFINEMENT_ID): AiPendingRefinement {
       preservedPositions: [1],
       diff: {
         tracks: {
-          added: [],
-          removed: [],
+          added: [
+            { trackId: 'b2', position: 2 },
+            { trackId: 'b3', position: 3 },
+          ],
+          removed: [{ trackId: 'a2', position: 2 }],
           moved: [],
-          retainedCount: 2,
-          replacedCount: 0,
+          retainedCount: 1,
+          replacedCount: 1,
           before: { trackCount: 2, durationMs: 400_000 },
           after: { trackCount: 3, durationMs: 600_000 },
         },
@@ -123,7 +126,12 @@ function setup(initial: AiSession) {
   const sessions = {
     find: jest.fn(() => Promise.resolve(stored)),
     saveIfUnchanged: jest.fn(
-      async (_token: string, next: AiSession, expectedUpdatedAt: string) => {
+      async (
+        _token: string,
+        next: AiSession,
+        expectedUpdatedAt: string,
+        _ttlMs: number,
+      ) => {
         await Promise.resolve();
         if (stored.updatedAt !== expectedUpdatedAt) {
           return false;
@@ -163,6 +171,7 @@ describe('Apply and dismiss a pending refinement', () => {
   it('promotes intent, preservation and candidate in one fenced write', async () => {
     const initial = session();
     const world = setup(initial);
+    const remainingTtlMs = Date.parse(initial.expiresAt) - Date.now();
 
     const { session: applied } = await world.apply.execute(command());
 
@@ -173,6 +182,9 @@ describe('Apply and dismiss a pending refinement', () => {
       initial.updatedAt,
       expect.any(Number),
     );
+    const [, , , ttlMs] = world.sessions.saveIfUnchanged.mock.calls[0];
+    expect(ttlMs).toBeGreaterThan(0);
+    expect(ttlMs).toBeLessThanOrEqual(remainingTtlMs);
     expect(applied).toEqual({
       ...initial,
       aiSafe: {

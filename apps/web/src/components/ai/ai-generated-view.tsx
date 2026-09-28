@@ -85,10 +85,12 @@ export function AiGeneratedView({
   const previousPendingId = useRef(pendingId)
   const previousSettlement = useRef(settlement)
   const isRefining = flow.refinementActivity === 'refining'
-  const isComposing = draft.isOpen && flow.refinement === null
   const canRefine =
     flow.destination === null && !flow.isPublishing && flow.refinement === null
+  const isComposing = draft.isOpen && canRefine
   const blocksDestination = flow.refinement !== null || isRefining
+  const showsPendingNotice = blocksDestination && flow.destination === null
+  const showsDestination = flow.destination !== null || (!blocksDestination && !isComposing)
   const statusKey = statusMessageKey(flow.refinementActivity, settlement)
   const refinementError = flow.refinementError
   const { close: closeDraft, open: openDraft, reset: resetDraft } = draft
@@ -266,11 +268,13 @@ export function AiGeneratedView({
         />
       ) : null}
 
-      {blocksDestination && flow.destination === null ? (
+      {showsPendingNotice ? (
         <p className="rounded-card border border-divider bg-card p-4 text-sm leading-relaxed text-cream-300">
           {t('ai.refine.pendingDestination')}
         </p>
-      ) : (
+      ) : null}
+
+      {showsDestination ? (
         <AiPlaylistDestination
           mode={mode}
           intentKind={flow.intent.kind}
@@ -282,7 +286,7 @@ export function AiGeneratedView({
           onPublish={onPublish}
           onPrepareTransfer={onPrepareTransfer}
         />
-      )}
+      ) : null}
     </AiGeneratedPlaylist>
   )
 }

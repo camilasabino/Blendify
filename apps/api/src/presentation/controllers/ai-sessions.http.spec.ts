@@ -2256,6 +2256,30 @@ describe('Create with AI sessions over HTTP', () => {
         );
       });
 
+      it('publishes a candidate a Guest applied after the user connects Spotify', async () => {
+        const sessionId = await generatedSession();
+        const refinementId = await proposeCandidate(sessionId);
+        const owner = await sessionCookie('user-1');
+
+        const pending = AiSessionStateSchema.parse(
+          (await readSession(sessionId, owner).expect(200)).body,
+        );
+        expect(pending.refinement?.id).toBe(refinementId);
+        await settle('apply', sessionId, refinementId, owner).expect(200);
+        await request(server())
+          .post(`${SESSIONS_PATH}/${sessionId}/publish`)
+          .set('Origin', FRONTEND)
+          .set('Cookie', owner)
+          .send({ name: 'Night run' })
+          .expect(200);
+
+        expect(world.spotify.addTracksToPlaylist).toHaveBeenCalledWith(
+          SPOTIFY_PLAYLIST.id,
+          CANDIDATE_TRACKS.map((id) => `spotify:track:${id}`),
+        );
+        expect(world.soundiiz.createTransfer).not.toHaveBeenCalled();
+      });
+
       it('transfers the applied candidate for a Guest', async () => {
         const sessionId = await generatedSession();
         const refinementId = await proposeCandidate(sessionId);
@@ -2311,6 +2335,81 @@ describe('Create with AI sessions over HTTP', () => {
             { title: 'Song r2', artists: ['Radiohead'] },
           ],
         });
+      });
+
+      function transfer(sessionId: string) {
+        return request(server())
+          .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+          .set('Origin', FRONTEND)
+          .send({ name: 'Mix' });
+      }
+
+      function soundiizLink(playlist: TransferPlaylist): PlaylistTransfer {
+        return {
+          url: SOUNDIIZ_URL,
+          expiresAt: new Date(Date.now() + 60 * 60_000),
+          trackCount: playlist.tracks.length,
+        };
+      }
+
+      it('discards a Soundiiz link prepared while another tab applied a refinement', async () => {
+        const sessionId = await generatedSession();
+        world.soundiiz.createTransfer.mockImplementationOnce(
+          async (playlist) => {
+            const refinementId = await proposeCandidate(sessionId);
+            await settle('apply', sessionId, refinementId).expect(200);
+            return soundiizLink(playlist);
+          },
+        );
+
+        const refused = await transfer(sessionId).expect(409);
+
+        expect(refused.body).toMatchObject({
+          code: 'AI_REFINEMENT_SUPERSEDED',
+        });
+        expect(world.soundiiz.createTransfer).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tracks: ['r1', 'r2'].map((id) => ({
+              title: `Song ${id}`,
+              artists: ['Radiohead'],
+            })),
+          }),
+        );
+        const state = AiSessionStateSchema.parse(
+          (await readSession(sessionId).expect(200)).body,
+        );
+        expect(currentTrackIds(state)).toEqual(CANDIDATE_TRACKS);
+        expect(state.destination).toBeNull();
+
+        await transfer(sessionId).expect(200);
+        expect(world.soundiiz.createTransfer).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            tracks: CANDIDATE_TRACKS.map((id) => ({
+              title: `Song ${id}`,
+              artists: ['Radiohead'],
+            })),
+          }),
+        );
+      });
+
+      it('discards a Soundiiz link prepared while a refinement became pending and keeps it pending', async () => {
+        const sessionId = await generatedSession();
+        world.soundiiz.createTransfer.mockImplementationOnce(
+          async (playlist) => {
+            await proposeCandidate(sessionId);
+            return soundiizLink(playlist);
+          },
+        );
+
+        const refused = await transfer(sessionId).expect(409);
+
+        expect(refused.body).toMatchObject({ code: 'AI_REFINEMENT_PENDING' });
+        const state = AiSessionStateSchema.parse(
+          (await readSession(sessionId).expect(200)).body,
+        );
+        expect(currentTrackIds(state)).toEqual(['r1', 'r2']);
+        expect(state.refinement?.status).toBe('candidate_ready');
+        expect(state.destination).toBeNull();
       });
 
       it('publishes the current playlist after the Spotify owner dismisses a candidate', async () => {
@@ -2518,16 +2617,16 @@ describe('Create with AI sessions over HTTP', () => {
         expect(world.stored.get(sessionId)).toEqual(afterDismiss);
       });
 
-      it('retries the fenced write when only the refinement attempt counter moved', async () => {
+      it('retries the fenced write when the session version moved but the same refinement is still pending', async () => {
         const sessionId = await generatedSession();
         const refinementId = await proposeCandidate(sessionId);
+        const pending = world.stored.get(sessionId)?.pendingRefinement;
         world.sessions.saveIfUnchanged.mockImplementationOnce(
           (token: string) => {
             const current = world.stored.get(token);
             if (current) {
               world.stored.set(token, {
                 ...current,
-                refinementAttempts: current.refinementAttempts + 1,
                 updatedAt: new Date(
                   Date.parse(current.updatedAt) + 5,
                 ).toISOString(),
@@ -2539,8 +2638,13 @@ describe('Create with AI sessions over HTTP', () => {
 
         await settle('apply', sessionId, refinementId).expect(200);
 
-        expect(world.stored.get(sessionId)?.pendingRefinement).toBeNull();
-        expect(world.stored.get(sessionId)?.refinementAttempts).toBe(2);
+        const stored = world.stored.get(sessionId);
+        expect(stored?.pendingRefinement).toBeNull();
+        if (pending?.status !== 'proposed') {
+          throw new Error('Expected a proposed refinement');
+        }
+        expect(stored?.aiSafe.intent).toEqual(pending.aiSafe.intent);
+        expect(stored?.refinementAttempts).toBe(1);
       });
 
       it('hides foreign, unknown and expired sessions with the not-found error', async () => {

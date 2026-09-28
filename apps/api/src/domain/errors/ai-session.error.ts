@@ -81,6 +81,13 @@ export class AiSessionError extends Error {
     );
   }
 
+  static destinationSuperseded(): AiSessionError {
+    return new AiSessionError(
+      'AI_REFINEMENT_SUPERSEDED',
+      'This playlist changed while it was being transferred. Review the latest version and try again.',
+    );
+  }
+
   static refinementPending(): AiSessionError {
     return new AiSessionError(
       'AI_REFINEMENT_PENDING',

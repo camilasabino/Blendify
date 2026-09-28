@@ -747,6 +747,18 @@ export const en = {
     'The songs you’re keeping don’t fit in a playlist of {limit} songs.',
   'ai.refine.clarify.outOfRange':
     'This playlist has {limit} songs, so Blendify can’t keep a song beyond that position.',
+  'ai.refine.clarify.ambiguous':
+    'Blendify needs more detail to make this change. Give an exact number of songs or minutes, or name what to add, remove or keep.',
+  'ai.refine.clarify.unsupported':
+    'Blendify can’t make this kind of change yet. Try a different refinement.',
+  'ai.refine.clarify.unsupportedNamed':
+    'Blendify can’t make these changes yet: {items}. Try a different refinement.',
+  'ai.refine.clarify.notARefinement':
+    'That doesn’t look like a change to this playlist. Say what to add, remove or keep.',
+  'ai.refine.clarify.mixedSeeds':
+    'A playlist starts from one kind of starting point at a time: artists, songs or genres. Try a refinement that uses only one of them.',
+  'ai.refine.clarify.ordering':
+    'Blendify can’t order songs this way. Ask for Artist A–Z, Song title A–Z or Random order instead.',
   'ai.refine.clarify.artistNotKept':
     'There are no songs by {names} in the current playlist to keep.',
   'ai.refine.error.inProgress':

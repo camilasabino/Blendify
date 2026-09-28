@@ -761,6 +761,18 @@ export const es: Record<MessageKey, string> = {
     'Las canciones que mantienes no entran en una playlist de {limit} canciones.',
   'ai.refine.clarify.outOfRange':
     'Esta playlist tiene {limit} canciones, así que Blendify no puede mantener una canción más allá de esa posición.',
+  'ai.refine.clarify.ambiguous':
+    'Blendify necesita más detalle para hacer este cambio. Indica un número exacto de canciones o minutos, o qué agregar, quitar o mantener.',
+  'ai.refine.clarify.unsupported':
+    'Blendify todavía no puede hacer este tipo de cambio. Prueba otro refinamiento.',
+  'ai.refine.clarify.unsupportedNamed':
+    'Blendify todavía no puede hacer estos cambios: {items}. Prueba otro refinamiento.',
+  'ai.refine.clarify.notARefinement':
+    'Eso no parece un cambio para esta playlist. Indica qué agregar, quitar o mantener.',
+  'ai.refine.clarify.mixedSeeds':
+    'Una playlist parte de un solo tipo de punto de partida a la vez: artistas, canciones o géneros. Prueba un refinamiento que use solo uno de ellos.',
+  'ai.refine.clarify.ordering':
+    'Blendify no puede ordenar las canciones de esa forma. Pide el orden Artista A–Z, Título A–Z o Al azar.',
   'ai.refine.clarify.artistNotKept':
     'No hay canciones de {names} en la playlist actual para mantener.',
   'ai.refine.error.inProgress':
