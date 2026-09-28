@@ -1,13 +1,18 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
-import type { InterpretIntentResponse } from '@blendify/contracts/ai-service';
+import type {
+  InterpretIntentResponse,
+  PlanRefinementRequest,
+  PlanRefinementResponse,
+} from '@blendify/contracts/ai-service';
 import {
   AiInterpretationError,
   type AiInterpretationErrorCode,
 } from '@/domain/errors/ai-interpretation.error';
 import {
   AI_SERVICE_INTERPRET_PATH,
+  AI_SERVICE_REFINEMENT_PATH,
   AI_SERVICE_TIMEOUT_MS,
   AiServiceIntentInterpreterAdapter,
 } from './ai-service-intent-interpreter.adapter';
@@ -262,5 +267,142 @@ describe('AiServiceIntentInterpreterAdapter', () => {
       expect(line).not.toContain(PROMPT);
       expect(line).not.toContain(AI_SERVICE_TOKEN);
     }
+  });
+
+  describe('refinement planning', () => {
+    const NO_NAMES = { add: [], remove: [] };
+    const REFINEMENT_REQUEST: PlanRefinementRequest = {
+      intent: (
+        interpretation.result as { intent: PlanRefinementRequest['intent'] }
+      ).intent,
+      preservation: { firstTracks: 5, positions: [8], artists: ['Radiohead'] },
+      refinement: 'Make it less mainstream',
+    };
+    const PLAN: PlanRefinementResponse = {
+      promptVersion: 'refinement-v0',
+      result: {
+        outcome: 'interpreted',
+        patch: {
+          kind: null,
+          artists: NO_NAMES,
+          genres: NO_NAMES,
+          seedTracks: NO_NAMES,
+          targetTrackCount: null,
+          targetDurationMinutes: null,
+          mood: null,
+          popularity: { operation: 'set', value: 'rarities' },
+          orderMode: null,
+          excludeArtists: NO_NAMES,
+          excludeTracks: NO_NAMES,
+        },
+        preservation: {
+          firstTracks: null,
+          positions: { add: [], remove: [] },
+          artists: NO_NAMES,
+        },
+        unsupportedConstraints: [],
+      },
+    };
+
+    it('sends only the AI-safe refinement request and returns the validated plan', async () => {
+      mockPost.mockResolvedValue({ data: PLAN });
+
+      const result = await createAdapter().planRefinement(REFINEMENT_REQUEST);
+
+      expect(mockPost).toHaveBeenCalledWith(
+        AI_SERVICE_REFINEMENT_PATH,
+        REFINEMENT_REQUEST,
+      );
+      expect(result).toEqual(PLAN);
+    });
+
+    it.each([
+      [
+        'generated playlist tracks',
+        { tracks: [{ id: '4uLU6hMCjMI75M1A2tKUQC' }] },
+      ],
+      ['destination metadata', { destination: { status: 'published' } }],
+      [
+        'the provider recipe',
+        { recipe: { artistIds: ['4Z8W4fKeB5YxbusRsdQVPb'] } },
+      ],
+    ])(
+      'refuses %s next to the refinement without any network call',
+      async (_label, extra) => {
+        const code = await interpretationErrorCode(
+          createAdapter().planRefinement({ ...REFINEMENT_REQUEST, ...extra }),
+        );
+
+        expect(code).toBe('AI_REQUEST_REJECTED');
+        expect(mockPost).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses provider identifiers smuggled into the preservation constraints', async () => {
+      const code = await interpretationErrorCode(
+        createAdapter().planRefinement({
+          ...REFINEMENT_REQUEST,
+          preservation: {
+            ...REFINEMENT_REQUEST.preservation,
+            // @ts-expect-error provider track ids are not AI-safe preservation
+            trackIds: ['4uLU6hMCjMI75M1A2tKUQC'],
+          },
+        }),
+      );
+
+      expect(code).toBe('AI_REQUEST_REJECTED');
+      expect(mockPost).not.toHaveBeenCalled();
+    });
+
+    it('rejects a plan that restates a full intent instead of a patch', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          promptVersion: 'refinement-v0',
+          result: {
+            outcome: 'interpreted',
+            intent: REFINEMENT_REQUEST.intent,
+          },
+        },
+      });
+
+      const code = await interpretationErrorCode(
+        createAdapter().planRefinement(REFINEMENT_REQUEST),
+      );
+
+      expect(code).toBe('AI_UNAVAILABLE');
+    });
+
+    it('normalizes AI service errors like interpretation errors', async () => {
+      mockPost.mockRejectedValue(
+        httpError(504, { code: 'MODEL_TIMEOUT', message: 'Timed out.' }),
+      );
+
+      const code = await interpretationErrorCode(
+        createAdapter().planRefinement(REFINEMENT_REQUEST),
+      );
+
+      expect(code).toBe('AI_TIMEOUT');
+    });
+
+    it('logs metadata only for refinements', async () => {
+      mockPost.mockResolvedValueOnce({ data: PLAN });
+      mockPost.mockRejectedValueOnce(new Error('boom'));
+      const adapter = createAdapter();
+
+      await adapter.planRefinement(REFINEMENT_REQUEST);
+      await adapter.planRefinement(REFINEMENT_REQUEST).catch(() => undefined);
+
+      const lines = [...log.mock.calls, ...warn.mock.calls].map((call) =>
+        String(call[0]),
+      );
+      expect(
+        lines.map((line) => (JSON.parse(line) as { event: string }).event),
+      ).toEqual(['ai.refinement.interpreted', 'ai.refinement.failed']);
+      for (const line of lines) {
+        expect(line).not.toContain(REFINEMENT_REQUEST.refinement);
+        expect(line).not.toContain('Radiohead');
+        expect(line).not.toContain(AI_SERVICE_TOKEN);
+      }
+    });
   });
 });

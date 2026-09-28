@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from app.interpretation.intent_interpreter import MAX_OUTPUT_VALIDATION_ATTEMPTS
+from app.interpretation.structured_model_call import MAX_OUTPUT_VALIDATION_ATTEMPTS
 from app.providers.model_provider import ModelConfigurationError, ModelInvalidOutputError
 from evals import run_intent_eval
 from evals.intent_eval import EvalCase, expectation_statuses, load_dataset, tally_expectations

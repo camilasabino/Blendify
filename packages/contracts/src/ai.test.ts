@@ -2,18 +2,24 @@ import { describe, expect, it } from 'vitest';
 import {
   AI_MOODS,
   AI_PROMPT_MAX_LENGTH,
+  AI_REFINEMENT_MAX_LENGTH,
   AiGenerationSchema,
   AiGenerationStreamEventSchema,
+  AiRefinementResultSchema,
   AiSessionSchema,
   AiSessionStateSchema,
   AnswerAiClarificationRequestSchema,
+  CreateAiRefinementRequestSchema,
   CreateAiSessionRequestSchema,
   MAX_TRACKS,
   PLAYLIST_NAME_MAX_LENGTH,
   PublishAiPlaylistRequestSchema,
   TransferAiPlaylistRequestSchema,
 } from './index';
-import { AI_INTENT_PROMPT_MAX_LENGTH } from './ai-service';
+import {
+  AI_INTENT_PROMPT_MAX_LENGTH,
+  AI_REFINEMENT_TEXT_MAX_LENGTH,
+} from './ai-service';
 
 const READY_SESSION = {
   sessionId: 'opaque-session-token',
@@ -528,5 +534,109 @@ describe('AI destination requests', () => {
         name: 'x'.repeat(PLAYLIST_NAME_MAX_LENGTH),
       }).success,
     ).toBe(true);
+  });
+});
+
+describe('AI refinement contracts', () => {
+  const PROPOSED = {
+    sessionId: 'opaque-session-token',
+    expiresAt: '2026-09-27T12:30:00.000Z',
+    refinement: {
+      status: 'proposed',
+      intent: { ...READY_SESSION.intent, popularity: 'rarities' },
+      preservation: { firstTracks: 5, positions: [8], artists: ['Radiohead'] },
+      notApplied: [{ category: 'activity', userText: 'for running' }],
+    },
+  };
+
+  it('accepts a proposed refinement with AI-safe intent and preservation only', () => {
+    expect(AiRefinementResultSchema.parse(PROPOSED)).toEqual(PROPOSED);
+  });
+
+  it('accepts a refinement clarification without offering options', () => {
+    const clarification = {
+      ...PROPOSED,
+      refinement: {
+        status: 'needs_clarification',
+        clarification: {
+          reason: 'conflicting_changes',
+          seedType: null,
+          limit: null,
+          names: ['Coldplay'],
+          unsupportedConstraints: [],
+        },
+      },
+    };
+
+    expect(AiRefinementResultSchema.safeParse(clarification).success).toBe(true);
+    expect(
+      AiRefinementResultSchema.safeParse({
+        ...clarification,
+        refinement: {
+          ...clarification.refinement,
+          clarification: { ...clarification.refinement.clarification, options: [] },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an unchanged refinement', () => {
+    expect(
+      AiRefinementResultSchema.safeParse({
+        ...PROPOSED,
+        refinement: { status: 'unchanged' },
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    ['a candidate playlist', { playlist: { tracks: [] } }],
+    ['a track diff', { diff: { added: [], removed: [] } }],
+    ['the raw model patch', { patch: {} }],
+    ['the refinement text', { refinement: 'Make it less mainstream' }],
+  ])('keeps %s out of the refinement result', (_label, extra) => {
+    const result = AiRefinementResultSchema.safeParse({
+      ...PROPOSED,
+      refinement: { ...PROPOSED.refinement, ...extra },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('bounds preserved positions by the playlist track limit', () => {
+    const withPosition = (position: number) => ({
+      ...PROPOSED,
+      refinement: {
+        ...PROPOSED.refinement,
+        preservation: { firstTracks: null, positions: [position], artists: [] },
+      },
+    });
+
+    expect(AiRefinementResultSchema.safeParse(withPosition(MAX_TRACKS)).success).toBe(true);
+    expect(AiRefinementResultSchema.safeParse(withPosition(MAX_TRACKS + 1)).success).toBe(
+      false,
+    );
+    expect(AiRefinementResultSchema.safeParse(withPosition(0)).success).toBe(false);
+  });
+
+  it('accepts only bounded refinement text in the public request', () => {
+    const atLimit = 'a'.repeat(AI_REFINEMENT_MAX_LENGTH);
+
+    expect(AI_REFINEMENT_TEXT_MAX_LENGTH).toBe(AI_REFINEMENT_MAX_LENGTH);
+    expect(CreateAiRefinementRequestSchema.safeParse({ refinement: atLimit }).success).toBe(
+      true,
+    );
+    expect(
+      CreateAiRefinementRequestSchema.safeParse({ refinement: `${atLimit}a` }).success,
+    ).toBe(false);
+    expect(CreateAiRefinementRequestSchema.safeParse({ refinement: '  ' }).success).toBe(
+      false,
+    );
+    expect(
+      CreateAiRefinementRequestSchema.safeParse({
+        refinement: 'Remove Coldplay',
+        positions: [1, 2],
+      }).success,
+    ).toBe(false);
   });
 });

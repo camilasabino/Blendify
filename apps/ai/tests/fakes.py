@@ -53,3 +53,64 @@ def interpreted_output(**intent_overrides: object) -> dict[str, object]:
     }
     intent.update(intent_overrides)
     return {"outcome": "interpreted", "intent": intent}
+
+
+def current_intent(**overrides: object) -> dict[str, object]:
+    intent = dict(interpreted_output()["intent"])  # type: ignore[call-overload]
+    intent.update(overrides)
+    return intent
+
+
+def empty_preservation() -> dict[str, object]:
+    return {"firstTracks": None, "positions": [], "artists": []}
+
+
+def unchanged_patch(**overrides: object) -> dict[str, object]:
+    patch: dict[str, object] = {
+        "kind": None,
+        "artists": {"add": [], "remove": []},
+        "genres": {"add": [], "remove": []},
+        "seedTracks": {"add": [], "remove": []},
+        "targetTrackCount": None,
+        "targetDurationMinutes": None,
+        "mood": None,
+        "popularity": None,
+        "orderMode": None,
+        "excludeArtists": {"add": [], "remove": []},
+        "excludeTracks": {"add": [], "remove": []},
+    }
+    patch.update(overrides)
+    return patch
+
+
+def unchanged_preservation_patch(**overrides: object) -> dict[str, object]:
+    patch: dict[str, object] = {
+        "firstTracks": None,
+        "positions": {"add": [], "remove": []},
+        "artists": {"add": [], "remove": []},
+    }
+    patch.update(overrides)
+    return patch
+
+
+def refinement_output(
+    *,
+    patch: dict[str, object] | None = None,
+    preservation: dict[str, object] | None = None,
+    unsupported: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
+    return {
+        "outcome": "interpreted",
+        "patch": patch or unchanged_patch(),
+        "preservation": preservation or unchanged_preservation_patch(),
+        "unsupportedConstraints": unsupported or [],
+    }
+
+
+def refinement_clarification(
+    reason: str, unsupported: list[dict[str, str]] | None = None
+) -> dict[str, object]:
+    return {
+        "outcome": "needs_clarification",
+        "clarification": {"reason": reason, "unsupportedConstraints": unsupported or []},
+    }

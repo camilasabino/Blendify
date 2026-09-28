@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
 import { Artist } from '@/domain/artist/artist.entity';
 import type { AiIntent } from '@/domain/ai/ai-intent';
@@ -60,10 +61,12 @@ function session(overrides: Partial<AiSession> = {}): AiSession {
     ownerUserId: null,
     originalPrompt: 'Radiohead and Interpol',
     promptVersion: 'intent-v3',
-    aiSafe: { intent: reviewed },
+    aiSafe: { intent: reviewed, preservation: EMPTY_AI_PRESERVATION },
     clarification: findIntentClarification(reviewed),
     execution: null,
     destination: null,
+    refinementAttempts: 0,
+    pendingRefinement: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 30 * MINUTE_MS).toISOString(),
@@ -200,6 +203,12 @@ function createWorld(initial: AiSession | null = session()) {
       (token: string, leaseId: string, ttlMs: number) =>
         Promise.resolve(locks.renew(token, leaseId, ttlMs)),
     ),
+    saveIfUnchanged: jest.fn(() => Promise.resolve(true)),
+    acquireRefinementLock: jest.fn(() =>
+      Promise.resolve<string | null>('refinement-lock'),
+    ),
+    renewRefinementLock: jest.fn(() => Promise.resolve(true)),
+    releaseRefinementLock: jest.fn(() => Promise.resolve()),
   } satisfies AiSessionRepositoryPort;
   const catalog = {
     searchArtists: jest.fn((name: string) =>
@@ -299,6 +308,7 @@ describe('GenerateAiPlaylistUseCase', () => {
             artists: [],
             genres: ['Shoegaze'],
           }),
+          preservation: EMPTY_AI_PRESERVATION,
         },
       }),
     );
@@ -317,6 +327,7 @@ describe('GenerateAiPlaylistUseCase', () => {
       session({
         aiSafe: {
           intent: intent({ kind: 'genre_mix', artists: [], mood: 'dark' }),
+          preservation: EMPTY_AI_PRESERVATION,
         },
       }),
     );
@@ -337,6 +348,7 @@ describe('GenerateAiPlaylistUseCase', () => {
       session({
         aiSafe: {
           intent: intent({ kind: 'discover_artist', artists: ['Radiohead'] }),
+          preservation: EMPTY_AI_PRESERVATION,
         },
       }),
     );
@@ -358,6 +370,7 @@ describe('GenerateAiPlaylistUseCase', () => {
             artists: [],
             seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
           }),
+          preservation: EMPTY_AI_PRESERVATION,
         },
       }),
     );
@@ -376,7 +389,12 @@ describe('GenerateAiPlaylistUseCase', () => {
 
   it('refuses a session that still needs clarification without touching providers', async () => {
     const world = createWorld(
-      session({ aiSafe: { intent: intent({ genres: ['Shoegaze'] }) } }),
+      session({
+        aiSafe: {
+          intent: intent({ genres: ['Shoegaze'] }),
+          preservation: EMPTY_AI_PRESERVATION,
+        },
+      }),
     );
 
     await expect(run(world)).rejects.toEqual(AiSessionError.notReady());
@@ -415,7 +433,10 @@ describe('GenerateAiPlaylistUseCase', () => {
   it('turns an unknown artist into a typed recoverable failure', async () => {
     const world = createWorld(
       session({
-        aiSafe: { intent: intent({ artists: ['Radiohed', 'Interpol'] }) },
+        aiSafe: {
+          intent: intent({ artists: ['Radiohed', 'Interpol'] }),
+          preservation: EMPTY_AI_PRESERVATION,
+        },
       }),
     );
 
@@ -846,6 +867,7 @@ describe('GenerateAiPlaylistUseCase', () => {
       session({
         aiSafe: {
           intent: intent({ targetTrackCount: 3, mood: 'happy' }),
+          preservation: EMPTY_AI_PRESERVATION,
         },
       }),
     );
@@ -865,7 +887,10 @@ describe('GenerateAiPlaylistUseCase', () => {
   it('removes excluded artists and replaces a cover taken from a removed track', async () => {
     const world = createWorld(
       session({
-        aiSafe: { intent: intent({ excludeArtists: ['Radiohead'] }) },
+        aiSafe: {
+          intent: intent({ excludeArtists: ['Radiohead'] }),
+          preservation: EMPTY_AI_PRESERVATION,
+        },
       }),
     );
 
@@ -886,6 +911,7 @@ describe('GenerateAiPlaylistUseCase', () => {
       session({
         aiSafe: {
           intent: intent({ excludeArtists: ['Radiohead', 'Interpol'] }),
+          preservation: EMPTY_AI_PRESERVATION,
         },
       }),
     );
@@ -899,7 +925,10 @@ describe('GenerateAiPlaylistUseCase', () => {
   it('fits a duration-only request and reports an unreachable duration', async () => {
     const world = createWorld(
       session({
-        aiSafe: { intent: intent({ targetDurationMinutes: 60 }) },
+        aiSafe: {
+          intent: intent({ targetDurationMinutes: 60 }),
+          preservation: EMPTY_AI_PRESERVATION,
+        },
       }),
     );
 
@@ -931,6 +960,7 @@ describe('GenerateAiPlaylistUseCase', () => {
             artists: ['Radiohead'],
             targetTrackCount: 20,
           }),
+          preservation: EMPTY_AI_PRESERVATION,
         },
       }),
     );

@@ -1,7 +1,7 @@
 import pytest
 
 from app.config.settings import InvalidSettingsError, load_settings
-from app.interpretation.intent_interpreter import MODEL_CALL_TIMEOUT_SECONDS
+from app.interpretation.structured_model_call import MODEL_CALL_TIMEOUT_SECONDS
 from app.main import create_app
 from app.providers.disabled import DisabledModelProvider
 from app.providers.openai_provider import OpenAIIntentModelProvider

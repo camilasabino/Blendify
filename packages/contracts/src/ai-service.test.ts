@@ -4,8 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   AI_INTENT_PROMPT_MAX_LENGTH,
+  AI_REFINEMENT_TEXT_MAX_LENGTH,
   AI_SERVICE_WIRE_SCHEMAS,
+  IntentPatchSchema,
   InterpretIntentRequestSchema,
+  PlanRefinementRequestSchema,
+  PlaylistIntentSchema,
+  type PlanRefinementRequest,
 } from './ai-service';
 
 type WireSchemaName = keyof typeof AI_SERVICE_WIRE_SCHEMAS;
@@ -226,5 +231,136 @@ describe('AI provider-content firewall', () => {
     expect(
       InterpretIntentRequestSchema.safeParse({ prompt: `${atLimit}a` }).success,
     ).toBe(false);
+  });
+});
+
+describe('AI refinement provider-content firewall', () => {
+  const VALID_REQUEST: PlanRefinementRequest = {
+    intent: {
+      kind: 'artist_mix',
+      artists: ['Radiohead', 'Interpol'],
+      genres: [],
+      seedTracks: [],
+      targetTrackCount: 30,
+      targetDurationMinutes: null,
+      mood: null,
+      popularity: 'balanced',
+      orderMode: null,
+      excludeArtists: ['Coldplay'],
+      excludeTracks: [],
+      unsupportedConstraints: [],
+    },
+    preservation: { firstTracks: 5, positions: [8], artists: ['Radiohead'] },
+    refinement: 'Make it less mainstream',
+  };
+
+  const PROVIDER_CONTENT: Array<[string, Record<string, unknown>]> = [
+    ['a provider track id', { trackId: '4uLU6hMCjMI75M1A2tKUQC' }],
+    ['a Spotify URL', { spotifyUrl: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC' }],
+    ['an artwork URL', { imageUrl: 'https://i.scdn.co/image/ab67616d0000b273' }],
+    ['provider-derived durations', { durationMs: 330_000, durationsMs: [215_000] }],
+    [
+      'provider track metadata',
+      { name: 'Teardrop', artistName: 'Massive Attack', popularity: 70, isrc: 'GBAAA9800001' },
+    ],
+    [
+      'the generated playlist tracks',
+      { tracks: [{ title: 'Teardrop', artists: ['Massive Attack'] }] },
+    ],
+    [
+      'destination metadata',
+      { destination: { status: 'published', spotifyPlaylistId: '37i9dQZF1DX0XUsuxWHRQd' } },
+    ],
+    ['an access or refresh token', { accessToken: 'BQD-token', refreshToken: 'AQD-token' }],
+    [
+      'the provider recipe or execution state',
+      { recipe: { artistIds: ['4Z8W4fKeB5YxbusRsdQVPb'] }, execution: { status: 'generated' } },
+    ],
+  ];
+
+  it('accepts only the AI-safe intent, preservation and user-authored refinement', () => {
+    const request = normalizedContract().PlanRefinementRequest;
+    const preservation = (request.properties as Record<string, JsonSchema>).preservation;
+
+    expect(Object.keys(request.properties as JsonSchema)).toEqual([
+      'intent',
+      'preservation',
+      'refinement',
+    ]);
+    expect(Object.keys(preservation.properties as JsonSchema)).toEqual([
+      'artists',
+      'firstTracks',
+      'positions',
+    ]);
+    expect(PlanRefinementRequestSchema.parse(VALID_REQUEST)).toEqual(VALID_REQUEST);
+  });
+
+  it('sends the current intent with exactly the first-turn intent shape', () => {
+    const request = normalizedContract().PlanRefinementRequest;
+    const intent = (request.properties as Record<string, JsonSchema>).intent;
+
+    expect(intent).toEqual(normalize(z.toJSONSchema(PlaylistIntentSchema) as JsonSchema));
+  });
+
+  it.each(PROVIDER_CONTENT)('rejects %s next to the refinement', (_label, content) => {
+    expect(
+      PlanRefinementRequestSchema.safeParse({ ...VALID_REQUEST, ...content }).success,
+    ).toBe(false);
+  });
+
+  it.each(PROVIDER_CONTENT)('rejects %s inside the current intent', (_label, content) => {
+    expect(
+      PlanRefinementRequestSchema.safeParse({
+        ...VALID_REQUEST,
+        intent: { ...VALID_REQUEST.intent, ...content },
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each(PROVIDER_CONTENT)('rejects %s inside the preservation constraints', (_label, content) => {
+    expect(
+      PlanRefinementRequestSchema.safeParse({
+        ...VALID_REQUEST,
+        preservation: { ...VALID_REQUEST.preservation, ...content },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects provider values smuggled through preserved positions or track references', () => {
+    expect(
+      PlanRefinementRequestSchema.safeParse({
+        ...VALID_REQUEST,
+        preservation: { ...VALID_REQUEST.preservation, positions: ['4uLU6hMCjMI75M1A2tKUQC'] },
+      }).success,
+    ).toBe(false);
+    expect(
+      PlanRefinementRequestSchema.safeParse({
+        ...VALID_REQUEST,
+        intent: {
+          ...VALID_REQUEST.intent,
+          seedTracks: [{ title: 'Teardrop', artist: null, uri: 'spotify:track:1' }],
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('bounds the refinement text', () => {
+    const atLimit = 'a'.repeat(AI_REFINEMENT_TEXT_MAX_LENGTH);
+
+    expect(
+      PlanRefinementRequestSchema.safeParse({ ...VALID_REQUEST, refinement: atLimit }).success,
+    ).toBe(true);
+    expect(
+      PlanRefinementRequestSchema.safeParse({ ...VALID_REQUEST, refinement: `${atLimit}a` })
+        .success,
+    ).toBe(false);
+  });
+
+  it('patches only executable intent fields and never the unsupported constraints', () => {
+    const intentFields = Object.keys(PlaylistIntentSchema.shape).filter(
+      (field) => field !== 'unsupportedConstraints',
+    );
+
+    expect(Object.keys(IntentPatchSchema.shape).sort()).toEqual(intentFields.sort());
   });
 });

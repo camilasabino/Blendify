@@ -5,6 +5,7 @@ import {
   type AiSession,
   type AiSessionDestination,
 } from './ai-session';
+import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 
 const NOW = new Date('2026-09-27T12:00:00.000Z');
 
@@ -14,10 +15,12 @@ function session(destination: AiSessionDestination | null): AiSession {
     ownerUserId: null,
     originalPrompt: 'Shoegaze',
     promptVersion: 'intent-v3',
-    aiSafe: { intent: null },
+    aiSafe: { intent: null, preservation: EMPTY_AI_PRESERVATION },
     clarification: null,
     execution: null,
     destination,
+    refinementAttempts: 0,
+    pendingRefinement: null,
     createdAt: NOW.toISOString(),
     updatedAt: NOW.toISOString(),
     expiresAt: new Date(NOW.getTime() + 30 * 60_000).toISOString(),

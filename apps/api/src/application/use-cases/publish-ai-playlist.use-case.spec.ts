@@ -1,4 +1,5 @@
 import type { PlaylistDetail } from '@blendify/contracts';
+import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import {
   AI_SESSION_RECORD_VERSION,
   type AiSession,
@@ -30,7 +31,7 @@ function generatedSession(
     ownerUserId: 'user-1',
     originalPrompt: 'Radiohead deep cuts',
     promptVersion: 'intent-v3',
-    aiSafe: { intent: null },
+    aiSafe: { intent: null, preservation: EMPTY_AI_PRESERVATION },
     clarification: null,
     execution: {
       status: 'generated',
@@ -66,6 +67,8 @@ function generatedSession(
       },
     },
     destination,
+    refinementAttempts: 0,
+    pendingRefinement: null,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 20 * 60_000).toISOString(),

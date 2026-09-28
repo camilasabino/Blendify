@@ -10,6 +10,7 @@ import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 const AI_SESSION_KEY_PREFIX = 'blendify:ai:session';
 const AI_GENERATION_LOCK_KEY_PREFIX = 'blendify:ai:generation-lock';
 const AI_DESTINATION_CLAIM_KEY_PREFIX = 'blendify:ai:destination-claim';
+const AI_REFINEMENT_LOCK_KEY_PREFIX = 'blendify:ai:refinement-lock';
 
 @Injectable()
 export class RedisAiSessionRepository implements AiSessionRepositoryPort {
@@ -109,6 +110,42 @@ export class RedisAiSessionRepository implements AiSessionRepositoryPort {
   hasDestinationClaim(token: string): Promise<boolean> {
     return this.cache.exists(destinationClaimKey(token));
   }
+
+  saveIfUnchanged(
+    token: string,
+    session: AiSession,
+    expectedUpdatedAt: string,
+    ttlMs: number,
+  ): Promise<boolean> {
+    return this.cache.setJsonIfFields(sessionKey(token), session, ttlMs, {
+      updatedAt: expectedUpdatedAt,
+    });
+  }
+
+  async acquireRefinementLock(
+    token: string,
+    ttlMs: number,
+  ): Promise<string | null> {
+    const lockId = randomUUID();
+    const acquired = await this.cache.setIfAbsent(
+      refinementLockKey(token),
+      lockId,
+      ttlMs,
+    );
+    return acquired ? lockId : null;
+  }
+
+  renewRefinementLock(
+    token: string,
+    lockId: string,
+    ttlMs: number,
+  ): Promise<boolean> {
+    return this.cache.renewIfValue(refinementLockKey(token), lockId, ttlMs);
+  }
+
+  releaseRefinementLock(token: string, lockId: string): Promise<void> {
+    return this.cache.deleteIfValue(refinementLockKey(token), lockId);
+  }
 }
 
 function sessionKey(token: string): string {
@@ -121,6 +158,10 @@ function generationLockKey(token: string): string {
 
 function destinationClaimKey(token: string): string {
   return `${AI_DESTINATION_CLAIM_KEY_PREFIX}:${tokenDigest(token)}`;
+}
+
+function refinementLockKey(token: string): string {
+  return `${AI_REFINEMENT_LOCK_KEY_PREFIX}:${tokenDigest(token)}`;
 }
 
 function tokenDigest(token: string): string {

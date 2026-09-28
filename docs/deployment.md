@@ -692,6 +692,7 @@ PR runs only exercise `ci.yml`, which has no access to either.
 | `RATE_LIMIT_OVERRIDES` | No | Unset (code defaults) |
 | `GENERATION_CONCURRENCY_PER_CLIENT` | No | Unset (default 2) |
 | `GENERATION_CONCURRENCY_GLOBAL` | No | Unset (default 6) |
+| `AI_REFINEMENTS_PER_SESSION` | No | Unset (default 10 refinement interpretations per Create with AI session) |
 
 ### 8.3 API secrets (Railway)
 
@@ -1138,9 +1139,14 @@ request). The browser never calls the AI service, and `OPENAI_API_KEY` exists
 only on `ai`. The service sends OpenAI the versioned system prompt and the
 user's request text only (`store=false`); it never logs prompts or model output.
 
-The public endpoint `POST /api/ai/sessions` has its own rate-limit bucket
-`interpret` (default 10 per 10 minutes per client, fail-closed). Emergency brake
-without redeploying `ai`: `RATE_LIMIT_OVERRIDES=interpret=1/3600` on `api`.
+The public endpoints that call the AI service, `POST /api/ai/sessions` and
+`POST /api/ai/sessions/:id/refinements`, share the rate-limit bucket `interpret`
+(default 10 per 10 minutes per client, fail-closed). Refinements are also capped
+per session by `AI_REFINEMENTS_PER_SESSION` (default 10). A refinement sends the
+AI service only the session's AI-safe intent, the positions or user-authored
+artist names to keep, and the user's refinement text; never tracks, provider IDs
+or destination state. Emergency brake without redeploying `ai`:
+`RATE_LIMIT_OVERRIDES=interpret=1/3600` on `api`.
 
 Kill switch: unset `AI_SERVICE_URL` on `api`. The API then reports AI as
 unavailable without any network call; Mix, Discover, Library, publishing and

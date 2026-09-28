@@ -5,10 +5,19 @@ import type {
   AiSeedNotFound,
   PlaylistGeneration,
 } from '@blendify/contracts';
-import type { AiIntent, AiIntentClarification } from './ai-intent';
+import type {
+  AiIntent,
+  AiIntentClarification,
+  AiUnsupportedConstraint,
+} from './ai-intent';
+import type { AiPreservation } from './ai-intent-patch';
 import { findIntentClarification } from './ai-intent-rules';
+import type {
+  AiRefinementClarification,
+  AiRefinementEvaluation,
+} from './ai-refinement';
 
-export const AI_SESSION_RECORD_VERSION = 5;
+export const AI_SESSION_RECORD_VERSION = 6;
 export const AI_GENERATION_INTERRUPTED_CODE = 'AI_GENERATION_INTERRUPTED';
 
 export interface AiGenerationFailure {
@@ -75,15 +84,44 @@ export type AiSessionDestination =
       transfer: AiPreparedTransfer;
     };
 
+export interface AiSessionAiSafeState {
+  intent: AiIntent | null;
+  preservation: AiPreservation;
+}
+
+export type AiPendingRefinement =
+  | {
+      status: 'proposed';
+      promptVersion: string;
+      proposedAt: string;
+      aiSafe: {
+        intent: AiIntent;
+        preservation: AiPreservation;
+        notApplied: AiUnsupportedConstraint[];
+      };
+    }
+  | {
+      status: 'needs_clarification';
+      promptVersion: string;
+      proposedAt: string;
+      clarification: AiRefinementClarification;
+    }
+  | { status: 'unchanged'; promptVersion: string; proposedAt: string };
+
+export type AiRefinementBlocker =
+  'not_reviewed' | 'not_generated' | 'destination_exists';
+
 export interface AiSession {
   version: typeof AI_SESSION_RECORD_VERSION;
   ownerUserId: string | null;
   originalPrompt: string;
   promptVersion: string;
-  aiSafe: { intent: AiIntent | null };
+  aiSafe: AiSessionAiSafeState;
   clarification: AiIntentClarification | null;
   execution: AiSessionExecution | null;
   destination: AiSessionDestination | null;
+  refinementAttempts: number;
+  pendingRefinement: AiPendingRefinement | null;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;
@@ -95,7 +133,7 @@ export function withReviewedIntent(
 ): AiSession {
   return {
     ...session,
-    aiSafe: { intent },
+    aiSafe: { ...session.aiSafe, intent },
     clarification: findIntentClarification(intent),
   };
 }
@@ -299,4 +337,78 @@ export function withTransferPrepared(
     { status: 'transfer_prepared', preparedAt: now.toISOString(), transfer },
     now,
   );
+}
+
+export function refinementBlocker(
+  session: AiSession,
+): AiRefinementBlocker | null {
+  if (reviewedIntentOf(session) === null) {
+    return 'not_reviewed';
+  }
+  if (generatedResultOf(session) === null) {
+    return 'not_generated';
+  }
+  if (session.destination !== null) {
+    return 'destination_exists';
+  }
+  return null;
+}
+
+export function withRefinementAttempt(
+  session: AiSession,
+  now: Date,
+): AiSession {
+  return {
+    ...session,
+    refinementAttempts: session.refinementAttempts + 1,
+    updatedAt: now.toISOString(),
+  };
+}
+
+export function withPendingRefinement(
+  session: AiSession,
+  evaluation: AiRefinementEvaluation,
+  promptVersion: string,
+  now: Date,
+): AiSession {
+  const proposedAt = now.toISOString();
+
+  return {
+    ...session,
+    pendingRefinement: pendingRefinementOf(
+      evaluation,
+      promptVersion,
+      proposedAt,
+    ),
+    updatedAt: proposedAt,
+  };
+}
+
+function pendingRefinementOf(
+  evaluation: AiRefinementEvaluation,
+  promptVersion: string,
+  proposedAt: string,
+): AiPendingRefinement {
+  switch (evaluation.status) {
+    case 'proposed':
+      return {
+        status: 'proposed',
+        promptVersion,
+        proposedAt,
+        aiSafe: {
+          intent: evaluation.intent,
+          preservation: evaluation.preservation,
+          notApplied: evaluation.notApplied,
+        },
+      };
+    case 'needs_clarification':
+      return {
+        status: 'needs_clarification',
+        promptVersion,
+        proposedAt,
+        clarification: evaluation.clarification,
+      };
+    case 'unchanged':
+      return { status: 'unchanged', promptVersion, proposedAt };
+  }
 }

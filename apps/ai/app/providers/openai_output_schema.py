@@ -1,9 +1,9 @@
 from typing import Any
 
-from app.models.intent import IntentInterpretation
+from pydantic import create_model
+
 from app.models.wire import WireModel
 
-MODEL_OUTPUT_SCHEMA_NAME = "playlist_intent_interpretation"
 MODEL_OUTPUT_RESULT_FIELD = "result"
 
 STRICT_MODE_KEYWORDS = frozenset(
@@ -27,12 +27,13 @@ STRICT_MODE_KEYWORDS = frozenset(
 JsonSchema = dict[str, Any]
 
 
-class ModelIntentOutput(WireModel):
-    result: IntentInterpretation
-
-
-def build_model_output_schema() -> JsonSchema:
-    schema = ModelIntentOutput.model_json_schema(by_alias=True, mode="validation")
+def build_model_output_schema(result_type: object) -> JsonSchema:
+    output_model = create_model(
+        "ModelOutput",
+        __base__=WireModel,
+        **{MODEL_OUTPUT_RESULT_FIELD: (result_type, ...)},  # type: ignore[call-overload]
+    )
+    schema = output_model.model_json_schema(by_alias=True, mode="validation")
     return _to_strict_mode(schema)
 
 

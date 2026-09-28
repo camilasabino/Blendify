@@ -3,33 +3,35 @@ import asyncio
 import json
 import os
 import re
-from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from app.config.settings import InvalidSettingsError, Settings, load_settings
 from app.errors import AiServiceError
-from app.interpretation.intent_interpreter import (
+from app.interpretation.intent_interpreter import IntentInterpreter
+from app.interpretation.refinement_planner import RefinementPlanner
+from app.interpretation.structured_model_call import (
     MAX_OUTPUT_VALIDATION_ATTEMPTS,
     MODEL_CALL_TIMEOUT_SECONDS,
-    IntentInterpreter,
 )
 from app.models.interpretation import InterpretIntentRequest
 from app.prompts.intent import INTENT_PROMPT_VERSION
+from app.prompts.refinement import REFINEMENT_PROMPT_VERSION
 from app.providers.model_provider import IntentModelProvider
 from app.providers.openai_provider import MODEL_MAX_OUTPUT_TOKENS, OpenAIIntentModelProvider
+from evals import intent_eval, refinement_eval
 from evals.intent_eval import (
-    DATASET_PATH,
     EvalCase,
     ExpectationStatus,
     check_case,
     expectation_statuses,
-    load_dataset,
     tally_expectations,
 )
 from evals.metered_provider import MeteredModelProvider, ProviderRequestBudgetExceededError
+from evals.refinement_eval import RefinementEvalCase, check_refinement_case
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = APP_ROOT / "evals" / "results"
@@ -46,6 +48,61 @@ PERSISTED_OPT_IN_PATTERN = re.compile(rf"^\s*(export\s+)?{PAID_EVAL_OPT_IN_VARIA
 
 class EvalPreflightError(Exception):
     pass
+
+
+AnyEvalCase = EvalCase | RefinementEvalCase
+CaseOutcome = tuple[list[str], dict[str, Any]]
+CaseEvaluator = Callable[[IntentModelProvider, Any], Awaitable[CaseOutcome]]
+
+
+@dataclass(frozen=True, slots=True)
+class EvalSuite:
+    name: str
+    prompt_version: str
+    dataset_path: Path
+    load_dataset: Callable[[Path], tuple[str, Sequence[AnyEvalCase]]]
+    evaluate: CaseEvaluator
+
+
+async def _evaluate_intent_case(provider: IntentModelProvider, case: EvalCase) -> CaseOutcome:
+    interpreter = IntentInterpreter(
+        provider, max_output_validation_attempts=MAX_PROVIDER_REQUESTS_PER_CASE
+    )
+    response = await interpreter.interpret(
+        InterpretIntentRequest.model_validate({"prompt": case.prompt})
+    )
+    return check_case(case.expect, response.result), response.result.model_dump(
+        mode="json", by_alias=True
+    )
+
+
+async def _evaluate_refinement_case(
+    provider: IntentModelProvider, case: RefinementEvalCase
+) -> CaseOutcome:
+    planner = RefinementPlanner(
+        provider, max_output_validation_attempts=MAX_PROVIDER_REQUESTS_PER_CASE
+    )
+    response = await planner.plan(case.request)
+    return check_refinement_case(case.expect, response.result), response.result.model_dump(
+        mode="json", by_alias=True
+    )
+
+
+INTENT_SUITE = EvalSuite(
+    name="intent",
+    prompt_version=INTENT_PROMPT_VERSION,
+    dataset_path=intent_eval.DATASET_PATH,
+    load_dataset=intent_eval.load_dataset,
+    evaluate=_evaluate_intent_case,
+)
+REFINEMENT_SUITE = EvalSuite(
+    name="refinement",
+    prompt_version=REFINEMENT_PROMPT_VERSION,
+    dataset_path=refinement_eval.DATASET_PATH,
+    load_dataset=refinement_eval.load_dataset,
+    evaluate=_evaluate_refinement_case,
+)
+EVAL_SUITES = {suite.name: suite for suite in (INTENT_SUITE, REFINEMENT_SUITE)}
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +124,8 @@ class CaseResult:
 class EvalPlan:
     model: str
     dataset_version: str
-    cases: list[EvalCase]
+    cases: Sequence[AnyEvalCase]
+    suite: EvalSuite = field(default=INTENT_SUITE)
 
     @property
     def request_budget(self) -> int:
@@ -124,8 +182,10 @@ def _opt_in_is_persisted(env_file: Path) -> bool:
     return any(PERSISTED_OPT_IN_PATTERN.match(line) for line in env_file.read_text().splitlines())
 
 
-def plan_eval(settings: Settings, case_ids: Sequence[str]) -> EvalPlan:
-    dataset_version, cases = load_dataset()
+def plan_eval(
+    settings: Settings, case_ids: Sequence[str], suite: EvalSuite = INTENT_SUITE
+) -> EvalPlan:
+    dataset_version, cases = suite.load_dataset(suite.dataset_path)
     unknown = sorted(set(case_ids) - {case.id for case in cases})
     if unknown:
         raise EvalPreflightError(f"Unknown eval case ids: {', '.join(unknown)}")
@@ -134,17 +194,19 @@ def plan_eval(settings: Settings, case_ids: Sequence[str]) -> EvalPlan:
         raise EvalPreflightError("AI_MODEL is required to run the eval.")
 
     selected = [case for case in cases if not case_ids or case.id in case_ids]
-    return EvalPlan(model=settings.model, dataset_version=dataset_version, cases=selected)
+    return EvalPlan(
+        model=settings.model, dataset_version=dataset_version, cases=selected, suite=suite
+    )
 
 
 def preflight_lines(plan: EvalPlan) -> list[str]:
     return [
-        "Paid real-model intent eval",
+        f"Paid real-model {plan.suite.name} eval",
         f"  provider:                 {EVAL_PROVIDER}",
         f"  model:                    {plan.model}",
-        f"  prompt version:           {INTENT_PROMPT_VERSION}",
+        f"  prompt version:           {plan.suite.prompt_version}",
         f"  dataset:                  {plan.dataset_version}"
-        f" ({DATASET_PATH.relative_to(APP_ROOT)})",
+        f" ({plan.suite.dataset_path.relative_to(APP_ROOT)})",
         f"  cases:                    {len(plan.cases)}",
         f"  max provider requests:    {plan.request_budget}"
         f" ({MAX_PROVIDER_REQUESTS_PER_CASE} per case)",
@@ -156,15 +218,12 @@ def preflight_lines(plan: EvalPlan) -> list[str]:
 
 async def run_eval(plan: EvalPlan, provider: IntentModelProvider) -> dict[str, object]:
     metered = MeteredModelProvider(provider, request_budget=plan.request_budget)
-    interpreter = IntentInterpreter(
-        metered, max_output_validation_attempts=MAX_PROVIDER_REQUESTS_PER_CASE
-    )
     results: list[CaseResult] = []
     aborted: str | None = None
 
     for case in plan.cases:
         try:
-            result = await _run_case(interpreter, metered, case)
+            result = await _run_case(plan.suite, metered, case)
         except ProviderRequestBudgetExceededError as error:
             aborted = str(error)
             break
@@ -177,7 +236,7 @@ async def run_eval(plan: EvalPlan, provider: IntentModelProvider) -> dict[str, o
 
 
 async def _run_case(
-    interpreter: IntentInterpreter, metered: MeteredModelProvider, case: EvalCase
+    suite: EvalSuite, metered: MeteredModelProvider, case: AnyEvalCase
 ) -> CaseResult:
     first_record = len(metered.records)
     failures: list[str] | None
@@ -185,12 +244,9 @@ async def _run_case(
     failed_output: dict[str, Any] | None = None
 
     try:
-        response = await interpreter.interpret(
-            InterpretIntentRequest.model_validate({"prompt": case.prompt})
-        )
-        failures = check_case(case.expect, response.result)
+        failures, output = await suite.evaluate(metered, case)
         if failures:
-            failed_output = response.result.model_dump(mode="json", by_alias=True)
+            failed_output = output
     except AiServiceError as service_error:
         error = service_error.code
         failures = None
@@ -226,9 +282,10 @@ def _report(
 
     return {
         "ranAt": datetime.now(UTC).isoformat(),
+        "suite": plan.suite.name,
         "provider": EVAL_PROVIDER,
         "model": plan.model,
-        "promptVersion": INTENT_PROMPT_VERSION,
+        "promptVersion": plan.suite.prompt_version,
         "datasetVersion": plan.dataset_version,
         "plannedCases": len(plan.cases),
         "cases": len(results),
@@ -263,8 +320,11 @@ def summary_lines(report: Mapping[str, Any], output_path: Path) -> list[str]:
 
 
 def main(argv: Sequence[str] | None = None, environ: Mapping[str, str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Run the paid intent eval against the real model.")
+    parser = argparse.ArgumentParser(description="Run a paid AI eval against the real model.")
     parser.add_argument("--confirm", action="store_true", help="authorize paid model requests")
+    parser.add_argument(
+        "--suite", choices=sorted(EVAL_SUITES), default=INTENT_SUITE.name, help="eval suite"
+    )
     parser.add_argument("--case", action="append", default=[], help="run only this case id")
     arguments = parser.parse_args(argv)
 
@@ -272,7 +332,7 @@ def main(argv: Sequence[str] | None = None, environ: Mapping[str, str] | None = 
         settings = authorize_paid_eval(
             os.environ if environ is None else environ, confirmed=arguments.confirm
         )
-        plan = plan_eval(settings, arguments.case)
+        plan = plan_eval(settings, arguments.case, EVAL_SUITES[arguments.suite])
         provider = build_eval_provider(settings)
     except EvalPreflightError as error:
         raise SystemExit(str(error)) from None
@@ -281,7 +341,7 @@ def main(argv: Sequence[str] | None = None, environ: Mapping[str, str] | None = 
     report = asyncio.run(run_eval(plan, provider))
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    output_path = RESULTS_DIR / f"intent-eval-{report['ranAt']}.json".replace(":", "-")
+    output_path = RESULTS_DIR / f"{plan.suite.name}-eval-{report['ranAt']}.json".replace(":", "-")
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False))
     print("\n".join(summary_lines(report, output_path)))
 

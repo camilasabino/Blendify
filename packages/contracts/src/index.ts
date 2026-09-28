@@ -418,6 +418,7 @@ export const GeneratedPlaylistStreamEventSchema = z.discriminatedUnion(
 );
 
 export const AI_PROMPT_MAX_LENGTH = 2_000;
+export const AI_REFINEMENT_MAX_LENGTH = AI_PROMPT_MAX_LENGTH;
 export const AI_CLARIFICATION_OPTION_ID_MAX_LENGTH = 64;
 export const AI_UNSUPPORTED_CONSTRAINT_CATEGORIES = [
   'duration',
@@ -530,6 +531,54 @@ export const AiSessionSchema = z.strictObject({
   status: z.enum(AI_SESSION_STATUSES),
   intent: AiIntentSummarySchema.nullable(),
   clarification: AiClarificationSchema.nullable(),
+});
+
+export const AI_REFINEMENT_CLARIFICATION_REASONS = [
+  'ambiguous_request',
+  'unsupported_constraint',
+  'not_a_playlist_request',
+  'mixed_seed_types',
+  'too_many_seeds',
+  'track_count_over_limit',
+  'invalid_duration',
+  'unsupported_ordering',
+  'unknown_genres',
+  'conflicting_changes',
+  'preserved_track_out_of_range',
+] as const;
+
+export const AiPreservationSchema = z.strictObject({
+  firstTracks: z.number().int().min(1).max(MAX_TRACKS).nullable(),
+  positions: z.array(z.number().int().min(1).max(MAX_TRACKS)).max(MAX_TRACKS),
+  artists: z.array(z.string().min(1).max(200)),
+});
+
+export const AiRefinementClarificationSchema = z.strictObject({
+  reason: z.enum(AI_REFINEMENT_CLARIFICATION_REASONS),
+  seedType: AiSeedTypeSchema.nullable(),
+  limit: z.number().int().positive().nullable(),
+  names: z.array(z.string().min(1).max(200)),
+  unsupportedConstraints: z.array(AiUnmetConstraintSchema),
+});
+
+export const AiRefinementSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('proposed'),
+    intent: AiIntentSummarySchema,
+    preservation: AiPreservationSchema,
+    notApplied: z.array(AiUnmetConstraintSchema),
+  }),
+  z.strictObject({
+    status: z.literal('needs_clarification'),
+    clarification: AiRefinementClarificationSchema,
+  }),
+  z.strictObject({ status: z.literal('unchanged') }),
+]);
+
+export const AiRefinementResultSchema = z.strictObject({
+  sessionId: z.string().min(1),
+  expiresAt: z.iso.datetime(),
+  refinement: AiRefinementSchema,
 });
 
 export const AI_MOOD_UNMET_REASONS = [
@@ -658,6 +707,10 @@ export const AnswerAiClarificationRequestSchema = z.strictObject({
   optionId: AiClarificationOptionIdSchema,
 });
 
+export const CreateAiRefinementRequestSchema = z.strictObject({
+  refinement: z.string().trim().min(1).max(AI_REFINEMENT_MAX_LENGTH),
+});
+
 export const PublishAiPlaylistRequestSchema = z.strictObject({
   name: PlaylistNameSchema,
   coverImageBase64: PlaylistMetadataSchema.shape.coverImageBase64,
@@ -726,6 +779,17 @@ export type AiClarificationOption = z.infer<typeof AiClarificationOptionSchema>;
 export type AiClarificationReason = (typeof AI_CLARIFICATION_REASONS)[number];
 export type AiClarification = z.infer<typeof AiClarificationSchema>;
 export type AiSessionDto = z.infer<typeof AiSessionSchema>;
+export type AiPreservationDto = z.infer<typeof AiPreservationSchema>;
+export type AiRefinementClarificationReason =
+  (typeof AI_REFINEMENT_CLARIFICATION_REASONS)[number];
+export type AiRefinementClarificationDto = z.infer<
+  typeof AiRefinementClarificationSchema
+>;
+export type AiRefinementDto = z.infer<typeof AiRefinementSchema>;
+export type AiRefinementResultDto = z.infer<typeof AiRefinementResultSchema>;
+export type CreateAiRefinementRequest = z.infer<
+  typeof CreateAiRefinementRequestSchema
+>;
 export type AiMoodUnmetReason = (typeof AI_MOOD_UNMET_REASONS)[number];
 export type AiGeneratedPlaylist = z.infer<typeof AiGeneratedPlaylistSchema>;
 export type AiGenerationUnmetConstraint = z.infer<

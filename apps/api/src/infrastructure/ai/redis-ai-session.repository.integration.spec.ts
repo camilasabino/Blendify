@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
+import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import {
   AI_SESSION_RECORD_VERSION,
   type AiSession,
@@ -19,10 +20,12 @@ function session(destination: AiSessionDestination | null): AiSession {
     ownerUserId: 'user-1',
     originalPrompt: 'Radiohead deep cuts',
     promptVersion: 'intent-v3',
-    aiSafe: { intent: null },
+    aiSafe: { intent: null, preservation: EMPTY_AI_PRESERVATION },
     clarification: null,
     execution: null,
     destination,
+    refinementAttempts: 0,
+    pendingRefinement: null,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 60_000).toISOString(),
@@ -97,6 +100,52 @@ describeWithRedis(
 
       await repository.releaseDestinationClaim(token, newer ?? '');
       await expect(repository.hasDestinationClaim(token)).resolves.toBe(false);
+    });
+
+    it('fences a refinement write on the session version it read', async () => {
+      const token = randomUUID();
+      const read = session(null);
+      await repository.save(token, read, 60_000);
+      const concurrent = {
+        ...session(publishing('attempt-b')),
+        updatedAt: new Date(Date.parse(read.updatedAt) + 1).toISOString(),
+      };
+      await repository.save(token, concurrent, 60_000);
+
+      await expect(
+        repository.saveIfUnchanged(
+          token,
+          { ...read, refinementAttempts: 1 },
+          read.updatedAt,
+          60_000,
+        ),
+      ).resolves.toBe(false);
+      await expect(repository.find(token)).resolves.toEqual(concurrent);
+      await expect(
+        repository.saveIfUnchanged(
+          token,
+          { ...concurrent, refinementAttempts: 1 },
+          concurrent.updatedAt,
+          60_000,
+        ),
+      ).resolves.toBe(true);
+    });
+
+    it('allows one refinement lease per session and only its owner releases it', async () => {
+      const token = randomUUID();
+      const owner = await repository.acquireRefinementLock(token, 5_000);
+
+      await expect(
+        repository.acquireRefinementLock(token, 5_000),
+      ).resolves.toBeNull();
+      await repository.releaseRefinementLock(token, 'someone-else');
+      await expect(
+        repository.acquireRefinementLock(token, 5_000),
+      ).resolves.toBeNull();
+      await repository.releaseRefinementLock(token, owner ?? '');
+      await expect(
+        repository.acquireRefinementLock(token, 5_000),
+      ).resolves.not.toBeNull();
     });
   },
 );

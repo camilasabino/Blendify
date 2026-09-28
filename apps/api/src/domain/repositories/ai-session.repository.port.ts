@@ -33,4 +33,17 @@ export interface AiSessionRepositoryPort {
   ): Promise<boolean>;
   releaseDestinationClaim(token: string, claimId: string): Promise<void>;
   hasDestinationClaim(token: string): Promise<boolean>;
+  saveIfUnchanged(
+    token: string,
+    session: AiSession,
+    expectedUpdatedAt: string,
+    ttlMs: number,
+  ): Promise<boolean>;
+  acquireRefinementLock(token: string, ttlMs: number): Promise<string | null>;
+  renewRefinementLock(
+    token: string,
+    lockId: string,
+    ttlMs: number,
+  ): Promise<boolean>;
+  releaseRefinementLock(token: string, lockId: string): Promise<void>;
 }

@@ -7,7 +7,11 @@ import httpx2
 import pytest
 
 from app.config.settings import Settings
-from app.prompts.intent import INTENT_PROMPT_VERSION, build_intent_model_request
+from app.prompts.intent import (
+    INTENT_MODEL_OUTPUT,
+    INTENT_PROMPT_VERSION,
+    build_intent_model_request,
+)
 from app.providers.model_provider import (
     ModelConfigurationError,
     ModelInvalidOutputError,
@@ -16,7 +20,6 @@ from app.providers.model_provider import (
     ModelTokenUsage,
     ModelUnavailableError,
 )
-from app.providers.openai_output_schema import MODEL_OUTPUT_SCHEMA_NAME
 from app.providers.openai_provider import MODEL_MAX_OUTPUT_TOKENS, OpenAIIntentModelProvider
 from tests.conftest import AUTH_HEADERS, ClientFactory
 from tests.fakes import interpreted_output
@@ -111,7 +114,7 @@ async def test_requests_strict_structured_output_without_tools_or_storage() -> N
     assert body["max_output_tokens"] == MODEL_MAX_OUTPUT_TOKENS
     assert "tools" not in body
     assert body["text"]["format"]["type"] == "json_schema"
-    assert body["text"]["format"]["name"] == MODEL_OUTPUT_SCHEMA_NAME
+    assert body["text"]["format"]["name"] == INTENT_MODEL_OUTPUT.name
     assert body["text"]["format"]["strict"] is True
 
 

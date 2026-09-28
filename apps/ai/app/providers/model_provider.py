@@ -4,10 +4,17 @@ from typing import Protocol
 
 
 @dataclass(frozen=True, slots=True)
+class ModelOutputSpec:
+    name: str
+    result_type: object
+
+
+@dataclass(frozen=True, slots=True)
 class ModelIntentRequest:
     prompt_version: str
     system_prompt: str
     user_prompt: str
+    output: ModelOutputSpec
 
 
 @dataclass(frozen=True, slots=True)

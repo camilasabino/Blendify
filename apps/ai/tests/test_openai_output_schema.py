@@ -3,7 +3,8 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from app.models.intent import intent_interpretation_adapter
+from app.models.intent import IntentInterpretation, intent_interpretation_adapter
+from app.models.refinement import RefinementInterpretation, refinement_interpretation_adapter
 from app.providers.openai_output_schema import (
     STRICT_MODE_KEYWORDS,
     build_model_output_schema,
@@ -25,14 +26,24 @@ def walk(schema: JsonSchema) -> list[JsonSchema]:
     return nodes
 
 
-def test_uses_only_keywords_accepted_by_strict_structured_outputs() -> None:
-    used = {keyword for node in walk(build_model_output_schema()) for keyword in node}
+MODEL_OUTPUTS = pytest.mark.parametrize(
+    "result_type",
+    [IntentInterpretation, RefinementInterpretation],
+    ids=["intent", "refinement"],
+)
+
+
+@MODEL_OUTPUTS
+def test_uses_only_keywords_accepted_by_strict_structured_outputs(result_type: object) -> None:
+    used = {keyword for node in walk(build_model_output_schema(result_type)) for keyword in node}
 
     assert used <= STRICT_MODE_KEYWORDS
 
 
-def test_every_object_is_closed_and_requires_every_property() -> None:
-    objects = [node for node in walk(build_model_output_schema()) if node.get("type") == "object"]
+@MODEL_OUTPUTS
+def test_every_object_is_closed_and_requires_every_property(result_type: object) -> None:
+    schema = build_model_output_schema(result_type)
+    objects = [node for node in walk(schema) if node.get("type") == "object"]
 
     assert objects
     for node in objects:
@@ -40,8 +51,9 @@ def test_every_object_is_closed_and_requires_every_property() -> None:
         assert sorted(node["required"]) == sorted(node["properties"])
 
 
-def test_root_is_an_object_wrapping_the_interpretation_union() -> None:
-    schema = build_model_output_schema()
+@MODEL_OUTPUTS
+def test_root_is_an_object_wrapping_the_interpretation_union(result_type: object) -> None:
+    schema = build_model_output_schema(result_type)
 
     assert schema["type"] == "object"
     assert list(schema["properties"]) == ["result"]
@@ -49,7 +61,7 @@ def test_root_is_an_object_wrapping_the_interpretation_union() -> None:
 
 
 def test_exposes_no_capability_verdict_to_the_model() -> None:
-    unsupported = build_model_output_schema()["$defs"]["UnsupportedConstraint"]
+    unsupported = build_model_output_schema(IntentInterpretation)["$defs"]["UnsupportedConstraint"]
 
     assert sorted(unsupported["properties"]) == ["category", "userText"]
 
@@ -76,3 +88,46 @@ def test_bounds_dropped_for_the_model_are_still_enforced_by_the_wire_model() -> 
 
     with pytest.raises(ValidationError):
         intent_interpretation_adapter.validate_python(output)
+
+
+def test_refinement_patch_operations_stay_explicit_for_the_model() -> None:
+    definitions = build_model_output_schema(RefinementInterpretation)["$defs"]
+
+    assert definitions["ClearValue"]["properties"]["operation"] == {
+        "enum": ["clear"],
+        "type": "string",
+    }
+    assert sorted(definitions["SetMood"]["properties"]) == ["operation", "value"]
+    assert sorted(definitions["IntentPatch"]["properties"]) == sorted(
+        definitions["IntentPatch"]["required"]
+    )
+    assert "unsupportedConstraints" not in definitions["IntentPatch"]["properties"]
+
+
+def test_refinement_bounds_dropped_for_the_model_are_still_enforced() -> None:
+    names = {"add": ["x" * 201], "remove": []}
+    output = {
+        "outcome": "interpreted",
+        "patch": {
+            "kind": None,
+            "artists": names,
+            "genres": {"add": [], "remove": []},
+            "seedTracks": {"add": [], "remove": []},
+            "targetTrackCount": None,
+            "targetDurationMinutes": None,
+            "mood": None,
+            "popularity": None,
+            "orderMode": None,
+            "excludeArtists": {"add": [], "remove": []},
+            "excludeTracks": {"add": [], "remove": []},
+        },
+        "preservation": {
+            "firstTracks": None,
+            "positions": {"add": [], "remove": []},
+            "artists": {"add": [], "remove": []},
+        },
+        "unsupportedConstraints": [],
+    }
+
+    with pytest.raises(ValidationError):
+        refinement_interpretation_adapter.validate_python(output)

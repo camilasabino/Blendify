@@ -1,3 +1,4 @@
+import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import type { AiIntent } from '@/domain/ai/ai-intent';
 import { findIntentClarification } from '@/domain/ai/ai-intent-rules';
 import {
@@ -40,10 +41,12 @@ function session(overrides: Partial<AiSession> = {}): AiSession {
     ownerUserId: null,
     originalPrompt: 'Radiohead',
     promptVersion: 'intent-v3',
-    aiSafe: { intent: reviewed },
+    aiSafe: { intent: reviewed, preservation: EMPTY_AI_PRESERVATION },
     clarification: findIntentClarification(reviewed),
     execution: null,
     destination: null,
+    refinementAttempts: 0,
+    pendingRefinement: null,
     createdAt: STARTED_AT,
     updatedAt: STARTED_AT,
     expiresAt: new Date(Date.now() + 30 * MINUTE_MS).toISOString(),
@@ -71,6 +74,12 @@ function createWorld(
     hasDestinationClaim: jest.fn(() => Promise.resolve(claimHeld)),
     savePublishOutcome: jest.fn(() => Promise.resolve(true)),
     renewGenerationLock: jest.fn(() => Promise.resolve(true)),
+    saveIfUnchanged: jest.fn(() => Promise.resolve(true)),
+    acquireRefinementLock: jest.fn(() =>
+      Promise.resolve<string | null>('refinement-lock'),
+    ),
+    renewRefinementLock: jest.fn(() => Promise.resolve(true)),
+    releaseRefinementLock: jest.fn(() => Promise.resolve()),
   } satisfies AiSessionRepositoryPort;
 
   return { sessions, useCase: new GetAiSessionUseCase(sessions) };
@@ -86,7 +95,12 @@ describe('GetAiSessionUseCase', () => {
   it.each([
     [
       'clarification pending',
-      session({ aiSafe: { intent: intent({ genres: ['Shoegaze'] }) } }),
+      session({
+        aiSafe: {
+          intent: intent({ genres: ['Shoegaze'] }),
+          preservation: EMPTY_AI_PRESERVATION,
+        },
+      }),
     ],
     ['reviewed', session()],
     [

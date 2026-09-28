@@ -7,6 +7,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from app.models.interpretation import InterpretIntentRequest, InterpretIntentResponse
+from app.models.refinement import PlanRefinementRequest, PlanRefinementResponse
 from app.models.service import AiServiceErrorResponse, AiServiceHealth
 
 CONTRACT_DIR = Path(__file__).resolve().parents[3] / "packages" / "contracts" / "ai-service"
@@ -18,6 +19,8 @@ WIRE_MODELS: dict[str, type[BaseModel]] = {
     "AiServiceHealth": AiServiceHealth,
     "InterpretIntentRequest": InterpretIntentRequest,
     "InterpretIntentResponse": InterpretIntentResponse,
+    "PlanRefinementRequest": PlanRefinementRequest,
+    "PlanRefinementResponse": PlanRefinementResponse,
 }
 
 KEPT_KEYWORDS = (
@@ -133,3 +136,14 @@ def test_no_wire_field_can_carry_provider_ids_urls_artwork_or_credentials() -> N
     ]
 
     assert offending == []
+
+
+def test_refinement_request_accepts_only_ai_safe_state_and_the_user_refinement() -> None:
+    request = normalized_contract()["PlanRefinementRequest"]
+
+    assert list(request["properties"]) == ["intent", "preservation", "refinement"]
+    assert list(request["properties"]["preservation"]["properties"]) == [
+        "artists",
+        "firstTracks",
+        "positions",
+    ]

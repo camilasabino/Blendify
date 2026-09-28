@@ -6,7 +6,11 @@ export type AiSessionErrorCode =
   | 'AI_GENERATION_SUPERSEDED'
   | 'AI_PLAYLIST_NOT_GENERATED'
   | 'AI_DESTINATION_IN_PROGRESS'
-  | 'AI_DESTINATION_UNAVAILABLE';
+  | 'AI_DESTINATION_UNAVAILABLE'
+  | 'AI_REFINEMENT_UNAVAILABLE'
+  | 'AI_REFINEMENT_IN_PROGRESS'
+  | 'AI_REFINEMENT_LIMIT_REACHED'
+  | 'AI_REFINEMENT_SUPERSEDED';
 
 export class AiSessionError extends Error {
   private constructor(
@@ -64,6 +68,34 @@ export class AiSessionError extends Error {
     return new AiSessionError(
       'AI_DESTINATION_UNAVAILABLE',
       'This playlist was already sent to Spotify.',
+    );
+  }
+
+  static refinementUnavailable(): AiSessionError {
+    return new AiSessionError(
+      'AI_REFINEMENT_UNAVAILABLE',
+      'This playlist was already saved or transferred. Start over to create another version.',
+    );
+  }
+
+  static refinementInProgress(): AiSessionError {
+    return new AiSessionError(
+      'AI_REFINEMENT_IN_PROGRESS',
+      'A change to this playlist is already being interpreted.',
+    );
+  }
+
+  static refinementLimitReached(): AiSessionError {
+    return new AiSessionError(
+      'AI_REFINEMENT_LIMIT_REACHED',
+      'This playlist cannot be changed any further. Start over to create another version.',
+    );
+  }
+
+  static refinementSuperseded(): AiSessionError {
+    return new AiSessionError(
+      'AI_REFINEMENT_SUPERSEDED',
+      'This playlist changed while your request was being interpreted. Try again.',
     );
   }
 

@@ -11,6 +11,7 @@ from app.providers.model_provider import (
     ModelIntentRequest,
     ModelIntentResult,
     ModelInvalidOutputError,
+    ModelOutputSpec,
     ModelRateLimitedError,
     ModelTimeoutError,
     ModelTokenUsage,
@@ -18,7 +19,7 @@ from app.providers.model_provider import (
 )
 from app.providers.openai_output_schema import (
     MODEL_OUTPUT_RESULT_FIELD,
-    MODEL_OUTPUT_SCHEMA_NAME,
+    JsonSchema,
     build_model_output_schema,
 )
 
@@ -44,7 +45,7 @@ class OpenAIIntentModelProvider:
         http_client: httpx2.AsyncClient | None = None,
     ) -> None:
         self._model = model
-        self._output_schema = build_model_output_schema()
+        self._output_schemas: dict[str, JsonSchema] = {}
         self._client = AsyncOpenAI(
             api_key=api_key,
             timeout=timeout_seconds,
@@ -67,9 +68,9 @@ class OpenAIIntentModelProvider:
                 text={
                     "format": {
                         "type": "json_schema",
-                        "name": MODEL_OUTPUT_SCHEMA_NAME,
+                        "name": request.output.name,
                         "strict": True,
-                        "schema": self._output_schema,
+                        "schema": self._output_schema(request.output),
                     }
                 },
             )
@@ -81,6 +82,11 @@ class OpenAIIntentModelProvider:
             model=response.model,
             usage=_token_usage(response),
         )
+
+    def _output_schema(self, output: ModelOutputSpec) -> JsonSchema:
+        if output.name not in self._output_schemas:
+            self._output_schemas[output.name] = build_model_output_schema(output.result_type)
+        return self._output_schemas[output.name]
 
 
 def _to_provider_error(error: openai.APIError) -> Exception:

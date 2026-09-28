@@ -1,3 +1,4 @@
+import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import type { AiIntent } from '@/domain/ai/ai-intent';
 import { findIntentClarification } from '@/domain/ai/ai-intent-rules';
 import {
@@ -33,10 +34,12 @@ function storedSession(overrides: Partial<AiSession> = {}): AiSession {
     ownerUserId: null,
     originalPrompt: 'Music like Radiohead and Interpol',
     promptVersion: 'intent-v2',
-    aiSafe: { intent: DISCOVER_INTENT },
+    aiSafe: { intent: DISCOVER_INTENT, preservation: EMPTY_AI_PRESERVATION },
     clarification: findIntentClarification(DISCOVER_INTENT),
     execution: null,
     destination: null,
+    refinementAttempts: 0,
+    pendingRefinement: null,
     createdAt: NOW.toISOString(),
     updatedAt: NOW.toISOString(),
     expiresAt: EXPIRES_AT.toISOString(),
@@ -62,6 +65,12 @@ function createUseCase(session: AiSession | null) {
     hasDestinationClaim: jest.fn(() => Promise.resolve(false)),
     savePublishOutcome: jest.fn(() => Promise.resolve(true)),
     renewGenerationLock: jest.fn(() => Promise.resolve(true)),
+    saveIfUnchanged: jest.fn(() => Promise.resolve(true)),
+    acquireRefinementLock: jest.fn(() =>
+      Promise.resolve<string | null>('refinement-lock'),
+    ),
+    renewRefinementLock: jest.fn(() => Promise.resolve(true)),
+    releaseRefinementLock: jest.fn(() => Promise.resolve()),
   };
   return {
     useCase: new AnswerAiClarificationUseCase(sessions),

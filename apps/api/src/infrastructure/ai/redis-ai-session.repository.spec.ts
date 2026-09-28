@@ -1,3 +1,4 @@
+import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import {
   AI_SESSION_RECORD_VERSION,
   type AiSession,
@@ -12,10 +13,12 @@ const SESSION: AiSession = {
   ownerUserId: null,
   originalPrompt: 'Shoegaze and dream pop',
   promptVersion: 'intent-v2',
-  aiSafe: { intent: null },
+  aiSafe: { intent: null, preservation: EMPTY_AI_PRESERVATION },
   clarification: null,
   execution: null,
   destination: null,
+  refinementAttempts: 0,
+  pendingRefinement: null,
   createdAt: '2026-09-27T12:00:00.000Z',
   updatedAt: '2026-09-27T12:00:00.000Z',
   expiresAt: '2026-09-27T12:30:00.000Z',
@@ -75,6 +78,50 @@ describe('RedisAiSessionRepository', () => {
     const { repository } = createRepository({ ...SESSION, version: 0 });
 
     await expect(repository.find(TOKEN)).resolves.toBeNull();
+  });
+
+  it('treats M3 records without refinement state as expired', async () => {
+    const { repository } = createRepository({
+      ...SESSION,
+      version: 5,
+      aiSafe: { intent: null },
+      refinementAttempts: undefined,
+      pendingRefinement: undefined,
+    });
+
+    await expect(repository.find(TOKEN)).resolves.toBeNull();
+  });
+
+  it('writes a refinement only if nobody changed the session since it was read', async () => {
+    const { cache, repository } = createRepository();
+
+    await repository.saveIfUnchanged(TOKEN, SESSION, SESSION.updatedAt, 60_000);
+
+    const [key, value, ttlMs, expected] = cache.setJsonIfFields.mock.calls[0];
+    expect(key).toMatch(/^blendify:ai:session:[0-9a-f]{64}$/);
+    expect(value).toEqual(SESSION);
+    expect(ttlMs).toBe(60_000);
+    expect(expected).toEqual({ updatedAt: SESSION.updatedAt });
+  });
+
+  it('guards refinement with its own owned lease, separate from generation and destination', async () => {
+    const { cache, repository } = createRepository();
+
+    const lockId = await repository.acquireRefinementLock(TOKEN, 30_000);
+    await repository.renewRefinementLock(TOKEN, lockId ?? '', 30_000);
+    await repository.releaseRefinementLock(TOKEN, lockId ?? '');
+
+    const [lockKey, storedLock, ttlMs] = cache.setIfAbsent.mock.calls[0];
+    expect(lockKey).toMatch(/^blendify:ai:refinement-lock:[0-9a-f]{64}$/);
+    expect(lockKey).not.toContain(TOKEN);
+    expect(storedLock).toBe(lockId);
+    expect(ttlMs).toBe(30_000);
+    expect(cache.renewIfValue).toHaveBeenCalledWith(lockKey, lockId, 30_000);
+    expect(cache.deleteIfValue).toHaveBeenCalledWith(lockKey, lockId);
+    cache.setIfAbsent.mockResolvedValueOnce(false);
+    await expect(
+      repository.acquireRefinementLock(TOKEN, 30_000),
+    ).resolves.toBeNull();
   });
 
   it('ignores M1 records that carried provider-resolved execution state', async () => {

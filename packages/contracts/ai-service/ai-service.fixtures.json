@@ -547,6 +547,1054 @@
         "intentInterpretation": "available",
         "modelApiKey": "sk-test"
       }
+    },
+    {
+      "name": "refinement request with AI-safe state only",
+      "schema": "PlanRefinementRequest",
+      "valid": true,
+      "payload": {
+        "intent": {
+          "kind": "artist_mix",
+          "artists": [
+            "Radiohead",
+            "Interpol"
+          ],
+          "genres": [],
+          "seedTracks": [],
+          "targetTrackCount": 30,
+          "targetDurationMinutes": null,
+          "mood": null,
+          "popularity": "balanced",
+          "orderMode": null,
+          "excludeArtists": [
+            "Coldplay"
+          ],
+          "excludeTracks": [],
+          "unsupportedConstraints": [
+            {
+              "category": "activity",
+              "userText": "for a long run"
+            }
+          ]
+        },
+        "preservation": {
+          "firstTracks": 5,
+          "positions": [
+            7,
+            9
+          ],
+          "artists": [
+            "Radiohead"
+          ]
+        },
+        "refinement": "Make it less mainstream and remove Interpol"
+      }
+    },
+    {
+      "name": "refinement request with a whitespace-only refinement",
+      "schema": "PlanRefinementRequest",
+      "valid": false,
+      "payload": {
+        "intent": {
+          "kind": "artist_mix",
+          "artists": [
+            "Radiohead",
+            "Interpol"
+          ],
+          "genres": [],
+          "seedTracks": [],
+          "targetTrackCount": 30,
+          "targetDurationMinutes": null,
+          "mood": null,
+          "popularity": "balanced",
+          "orderMode": null,
+          "excludeArtists": [
+            "Coldplay"
+          ],
+          "excludeTracks": [],
+          "unsupportedConstraints": [
+            {
+              "category": "activity",
+              "userText": "for a long run"
+            }
+          ]
+        },
+        "preservation": {
+          "firstTracks": null,
+          "positions": [],
+          "artists": []
+        },
+        "refinement": "   "
+      }
+    },
+    {
+      "name": "refinement request without the current preservation",
+      "schema": "PlanRefinementRequest",
+      "valid": false,
+      "payload": {
+        "intent": {
+          "kind": "artist_mix",
+          "artists": [
+            "Radiohead",
+            "Interpol"
+          ],
+          "genres": [],
+          "seedTracks": [],
+          "targetTrackCount": 30,
+          "targetDurationMinutes": null,
+          "mood": null,
+          "popularity": "balanced",
+          "orderMode": null,
+          "excludeArtists": [
+            "Coldplay"
+          ],
+          "excludeTracks": [],
+          "unsupportedConstraints": [
+            {
+              "category": "activity",
+              "userText": "for a long run"
+            }
+          ]
+        },
+        "refinement": "Remove Coldplay"
+      }
+    },
+    {
+      "name": "refinement request carrying generated playlist tracks",
+      "schema": "PlanRefinementRequest",
+      "valid": false,
+      "payload": {
+        "intent": {
+          "kind": "artist_mix",
+          "artists": [
+            "Radiohead",
+            "Interpol"
+          ],
+          "genres": [],
+          "seedTracks": [],
+          "targetTrackCount": 30,
+          "targetDurationMinutes": null,
+          "mood": null,
+          "popularity": "balanced",
+          "orderMode": null,
+          "excludeArtists": [
+            "Coldplay"
+          ],
+          "excludeTracks": [],
+          "unsupportedConstraints": [
+            {
+              "category": "activity",
+              "userText": "for a long run"
+            }
+          ]
+        },
+        "preservation": {
+          "firstTracks": null,
+          "positions": [],
+          "artists": []
+        },
+        "refinement": "Make it less mainstream and remove Interpol",
+        "playlist": {
+          "tracks": [
+            {
+              "id": "4uLU6hMCjMI75M1A2tKUQC",
+              "name": "Teardrop",
+              "artistName": "Massive Attack",
+              "uri": "spotify:track:4uLU6hMCjMI75M1A2tKUQC",
+              "durationMs": 330000,
+              "popularity": 70
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "refinement request carrying a provider track id in the preservation",
+      "schema": "PlanRefinementRequest",
+      "valid": false,
+      "payload": {
+        "intent": {
+          "kind": "artist_mix",
+          "artists": [
+            "Radiohead",
+            "Interpol"
+          ],
+          "genres": [],
+          "seedTracks": [],
+          "targetTrackCount": 30,
+          "targetDurationMinutes": null,
+          "mood": null,
+          "popularity": "balanced",
+          "orderMode": null,
+          "excludeArtists": [
+            "Coldplay"
+          ],
+          "excludeTracks": [],
+          "unsupportedConstraints": [
+            {
+              "category": "activity",
+              "userText": "for a long run"
+            }
+          ]
+        },
+        "preservation": {
+          "firstTracks": null,
+          "positions": [],
+          "artists": [],
+          "trackIds": [
+            "4uLU6hMCjMI75M1A2tKUQC"
+          ]
+        },
+        "refinement": "Make it less mainstream and remove Interpol"
+      }
+    },
+    {
+      "name": "refinement request preserving a provider track id as a position",
+      "schema": "PlanRefinementRequest",
+      "valid": false,
+      "payload": {
+        "intent": {
+          "kind": "artist_mix",
+          "artists": [
+            "Radiohead",
+            "Interpol"
+          ],
+          "genres": [],
+          "seedTracks": [],
+          "targetTrackCount": 30,
+          "targetDurationMinutes": null,
+          "mood": null,
+          "popularity": "balanced",
+          "orderMode": null,
+          "excludeArtists": [
+            "Coldplay"
+          ],
+          "excludeTracks": [],
+          "unsupportedConstraints": [
+            {
+              "category": "activity",
+              "userText": "for a long run"
+            }
+          ]
+        },
+        "preservation": {
+          "firstTracks": null,
+          "positions": [
+            "4uLU6hMCjMI75M1A2tKUQC"
+          ],
+          "artists": []
+        },
+        "refinement": "Make it less mainstream and remove Interpol"
+      }
+    },
+    {
+      "name": "refinement request carrying destination state",
+      "schema": "PlanRefinementRequest",
+      "valid": false,
+      "payload": {
+        "intent": {
+          "kind": "artist_mix",
+          "artists": [
+            "Radiohead",
+            "Interpol"
+          ],
+          "genres": [],
+          "seedTracks": [],
+          "targetTrackCount": 30,
+          "targetDurationMinutes": null,
+          "mood": null,
+          "popularity": "balanced",
+          "orderMode": null,
+          "excludeArtists": [
+            "Coldplay"
+          ],
+          "excludeTracks": [],
+          "unsupportedConstraints": [
+            {
+              "category": "activity",
+              "userText": "for a long run"
+            }
+          ]
+        },
+        "preservation": {
+          "firstTracks": null,
+          "positions": [],
+          "artists": []
+        },
+        "refinement": "Make it less mainstream and remove Interpol",
+        "destination": {
+          "status": "published",
+          "spotifyUrl": "https://open.spotify.com/playlist/37i9dQZF1DX0XUsuxWHRQd"
+        }
+      }
+    },
+    {
+      "name": "refinement request carrying the execution recipe inside the intent",
+      "schema": "PlanRefinementRequest",
+      "valid": false,
+      "payload": {
+        "intent": {
+          "kind": "artist_mix",
+          "artists": [
+            "Radiohead",
+            "Interpol"
+          ],
+          "genres": [],
+          "seedTracks": [],
+          "targetTrackCount": 30,
+          "targetDurationMinutes": null,
+          "mood": null,
+          "popularity": "balanced",
+          "orderMode": null,
+          "excludeArtists": [
+            "Coldplay"
+          ],
+          "excludeTracks": [],
+          "unsupportedConstraints": [
+            {
+              "category": "activity",
+              "userText": "for a long run"
+            }
+          ],
+          "recipe": {
+            "artistIds": [
+              "4Z8W4fKeB5YxbusRsdQVPb"
+            ],
+            "tracksPerSeed": 15
+          }
+        },
+        "preservation": {
+          "firstTracks": null,
+          "positions": [],
+          "artists": []
+        },
+        "refinement": "Make it less mainstream and remove Interpol"
+      }
+    },
+    {
+      "name": "interpreted refinement with set, clear, add and remove operations",
+      "schema": "PlanRefinementResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [
+                "Portishead"
+              ],
+              "remove": [
+                "Interpol"
+              ]
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": {
+              "operation": "clear"
+            },
+            "popularity": {
+              "operation": "set",
+              "value": "rarities"
+            },
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [
+                {
+                  "title": "Creep",
+                  "artist": "Radiohead"
+                }
+              ],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": {
+              "operation": "set",
+              "value": 5
+            },
+            "positions": {
+              "add": [
+                8
+              ],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": [
+            {
+              "category": "energy",
+              "userText": "build up the energy"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "interpreted refinement that changes nothing",
+      "schema": "PlanRefinementResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement clarification",
+      "schema": "PlanRefinementResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "needs_clarification",
+          "clarification": {
+            "reason": "ambiguous_request",
+            "unsupportedConstraints": [
+              {
+                "category": "duration",
+                "userText": "make it shorter"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "refinement patch omitting an unchanged field instead of sending null",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch sending an empty list to mean clear",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": [],
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch replacing the whole intent",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "intent": {
+            "kind": "artist_mix",
+            "artists": [
+              "Radiohead",
+              "Interpol"
+            ],
+            "genres": [],
+            "seedTracks": [],
+            "targetTrackCount": 30,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": "balanced",
+            "orderMode": null,
+            "excludeArtists": [
+              "Coldplay"
+            ],
+            "excludeTracks": [],
+            "unsupportedConstraints": [
+              {
+                "category": "activity",
+                "userText": "for a long run"
+              }
+            ]
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch with a set operation missing its value",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": {
+              "operation": "set"
+            },
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch clearing the playlist kind",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": {
+              "operation": "clear"
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch with an unknown operation",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": {
+              "operation": "decrease",
+              "value": 5
+            },
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch with a capability Blendify cannot execute",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            },
+            "maxTracksPerArtist": {
+              "operation": "set",
+              "value": 2
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch changing the unsupported constraints of the intent",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            },
+            "unsupportedConstraints": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch carrying a provider track id",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [
+                {
+                  "title": "Teardrop",
+                  "artist": null,
+                  "id": "4uLU6hMCjMI75M1A2tKUQC"
+                }
+              ],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement preservation with a zero position",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [
+                0
+              ],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement preservation with a fractional first-tracks count",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": {
+              "operation": "set",
+              "value": 2.5
+            },
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
     }
   ]
 }

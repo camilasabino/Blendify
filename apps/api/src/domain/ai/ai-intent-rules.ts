@@ -232,11 +232,19 @@ function clarify(
   };
 }
 
+export function aiNameKey(name: string): string {
+  return normalizeArtistName(name) || name.trim().toLowerCase();
+}
+
+export function aiTrackKey(track: AiTrackReference): string {
+  return `${normalizeArtistName(track.title)}|${normalizeArtistName(track.artist ?? '')}`;
+}
+
 function uniqueNames(names: string[]): string[] {
   const seen = new Set<string>();
 
   return names.filter((name) => {
-    const key = normalizeArtistName(name) || name.trim().toLowerCase();
+    const key = aiNameKey(name);
     if (seen.has(key)) {
       return false;
     }
@@ -249,7 +257,7 @@ function uniqueTracks(tracks: AiTrackReference[]): AiTrackReference[] {
   const seen = new Set<string>();
 
   return tracks.filter((track) => {
-    const key = `${normalizeArtistName(track.title)}|${normalizeArtistName(track.artist ?? '')}`;
+    const key = aiTrackKey(track);
     if (seen.has(key)) {
       return false;
     }

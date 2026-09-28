@@ -6,17 +6,26 @@ import {
   AiServiceErrorResponseSchema,
   InterpretIntentRequestSchema,
   InterpretIntentResponseSchema,
+  PlanRefinementRequestSchema,
+  PlanRefinementResponseSchema,
 } from '@blendify/contracts/ai-service';
+import type { z } from 'zod';
 import { AiInterpretationError } from '@/domain/errors/ai-interpretation.error';
 import type {
   AiSafeIntentRequest,
   IntentInterpretationResult,
   IntentInterpreterPort,
 } from '@/domain/repositories/intent-interpreter.port';
+import type {
+  AiSafeRefinementRequest,
+  RefinementPlanResult,
+  RefinementPlannerPort,
+} from '@/domain/repositories/refinement-planner.port';
 import { createOutboundHttp } from '@/infrastructure/http/outbound-http.logging';
 
 export const AI_SERVICE_TIMEOUT_MS = 30_000;
 export const AI_SERVICE_INTERPRET_PATH = '/v1/intent/interpret';
+export const AI_SERVICE_REFINEMENT_PATH = '/v1/refinement/plan';
 
 type FailureCategory =
   | 'not_configured'
@@ -26,8 +35,34 @@ type FailureCategory =
   | 'malformed_response'
   | Lowercase<AiServiceErrorCode>;
 
+interface AiServiceOperation<
+  RequestSchema extends z.ZodType,
+  ResponseSchema extends z.ZodType,
+> {
+  path: string;
+  event: 'ai.intent' | 'ai.refinement';
+  request: RequestSchema;
+  response: ResponseSchema;
+}
+
+const INTERPRET_OPERATION = {
+  path: AI_SERVICE_INTERPRET_PATH,
+  event: 'ai.intent',
+  request: InterpretIntentRequestSchema,
+  response: InterpretIntentResponseSchema,
+} as const satisfies AiServiceOperation<z.ZodType, z.ZodType>;
+
+const REFINEMENT_OPERATION = {
+  path: AI_SERVICE_REFINEMENT_PATH,
+  event: 'ai.refinement',
+  request: PlanRefinementRequestSchema,
+  response: PlanRefinementResponseSchema,
+} as const satisfies AiServiceOperation<z.ZodType, z.ZodType>;
+
 @Injectable()
-export class AiServiceIntentInterpreterAdapter implements IntentInterpreterPort {
+export class AiServiceIntentInterpreterAdapter
+  implements IntentInterpreterPort, RefinementPlannerPort
+{
   private readonly logger = new Logger(AiServiceIntentInterpreterAdapter.name);
   private readonly http: AxiosInstance | null;
 
@@ -54,38 +89,57 @@ export class AiServiceIntentInterpreterAdapter implements IntentInterpreterPort 
     );
   }
 
-  async interpretIntent(
+  interpretIntent(
     request: AiSafeIntentRequest,
   ): Promise<IntentInterpretationResult> {
+    return this.call(INTERPRET_OPERATION, request);
+  }
+
+  planRefinement(
+    request: AiSafeRefinementRequest,
+  ): Promise<RefinementPlanResult> {
+    return this.call(REFINEMENT_OPERATION, request);
+  }
+
+  private async call<
+    RequestSchema extends z.ZodType,
+    ResponseSchema extends z.ZodType<{
+      promptVersion: string;
+      result: { outcome: string };
+    }>,
+  >(
+    operation: AiServiceOperation<RequestSchema, ResponseSchema>,
+    request: unknown,
+  ): Promise<z.output<ResponseSchema>> {
     const startedAt = Date.now();
-    const safeRequest = InterpretIntentRequestSchema.safeParse(request);
+    const safeRequest = operation.request.safeParse(request);
 
     if (!safeRequest.success) {
-      throw this.fail('request_rejected', startedAt);
+      throw this.fail(operation, 'request_rejected', startedAt);
     }
     if (!this.http) {
-      throw this.fail('not_configured', startedAt);
+      throw this.fail(operation, 'not_configured', startedAt);
     }
 
     let data: unknown;
     try {
       const response = await this.http.post<unknown>(
-        AI_SERVICE_INTERPRET_PATH,
+        operation.path,
         safeRequest.data,
       );
       data = response.data;
     } catch (error) {
-      throw this.fail(classifyHttpError(error), startedAt);
+      throw this.fail(operation, classifyHttpError(error), startedAt);
     }
 
-    const parsed = InterpretIntentResponseSchema.safeParse(data);
+    const parsed = operation.response.safeParse(data);
     if (!parsed.success) {
-      throw this.fail('malformed_response', startedAt);
+      throw this.fail(operation, 'malformed_response', startedAt);
     }
 
     this.logger.log(
       JSON.stringify({
-        event: 'ai.intent.interpreted',
+        event: `${operation.event}.interpreted`,
         outcome: parsed.data.result.outcome,
         promptVersion: parsed.data.promptVersion,
         durationMs: Date.now() - startedAt,
@@ -95,12 +149,13 @@ export class AiServiceIntentInterpreterAdapter implements IntentInterpreterPort 
   }
 
   private fail(
+    operation: AiServiceOperation<z.ZodType, z.ZodType>,
     category: FailureCategory,
     startedAt: number,
   ): AiInterpretationError {
     this.logger.warn(
       JSON.stringify({
-        event: 'ai.intent.failed',
+        event: `${operation.event}.failed`,
         category,
         durationMs: Date.now() - startedAt,
       }),

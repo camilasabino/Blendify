@@ -13,13 +13,16 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   AnswerAiClarificationRequestSchema,
+  CreateAiRefinementRequestSchema,
   CreateAiSessionRequestSchema,
   PublishAiPlaylistRequestSchema,
   TransferAiPlaylistRequestSchema,
   type AiGenerationDto,
+  type AiRefinementResultDto,
   type AiSessionDto,
   type AiSessionStateDto,
   type AnswerAiClarificationRequest,
+  type CreateAiRefinementRequest,
   type CreateAiSessionRequest,
   type TransferAiPlaylistRequest,
 } from '@blendify/contracts';
@@ -31,12 +34,14 @@ import {
   toAiGenerationResponse,
   toAiSessionStateResponse,
 } from '@/application/dto/ai-generation-response.dto';
+import { toAiRefinementResponse } from '@/application/dto/ai-refinement-response.dto';
 import { toAiSessionResponse } from '@/application/dto/ai-session-response.dto';
 import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
 import { GenerateAiPlaylistUseCase } from '@/application/use-cases/generate-ai-playlist.use-case';
 import { GetAiSessionUseCase } from '@/application/use-cases/get-ai-session.use-case';
+import { ProposeAiRefinementUseCase } from '@/application/use-cases/propose-ai-refinement.use-case';
 import { PublishAiPlaylistUseCase } from '@/application/use-cases/publish-ai-playlist.use-case';
 import { TransferAiPlaylistUseCase } from '@/application/use-cases/transfer-ai-playlist.use-case';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
@@ -66,6 +71,7 @@ export class AiSessionsController {
     private readonly getSession: GetAiSessionUseCase,
     private readonly publishPlaylist: PublishAiPlaylistUseCase,
     private readonly transferPlaylist: TransferAiPlaylistUseCase,
+    private readonly proposeRefinement: ProposeAiRefinementUseCase,
     private readonly transferGate: GuestTransferGate,
   ) {}
 
@@ -229,6 +235,31 @@ export class AiSessionsController {
       session,
       this.destinationOptions(userId),
     );
+  }
+
+  @Post(':sessionId/refinements')
+  @HttpCode(HttpStatus.OK)
+  @RateLimit('interpret')
+  @ApiOperation({
+    summary:
+      'Interpret a refinement of the generated Create with AI playlist without applying it',
+  })
+  async refine(
+    @Param('sessionId') sessionId: string,
+    @Body(new ZodValidationPipe(CreateAiRefinementRequestSchema))
+    body: CreateAiRefinementRequest,
+    @Req() req: Request,
+  ): Promise<AiRefinementResultDto> {
+    if (!SESSION_TOKEN_PATTERN.test(sessionId)) {
+      throw AiSessionError.notFound();
+    }
+
+    const { token, session } = await this.proposeRefinement.execute({
+      token: sessionId,
+      userId: currentUserId(req),
+      refinement: body.refinement,
+    });
+    return toAiRefinementResponse(token, session);
   }
 
   private destinationOptions(userId: string | null) {

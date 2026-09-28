@@ -1,6 +1,10 @@
-from app.providers.model_provider import ModelIntentRequest
+from app.models.intent import IntentInterpretation
+from app.providers.model_provider import ModelIntentRequest, ModelOutputSpec
 
 INTENT_PROMPT_VERSION = "intent-v3"
+INTENT_MODEL_OUTPUT = ModelOutputSpec(
+    name="playlist_intent_interpretation", result_type=IntentInterpretation
+)
 
 INTENT_SYSTEM_PROMPT = """\
 You interpret one playlist request for Blendify into the structured response schema.
@@ -99,4 +103,5 @@ def build_intent_model_request(prompt: str) -> ModelIntentRequest:
         prompt_version=INTENT_PROMPT_VERSION,
         system_prompt=INTENT_SYSTEM_PROMPT,
         user_prompt=prompt,
+        output=INTENT_MODEL_OUTPUT,
     )

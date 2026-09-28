@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { InterpretIntentResponse } from '@blendify/contracts/ai-service';
+import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import type { AiSession } from '@/domain/ai/ai-session';
 import { AiInterpretationError } from '@/domain/errors/ai-interpretation.error';
 import type { AiSessionRepositoryPort } from '@/domain/repositories/ai-session.repository.port';
@@ -66,6 +67,12 @@ function createUseCase(response: InterpretIntentResponse | Error) {
     hasDestinationClaim: jest.fn(() => Promise.resolve(false)),
     savePublishOutcome: jest.fn(() => Promise.resolve(true)),
     renewGenerationLock: jest.fn(() => Promise.resolve(true)),
+    saveIfUnchanged: jest.fn(() => Promise.resolve(true)),
+    acquireRefinementLock: jest.fn(() =>
+      Promise.resolve<string | null>('refinement-lock'),
+    ),
+    renewRefinementLock: jest.fn(() => Promise.resolve(true)),
+    releaseRefinementLock: jest.fn(() => Promise.resolve()),
   };
   const useCase = new CreateAiSessionUseCase(interpreter, sessions);
   return { useCase, interpreter, saved };
@@ -108,7 +115,10 @@ describe('CreateAiSessionUseCase', () => {
       clarification: null,
       createdAt: NOW.toISOString(),
       expiresAt: new Date(NOW.getTime() + AI_SESSION_TTL_MS).toISOString(),
-      aiSafe: { intent: { artists: ['Radiohead', 'Interpol'] } },
+      aiSafe: {
+        intent: { artists: ['Radiohead', 'Interpol'] },
+        preservation: EMPTY_AI_PRESERVATION,
+      },
     });
     expect(session.execution).toBeNull();
   });

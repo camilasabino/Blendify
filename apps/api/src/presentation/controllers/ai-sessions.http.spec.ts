@@ -10,6 +10,7 @@ import request from 'supertest';
 import {
   AiGenerationSchema,
   AiGenerationStreamEventSchema,
+  AiRefinementResultSchema,
   AiSessionSchema,
   AiSessionStateSchema,
   type AiSessionDto,
@@ -17,6 +18,8 @@ import {
 import type {
   InterpretIntentRequest,
   InterpretIntentResponse,
+  PlanRefinementRequest,
+  PlanRefinementResponse,
 } from '@blendify/contracts/ai-service';
 import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
 import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
@@ -24,6 +27,7 @@ import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-
 import { CreateAiSessionUseCase } from '@/application/use-cases/create-ai-session.use-case';
 import { GenerateAiPlaylistUseCase } from '@/application/use-cases/generate-ai-playlist.use-case';
 import { GetAiSessionUseCase } from '@/application/use-cases/get-ai-session.use-case';
+import { ProposeAiRefinementUseCase } from '@/application/use-cases/propose-ai-refinement.use-case';
 import { PublishAiPlaylistUseCase } from '@/application/use-cases/publish-ai-playlist.use-case';
 import { TransferAiPlaylistUseCase } from '@/application/use-cases/transfer-ai-playlist.use-case';
 import { PublishPlaylistService } from '@/application/services/publish-playlist.service';
@@ -48,6 +52,7 @@ import { INTENT_INTERPRETER } from '@/domain/repositories/intent-interpreter.por
 import { MUSIC_PROVIDER_FACTORY } from '@/domain/repositories/music-provider.factory.port';
 import type { ProviderPlaylist } from '@/domain/repositories/music-provider.port';
 import { PLAYLIST_REPOSITORY } from '@/domain/repositories/playlist.repository.port';
+import { REFINEMENT_PLANNER } from '@/domain/repositories/refinement-planner.port';
 import {
   PLAYLIST_TRANSFER_GATEWAY,
   type PlaylistTransfer,
@@ -120,9 +125,42 @@ const SPOTIFY_PLAYLIST: ProviderPlaylist = {
 };
 const SOUNDIIZ_URL = 'https://soundiiz.com/go/import-playlist/abcdefghijklmnop';
 
+function refinementPlan(
+  result: PlanRefinementResponse['result'],
+): PlanRefinementResponse {
+  return { promptVersion: 'refinement-v1', result };
+}
+
+function lessMainstreamPlan(): PlanRefinementResponse {
+  const unchangedNames = { add: [], remove: [] };
+  return refinementPlan({
+    outcome: 'interpreted',
+    patch: {
+      kind: null,
+      artists: { add: [], remove: ['Interpol'] },
+      genres: unchangedNames,
+      seedTracks: unchangedNames,
+      targetTrackCount: null,
+      targetDurationMinutes: null,
+      mood: null,
+      popularity: { operation: 'set', value: 'rarities' },
+      orderMode: null,
+      excludeArtists: unchangedNames,
+      excludeTracks: unchangedNames,
+    },
+    preservation: {
+      firstTracks: { operation: 'set', value: 2 },
+      positions: { add: [], remove: [] },
+      artists: unchangedNames,
+    },
+    unsupportedConstraints: [{ category: 'activity', userText: 'for running' }],
+  });
+}
+
 function createWorld() {
   const stored = new Map<string, AiSession>();
   const claims = new Map<string, string>();
+  const refinementLocks = new Map<string, string>();
   const spotify = {
     createPlaylist: jest.fn<Promise<ProviderPlaylist>, [unknown]>(() =>
       Promise.resolve(SPOTIFY_PLAYLIST),
@@ -160,6 +198,13 @@ function createWorld() {
         [InterpretIntentRequest]
       >(() => Promise.resolve(interpreted())),
     },
+    planner: {
+      planRefinement: jest.fn<
+        Promise<PlanRefinementResponse>,
+        [PlanRefinementRequest]
+      >(() => Promise.resolve(lessMainstreamPlan())),
+    },
+    refinementLocks,
     catalogFactory: { forMarket: unavailableProvider() },
     discovery: {
       isConfigured: unavailableProvider(),
@@ -229,6 +274,32 @@ function createWorld() {
           return Promise.resolve(true);
         },
       ),
+      saveIfUnchanged: jest.fn(
+        (token: string, session: AiSession, expectedUpdatedAt: string) => {
+          if (stored.get(token)?.updatedAt !== expectedUpdatedAt) {
+            return Promise.resolve(false);
+          }
+          stored.set(token, session);
+          return Promise.resolve(true);
+        },
+      ),
+      acquireRefinementLock: jest.fn((token: string) => {
+        if (refinementLocks.has(token)) {
+          return Promise.resolve<string | null>(null);
+        }
+        const lockId = `refinement-${refinementLocks.size + 1}`;
+        refinementLocks.set(token, lockId);
+        return Promise.resolve<string | null>(lockId);
+      }),
+      renewRefinementLock: jest.fn((token: string, lockId: string) =>
+        Promise.resolve(refinementLocks.get(token) === lockId),
+      ),
+      releaseRefinementLock: jest.fn((token: string, lockId: string) => {
+        if (refinementLocks.get(token) === lockId) {
+          refinementLocks.delete(token);
+        }
+        return Promise.resolve();
+      }),
     },
     generator: {
       execute: jest.fn<
@@ -294,7 +365,11 @@ async function createApp(
     provide: INTENT_INTERPRETER,
     useValue: world.interpreter,
   },
-  options: { transferEnabled?: boolean; generationLimit?: number } = {},
+  options: {
+    transferEnabled?: boolean;
+    generationLimit?: number;
+    refinementsPerSession?: number;
+  } = {},
 ): Promise<INestApplication> {
   const module = await Test.createTestingModule({
     imports: [
@@ -305,6 +380,9 @@ async function createApp(
             FRONTEND_URL: FRONTEND,
             JWT_SECRET,
             GUEST_TRANSFER_ENABLED: String(options.transferEnabled ?? true),
+            AI_REFINEMENTS_PER_SESSION: options.refinementsPerSession
+              ? String(options.refinementsPerSession)
+              : undefined,
           }),
         ],
       }),
@@ -354,6 +432,8 @@ async function createApp(
       PublishPlaylistService,
       PublishAiPlaylistUseCase,
       TransferAiPlaylistUseCase,
+      { provide: REFINEMENT_PLANNER, useValue: world.planner },
+      ProposeAiRefinementUseCase,
       ...inMemoryRequestLimitProviders({
         rateLimits: {
           ...DEFAULT_RATE_LIMITS,
@@ -1550,6 +1630,211 @@ describe('Create with AI sessions over HTTP', () => {
       expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(2);
       expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
       expect(world.generator.execute).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('refinement interpretation', () => {
+    const REFINEMENT =
+      'Less mainstream, drop Interpol, keep the first two, for running';
+
+    function refine(sessionId: string, body: object, cookie?: string) {
+      const req = request(server())
+        .post(`${SESSIONS_PATH}/${sessionId}/refinements`)
+        .set('Origin', FRONTEND)
+        .send(body);
+      return cookie ? req.set('Cookie', cookie) : req;
+    }
+
+    async function generatedSession(cookie?: string): Promise<string> {
+      useWorkingProviders();
+      const created = await createSession({ prompt: PROMPT }, cookie).expect(
+        201,
+      );
+      const sessionId = (created.body as AiSessionDto).sessionId;
+      await generate(sessionId, cookie).expect(200);
+      return sessionId;
+    }
+
+    function providerCallCounts() {
+      return {
+        catalog: world.catalogFactory.forMarket.mock.calls.length,
+        generator: world.generator.execute.mock.calls.length,
+      };
+    }
+
+    function expectNoDestinationCalls(): void {
+      expect(world.musicProviders.forUser).not.toHaveBeenCalled();
+      expect(world.spotify.createPlaylist).not.toHaveBeenCalled();
+      expect(world.playlists.save).not.toHaveBeenCalled();
+      expect(world.soundiiz.createTransfer).not.toHaveBeenCalled();
+    }
+
+    it('interprets a refinement into a pending proposal with zero provider or destination calls', async () => {
+      const sessionId = await generatedSession();
+      const before = providerCallCounts();
+
+      const response = await refine(sessionId, {
+        refinement: REFINEMENT,
+      }).expect(200);
+
+      expect(AiRefinementResultSchema.parse(response.body)).toEqual({
+        sessionId,
+        expiresAt: world.stored.get(sessionId)?.expiresAt,
+        refinement: {
+          status: 'proposed',
+          intent: expect.objectContaining({
+            artists: ['Radiohead'],
+            popularity: 'rarities',
+            excludeArtists: ['Coldplay'],
+          }) as object,
+          preservation: { firstTracks: 2, positions: [], artists: [] },
+          notApplied: [{ category: 'activity', userText: 'for running' }],
+        },
+      });
+      expect(providerCallCounts()).toEqual(before);
+      expectNoDestinationCalls();
+      expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
+      expect(world.planner.planRefinement).toHaveBeenCalledWith({
+        intent: world.stored.get(sessionId)?.aiSafe.intent,
+        preservation: { firstTracks: null, positions: [], artists: [] },
+        refinement: REFINEMENT,
+      });
+    });
+
+    it('keeps the restored M2 preview and the public session state unchanged', async () => {
+      const sessionId = await generatedSession();
+      const before = AiSessionStateSchema.parse(
+        (await readSession(sessionId).expect(200)).body,
+      );
+
+      await refine(sessionId, { refinement: REFINEMENT }).expect(200);
+
+      const after = (await readSession(sessionId).expect(200)).body as object;
+      expect(AiSessionStateSchema.parse(after)).toEqual(before);
+      expect(after).not.toHaveProperty('refinement');
+      expect(after).not.toHaveProperty('pendingRefinement');
+      expect(JSON.stringify(after)).not.toContain('refinement-v1');
+    });
+
+    it('shares the paid-model interpret bucket with first-turn requests', async () => {
+      const sessionId = await generatedSession();
+
+      await refine(sessionId, { refinement: REFINEMENT }).expect(200);
+      await refine(sessionId, { refinement: REFINEMENT }).expect(200);
+      const limited = await refine(sessionId, {
+        refinement: REFINEMENT,
+      }).expect(429);
+
+      expect(limited.body).toMatchObject({ code: 'RATE_LIMITED' });
+      expect(world.planner.planRefinement).toHaveBeenCalledTimes(
+        INTERPRET_LIMIT - 1,
+      );
+    });
+
+    it('stops at the per-session refinement limit', async () => {
+      await app.close();
+      app = await createApp(
+        world,
+        { provide: INTENT_INTERPRETER, useValue: world.interpreter },
+        { refinementsPerSession: 1 },
+      );
+      const sessionId = await generatedSession();
+
+      await refine(sessionId, { refinement: REFINEMENT }).expect(200);
+      const refused = await refine(sessionId, {
+        refinement: REFINEMENT,
+      }).expect(409);
+
+      expect(refused.body).toMatchObject({
+        code: 'AI_REFINEMENT_LIMIT_REACHED',
+      });
+      expect(world.planner.planRefinement).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers a concurrent refinement of the same session with a typed in-progress error', async () => {
+      const sessionId = await generatedSession();
+      world.refinementLocks.set(sessionId, 'another-request');
+
+      const busy = await refine(sessionId, { refinement: REFINEMENT }).expect(
+        409,
+      );
+
+      expect(busy.body).toMatchObject({ code: 'AI_REFINEMENT_IN_PROGRESS' });
+      expect(world.planner.planRefinement).not.toHaveBeenCalled();
+    });
+
+    it('refuses to refine a preview that was already transferred', async () => {
+      const sessionId = await generatedSession();
+      await request(server())
+        .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+        .set('Origin', FRONTEND)
+        .send({ name: 'Mix' })
+        .expect(200);
+
+      const refused = await refine(sessionId, {
+        refinement: REFINEMENT,
+      }).expect(409);
+
+      expect(refused.body).toMatchObject({ code: 'AI_REFINEMENT_UNAVAILABLE' });
+      expect(world.planner.planRefinement).not.toHaveBeenCalled();
+      expect(world.soundiiz.createTransfer).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses sessions that are not generated, foreign or unknown', async () => {
+      const owner = await sessionCookie('user-1');
+      const intruder = await sessionCookie('user-2');
+      const reviewed = (await createSession({ prompt: PROMPT }).expect(201))
+        .body as AiSessionDto;
+      const owned = await generatedSession(owner);
+
+      await refine(reviewed.sessionId, { refinement: REFINEMENT }).expect(409);
+      for (const response of [
+        await refine(owned, { refinement: REFINEMENT }, intruder).expect(404),
+        await refine(owned, { refinement: REFINEMENT }).expect(404),
+        await refine('bad$token', { refinement: REFINEMENT }, intruder).expect(
+          404,
+        ),
+      ]) {
+        expect(response.body).toMatchObject({ code: 'AI_SESSION_NOT_FOUND' });
+      }
+      expect(world.planner.planRefinement).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [{}],
+      [{ refinement: '   ' }],
+      [{ refinement: 'x'.repeat(2_001) }],
+      [{ refinement: REFINEMENT, positions: [1, 2] }],
+      [{ refinement: REFINEMENT, tracks: [{ id: '4uLU6hMCjMI75M1A2tKUQC' }] }],
+    ])(
+      'rejects bodies outside the public refinement contract: %j',
+      async (body) => {
+        const sessionId = await generatedSession();
+
+        await refine(sessionId, body).expect(400);
+
+        expect(world.planner.planRefinement).not.toHaveBeenCalled();
+      },
+    );
+
+    it('keeps the applied state when the refinement interpretation fails', async () => {
+      const sessionId = await generatedSession();
+      const applied = world.stored.get(sessionId);
+      world.planner.planRefinement.mockRejectedValueOnce(
+        AiInterpretationError.unavailable(),
+      );
+
+      const failed = await refine(sessionId, { refinement: REFINEMENT }).expect(
+        503,
+      );
+
+      expect(failed.body).toMatchObject({ code: 'AI_UNAVAILABLE' });
+      expect(world.stored.get(sessionId)).toMatchObject({
+        aiSafe: applied?.aiSafe,
+        execution: applied?.execution,
+        destination: null,
+        pendingRefinement: null,
+      });
     });
   });
 });

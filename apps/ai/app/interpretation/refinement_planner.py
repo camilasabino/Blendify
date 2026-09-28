@@ -4,20 +4,23 @@ from app.interpretation.structured_model_call import (
     ModelCallEvents,
     StructuredModelCaller,
 )
-from app.models.intent import intent_interpretation_adapter
-from app.models.interpretation import InterpretIntentRequest, InterpretIntentResponse
-from app.prompts.intent import build_intent_model_request
+from app.models.refinement import (
+    PlanRefinementRequest,
+    PlanRefinementResponse,
+    refinement_interpretation_adapter,
+)
+from app.prompts.refinement import build_refinement_model_request
 from app.providers.model_provider import IntentModelProvider
 
-INTENT_EVENTS = ModelCallEvents(
-    completed="intent.interpreted",
-    output_invalid="intent.output_invalid",
-    failed="intent.failed",
-    provider_misconfigured="intent.provider_misconfigured",
+REFINEMENT_EVENTS = ModelCallEvents(
+    completed="refinement.planned",
+    output_invalid="refinement.output_invalid",
+    failed="refinement.failed",
+    provider_misconfigured="refinement.provider_misconfigured",
 )
 
 
-class IntentInterpreter:
+class RefinementPlanner:
     def __init__(
         self,
         provider: IntentModelProvider,
@@ -31,16 +34,12 @@ class IntentInterpreter:
             max_output_validation_attempts=max_output_validation_attempts,
         )
 
-    @property
-    def is_available(self) -> bool:
-        return self._caller.is_available
-
-    async def interpret(self, request: InterpretIntentRequest) -> InterpretIntentResponse:
-        model_request = build_intent_model_request(request.prompt)
+    async def plan(self, request: PlanRefinementRequest) -> PlanRefinementResponse:
+        model_request = build_refinement_model_request(request)
         result = await self._caller.call(
-            model_request, intent_interpretation_adapter, INTENT_EVENTS
+            model_request, refinement_interpretation_adapter, REFINEMENT_EVENTS
         )
 
-        return InterpretIntentResponse.model_validate(
+        return PlanRefinementResponse.model_validate(
             {"promptVersion": model_request.prompt_version, "result": result}
         )

@@ -4,6 +4,7 @@ import {
   clarificationFromModel,
   normalizeAiIntent,
 } from '@/domain/ai/ai-intent-rules';
+import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import {
   AI_SESSION_RECORD_VERSION,
   withReviewedIntent,
@@ -52,10 +53,12 @@ export class CreateAiSessionUseCase {
       ownerUserId: command.userId,
       originalPrompt: command.prompt,
       promptVersion: interpretation.promptVersion,
-      aiSafe: { intent: null },
+      aiSafe: { intent: null, preservation: EMPTY_AI_PRESERVATION },
       clarification: null,
       execution: null,
       destination: null,
+      refinementAttempts: 0,
+      pendingRefinement: null,
       createdAt: createdAt.toISOString(),
       updatedAt: createdAt.toISOString(),
       expiresAt: new Date(
