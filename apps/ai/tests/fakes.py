@@ -11,8 +11,11 @@ ScriptedOutput = Mapping[str, object] | Exception
 
 
 class ScriptedModelProvider:
-    def __init__(self, outputs: Sequence[ScriptedOutput]) -> None:
+    def __init__(
+        self, outputs: Sequence[ScriptedOutput], usage: ModelTokenUsage | None = FAKE_USAGE
+    ) -> None:
         self._outputs = list(outputs)
+        self._usage = usage
         self.requests: list[ModelIntentRequest] = []
 
     @property
@@ -28,7 +31,7 @@ class ScriptedModelProvider:
         output = self._outputs.pop(0)
         if isinstance(output, Exception):
             raise output
-        return ModelIntentResult(payload=output, model=FAKE_MODEL, usage=FAKE_USAGE)
+        return ModelIntentResult(payload=output, model=FAKE_MODEL, usage=self._usage)
 
 
 class HangingModelProvider:

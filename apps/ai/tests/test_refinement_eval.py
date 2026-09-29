@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from app.interpretation.structured_model_call import MAX_OUTPUT_VALIDATION_ATTEMPTS
-from app.models.intent import Mood, UnsupportedConstraintCategory
+from app.models.intent import ClarificationReason, Mood, UnsupportedConstraintCategory
 from app.models.refinement import refinement_interpretation_adapter
 from evals import run_intent_eval
 from evals.refinement_eval import (
@@ -30,6 +30,21 @@ DATASET_VERSION, CASES = load_dataset()
 HISTORICAL_V1_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v1.json"
 HISTORICAL_V1_DATASET_SHA256 = "05a16b4a7888c4d8a6e1a8b1da08d0d5e9542b78039f9560f066aa5457dccc17"
 CASES_BY_ID = {case.id: case for case in CASES}
+V1_CASES_WITH_A_REQUIRED_CLARIFICATION_REASON = {
+    "en-shorter-ambiguous": "ambiguous_request",
+    "en-few-more-songs-ambiguous": "ambiguous_request",
+    "en-percentage-popularity-ambiguous": "ambiguous_request",
+    "es-longer-ambiguous": "ambiguous_request",
+    "en-unsupported-activity": "unsupported_constraint",
+    "en-unsupported-energy-progression": "unsupported_constraint",
+    "en-per-artist-limit": "unsupported_constraint",
+    "en-more-of-existing-seed": "unsupported_constraint",
+    "en-keep-last-song": "unsupported_constraint",
+    "en-rename-playlist": "unsupported_constraint",
+    "es-unsupported-tempo": "unsupported_constraint",
+    "pt-unsupported-artist-attribute": "unsupported_constraint",
+    "en-prompt-injection": ["not_a_playlist_request", "unsupported_constraint"],
+}
 CATEGORIES = set(UnsupportedConstraintCategory.__args__)
 PROVIDER_CONTENT_PATTERN = re.compile(r"spotify:|open\.spotify|https?://|\b[0-9A-Za-z]{22}\b")
 REQUIRED_COVERAGE = {
@@ -58,6 +73,9 @@ REQUIRED_COVERAGE = {
         "en-unsupported-energy-progression",
         "en-already-satisfied",
         "en-prompt-injection",
+        "en-injection-schema-and-tools",
+        "en-more-mainstream-from-balanced",
+        "en-add-seed-track",
         "en-combination",
     ],
     "es": [
@@ -74,6 +92,12 @@ REQUIRED_COVERAGE = {
         "es-preserve-first-tracks",
         "es-unsupported-tempo",
         "es-combination",
+        "es-more-mainstream-from-null",
+        "es-percentage-popularity-ambiguous",
+        "es-remove-seed-track",
+        "es-exclude-track",
+        "es-per-artist-limit",
+        "es-injection-fake-assistant-text",
     ],
     "pt": [
         "pt-add-genre-place",
@@ -85,6 +109,7 @@ REQUIRED_COVERAGE = {
         "pt-preserve-first-tracks",
         "pt-unsupported-artist-attribute",
         "pt-combination",
+        "pt-injection-secrets-and-contents",
     ],
 }
 
@@ -108,7 +133,14 @@ def test_historical_v1_dataset_stays_frozen_and_inside_v2() -> None:
     assert digest == HISTORICAL_V1_DATASET_SHA256
     assert version == "refinement-eval-v1"
     for case in cases:
-        assert CASES_BY_ID[case.id] == case
+        current = CASES_BY_ID[case.id]
+        reason = V1_CASES_WITH_A_REQUIRED_CLARIFICATION_REASON.get(case.id)
+        if reason is None:
+            assert current == case
+            continue
+        assert "clarificationReason" not in case.expect
+        assert (current.language, current.request) == (case.language, case.request)
+        assert current.expect == {**case.expect, "clarificationReason": reason}
 
 
 def test_genre_refinements_expect_normalized_additions_and_literal_removals() -> None:
@@ -123,12 +155,27 @@ def test_genre_refinements_expect_normalized_additions_and_literal_removals() ->
 def test_local_genre_removals_copy_the_current_intent_spelling() -> None:
     for case_id, genre in (
         ("es-remove-local-genre", "pop argentino"),
-        ("en-remove-local-genre-named-in-english", "pop argentino"),
         ("pt-remove-local-genre", "mpb"),
     ):
         case = CASES_BY_ID[case_id]
         assert case.expect["remove"] == {"genres": [genre]}
         assert genre in case.request.intent.genres
+
+
+def test_a_local_genre_named_in_english_may_be_removed_by_its_supported_alias() -> None:
+    case = CASES_BY_ID["en-remove-local-genre-named-in-english"]
+
+    assert "remove" not in case.expect
+    assert case.expect["removeOneOf"] == {"genres": [["pop argentino"], ["argentine pop"]]}
+    assert "pop argentino" in case.request.intent.genres
+    for removed in (["pop argentino"], ["Argentine Pop"]):
+        output = refinement_output(patch=unchanged_patch(genres={"add": [], "remove": removed}))
+        assert check_refinement_case(case.expect, parsed(output)) == []
+    other = refinement_output(patch=unchanged_patch(genres={"add": [], "remove": ["indie rock"]}))
+    assert check_refinement_case(case.expect, parsed(other)) == [
+        "removeOneOf: expected genres one of [['pop argentino'], ['argentine pop']], "
+        "got ['indie rock']"
+    ]
 
 
 def test_relative_characteristics_never_expect_a_genre_change() -> None:
@@ -176,6 +223,7 @@ def test_every_expectation_uses_known_keys_paths_and_vocabularies(case: Any) -> 
         *expect.get("clear", []),
         *expect.get("add", {}),
         *expect.get("remove", {}),
+        *expect.get("removeOneOf", {}),
     ]
     categories = expect.get("unsupportedCategories", []) + expect.get(
         "unsupportedCategoriesWithin", []
@@ -185,8 +233,13 @@ def test_every_expectation_uses_known_keys_paths_and_vocabularies(case: Any) -> 
     assert set(outcomes) <= {"interpreted", "needs_clarification"}
     assert set(paths) <= PATCH_PATHS
     assert set(categories) <= CATEGORIES
+    assert set(as_list(expect.get("clarificationReason", []))) <= set(ClarificationReason.__args__)
     if "mood" in expect.get("set", {}):
         assert expect["set"]["mood"] in Mood.__args__
+
+
+def as_list(value: object) -> list[object]:
+    return value if isinstance(value, list) else [value]
 
 
 def test_relative_changes_without_an_amount_never_expect_a_number() -> None:
@@ -195,10 +248,37 @@ def test_relative_changes_without_an_amount_never_expect_a_number() -> None:
         "en-few-more-songs-ambiguous",
         "en-percentage-popularity-ambiguous",
         "es-longer-ambiguous",
+        "es-percentage-popularity-ambiguous",
     ):
         expect = CASES_BY_ID[case_id].expect
         assert expect["changedWithin"] == []
+        assert expect["clarificationReason"] == "ambiguous_request"
         assert "set" not in expect
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda case: case.id)
+def test_every_case_that_accepts_a_clarification_states_its_reason(case: Any) -> None:
+    if "needs_clarification" in as_list(case.expect["outcome"]):
+        assert case.expect.get("clarificationReason")
+
+
+INJECTION_CASES = {
+    "en": [
+        "en-prompt-injection",
+        "en-prompt-injection-next-to-a-change",
+        "en-injection-schema-and-tools",
+    ],
+    "es": ["es-injection-fake-assistant-text"],
+    "pt": ["pt-injection-secrets-and-contents"],
+}
+
+
+@pytest.mark.parametrize("language", sorted(INJECTION_CASES))
+def test_dataset_covers_prompt_injection_in_each_language(language: str) -> None:
+    for case_id in INJECTION_CASES[language]:
+        case = CASES_BY_ID[case_id]
+        assert case.language == language
+        assert set(as_list(case.expect["outcome"])) <= {"interpreted", "needs_clarification"}
 
 
 POPULARITY_LESS_MAINSTREAM = {"popular": "balanced", "balanced": "rarities", "rarities": "rarities"}
@@ -210,6 +290,8 @@ POPULARITY_STEP_CASES = {
     "en-already-satisfied": POPULARITY_LESS_MAINSTREAM,
     "en-more-mainstream-from-rarities": POPULARITY_MORE_MAINSTREAM,
     "en-more-mainstream-already-popular": POPULARITY_MORE_MAINSTREAM,
+    "en-more-mainstream-from-balanced": POPULARITY_MORE_MAINSTREAM,
+    "es-more-mainstream-from-null": POPULARITY_MORE_MAINSTREAM,
     "es-less-mainstream": POPULARITY_LESS_MAINSTREAM,
     "es-less-commercial-from-popular": POPULARITY_LESS_MAINSTREAM,
     "pt-more-popular": POPULARITY_MORE_MAINSTREAM,
@@ -389,7 +471,7 @@ async def test_fake_refinement_run_reports_failed_output_only_for_failed_cases()
 
     assert report["suite"] == "refinement"
     assert report["promptVersion"] == "refinement-v2"
-    assert report["providerRequests"] == 3
+    assert report["modelRequests"] == 3
     assert report["casesRequiringRetry"] == ["en-less-mainstream"]
     assert report["passed"] == 1
     assert passed["failed_output"] is None
@@ -410,3 +492,65 @@ def test_the_refinement_suite_is_refused_without_explicit_paid_authorization(
         main(["--suite", "refinement"], {"AI_PROVIDER": "openai", "AI_MODEL": "gpt-test"})
 
     assert constructed == []
+
+
+def test_popularity_steps_cover_every_mode_and_a_null_current_mode_in_both_directions() -> None:
+    covered = {
+        (CASES_BY_ID[case_id].request.intent.popularity, steps is POPULARITY_LESS_MAINSTREAM)
+        for case_id, steps in POPULARITY_STEP_CASES.items()
+    }
+
+    for less_mainstream in (True, False):
+        for current in (None, "popular", "balanced", "rarities"):
+            assert (current, less_mainstream) in covered
+
+
+def test_rejects_an_output_that_leaks_an_identifier() -> None:
+    expect = CASES_BY_ID["en-add-artist"].expect
+    leaked = refinement_output(
+        patch=unchanged_patch(
+            artists={"add": ["spotify:artist:6olE6TJLqED3rqDCT0FyPh"], "remove": []}
+        )
+    )
+
+    failures = check_refinement_case(expect, parsed(leaked))
+
+    assert failures[0].startswith("identifiers: output contains identifiers, URIs or URLs")
+
+
+def test_accepts_any_listed_clarification_reason_and_rejects_others() -> None:
+    expect = CASES_BY_ID["en-prompt-injection"].expect
+
+    for reason in ("not_a_playlist_request", "unsupported_constraint"):
+        assert check_refinement_case(expect, parsed(refinement_clarification(reason))) == []
+    assert check_refinement_case(expect, parsed(refinement_clarification("ambiguous_request"))) == [
+        "clarificationReason: expected one of ['not_a_playlist_request', "
+        "'unsupported_constraint'], got ambiguous_request"
+    ]
+
+
+def test_rejects_a_clarification_with_the_wrong_reason_for_a_relative_change() -> None:
+    expect = CASES_BY_ID["en-shorter-ambiguous"].expect
+    unsupported = refinement_clarification(
+        "not_a_playlist_request", [{"category": "duration", "userText": "shorter"}]
+    )
+
+    assert check_refinement_case(expect, parsed(unsupported)) == [
+        "clarificationReason: expected one of ['ambiguous_request'], got not_a_playlist_request"
+    ]
+
+
+def test_compares_unsupported_categories_as_a_set() -> None:
+    expect = CASES_BY_ID["en-per-artist-limit"].expect
+    twice = refinement_output(
+        unsupported=[
+            {"category": "other", "userText": "no more than two"},
+            {"category": "other", "userText": "songs per artist"},
+        ]
+    )
+    wrong = refinement_output(unsupported=[{"category": "era", "userText": "per artist"}])
+
+    assert check_refinement_case(expect, parsed(twice)) == []
+    assert check_refinement_case(expect, parsed(wrong)) == [
+        "unsupportedCategories: expected ['other'], got ['era']"
+    ]

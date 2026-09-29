@@ -26,6 +26,8 @@ from app.providers.openai_output_schema import (
 
 OPENAI_PROVIDER_NAME = "openai"
 MODEL_MAX_OUTPUT_TOKENS = 4_000
+MODEL_SDK_MAX_RETRIES = 0
+MODEL_STORES_RESPONSES = False
 INSUFFICIENT_QUOTA_ERROR_CODE = "insufficient_quota"
 
 CONFIGURATION_ERRORS: tuple[tuple[type[openai.APIStatusError], ModelConfigurationReason], ...] = (
@@ -51,7 +53,7 @@ class OpenAIIntentModelProvider:
         self._client = AsyncOpenAI(
             api_key=api_key,
             timeout=timeout_seconds,
-            max_retries=0,
+            max_retries=MODEL_SDK_MAX_RETRIES,
             http_client=http_client,
         )
 
@@ -70,7 +72,7 @@ class OpenAIIntentModelProvider:
                 instructions=request.system_prompt,
                 input=request.user_prompt,
                 max_output_tokens=MODEL_MAX_OUTPUT_TOKENS,
-                store=False,
+                store=MODEL_STORES_RESPONSES,
                 text={
                     "format": {
                         "type": "json_schema",

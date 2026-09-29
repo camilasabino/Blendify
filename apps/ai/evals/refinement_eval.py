@@ -14,7 +14,12 @@ from app.models.refinement import (
     RefinementClarificationNeeded,
     TrackListPatch,
 )
-from evals.intent_eval import EvalLanguage, normalize_name
+from evals.intent_eval import (
+    EvalLanguage,
+    check_no_identifiers,
+    compare_categories,
+    normalize_name,
+)
 
 DATASET_PATH = Path(__file__).resolve().parent / "refinement-eval-v2.json"
 
@@ -53,6 +58,7 @@ EXPECTATION_KEYS = frozenset(
         "clear",
         "add",
         "remove",
+        "removeOneOf",
         "unsupportedCategories",
         "unsupportedCategoriesWithin",
     }
@@ -88,16 +94,20 @@ def load_dataset(path: Path = DATASET_PATH) -> tuple[str, list[RefinementEvalCas
 
 
 def check_refinement_case(expect: dict[str, Any], result: RefinementResult) -> list[str]:
+    return [*check_no_identifiers(result), *_check_semantics(expect, result)]
+
+
+def _check_semantics(expect: dict[str, Any], result: RefinementResult) -> list[str]:
     allowed_outcomes = _as_list(expect["outcome"])
     if result.outcome not in allowed_outcomes:
         return [f"outcome: expected one of {allowed_outcomes}, got {result.outcome}"]
 
     if isinstance(result, RefinementClarificationNeeded):
         failures: list[str] = []
-        reason = expect.get("clarificationReason")
-        if reason is not None and result.clarification.reason != reason:
+        reasons = _as_list(expect.get("clarificationReason", []))
+        if reasons and result.clarification.reason not in reasons:
             failures.append(
-                f"clarificationReason: expected {reason}, got {result.clarification.reason}"
+                f"clarificationReason: expected one of {reasons}, got {result.clarification.reason}"
             )
         categories = [item.category for item in result.clarification.unsupported_constraints]
         failures.extend(_check_categories(expect, categories))
@@ -187,19 +197,20 @@ def _check_lists(expect: dict[str, Any], lists: dict[str, ListPatch]) -> list[st
                 failures.append(
                     f"{direction}: expected {path} {expected_items}, got {actual_items}"
                 )
+    for path, alternatives in expect.get("removeOneOf", {}).items():
+        actual_items = _comparable(lists[path].remove)
+        if actual_items not in [_comparable(items) for items in alternatives]:
+            failures.append(
+                f"removeOneOf: expected {path} one of {alternatives}, got {actual_items}"
+            )
     return failures
 
 
 def _check_categories(expect: dict[str, Any], categories: Sequence[str]) -> list[str]:
     failures: list[str] = []
 
-    if "unsupportedCategories" in expect and sorted(expect["unsupportedCategories"]) != sorted(
-        categories
-    ):
-        failures.append(
-            f"unsupportedCategories: expected {sorted(expect['unsupportedCategories'])}, "
-            f"got {sorted(categories)}"
-        )
+    if "unsupportedCategories" in expect:
+        failures.extend(compare_categories(expect["unsupportedCategories"], categories))
     if "unsupportedCategoriesWithin" in expect:
         allowed = set(expect["unsupportedCategoriesWithin"])
         if not categories or not set(categories) <= allowed:

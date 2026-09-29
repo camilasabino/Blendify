@@ -5,6 +5,7 @@ from app.providers.model_provider import (
     IntentModelProvider,
     ModelIntentRequest,
     ModelIntentResult,
+    ModelInvalidOutputError,
     ModelTokenUsage,
 )
 
@@ -16,6 +17,7 @@ class ProviderRequestBudgetExceededError(Exception):
 @dataclass(frozen=True, slots=True)
 class ProviderRequestRecord:
     latency_ms: int
+    model: str | None
     usage: ModelTokenUsage | None
 
 
@@ -42,11 +44,17 @@ class MeteredModelProvider:
 
         self.request_count += 1
         started_at = time.monotonic()
+        model: str | None = None
         usage: ModelTokenUsage | None = None
         try:
             result = await self._provider.generate_intent(request)
-            usage = result.usage
+            model, usage = result.model, result.usage
             return result
+        except ModelInvalidOutputError as error:
+            model, usage = error.model, error.usage
+            raise
         finally:
             latency_ms = round((time.monotonic() - started_at) * 1000)
-            self.records.append(ProviderRequestRecord(latency_ms=latency_ms, usage=usage))
+            self.records.append(
+                ProviderRequestRecord(latency_ms=latency_ms, model=model, usage=usage)
+            )

@@ -3,7 +3,11 @@ from pathlib import Path
 import pytest
 
 from app.interpretation.structured_model_call import MAX_OUTPUT_VALIDATION_ATTEMPTS
-from app.providers.model_provider import ModelConfigurationError, ModelInvalidOutputError
+from app.providers.model_provider import (
+    ModelConfigurationError,
+    ModelInvalidOutputError,
+    ModelRateLimitedError,
+)
 from evals import run_intent_eval
 from evals.intent_eval import EvalCase, expectation_statuses, load_dataset, tally_expectations
 from evals.metered_provider import MeteredModelProvider, ProviderRequestBudgetExceededError
@@ -14,7 +18,7 @@ from evals.run_intent_eval import (
     preflight_lines,
     run_eval,
 )
-from tests.fakes import FAKE_USAGE, ScriptedModelProvider, interpreted_output
+from tests.fakes import FAKE_MODEL, FAKE_USAGE, ScriptedModelProvider, interpreted_output
 
 API_KEY = "sk-test-key-that-must-never-be-printed"
 AUTHORIZED_ENV = {
@@ -153,7 +157,7 @@ def test_preflight_states_the_run_bounds_without_secrets_or_prompts() -> None:
     preflight = "\n".join(preflight_lines(plan))
 
     assert plan.request_budget == len(cases) * MAX_OUTPUT_VALIDATION_ATTEMPTS
-    assert f"max provider requests:    {plan.request_budget}" in preflight
+    assert f"max model requests:       {plan.request_budget}" in preflight
     assert "gpt-5.6-luna" in preflight
     assert "intent-eval-v4" in preflight
     assert "intent-v4" in preflight
@@ -164,19 +168,151 @@ def test_preflight_states_the_run_bounds_without_secrets_or_prompts() -> None:
 
 @pytest.mark.anyio
 async def test_metered_provider_counts_failed_requests_and_enforces_the_budget() -> None:
-    scripted = ScriptedModelProvider([ModelInvalidOutputError("bad"), interpreted_output()])
-    metered = MeteredModelProvider(scripted, request_budget=2)
+    scripted = ScriptedModelProvider(
+        [
+            ModelInvalidOutputError("bad", model=FAKE_MODEL, usage=FAKE_USAGE),
+            ModelInvalidOutputError("bad"),
+            interpreted_output(),
+        ]
+    )
+    metered = MeteredModelProvider(scripted, request_budget=3)
     request = object()
 
-    with pytest.raises(ModelInvalidOutputError):
-        await metered.generate_intent(request)  # type: ignore[arg-type]
+    for _ in range(2):
+        with pytest.raises(ModelInvalidOutputError):
+            await metered.generate_intent(request)  # type: ignore[arg-type]
     await metered.generate_intent(request)  # type: ignore[arg-type]
     with pytest.raises(ProviderRequestBudgetExceededError):
         await metered.generate_intent(request)  # type: ignore[arg-type]
 
-    assert metered.request_count == 2
-    assert len(scripted.requests) == 2
-    assert [record.usage for record in metered.records] == [None, FAKE_USAGE]
+    assert metered.request_count == 3
+    assert len(scripted.requests) == 3
+    assert [record.usage for record in metered.records] == [FAKE_USAGE, None, FAKE_USAGE]
+    assert [record.model for record in metered.records] == [FAKE_MODEL, None, FAKE_MODEL]
+
+
+def usage_of(report: dict[str, object]) -> tuple[object, ...]:
+    return (
+        report["modelRequests"],
+        report["inputTokens"],
+        report["outputTokens"],
+        report["totalTokens"],
+        report["usageComplete"],
+    )
+
+
+@pytest.mark.anyio
+async def test_run_accounts_for_a_first_attempt_success() -> None:
+    plan = EvalPlan(model="fake", dataset_version="test", cases=[MATCHING_CASE])
+
+    report = await run_eval(plan, ScriptedModelProvider([interpreted_output()]))
+
+    assert usage_of(report) == (
+        1,
+        FAKE_USAGE.input_tokens,
+        FAKE_USAGE.output_tokens,
+        FAKE_USAGE.total_tokens,
+        True,
+    )
+    assert report["casesRequiringRetry"] == []
+    assert report["retryRequests"] == 0
+    assert report["responseModels"] == [FAKE_MODEL]
+
+
+@pytest.mark.parametrize(
+    "invalid_output",
+    [{"outcome": "invalid"}, ModelInvalidOutputError("bad", model=FAKE_MODEL, usage=FAKE_USAGE)],
+    ids=["schema-invalid", "provider-invalid"],
+)
+@pytest.mark.anyio
+async def test_run_counts_the_usage_of_an_invalid_output_followed_by_a_success(
+    invalid_output: object,
+) -> None:
+    plan = EvalPlan(model="fake", dataset_version="test", cases=[MATCHING_CASE])
+    provider = ScriptedModelProvider([invalid_output, interpreted_output()])  # type: ignore[list-item]
+
+    report = await run_eval(plan, provider)
+    (result,) = report["results"]  # type: ignore[misc]
+
+    assert report["cases"] == 1
+    assert report["passed"] == 1
+    assert usage_of(report) == (
+        2,
+        2 * FAKE_USAGE.input_tokens,
+        2 * FAKE_USAGE.output_tokens,
+        2 * FAKE_USAGE.total_tokens,
+        True,
+    )
+    assert report["casesRequiringRetry"] == ["matching"]
+    assert report["retryRequests"] == 1
+    assert result["model_requests"] == 2
+    assert result["total_tokens"] == 2 * FAKE_USAGE.total_tokens
+
+
+@pytest.mark.anyio
+async def test_run_counts_the_usage_of_two_invalid_outputs() -> None:
+    plan = EvalPlan(model="fake", dataset_version="test", cases=[MATCHING_CASE])
+    provider = ScriptedModelProvider(
+        [
+            ModelInvalidOutputError("bad", model=FAKE_MODEL, usage=FAKE_USAGE),
+            {"outcome": "invalid"},
+        ]
+    )
+
+    report = await run_eval(plan, provider)
+
+    assert report["cases"] == 1
+    assert report["passed"] == 0
+    assert report["failedCaseIds"] == ["matching"]
+    assert report["erroredCaseIds"] == ["matching"]
+    assert usage_of(report) == (
+        2,
+        2 * FAKE_USAGE.input_tokens,
+        2 * FAKE_USAGE.output_tokens,
+        2 * FAKE_USAGE.total_tokens,
+        True,
+    )
+    assert report["results"][0]["error"] == "INVALID_MODEL_OUTPUT"  # type: ignore[index]
+
+
+@pytest.mark.anyio
+async def test_run_reports_incomplete_usage_without_estimating_it() -> None:
+    plan = EvalPlan(model="fake", dataset_version="test", cases=[MATCHING_CASE])
+    provider = ScriptedModelProvider([ModelInvalidOutputError("bad"), interpreted_output()])
+
+    report = await run_eval(plan, provider)
+    (result,) = report["results"]  # type: ignore[misc]
+
+    assert usage_of(report) == (
+        2,
+        FAKE_USAGE.input_tokens,
+        FAKE_USAGE.output_tokens,
+        FAKE_USAGE.total_tokens,
+        False,
+    )
+    assert result["usage_complete"] is False
+
+
+@pytest.mark.anyio
+async def test_run_reports_missing_usage_as_incomplete_and_zero() -> None:
+    plan = EvalPlan(model="fake", dataset_version="test", cases=[MATCHING_CASE])
+
+    report = await run_eval(plan, ScriptedModelProvider([interpreted_output()], usage=None))
+
+    assert usage_of(report) == (1, 0, 0, 0, False)
+
+
+@pytest.mark.anyio
+async def test_run_counts_a_provider_failure_as_a_request_with_unknown_usage() -> None:
+    plan = EvalPlan(model="fake", dataset_version="test", cases=[MATCHING_CASE, MISMATCHING_CASE])
+    provider = ScriptedModelProvider([ModelRateLimitedError("slow down")])
+
+    report = await run_eval(plan, provider)
+
+    assert usage_of(report) == (1, 0, 0, 0, False)
+    assert report["cases"] == 1
+    assert report["erroredCaseIds"] == ["matching"]
+    assert report["aborted"] == "Provider error MODEL_RATE_LIMITED on case matching"
 
 
 @pytest.mark.anyio
@@ -188,12 +324,19 @@ async def test_run_accounts_for_requests_retries_and_tokens() -> None:
 
     report = await run_eval(plan, provider)
 
-    assert report["providerRequests"] == 3
-    assert report["providerRequestBudget"] == 2 * MAX_OUTPUT_VALIDATION_ATTEMPTS
+    assert report["modelRequests"] == 3
+    assert report["modelRequestBudget"] == 2 * MAX_OUTPUT_VALIDATION_ATTEMPTS
     assert report["casesRequiringRetry"] == ["matching"]
+    assert report["cases"] == 2
     assert report["passed"] == 1
+    assert report["failed"] == 1
+    assert report["passRate"] == 0.5
+    assert report["failedCaseIds"] == ["mismatching"]
+    assert report["erroredCaseIds"] == []
     assert report["inputTokens"] == 3 * FAKE_USAGE.input_tokens
     assert report["outputTokens"] == 3 * FAKE_USAGE.output_tokens
+    assert report["totalTokens"] == 3 * FAKE_USAGE.total_tokens
+    assert report["usageComplete"] is True
     assert report["aborted"] is None
     assert report["byLanguage"] == {
         "en": {"passed": 1, "cases": 1},
@@ -221,7 +364,7 @@ async def test_run_never_exceeds_the_attempt_bound_per_case() -> None:
 
     report = await run_eval(plan, provider)
 
-    assert report["providerRequests"] == plan.request_budget
+    assert report["modelRequests"] == plan.request_budget
     assert report["passed"] == 0
     assert [result["error"] for result in report["results"]] == [  # type: ignore[index]
         "INVALID_MODEL_OUTPUT",
@@ -236,7 +379,7 @@ async def test_run_stops_at_the_first_provider_configuration_failure() -> None:
 
     report = await run_eval(plan, provider)
 
-    assert report["providerRequests"] == 1
+    assert report["modelRequests"] == 1
     assert report["cases"] == 1
     assert report["aborted"] == "Provider error MODEL_UNAVAILABLE on case matching"
 
@@ -248,13 +391,46 @@ def test_expectation_statuses_distinguish_failed_and_unchecked_keys() -> None:
         "outcome": "passed",
         "artists": "failed",
         "kind": "passed",
+        "identifiers": "passed",
     }
-    assert expectation_statuses(expect, ["outcome: expected interpreted, got x"]) == {
+    assert expectation_statuses(
+        expect, ["identifiers: output contains", "outcome: expected interpreted, got x"]
+    ) == {
         "outcome": "failed",
         "artists": "unchecked",
         "kind": "unchecked",
+        "identifiers": "failed",
     }
     assert set(expectation_statuses(expect, None).values()) == {"unchecked"}
     assert tally_expectations([{"kind": "passed"}, {"kind": "failed"}]) == {
         "kind": {"passed": 1, "failed": 1, "unchecked": 0}
     }
+
+
+@pytest.mark.anyio
+async def test_report_records_reproducibility_metadata_without_secrets() -> None:
+    plan = EvalPlan(model="gpt-test-model", dataset_version="test", cases=[MATCHING_CASE])
+
+    report = await run_eval(plan, ScriptedModelProvider([interpreted_output()]))
+
+    assert report["promptVersion"] == "intent-v4"
+    assert len(report["promptSha256"]) == 64  # type: ignore[arg-type]
+    assert len(report["datasetSha256"]) == 64  # type: ignore[arg-type]
+    assert report["caseFilter"] is None
+    assert report["modelSettings"] == {
+        "maxOutputTokensPerRequest": 4_000,
+        "maxModelRequestsPerCase": MAX_OUTPUT_VALIDATION_ATTEMPTS,
+        "modelCallTimeoutSeconds": 12.0,
+        "sdkMaxRetries": 0,
+        "storesResponses": False,
+        "temperature": None,
+        "reasoningEffort": None,
+    }
+    assert API_KEY not in str(report)
+
+
+def test_refuses_an_abbreviated_confirmation_flag(forbid_provider: list[object]) -> None:
+    with pytest.raises(SystemExit):
+        main(["--conf"], AUTHORIZED_ENV)
+
+    assert forbid_provider == []

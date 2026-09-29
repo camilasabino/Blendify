@@ -1202,9 +1202,18 @@ Real-model evals are never part of CI. The `test-ai` job uses fakes only and
 needs no `OPENAI_API_KEY`. Locally, the eval runs only as
 `ALLOW_PAID_AI_EVALS=true npm run eval:ai -- --confirm` with `AI_PROVIDER=openai`,
 `AI_MODEL` and `OPENAI_API_KEY` configured; the runner refuses before any request
-if any of them is missing, or if `ALLOW_PAID_AI_EVALS` is persisted in `apps/ai/.env`. A run is
-capped at `cases × 2` provider requests (the interpreter's attempt bound) and
-4,000 output tokens per request.
+if any of them is missing, or if `ALLOW_PAID_AI_EVALS` is persisted in `apps/ai/.env`
+(flags are never abbreviated: `--confirm` must be written in full). `--suite intent` (default) or
+`--suite refinement` selects the dataset. A run uses the production prompt, output schema,
+validation and attempt bound, is capped at `cases × 2` model requests and 4,000 output tokens per
+request, and stops on the first rate-limit or unavailable-provider error.
+
+Each run writes one JSON report to `apps/ai/evals/results/` (gitignored, local only): suite,
+configured and returned model, prompt and dataset versions with their SHA-256, model settings,
+pass/fail per case, failed and errored case ids, model requests (every request, including invalid
+outputs and retries), retries, input/output/total tokens as reported by the provider and whether
+usage was complete (never estimated). It never contains secrets or raw provider responses; the
+normalized structured output is kept only for cases that failed an expectation.
 
 No GitHub eval workflow exists yet. If one is added, it must be a separate
 `.github/workflows/ai-eval.yml` whose only trigger is `workflow_dispatch` (no

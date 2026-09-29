@@ -1,9 +1,12 @@
 import json
+import re
 import unicodedata
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
+
+from pydantic import BaseModel
 
 from app.models.intent import (
     ClarificationNeeded,
@@ -30,6 +33,8 @@ SCALAR_EXPECTATIONS = (
 )
 TRACK_EXPECTATIONS = ("seedTrackTitles", "seedTrackArtists", "excludeTrackTitles")
 CATEGORY_EXPECTATIONS = ("unsupportedCategories", "unsupportedCategoriesWithin")
+IDENTIFIERS_CHECK = "identifiers"
+IDENTIFIER_PATTERN = re.compile(r"spotify:|open\.spotify|https?://|\b[0-9A-Za-z]{22}\b")
 EXPECTATION_KEYS = frozenset(
     {
         "outcome",
@@ -66,6 +71,33 @@ def load_dataset(path: Path = DATASET_PATH) -> tuple[str, list[EvalCase]]:
 
 
 def check_case(expect: dict[str, Any], interpretation: Interpretation) -> list[str]:
+    return [*check_no_identifiers(interpretation), *_check_semantics(expect, interpretation)]
+
+
+def check_no_identifiers(output: BaseModel) -> list[str]:
+    leaked = sorted(
+        {
+            text
+            for text in _string_values(output.model_dump(mode="json"))
+            if IDENTIFIER_PATTERN.search(text)
+        }
+    )
+    if not leaked:
+        return []
+    return [f"{IDENTIFIERS_CHECK}: output contains identifiers, URIs or URLs {leaked}"]
+
+
+def _string_values(value: object) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [text for child in value.values() for text in _string_values(child)]
+    if isinstance(value, list):
+        return [text for child in value for text in _string_values(child)]
+    return []
+
+
+def _check_semantics(expect: dict[str, Any], interpretation: Interpretation) -> list[str]:
     failures: list[str] = []
 
     if interpretation.outcome != expect["outcome"]:
@@ -93,13 +125,16 @@ def expectation_statuses(
     expect: dict[str, Any], failures: Sequence[str] | None
 ) -> dict[str, ExpectationStatus]:
     if failures is None:
-        return dict.fromkeys(expect, "unchecked")
+        return dict.fromkeys([*expect, IDENTIFIERS_CHECK], "unchecked")
 
     failed_keys = {failure.split(":", 1)[0] for failure in failures}
     outcome_failed = "outcome" in failed_keys
     return {
-        key: "failed" if key in failed_keys else "unchecked" if outcome_failed else "passed"
-        for key in expect
+        **{
+            key: "failed" if key in failed_keys else "unchecked" if outcome_failed else "passed"
+            for key in expect
+        },
+        IDENTIFIERS_CHECK: "failed" if IDENTIFIERS_CHECK in failed_keys else "passed",
     }
 
 
@@ -178,9 +213,7 @@ def _check_categories(expect: dict[str, Any], categories: Sequence[str]) -> list
     failures: list[str] = []
 
     if "unsupportedCategories" in expect:
-        failures.extend(
-            _compare_sets("unsupportedCategories", expect["unsupportedCategories"], categories)
-        )
+        failures.extend(compare_categories(expect["unsupportedCategories"], categories))
     if "unsupportedCategoriesWithin" in expect:
         allowed = set(expect["unsupportedCategoriesWithin"])
         if not categories or not set(categories) <= allowed:
@@ -189,6 +222,14 @@ def _check_categories(expect: dict[str, Any], categories: Sequence[str]) -> list
                 f"got {sorted(categories)}"
             )
     return failures
+
+
+def compare_categories(expected: Iterable[str], categories: Iterable[str]) -> list[str]:
+    expected_categories = sorted(set(expected))
+    actual_categories = sorted(set(categories))
+    if expected_categories == actual_categories:
+        return []
+    return [f"unsupportedCategories: expected {expected_categories}, got {actual_categories}"]
 
 
 def _compare_sets(

@@ -23,6 +23,7 @@ from tests.fakes import interpreted_output
 
 HISTORICAL_V1_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v1.json"
 HISTORICAL_V1_CASE_COUNT = 27
+HISTORICAL_V1_DATASET_SHA256 = "31b87c590fb4c44d6347019132eb22eae1b0e63cd18cec52bec322051289e23c"
 HISTORICAL_V2_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v2.json"
 HISTORICAL_V2_CASE_COUNT = 63
 HISTORICAL_V2_DATASET_SHA256 = "e48d430825cf60d4cf1142f5c9e32206b2415269ce9df5189b2682e411201d68"
@@ -54,8 +55,10 @@ def test_dataset_is_versioned_with_unique_case_ids() -> None:
 
 
 def test_historical_v1_dataset_is_preserved_for_baseline_comparison() -> None:
+    digest = hashlib.sha256(HISTORICAL_V1_DATASET_PATH.read_bytes()).hexdigest()
     version, cases = load_dataset(HISTORICAL_V1_DATASET_PATH)
 
+    assert digest == HISTORICAL_V1_DATASET_SHA256
     assert version == "intent-eval-v1"
     assert len(cases) == HISTORICAL_V1_CASE_COUNT
     assert DATASET_PATH != HISTORICAL_V1_DATASET_PATH
@@ -351,3 +354,87 @@ def test_check_stops_at_an_outcome_mismatch() -> None:
         {"outcome": "needs_clarification", "clarificationReason": "not_a_playlist_request"},
         clarification,
     ) == ["clarificationReason: expected not_a_playlist_request, got ambiguous_request"]
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda case: case.id)
+def test_every_clarification_case_states_its_reason(case: EvalCase) -> None:
+    if case.expect["outcome"] == "needs_clarification":
+        assert case.expect.get("clarificationReason") in REASONS
+
+
+INJECTION_CASES = {
+    "en": ["en-prompt-injection", "en-injection-schema-and-tools"],
+    "es": ["es-injection-fake-system-text"],
+    "pt": ["pt-injection-fake-assistant-text", "pt-injection-secrets-only"],
+}
+
+
+@pytest.mark.parametrize("language", sorted(INJECTION_CASES))
+def test_dataset_covers_prompt_injection_in_each_language(language: str) -> None:
+    by_id = {case.id: case for case in CASES}
+
+    for case_id in INJECTION_CASES[language]:
+        case = by_id[case_id]
+        assert case.language == language
+        if case.expect["outcome"] == "interpreted":
+            assert case.expect["artists"]
+        else:
+            assert case.expect["clarificationReason"] == "not_a_playlist_request"
+
+
+def test_dataset_keeps_unsupported_limits_and_unstated_lengths_out_of_executable_fields() -> None:
+    by_id = {case.id: case for case in CASES}
+
+    for case_id in ("en-per-artist-limit", "es-per-artist-limit"):
+        assert by_id[case_id].expect["unsupportedCategories"] == ["other"]
+    assert by_id["es-per-artist-limit"].expect["targetTrackCount"] is None
+    long_playlist = by_id["es-duration-long-without-amount"].expect
+    assert long_playlist["targetDurationMinutes"] is None
+    assert long_playlist["unsupportedCategories"] == ["duration"]
+    liked = by_id["en-provider-contents-liked-songs"].expect
+    assert liked["seedTrackTitles"] == []
+    assert liked["unsupportedCategories"] == ["other"]
+
+
+@pytest.mark.parametrize(
+    "leak",
+    [
+        "spotify:artist:6olE6TJLqED3rqDCT0FyPh",
+        "https://open.spotify.com/artist/x",
+        "6olE6TJLqED3rqDCT0FyPh",
+    ],
+)
+def test_check_rejects_identifiers_uris_and_urls_anywhere_in_the_output(leak: str) -> None:
+    expect = {"outcome": "interpreted", "artists": ["Radiohead", "Interpol"]}
+    leaked = interpretation(
+        unsupportedConstraints=[{"category": "other", "userText": f"catalog ID {leak}"}]
+    )
+
+    failures = check_case(expect, leaked)
+
+    assert [failure.split(":")[0] for failure in failures] == ["identifiers"]
+
+
+def test_check_compares_unsupported_categories_as_a_set() -> None:
+    expect = {"outcome": "interpreted", "unsupportedCategories": ["other"]}
+    twice = interpretation(
+        unsupportedConstraints=[
+            {"category": "other", "userText": "groovy"},
+            {"category": "other", "userText": "heavy"},
+        ]
+    )
+    missing = interpretation(unsupportedConstraints=[])
+
+    assert check_case(expect, twice) == []
+    assert check_case(expect, missing) == ["unsupportedCategories: expected ['other'], got []"]
+    assert check_case({"outcome": "interpreted", "unsupportedCategories": []}, twice) == [
+        "unsupportedCategories: expected [], got ['other']"
+    ]
+
+
+def test_check_never_accepts_a_missing_clarification() -> None:
+    expect = {"outcome": "needs_clarification", "clarificationReason": "not_a_playlist_request"}
+
+    assert check_case(expect, interpretation()) == [
+        "outcome: expected needs_clarification, got interpreted"
+    ]
