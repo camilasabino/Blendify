@@ -12,8 +12,10 @@ coding sessions only need the short summary in `CLAUDE.md`.
   depend on `@blendify/contracts`. Keep it that way — this boundary is clean
   today, verified by grepping for cross-app imports.
 - `packages/contracts` is the source of truth for shared runtime contracts
-  (Zod schemas + inferred types) used at the API/web HTTP boundary. It is
-  intentionally a single `index.ts` today; split it into per-domain files
+  (Zod schemas + inferred types) used at the API/web HTTP boundary, plus the
+  API ↔ AI-service wire contract (`ai-service.ts`, exported as
+  `@blendify/contracts/ai-service`). The HTTP contracts are intentionally a
+  single `index.ts` today; split it into per-domain files
   (recipe/requests/playlists/errors/stats/stream) only if it keeps growing —
   Zod inference already makes the current size functionally fine.
 - Only shared **boundary** contracts belong in `packages/contracts`. Domain
@@ -298,12 +300,13 @@ abstraction for control flow that's local to one file.
   test:e2e`) covering the handful of journeys that only a real browser can
   protect: Guest bootstrap, a full generation flow, the Soundiiz transfer CTA,
   authenticated navigation, logout (including logout during an active
-  generation), and Spotify OAuth failure feedback. It mocks Blendify's own API
+  generation), Spotify OAuth failure feedback, and the Create with AI flows
+  (refinement, destinations, session recovery). It mocks Blendify's own API
   at the browser boundary via Playwright routing (`apps/web/e2e/fixtures`) —
-  never real Spotify, Last.fm, or Soundiiz — and runs against Chromium only
-  for now. It is not wired into CI yet. Failure artifacts (trace, screenshot)
-  land in `apps/web/test-results/` and `apps/web/playwright-report/`, both
-  gitignored.
+  never real Spotify, Last.fm, Soundiiz, or an AI provider — and runs against
+  Chromium only. CI runs it as the `e2e` job. Failure artifacts (trace,
+  screenshot) land in `apps/web/test-results/` and `apps/web/playwright-report/`,
+  both gitignored.
 
 ### Validation environment: functional fixes are local-first
 

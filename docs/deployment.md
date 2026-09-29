@@ -132,7 +132,11 @@ its own group removes that risk entirely for "CI" and, by extension, for
 
 **Branch protection.** `main` is covered by a repository ruleset ("main
 required checks") requiring `quality`, `test-contracts`, `test-api`,
-`test-web`, `e2e`, and `sonar` to pass before a pull request can merge.
+`test-web`, `e2e`, and `sonar` to pass before a pull request can merge. The
+`sonar` check comes from `.github/workflows/sonar.yml`, whose SonarCloud scan
+step runs with `continue-on-error: true`: the check is required, but the scan
+result and the SonarCloud Quality Gate are currently non-blocking, so the gate
+can be `ERROR` while the check passes.
 `commitlint` (PR-only) and `Deploy Web` (downstream of CI) are intentionally
 not required checks, and Railway's own deploy is not a GitHub merge check.
 Direct pushes to `main` remain allowed; no PR-review count is required.
@@ -666,7 +670,7 @@ dashboard variables.
 
 | Name | Kind | Required for | Notes |
 |---|---|---|---|
-| `SONAR_TOKEN` | Secret | `ci.yml` sonar job | Already configured |
+| `SONAR_TOKEN` | Secret | `sonar.yml` sonar job | Already configured |
 | `CLOUDFLARE_API_TOKEN` | Secret | `deploy-web.yml` | Scoped token, **not** account-wide (see below) |
 | `CLOUDFLARE_ACCOUNT_ID` | Repository **variable** (`vars`, not `secrets`) | `deploy-web.yml` | Not a credential — it grants no access by itself, it just tells Wrangler which account to target. Kept out of `wrangler.jsonc` only so the workflow stays copy-pasteable |
 
@@ -914,8 +918,8 @@ Testing).
 
 ### Security and operations
 
-- [ ] HTTPS on both hosts; `http://` redirects to `https://` (frontend
-      redirect still pending, see section 3.3).
+- [ ] HTTPS on both hosts; `http://blendify.camilasabino.dev` redirects to
+      `https://` with a `301` through the scoped Redirect Rule of section 3.3.
 - [ ] Response headers on the web host match section 3
       (`curl -sI https://blendify.camilasabino.dev/app/mix`).
 - [ ] DevTools → Application → Cookies (`api.blendify…`): `blendify_session`
@@ -1181,8 +1185,8 @@ commits or chat logs.
 
 `apps/ai` (FastAPI, Python managed by `uv`) interprets user-authored requests
 for Create with AI. It runs in production as the private Railway service `ai`,
-declared in `.railway/railway.ts` (section 4.1). The web entry point stays
-hidden until the feature flag is added (section 19.6).
+declared in `.railway/railway.ts` (section 4.1). The web entry point is gated
+by a build-time flag (section 19.6).
 
 ### 19.1 Topology
 

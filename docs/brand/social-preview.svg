@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@500&amp;family=Syne:wght@800&amp;display=swap");
+      .wordmark { font-family: "Syne", "Helvetica Neue", Arial, sans-serif; font-weight: 800; font-size: 168px; fill: #f7f2ea; letter-spacing: -4px; }
+      .tagline { font-family: "DM Sans", "Helvetica Neue", Arial, sans-serif; font-weight: 500; font-size: 42px; fill: #f0b84a; }
+      .modes { font-family: "DM Sans", "Helvetica Neue", Arial, sans-serif; font-weight: 500; font-size: 34px; fill: #cfc4b4; }
+    </style>
+    <radialGradient id="glow" cx="18%" cy="8%" r="75%">
+      <stop offset="0" stop-color="#e8a838" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#e8a838" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#181512"/>
+      <stop offset="1" stop-color="#0a0908"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#base)"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+  <image href="blendify-mark.svg" x="96" y="72" width="120" height="120"/>
+  <text x="88" y="356" class="wordmark">Blendify</text>
+  <text x="96" y="446" class="tagline">Blend the music you love into new playlists.</text>
+  <text x="96" y="530" class="modes">Mix  ·  Discover  ·  Create with AI</text>
+  <rect x="96" y="566" width="160" height="6" rx="3" fill="#e8a838"/>
+</svg>

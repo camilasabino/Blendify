@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Blendify is a full-stack Spotify playlist builder (npm workspaces monorepo). It combines the Spotify Web API with Last.fm discovery data to build four playlist types: Artist Mix, Genre Mix, Discover Artist, Discover Track. Every generation has a typed, versioned "recipe" (seeds, popularity preference, ordering mode, track budget) that can be published to Spotify and later reviewed.
+Blendify is a full-stack Spotify playlist builder (npm workspaces monorepo plus a Python AI service). It combines the Spotify Web API with Last.fm discovery data and offers three ways to start: Mix (Artist Mix, Genre Mix), Discover (Discover Artist, Discover Track), and Create with AI (a natural-language request interpreted by the private AI service; the model never receives provider data or chooses tracks). Every generation has a typed, versioned "recipe" (seeds, popularity preference, ordering mode, track budget) that can be published to Spotify (Spotify Mode) or transferred through Soundiiz (Guest Mode) and later reviewed.
 
 ```
 Blendify/
@@ -32,6 +32,7 @@ npm run dev:api          # Nest watch mode (apps/api, port 3000)
 npm run dev:web           # Vite dev server (apps/web, port 5173)
 npm run build              # build every workspace
 npm run test                # run contract, API, and web tests
+npm run test:e2e          # Playwright browser suite (mocked API)
 npm run lint                 # ESLint (api) + oxlint (web) across workspaces
 npm run format:check    # verify API formatting (Prettier)
 
@@ -59,19 +60,19 @@ npm test -w @blendify/api -- -t "test name"
 npm test -w @blendify/web -- path/to/file.test.ts
 ```
 
-Requires Node.js 22+ (CI and production pin 22 via `.nvmrc`), npm 10+, and Docker (PostgreSQL 16 + Redis 7) or compatible local services. See README.md for full environment setup (`.env` files, Spotify OAuth scopes/redirect URI, Last.fm key).
+Requires Node.js 22+ (CI and production pin 22 via `.nvmrc`), npm 10+, and Docker (PostgreSQL 16 + Redis 7) or compatible local services. See README.md for full environment setup (`.env` files, Spotify OAuth redirect URI, Last.fm key; the scopes are in `apps/api/.env.example`) and each workspace's README for app-level details.
 
 Git hooks (Husky + commitlint) enforce Conventional Commits and run lint on pre-commit/pre-push. Commit subjects must follow `feat:`, `fix:`, `docs:`, `chore:`, etc.
 
 ## Architecture
 
-**Ports-and-adapters (hexagonal) on the API.** `apps/api/src/domain` holds entities, value objects, domain services (`strategies/` for allocation and track ordering, `specifications/` for duplicate/alternate-version rules), and repository *ports* (interfaces) — no framework or I/O dependencies. `apps/api/src/application` holds use cases that orchestrate domain logic via those ports. `apps/api/src/infrastructure` provides the concrete adapters: Spotify clients (catalog, playlist, playback, auth, quota/rate-limit handling) behind a user-bound `spotify-music.provider`, Last.fm client, Redis-backed cache (falls back to in-memory if Redis is down), and Prisma-backed persistence. `apps/api/src/modules` wires everything together per feature (auth, catalog, playlists, playback, stats, health), and `apps/api/src/presentation` is the HTTP boundary (controllers, pipes, guards, exception filter) — one normalized error envelope for all responses.
+**Ports-and-adapters (hexagonal) on the API.** `apps/api/src/domain` holds entities, value objects, domain services (`strategies/` for allocation and track ordering, `specifications/` for duplicate/alternate-version rules), and repository *ports* (interfaces) — no framework or I/O dependencies. `apps/api/src/application` holds use cases that orchestrate domain logic via those ports. `apps/api/src/infrastructure` provides the concrete adapters: Spotify clients (catalog, playlist, playback, auth, quota/rate-limit handling) behind a user-bound `spotify-music.provider`, Last.fm client, Redis-backed cache (falls back to in-memory if Redis is down), and Prisma-backed persistence. `apps/api/src/modules` wires everything together per feature (auth, account, catalog, generation, playlists, playback, stats, transfers, ai, health), and `apps/api/src/presentation` is the HTTP boundary (controllers, pipes, guards, exception filter) — one normalized error envelope for all responses.
 
 **Shared contracts are the source of truth.** `packages/contracts` defines Zod schemas for HTTP requests/responses, errors, playlist recipes, and statistics; both `apps/api` and `apps/web` depend on `@blendify/contracts` and infer TypeScript types from the same schemas rather than duplicating shape definitions.
 
-**Web app** (`apps/web/src`) is a Vite SPA: `pages/` for route-level screens (mix, discover, library, stats, landing), `stores/` for Zustand state (e.g. `auth-store.ts`), `lib/` for API client, error mapping, generation streaming, and other framework-agnostic helpers, `hooks/` and `components/` for UI, `i18n/` for English/Spanish/Brazilian Portuguese translations.
+**Web app** (`apps/web/src`) is a Vite SPA: `pages/` for route-level screens (landing, privacy, mix, discover, ai, library, stats), `stores/` for Zustand state (e.g. `auth-store.ts`), `lib/` for API client, error mapping, generation streaming, and other framework-agnostic helpers, `hooks/` and `components/` for UI, `i18n/` for English/Spanish/Brazilian Portuguese translations.
 
-**AI service** (`apps/ai`): internal FastAPI service reached only by the API through the `INTENT_INTERPRETER` port (`infrastructure/ai`), authenticated with a shared bearer token. It interprets user-authored text into typed intent; it never receives Spotify/Last.fm/Soundiiz data, IDs, URLs, or user data, and never calls those providers. Its wire contract is owned by `@blendify/contracts/ai-service` (Zod); Python mirrors it and both sides are checked against `packages/contracts/ai-service/` (normalized contract + shared fixtures). Changing the contract: edit the Zod schema, run `npm test -w @blendify/contracts -- -u`, update the Pydantic models until `npm run test:ai` passes. The API and Mix/Discover must keep working when the AI service is absent.
+**AI service** (`apps/ai`): internal FastAPI service reached only by the API through the `INTENT_INTERPRETER` port (`infrastructure/ai`), authenticated with a shared bearer token. It interprets user-authored text into typed intent; it never receives Spotify/Last.fm/Soundiiz data, IDs, URLs, or user data, and never calls those providers. It runs as a private Railway service with no public domain; the browser never calls it. Its wire contract is owned by `@blendify/contracts/ai-service` (Zod); Python mirrors it and both sides are checked against `packages/contracts/ai-service/` (normalized contract + shared fixtures). Changing the contract: edit the Zod schema, run `npm test -w @blendify/contracts -- -u`, update the Pydantic models until `npm run test:ai` passes. The API and Mix/Discover must keep working when the AI service is absent.
 
 **Auth**: Spotify OAuth with server-side token storage in PostgreSQL and an HTTP-only `blendify_session` cookie (no tokens in the browser). Session cookies are always `Secure` and host-only; the canonical local origin is `http://127.0.0.1:5173` (Spotify rejects `localhost` redirect URIs). Production deployment is documented in `docs/deployment.md`.
 
@@ -91,7 +92,7 @@ Reproduce, debug and validate functional changes and bug fixes locally (determin
 
 ## Quality analysis
 
-CI sends coverage/analysis for API, web, and contracts to SonarCloud (`sonar-project.properties`). SonarCloud Automatic Analysis must stay disabled for the CI-based scan to run.
+The `sonar` workflow (`.github/workflows/sonar.yml`) sends coverage/analysis for API, web, and contracts to SonarCloud (`sonar-project.properties`). The `sonar` GitHub check is required for pull requests, but the scan step runs with `continue-on-error: true`, so the SonarCloud Quality Gate is currently non-blocking. SonarCloud Automatic Analysis must stay disabled for the CI-based scan to run.
 
 ## Engineering conventions
 
