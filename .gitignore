@@ -36,6 +36,7 @@ apps/api/prisma/*.db-journal
 # Test / Playwright
 test-results/
 playwright-report/
+.playwright-mcp/
 apps/web/playwright-report/
 apps/web/test-results/
 
