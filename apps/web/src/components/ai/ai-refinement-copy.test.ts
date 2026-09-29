@@ -5,6 +5,7 @@ import {
 } from '@blendify/contracts'
 import { LOCALES, messages, type Locale, type MessageKey } from '@/i18n/messages'
 import { ApiError } from '@/lib/api-error'
+import { clarificationMessage } from './ai-copy'
 import {
   intentChangeView,
   refinementClarificationMessage,
@@ -56,6 +57,26 @@ describe.each(LOCALES)('Create with AI refinement copy (%s)', (locale) => {
       expect(message.length, reason).toBeGreaterThan(0)
     }
   })
+
+  it.each([
+    ['artist', 1, ['Björk', 'Interpol']],
+    ['artist', 12, Array.from({ length: 13 }, (_, index) => `Artist ${index}`)],
+    ['genre', 5, ['a', 'b', 'c', 'd', 'e', 'f']],
+    ['track', 1, ['Teardrop', 'Yellow']],
+  ] as const)(
+    'explains too many %s seeds as a refinement without offering unrendered choices',
+    (seedType, limit, names) => {
+      const message = refinementClarificationMessage(
+        clarification('too_many_seeds', { seedType, limit, names: [...names] }),
+        t,
+      )
+
+      expect(message).not.toBe(
+        clarificationMessage({ reason: 'too_many_seeds', seedType, limit, names: [...names] }, t),
+      )
+      expect(message).not.toMatch(/\{\w+\}/)
+    },
+  )
 
   it('names the artist without claiming it does not exist', () => {
     const message = refinementClarificationMessage(
@@ -137,6 +158,14 @@ describe('English refinement copy', () => {
       const message = refinementClarificationMessage(clarification(reason), t)
       expect(message, reason).not.toMatch(/\?$|:$|where to start/)
     }
+    expect(
+      refinementClarificationMessage(
+        clarification('too_many_seeds', { seedType: 'artist', limit: 1, names: ['Björk', 'Interpol'] }),
+        t,
+      ),
+    ).toBe(
+      'Discover starts from one artist. Try a refinement that names just one, or ask for a mix instead.',
+    )
   })
 
   it('renders canonical before and after values', () => {

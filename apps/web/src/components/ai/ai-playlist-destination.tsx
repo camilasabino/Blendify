@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { useT } from '@/i18n/use-t'
 import { isSpotifyDestination, type AiSpotifyDestination } from './ai-destination-state'
 import { ApiError, getApiErrorMessage } from '@/lib/api'
+import { markAiReturnAfterLogin } from '@/lib/ai-session-storage'
 import type { AppMode } from '@/lib/capabilities'
 import { readPersistToLibraryPreference } from '@/lib/persist-to-library-preference'
 import { renderPlaylistCoverBase64, type PlaylistCoverKind } from '@/lib/playlist-cover'
@@ -104,15 +105,28 @@ function AiSpotifyPublish({
   const hintId = useId()
   const [isPreparing, setIsPreparing] = useState(false)
   const isRequesting = useRef(false)
+  const reconnectRef = useRef<HTMLButtonElement>(null)
   const persistToLibrary = readPersistToLibraryPreference()
   const isBusy = isPreparing || isPublishing
   const needsReconnect = needsSpotifyReconnect(error)
+  const showsReconnect = needsReconnect && !isBusy
 
   useEffect(() => {
     if (!isPublishing) {
       isRequesting.current = false
     }
   }, [isPublishing])
+
+  useEffect(() => {
+    if (showsReconnect) {
+      reconnectRef.current?.focus()
+    }
+  }, [showsReconnect])
+
+  function reconnect() {
+    markAiReturnAfterLogin()
+    login()
+  }
 
   async function save() {
     if (isBusy || isRequesting.current) {
@@ -147,8 +161,8 @@ function AiSpotifyPublish({
             : getApiErrorMessage(error, t, 'ai.destination.failed')}
         </p>
       ) : null}
-      {needsReconnect && !isBusy ? (
-        <Button type="button" className="w-full sm:w-auto" onClick={login}>
+      {showsReconnect ? (
+        <Button ref={reconnectRef} type="button" className="w-full sm:w-auto" onClick={reconnect}>
           {t('nav.connectSpotify')}
         </Button>
       ) : (

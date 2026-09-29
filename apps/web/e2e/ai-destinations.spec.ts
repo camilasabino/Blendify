@@ -167,14 +167,16 @@ test.describe('Create with AI destinations', () => {
     await expect(page.getByRole('list', { name: 'Songs in this playlist' })).toBeVisible()
     expect(requests).toHaveLength(1)
 
-    const returnUrl = new URL('/app/ai', page.url()).href
+    const reconnect = page.getByRole('main').getByRole('button', { name: 'Connect Spotify' })
+    await expect(reconnect).toBeFocused()
+    const callbackUrl = new URL('/app/mix', page.url()).href
     await page.route('**/api/auth/spotify', (route) =>
-      route.fulfill({ status: 302, headers: { location: returnUrl } }),
+      route.fulfill({ status: 302, headers: { location: callbackUrl } }),
     )
     const oauth = page.waitForRequest('**/api/auth/spotify')
-    await page.getByRole('main').getByRole('button', { name: 'Connect Spotify' }).click()
+    await page.keyboard.press('Enter')
     await oauth
-    await page.waitForURL(returnUrl)
+    await page.waitForURL(new URL('/app/ai', page.url()).href)
 
     await expect(page.getByRole('button', { name: 'Save to Spotify' })).toBeEnabled()
     await expect(

@@ -245,13 +245,35 @@ describe('Create with AI Spotify destination', () => {
       expect(screen.queryByRole('button', { name: 'Save to Spotify' })).not.toBeInTheDocument()
       expect(screen.getByRole('heading', { name: SUGGESTED_TITLE })).toBeVisible()
       expect(screen.getByRole('list', { name: 'Songs in this playlist' })).toBeVisible()
+      const reconnect = screen.getByRole('button', { name: 'Connect Spotify' })
+      await waitFor(() => expect(reconnect).toHaveFocus())
 
-      await user.click(screen.getByRole('button', { name: 'Connect Spotify' }))
+      await user.keyboard('{Enter}')
 
       expect(loginUrl).toHaveBeenCalledTimes(1)
+      expect(sessionStorage.getItem('blendify.aiReturnAfterLogin')).not.toBeNull()
+      expect(sessionStorage.getItem('blendify.aiSession')).not.toBeNull()
       expect(destinationCalls(calls)).toHaveLength(1)
     },
   )
+
+  it('reloads the session when the playlist was already sent from another tab', async () => {
+    const user = userEvent.setup()
+    const states = [
+      stateWith(null),
+      stateWith({ status: 'published', spotifyUrl: SPOTIFY_URL, savedToLibrary: true }),
+    ]
+    const { calls } = await renderGenerated({
+      [SESSION_ROUTE]: () => jsonResponse(states.length > 1 ? states.shift() : states[0]),
+      [PUBLISH_ROUTE]: () => apiError(409, 'AI_DESTINATION_UNAVAILABLE'),
+    })
+
+    await user.click(publishButton())
+
+    expect(await screen.findByRole('heading', { name: 'Saved to Spotify' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Save to Spotify' })).toBeNull()
+    expect(destinationCalls(calls)).toHaveLength(1)
+  })
 
   it('keeps Retry for a temporary Spotify failure instead of asking to reconnect', async () => {
     const user = userEvent.setup()

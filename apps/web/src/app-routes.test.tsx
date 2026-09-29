@@ -391,6 +391,27 @@ describe('Spotify Mode routing', () => {
     },
   )
 
+  it('returns to Create with AI once after a Spotify reconnect started there', async () => {
+    sessionStorage.setItem('blendify.aiReturnAfterLogin', String(Date.now()))
+    const { calls } = stubApi({})
+    renderApp('/app/mix')
+
+    expect(
+      await screen.findByRole('heading', { name: 'Describe the playlist you want' }),
+    ).toBeVisible()
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/ai')
+    expect(sessionStorage.getItem('blendify.aiReturnAfterLogin')).toBeNull()
+    expect(calls.filter((call) => call.url.startsWith('/api/ai/'))).toEqual([])
+  })
+
+  it('stays on Mix after an ordinary Spotify login', async () => {
+    stubApi({})
+    renderApp('/app/mix')
+
+    expect(await screen.findByRole('heading', { name: 'Create your mix' })).toBeVisible()
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/mix')
+  })
+
   it('forgets the Create with AI session on logout', async () => {
     const user = userEvent.setup()
     sessionStorage.setItem(

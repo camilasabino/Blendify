@@ -60,6 +60,10 @@ async function restoreSession(page: Page, sessionState: AiSessionStateDto | null
 
 async function capture(page: Page, name: string) {
   await page.waitForFunction('document.fonts.status === "loaded"')
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  )
+  expect(overflow, `${name} scrolls horizontally`).toBeLessThanOrEqual(0)
   await page.screenshot({
     path: `${SCREENSHOT_DIR}/${test.info().project.name}/${name}.png`,
     fullPage: true,
@@ -562,6 +566,159 @@ test.describe('Create with AI visual review', () => {
       await expect(page.getByRole('heading', { name: 'Proposed changes' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Save to Spotify' })).toHaveCount(0)
       await capture(page, '39-spotify-candidate-ready')
+    })
+  })
+
+  test.describe('failure recovery', () => {
+    const REFINE_URL = `${SESSION_URL}/refinements`
+
+    async function failInterpretation(page: Page, status: number, body: object) {
+      await blockUnmockedRequests(page)
+      await page.route('**/api/ai/sessions', (route) => route.fulfill({ status, json: body }))
+      await page.goto('/app/ai')
+      await page.getByRole('textbox', { name: 'Playlist request' }).fill(AI_REVIEW_PROMPT)
+      await page.getByRole('button', { name: 'Review request' }).click()
+    }
+
+    test('40 interpretation timed out', async ({ page }) => {
+      await failInterpretation(page, 504, {
+        statusCode: 504,
+        code: 'AI_TIMEOUT',
+        message: 'Create with AI took too long to respond.',
+      })
+      await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+      await expect(page.getByRole('textbox', { name: 'Playlist request' })).toBeFocused()
+      await capture(page, '40-interpretation-timeout')
+    })
+
+    test('41 interpretation rate limited', async ({ page }) => {
+      await failInterpretation(page, 429, {
+        statusCode: 429,
+        code: 'RATE_LIMITED',
+        message: 'Too many requests',
+        details: { retryAfterSeconds: 40 },
+      })
+      await expect(page.getByRole('alert')).toHaveText('Too many requests. Try again in about 40 seconds.')
+      await capture(page, '41-interpretation-rate-limited')
+    })
+
+    test('42 session expired', async ({ page }) => {
+      await blockUnmockedRequests(page)
+      await restoreSession(page, generatedState({ withArtwork: true }))
+      await page.route(SESSION_URL, (route) =>
+        route.fulfill({
+          status: 404,
+          json: { statusCode: 404, code: 'AI_SESSION_NOT_FOUND', message: 'Expired' },
+        }),
+      )
+      await page.goto('/app/ai')
+      await expect(page.getByRole('alert')).toHaveText(
+        'This session expired. Submit your request again to start a new one.',
+      )
+      await capture(page, '42-session-expired')
+    })
+
+    test('43 restore failed', async ({ page }) => {
+      await blockUnmockedRequests(page)
+      await restoreSession(page, generatedState({ withArtwork: true }))
+      await page.route(SESSION_URL, (route) =>
+        route.fulfill({
+          status: 503,
+          json: { statusCode: 503, code: 'SERVICE_UNAVAILABLE', message: 'Unavailable' },
+        }),
+      )
+      await page.goto('/app/ai')
+      await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+      await capture(page, '43-restore-failed')
+    })
+
+    test('44 clarification without options', async ({ page }) => {
+      await openReviewedLive(page, {
+        ...clarificationState(),
+        clarification: {
+          reason: 'unknown_genres',
+          seedType: 'genre',
+          limit: null,
+          names: ['glitter punk', 'rainy-day sofa rock'],
+          unsupportedConstraints: [],
+          options: [],
+        },
+      })
+      await expect(page.getByRole('heading', { name: 'One thing to confirm' })).toBeFocused()
+      await expect(page.getByRole('button', { name: 'Edit request' })).toBeVisible()
+      await capture(page, '44-clarification-without-options')
+    })
+
+    test('45 refinement request timed out', async ({ page }) => {
+      await openRestored(page, generatedState({ withArtwork: true }))
+      await page.route(REFINE_URL, (route) =>
+        route.fulfill({
+          status: 504,
+          json: { statusCode: 504, code: 'AI_TIMEOUT', message: 'Timed out' },
+        }),
+      )
+      await page.getByRole('button', { name: 'Refine playlist' }).click()
+      await page
+        .getByRole('textbox', { name: 'What would you like to change?' })
+        .fill('Make it less mainstream')
+      await page.getByRole('button', { name: 'Propose changes' }).click()
+      await expect(page.getByRole('alert')).toHaveText(
+        'Reading your request took too long. Try again.',
+      )
+      await capture(page, '45-refinement-timeout')
+    })
+
+    test('46 stale proposal reloaded', async ({ page }) => {
+      const base = generatedState({ withArtwork: true })
+      const server = { state: pendingState(candidateRefinement(base), base) }
+      await blockUnmockedRequests(page)
+      await restoreSession(page, server.state)
+      await page.route(SESSION_URL, (route) => route.fulfill({ json: server.state }))
+      await page.route(`${REFINE_URL}/${AI_REFINEMENT_ID}/apply`, (route) =>
+        route.fulfill({
+          status: 409,
+          json: { statusCode: 409, code: 'AI_REFINEMENT_STALE', message: 'Stale' },
+        }),
+      )
+      await page.goto('/app/ai')
+      await expect(page.getByRole('heading', { name: 'Proposed changes' })).toBeVisible()
+      server.state = pendingState({ id: 'visual-refinement-newer', status: 'unchanged' }, base)
+      await page.getByRole('button', { name: 'Apply changes' }).click()
+      await expect(page.getByRole('heading', { name: 'No changes needed' })).toBeFocused()
+      await capture(page, '46-stale-proposal-reloaded')
+    })
+
+    test('47 Spotify reauthorization in Brazilian Portuguese', async ({ page }) => {
+      await blockUnmockedRequests(page)
+      await mockAuthenticatedSession(page)
+      await restoreSession(page, generatedState({ withArtwork: true }))
+      await page.route(`${SESSION_URL}/publish`, (route) =>
+        route.fulfill({
+          status: 401,
+          json: { statusCode: 401, code: 'SPOTIFY_REAUTH_REQUIRED', message: 'Reconnect' },
+        }),
+      )
+      await page.goto('/app/ai?lang=pt')
+      const main = page.getByRole('main')
+      await main.getByRole('button', { name: /Spotify/ }).click()
+      await expect(main.getByRole('alert')).toBeVisible()
+      await expect(main.getByRole('button', { name: /Spotify/ })).toBeFocused()
+      await capture(page, '47-spotify-reconnect-pt')
+    })
+
+    test('48 interpretation timed out in Spanish', async ({ page }) => {
+      await blockUnmockedRequests(page)
+      await page.route('**/api/ai/sessions', (route) =>
+        route.fulfill({
+          status: 504,
+          json: { statusCode: 504, code: 'AI_TIMEOUT', message: 'Timed out' },
+        }),
+      )
+      await page.goto('/app/ai?lang=es')
+      await page.getByRole('textbox').fill(AI_REVIEW_PROMPT)
+      await page.getByRole('button', { name: 'Revisar pedido' }).click()
+      await expect(page.getByRole('button', { name: 'Reintentar' })).toBeVisible()
+      await capture(page, '48-interpretation-timeout-es')
     })
   })
 })

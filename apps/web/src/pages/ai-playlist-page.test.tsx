@@ -355,6 +355,138 @@ describe('Create with AI page', () => {
     expect(screen.getByRole('button', { name: 'Review request' })).toBeEnabled()
   })
 
+  it('offers an explicit Retry after a timeout and never resubmits on its own', async () => {
+    const user = userEvent.setup()
+    const responses = [
+      jsonResponse(
+        { statusCode: 504, code: 'AI_TIMEOUT', message: 'Create with AI took too long to respond.' },
+        504,
+      ),
+      jsonResponse(createdSession(READY_SESSION), 201),
+    ]
+    const { calls } = stubApi({
+      'POST /api/ai/sessions': () => responses.shift() ?? jsonResponse({}, 500),
+    })
+    renderPage()
+
+    await user.type(promptField(), PROMPT)
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Reading your request took too long. Try again.',
+    )
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/too long to respond|504/)
+    expect(sessionCalls(calls)).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+
+    await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
+    expect(sessionCalls(calls).map((call) => call.body)).toEqual([
+      { prompt: PROMPT },
+      { prompt: PROMPT },
+    ])
+  })
+
+  it.each([
+    ['AI_INVALID_OUTPUT', 502, 'Blendify couldn’t read your request this time. Try again, or rephrase it.'],
+    ['AI_RATE_LIMITED', 429, 'Create with AI is busy right now. Try again in a moment.'],
+  ] as const)('keeps %s recoverable with a Retry action', async (code, status, message) => {
+    const user = userEvent.setup()
+    stubApi({
+      'POST /api/ai/sessions': () => jsonResponse({ statusCode: status, code, message: 'raw' }, status),
+    })
+    renderPage()
+
+    await user.type(promptField(), PROMPT)
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+    expect(promptField()).toHaveValue(PROMPT)
+  })
+
+  it('asks to rephrase a rejected request instead of offering Retry', async () => {
+    const user = userEvent.setup()
+    stubApi({
+      'POST /api/ai/sessions': () =>
+        jsonResponse({ statusCode: 400, code: 'AI_REQUEST_REJECTED', message: 'raw' }, 400),
+    })
+    renderPage()
+
+    await user.type(promptField(), PROMPT)
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Blendify can’t use this request as written. Try rephrasing it.',
+    )
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+    expect(promptField()).toHaveFocus()
+  })
+
+  it('moves back to the prompt from a clarification without options', async () => {
+    const user = userEvent.setup()
+    stubApi({
+      'POST /api/ai/sessions': () =>
+        jsonResponse(
+          createdSession({
+            ...CLARIFICATION_SESSION,
+            clarification: {
+              reason: 'unknown_genres',
+              seedType: 'genre',
+              limit: null,
+              names: ['glitter punk'],
+              unsupportedConstraints: [],
+              options: [],
+            },
+          }),
+          201,
+        ),
+    })
+    renderPage()
+
+    await user.type(promptField(), 'Glitter punk')
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+    await screen.findByRole('heading', { name: 'One thing to confirm' })
+
+    expect(screen.queryByRole('group', { name: 'Choose an option' })).toBeNull()
+    expect(screen.getByText('Edit your request and submit it again.')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Edit request' }))
+
+    expect(promptField()).toHaveFocus()
+    expect(promptField()).toHaveValue('Glitter punk')
+  })
+
+  it('reloads the session when a clarification choice is no longer available', async () => {
+    const user = userEvent.setup()
+    const { calls } = stubApi({
+      'POST /api/ai/sessions': () => jsonResponse(createdSession(CLARIFICATION_SESSION), 201),
+      'POST /api/ai/sessions/session-id/clarification': () =>
+        jsonResponse(
+          { statusCode: 409, code: 'AI_CLARIFICATION_OPTION_UNAVAILABLE', message: 'raw' },
+          409,
+        ),
+      'GET /api/ai/sessions/session-id': () =>
+        jsonResponse({
+          ...READY_SESSION,
+          execution: null,
+          destination: null,
+          preservation: null,
+          refinement: null,
+        }),
+    })
+    renderPage()
+
+    await user.type(promptField(), 'Music like Radiohead and Interpol')
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+    await screen.findByRole('heading', { name: 'One thing to confirm' })
+    await user.click(screen.getByRole('button', { name: 'Start from Interpol' }))
+
+    await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
+    expect(calls.some((call) => call.method === 'GET' && call.url === '/api/ai/sessions/session-id')).toBe(
+      true,
+    )
+  })
+
   it('edits the request from the summary and reviews it again', async () => {
     const user = userEvent.setup()
     const { calls } = stubApi({ 'POST /api/ai/sessions': () => jsonResponse(createdSession(READY_SESSION), 201) })

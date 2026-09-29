@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -18,7 +18,10 @@ import { AccountMenu } from '@/components/layout/account-menu'
 import { ConnectSpotifyButton } from '@/components/layout/connect-spotify-button'
 import { readSpotifyRequiredState } from '@/lib/spotify-required'
 import { isAiCreationEnabled } from '@/lib/ai-creation'
-import { clearStoredAiSession } from '@/lib/ai-session-storage'
+import {
+  clearStoredAiSession,
+  consumeAiReturnAfterLogin,
+} from '@/lib/ai-session-storage'
 import { SpotifyRequiredNotice } from '@/components/layout/spotify-required-notice'
 import { Footer } from '@/components/layout/footer'
 import { ConfirmDialog } from '@/components/ui/dialog'
@@ -35,6 +38,8 @@ type NavItem = {
   icon: typeof Blend
   requires?: SpotifyOnlyCapability
 }
+
+const POST_LOGIN_PATH = '/app/mix'
 
 const AI_NAV_ITEM: NavItem = {
   to: '/app/ai',
@@ -103,6 +108,16 @@ export function AppShell() {
     capabilities.mode === 'guest'
       ? readSpotifyRequiredState(location.state)
       : null
+
+  useEffect(() => {
+    if (
+      consumeAiReturnAfterLogin() &&
+      location.pathname === POST_LOGIN_PATH &&
+      isAiCreationEnabled()
+    ) {
+      navigate(AI_NAV_ITEM.to, { replace: true })
+    }
+  }, [location.pathname, navigate])
 
   function forgetUserScopedQueries() {
     clearStoredAiSession()

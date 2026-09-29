@@ -53,10 +53,17 @@ const AI_ERROR_KEYS: Record<string, MessageKey> = {
   AI_TIMEOUT: 'ai.error.timeout',
   AI_RATE_LIMITED: 'ai.error.rateLimited',
   AI_INVALID_OUTPUT: 'ai.error.invalidOutput',
-  AI_REQUEST_REJECTED: 'ai.error.invalidOutput',
+  AI_REQUEST_REJECTED: 'ai.error.requestRejected',
   AI_SESSION_NOT_FOUND: 'ai.error.sessionExpired',
   AI_CLARIFICATION_OPTION_UNAVAILABLE: 'ai.error.optionUnavailable',
 }
+
+const NON_RETRYABLE_REQUEST_CODES = new Set([
+  'AI_REQUEST_REJECTED',
+  'AI_SESSION_NOT_FOUND',
+  'AI_CLARIFICATION_OPTION_UNAVAILABLE',
+  'VALIDATION_ERROR',
+])
 
 export function aiErrorMessage(error: unknown, t: Translate): string {
   if (error instanceof ApiError && error.code && Object.hasOwn(AI_ERROR_KEYS, error.code)) {
@@ -65,10 +72,21 @@ export function aiErrorMessage(error: unknown, t: Translate): string {
   return getApiErrorMessage(error, t, 'ai.error.generic')
 }
 
+export function canRetryAiRequest(error: unknown): boolean {
+  if (!(error instanceof ApiError)) {
+    return true
+  }
+  if (error.code && NON_RETRYABLE_REQUEST_CODES.has(error.code)) {
+    return false
+  }
+  return error.status === 408 || error.status === 429 || error.status >= 500
+}
+
 export type AiClarificationDetails = Pick<
   AiClarification,
   'reason' | 'seedType' | 'limit' | 'names'
->
+> &
+  Partial<Pick<AiClarification, 'options'>>
 
 export function clarificationMessage(clarification: AiClarificationDetails, t: Translate): string {
   const names = clarification.names.join(', ')
@@ -108,9 +126,11 @@ function tooManySeedsMessage(clarification: AiClarificationDetails, t: Translate
   if (clarification.seedType === 'genre') {
     return t('ai.clarify.tooManyGenres', { limit, count })
   }
-  return limit === 1
-    ? t('ai.clarify.singleArtist')
-    : t('ai.clarify.tooManyArtists', { limit, count })
+  if (limit !== 1) {
+    return t('ai.clarify.tooManyArtists', { limit, count })
+  }
+  const canMix = clarification.options?.some((option) => option.type === 'set_kind') ?? false
+  return canMix ? t('ai.clarify.singleArtist') : t('ai.clarify.singleArtistOnly')
 }
 
 export function optionLabel(

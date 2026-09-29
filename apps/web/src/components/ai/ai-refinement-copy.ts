@@ -101,9 +101,29 @@ export function refinementClarificationMessage(
       return t('ai.refine.clarify.outOfRange', { limit: clarification.limit ?? 0 })
     case 'preserved_artist_not_found':
       return t('ai.refine.clarify.artistNotKept', { names })
+    case 'too_many_seeds':
+      return tooManyRefinementSeedsMessage(clarification, t)
     default:
       return clarificationMessage({ ...clarification, reason: clarification.reason }, t)
   }
+}
+
+function tooManyRefinementSeedsMessage(
+  clarification: AiRefinementClarificationDto,
+  t: Translate,
+): string {
+  const count = clarification.names.length
+  const limit = clarification.limit ?? 0
+
+  if (clarification.seedType === 'track') {
+    return t('ai.refine.clarify.singleTrack')
+  }
+  if (clarification.seedType === 'genre') {
+    return t('ai.refine.clarify.tooManyGenres', { limit, count })
+  }
+  return limit === 1
+    ? t('ai.refine.clarify.singleArtist')
+    : t('ai.refine.clarify.tooManyArtists', { limit, count })
 }
 
 function unsupportedRefinementMessage(

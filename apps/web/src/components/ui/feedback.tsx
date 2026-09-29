@@ -31,6 +31,7 @@ export function EmptyState({ title, body, action, className }: EmptyStateProps) 
 
 type ErrorStateProps = Readonly<{
   message: string
+  messageRole?: 'alert'
   retryLabel?: string
   onRetry?: () => void
   className?: string
@@ -39,6 +40,7 @@ type ErrorStateProps = Readonly<{
 
 export function ErrorState({
   message,
+  messageRole,
   retryLabel,
   onRetry,
   className,
@@ -51,7 +53,7 @@ export function ErrorState({
         className,
       )}
     >
-      <p className="text-sm text-danger">{message}</p>
+      <p role={messageRole} className="text-sm text-danger">{message}</p>
       {children}
       {onRetry && retryLabel ? (
         <Button size="sm" variant="secondary" onClick={onRetry}>

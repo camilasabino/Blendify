@@ -24,7 +24,6 @@ export function AiGenerationProgress({
   return (
     <section
       aria-labelledby="ai-generation-title"
-      aria-busy={!isStalled}
       className="animate-fade-up space-y-4 rounded-panel border border-accent-line/50 bg-panel bg-linear-to-br from-amber-500/[0.12] to-transparent to-60% p-5 sm:p-6"
     >
       <h2

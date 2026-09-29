@@ -473,10 +473,13 @@ export const en = {
   'ai.error.rateLimited':
     'Create with AI is busy right now. Try again in a moment.',
   'ai.error.invalidOutput':
-    'Blendify couldn’t understand that request. Try rephrasing it.',
-  'ai.error.sessionExpired': 'This request expired. Submit it again.',
+    'Blendify couldn’t read your request this time. Try again, or rephrase it.',
+  'ai.error.requestRejected':
+    'Blendify can’t use this request as written. Try rephrasing it.',
+  'ai.error.sessionExpired':
+    'This session expired. Submit your request again to start a new one.',
   'ai.error.optionUnavailable':
-    'That choice is no longer available. Submit your request again.',
+    'That choice is no longer available. Blendify loaded the latest version of your request.',
   'ai.error.generic': 'Couldn’t read your request. Try again.',
   'ai.clarify.title': 'One thing to confirm',
   'ai.clarify.ambiguous':
@@ -493,6 +496,7 @@ export const en = {
     'A mix can use up to {limit} genres, and your request names {count}. Edit it to keep the ones you want.',
   'ai.clarify.singleArtist':
     'Discover starts from one artist. Choose one, or mix them instead.',
+  'ai.clarify.singleArtistOnly': 'Discover starts from one artist. Choose one.',
   'ai.clarify.singleTrack': 'Discover starts from one song. Choose one.',
   'ai.clarify.trackCount': 'Playlists can have up to {limit} songs.',
   'ai.clarify.ordering':
@@ -504,8 +508,8 @@ export const en = {
   'ai.clarify.invalidDuration':
     'That duration doesn’t work. Ask for a length of at least one minute.',
   'ai.clarify.optionsLabel': 'Choose an option',
-  'ai.clarify.orEdit': 'Or edit your request above and submit it again.',
-  'ai.clarify.edit': 'Edit your request above and submit it again.',
+  'ai.clarify.orEdit': 'Or edit your request and submit it again.',
+  'ai.clarify.edit': 'Edit your request and submit it again.',
   'ai.option.useArtists': 'Use only the artists',
   'ai.option.useGenres': 'Use only the genres',
   'ai.option.useSong': 'Use only the song',
@@ -551,7 +555,7 @@ export const en = {
   'ai.createHint': 'Blendify will create a preview of your playlist.',
   'ai.cancelEdit': 'Cancel editing',
   'ai.restoring': 'Loading your request…',
-  'ai.error.restoreFailed': 'Couldn’t load your previous request. You can submit it again.',
+  'ai.error.restoreFailed': 'Couldn’t load your previous request. Try again, or submit it again.',
   'ai.generating.title': 'Creating your playlist…',
   'ai.generating.hint': 'Finding music for your request',
   'ai.generating.stalled': 'This is taking longer than usual.',
@@ -761,6 +765,14 @@ export const en = {
     'Blendify can’t order songs this way. Ask for Artist A–Z, Song title A–Z or Random order instead.',
   'ai.refine.clarify.artistNotKept':
     'There are no songs by {names} in the current playlist to keep.',
+  'ai.refine.clarify.singleArtist':
+    'Discover starts from one artist. Try a refinement that names just one, or ask for a mix instead.',
+  'ai.refine.clarify.singleTrack':
+    'Discover starts from one song. Try a refinement that names just one.',
+  'ai.refine.clarify.tooManyArtists':
+    'A mix can use up to {limit} artists, and this change would use {count}. Try a refinement with fewer artists.',
+  'ai.refine.clarify.tooManyGenres':
+    'A mix can use up to {limit} genres, and this change would use {count}. Try a refinement with fewer genres.',
   'ai.refine.error.inProgress':
     'This playlist is already being refined. Wait a moment and try again.',
   'ai.refine.error.limit':

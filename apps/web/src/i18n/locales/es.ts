@@ -485,10 +485,13 @@ export const es: Record<MessageKey, string> = {
   'ai.error.rateLimited':
     'Crear con IA está ocupado en este momento. Vuelve a intentarlo en un rato.',
   'ai.error.invalidOutput':
-    'Blendify no pudo entender ese pedido. Prueba a escribirlo de otra forma.',
-  'ai.error.sessionExpired': 'Este pedido expiró. Envíalo de nuevo.',
+    'Blendify no pudo leer tu pedido esta vez. Vuelve a intentarlo o escríbelo de otra forma.',
+  'ai.error.requestRejected':
+    'Blendify no puede usar este pedido tal como está escrito. Prueba a escribirlo de otra forma.',
+  'ai.error.sessionExpired':
+    'Esta sesión expiró. Envía tu pedido de nuevo para empezar otra.',
   'ai.error.optionUnavailable':
-    'Esa opción ya no está disponible. Envía tu pedido de nuevo.',
+    'Esa opción ya no está disponible. Blendify cargó la última versión de tu pedido.',
   'ai.error.generic': 'No se pudo leer tu pedido. Vuelve a intentarlo.',
   'ai.clarify.title': 'Una cosa para confirmar',
   'ai.clarify.ambiguous':
@@ -505,6 +508,7 @@ export const es: Record<MessageKey, string> = {
     'Un mix puede usar hasta {limit} géneros y tu pedido nombra {count}. Edítalo para quedarte con los que quieras.',
   'ai.clarify.singleArtist':
     'Descubrir parte de un solo artista. Elige uno o mézclalos.',
+  'ai.clarify.singleArtistOnly': 'Descubrir parte de un solo artista. Elige uno.',
   'ai.clarify.singleTrack': 'Descubrir parte de una sola canción. Elige una.',
   'ai.clarify.trackCount':
     'Las playlists pueden tener hasta {limit} canciones.',
@@ -517,8 +521,8 @@ export const es: Record<MessageKey, string> = {
   'ai.clarify.invalidDuration':
     'Esa duración no sirve. Pide una duración de al menos un minuto.',
   'ai.clarify.optionsLabel': 'Elige una opción',
-  'ai.clarify.orEdit': 'O edita tu pedido arriba y envíalo de nuevo.',
-  'ai.clarify.edit': 'Edita tu pedido arriba y envíalo de nuevo.',
+  'ai.clarify.orEdit': 'O edita tu pedido y envíalo de nuevo.',
+  'ai.clarify.edit': 'Edita tu pedido y envíalo de nuevo.',
   'ai.option.useArtists': 'Usar solo los artistas',
   'ai.option.useGenres': 'Usar solo los géneros',
   'ai.option.useSong': 'Usar solo la canción',
@@ -564,7 +568,7 @@ export const es: Record<MessageKey, string> = {
   'ai.createHint': 'Blendify creará una vista previa de tu playlist.',
   'ai.cancelEdit': 'Cancelar edición',
   'ai.restoring': 'Cargando tu pedido…',
-  'ai.error.restoreFailed': 'No se pudo cargar tu pedido anterior. Puedes enviarlo de nuevo.',
+  'ai.error.restoreFailed': 'No se pudo cargar tu pedido anterior. Vuelve a intentarlo o envíalo de nuevo.',
   'ai.generating.title': 'Creando tu playlist…',
   'ai.generating.hint': 'Buscando música para tu pedido',
   'ai.generating.stalled': 'Esto está tardando más de lo habitual.',
@@ -775,6 +779,14 @@ export const es: Record<MessageKey, string> = {
     'Blendify no puede ordenar las canciones de esa forma. Pide el orden Artista A–Z, Título A–Z o Al azar.',
   'ai.refine.clarify.artistNotKept':
     'No hay canciones de {names} en la playlist actual para mantener.',
+  'ai.refine.clarify.singleArtist':
+    'Descubrir parte de un solo artista. Prueba un refinamiento que nombre solo uno o pide un mix.',
+  'ai.refine.clarify.singleTrack':
+    'Descubrir parte de una sola canción. Prueba un refinamiento que nombre solo una.',
+  'ai.refine.clarify.tooManyArtists':
+    'Un mix puede usar hasta {limit} artistas y este cambio usaría {count}. Prueba un refinamiento con menos artistas.',
+  'ai.refine.clarify.tooManyGenres':
+    'Un mix puede usar hasta {limit} géneros y este cambio usaría {count}. Prueba un refinamiento con menos géneros.',
   'ai.refine.error.inProgress':
     'Esta playlist ya se está refinando. Espera un momento y vuelve a intentarlo.',
   'ai.refine.error.limit':

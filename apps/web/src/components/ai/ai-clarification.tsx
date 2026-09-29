@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import { Pencil } from 'lucide-react'
 import type { AiClarification as AiClarificationDto } from '@blendify/contracts'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/i18n/use-t'
@@ -8,6 +9,7 @@ type AiClarificationProps = Readonly<{
   clarification: AiClarificationDto
   isPending: boolean
   onChoose: (optionId: string) => void
+  onEdit: () => void
   headingRef: RefObject<HTMLHeadingElement | null>
 }>
 
@@ -15,6 +17,7 @@ export function AiClarification({
   clarification,
   isPending,
   onChoose,
+  onEdit,
   headingRef,
 }: AiClarificationProps) {
   const t = useT()
@@ -67,9 +70,22 @@ export function AiClarification({
         </fieldset>
       ) : null}
 
-      <p className="text-sm text-cream-400">
-        {hasOptions ? t('ai.clarify.orEdit') : t('ai.clarify.edit')}
-      </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+        <p className="text-sm text-cream-400">
+          {hasOptions ? t('ai.clarify.orEdit') : t('ai.clarify.edit')}
+        </p>
+        <Button
+          type="button"
+          variant={hasOptions ? 'ghost' : 'secondary'}
+          size="sm"
+          className="self-start"
+          disabled={isPending}
+          onClick={onEdit}
+        >
+          <Pencil aria-hidden className="size-3.5" />
+          {t('ai.editRequest')}
+        </Button>
+      </div>
     </section>
   )
 }

@@ -39,7 +39,7 @@ export type AiGeneratedExecution = Extract<
 >
 
 export type AiFlowState =
-  | { phase: 'composing'; error: unknown; restoreFailed: boolean }
+  | { phase: 'composing'; error: unknown; restoreFailed: boolean; isRestoring: boolean }
   | { phase: 'restoring' }
   | { phase: 'interpreting' }
   | {
@@ -89,7 +89,9 @@ const EMPTY_CURRENT_PRESERVATION: AiCurrentPreservationDto = {
 }
 
 const SESSION_REFRESH_CODES = new Set([
+  'AI_CLARIFICATION_OPTION_UNAVAILABLE',
   'AI_DESTINATION_IN_PROGRESS',
+  'AI_DESTINATION_UNAVAILABLE',
   'AI_REFINEMENT_PENDING',
   'AI_REFINEMENT_UNAVAILABLE',
   'AI_REFINEMENT_IN_PROGRESS',
@@ -168,7 +170,7 @@ function sessionFlowState(
     }
   }
   if (!session.intent) {
-    return { phase: 'composing', error: null, restoreFailed: false }
+    return { phase: 'composing', error: null, restoreFailed: false, isRestoring: false }
   }
 
   const intent = session.intent
@@ -277,9 +279,13 @@ export function useAiSession() {
     onSuccess: (session) => {
       queryClient.setQueryData(aiSessionQueryKey(session.sessionId), reviewedState(session))
     },
-    onError: (error) => {
+    onError: (error, { access: target }) => {
       if (isSessionNotFound(error)) {
         expire(error)
+        return
+      }
+      if (needsSessionRefresh(error)) {
+        void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(target.sessionId) })
       }
     },
   })
@@ -420,7 +426,7 @@ export function useAiSession() {
       return { phase: 'interpreting' }
     }
     if (!sessionId) {
-      return { phase: 'composing', error: composeError, restoreFailed: false }
+      return { phase: 'composing', error: composeError, restoreFailed: false, isRestoring: false }
     }
     if (!session) {
       if (sessionQuery.isError) {
@@ -428,6 +434,7 @@ export function useAiSession() {
           phase: 'composing',
           error: sessionQuery.error,
           restoreFailed: !isSessionNotFound(sessionQuery.error),
+          isRestoring: sessionQuery.isFetching,
         }
       }
       return { phase: 'restoring' }
@@ -499,6 +506,13 @@ export function useAiSession() {
 
   function checkStatus() {
     setStatusChecks(0)
+    void refetch()
+  }
+
+  function retryRestore() {
+    if (!access || sessionQuery.isFetching) {
+      return
+    }
     void refetch()
   }
 
@@ -591,6 +605,7 @@ export function useAiSession() {
     refinementSettlement,
     clearRefinementError,
     checkStatus,
+    retryRestore,
     reset,
   }
 }

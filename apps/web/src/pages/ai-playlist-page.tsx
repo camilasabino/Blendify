@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { RotateCcw } from 'lucide-react'
 import { AiClarification } from '@/components/ai/ai-clarification'
-import { aiErrorMessage } from '@/components/ai/ai-copy'
+import { aiErrorMessage, canRetryAiRequest } from '@/components/ai/ai-copy'
 import { AiCurrentRequest } from '@/components/ai/ai-current-request'
 import { AiGeneratedView } from '@/components/ai/ai-generated-view'
 import { generationRequestErrorMessage } from '@/components/ai/ai-generation-copy'
@@ -9,6 +10,7 @@ import { AiGenerationProgress } from '@/components/ai/ai-generation-progress'
 import { AiIntentSummary } from '@/components/ai/ai-intent-summary'
 import { AiPromptForm } from '@/components/ai/ai-prompt-form'
 import { AiReviewActions } from '@/components/ai/ai-review-actions'
+import { Button } from '@/components/ui/button'
 import { ErrorState } from '@/components/ui/feedback'
 import { FormSection } from '@/components/ui/form-section'
 import { PageContainer } from '@/components/ui/page-container'
@@ -87,6 +89,7 @@ export function AiPlaylistPage() {
     refinementSettlement,
     clearRefinementError,
     checkStatus,
+    retryRestore,
     reset,
   } = useAiSession()
   const { mode } = useCapabilities()
@@ -116,15 +119,15 @@ export function AiPlaylistPage() {
   const isInterpreting =
     flow.phase === 'interpreting' || (flow.phase === 'clarifying' && flow.isAnswering)
   let requestError: unknown = null
-  if (flow.phase === 'composing') {
-    requestError = flow.error
-  } else if (flow.phase === 'clarifying') {
+  if (flow.phase === 'composing' || flow.phase === 'clarifying') {
     requestError = flow.error
   }
-  const requestErrorMessage =
-    flow.phase === 'composing' && flow.restoreFailed
-      ? t('ai.error.restoreFailed')
-      : aiErrorMessage(requestError, t)
+  const composing = flow.phase === 'composing' ? flow : null
+  const requestErrorMessage = composing?.restoreFailed
+    ? t('ai.error.restoreFailed')
+    : aiErrorMessage(requestError, t)
+  const canRetryRequest =
+    composing !== null && !composing.restoreFailed && canRetryAiRequest(requestError)
 
   function changePrompt(next: string) {
     setPrompt(next)
@@ -200,9 +203,26 @@ export function AiPlaylistPage() {
       </p>
 
       {requestError && !isInterpreting ? (
-        <div role="alert">
-          <ErrorState message={requestErrorMessage} />
-        </div>
+        <ErrorState message={requestErrorMessage} messageRole="alert">
+          {composing?.restoreFailed ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              loading={composing.isRestoring}
+              onClick={retryRestore}
+            >
+              {composing.isRestoring ? null : <RotateCcw aria-hidden className="size-3.5" />}
+              {t('common.retry')}
+            </Button>
+          ) : null}
+          {canRetryRequest ? (
+            <Button type="button" size="sm" variant="secondary" onClick={submitPrompt}>
+              <RotateCcw aria-hidden className="size-3.5" />
+              {t('common.retry')}
+            </Button>
+          ) : null}
+        </ErrorState>
       ) : null}
 
       {flow.phase === 'clarifying' ? (
@@ -210,6 +230,7 @@ export function AiPlaylistPage() {
           clarification={flow.clarification}
           isPending={flow.isAnswering}
           onChoose={choose}
+          onEdit={() => targets.textarea.current?.focus()}
           headingRef={targets.clarification}
         />
       ) : null}

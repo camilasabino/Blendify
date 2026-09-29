@@ -93,6 +93,9 @@ export function AiGeneratedView({
   const showsDestination = flow.destination !== null || (!blocksDestination && !isComposing)
   const statusKey = statusMessageKey(flow.refinementActivity, settlement)
   const refinementError = flow.refinementError
+  const showsDetachedError = Boolean(refinementError) && !canRefine && flow.refinement === null
+  const hasRefinementSurface = isComposing || pendingId !== null
+  const hadRefinementSurface = useRef(hasRefinementSurface)
   const { close: closeDraft, open: openDraft, reset: resetDraft } = draft
 
   useEffect(() => {
@@ -125,6 +128,22 @@ export function AiGeneratedView({
     }
     window.requestAnimationFrame(() => refineButtonRef.current?.focus())
   }, [settlement, headingRef, openDraft, resetDraft])
+
+  useEffect(() => {
+    const hadSurface = hadRefinementSurface.current
+    hadRefinementSurface.current = hasRefinementSurface
+    if (!hadSurface || hasRefinementSurface) {
+      return
+    }
+    window.requestAnimationFrame(() => {
+      const active = document.activeElement
+      if (active !== null && active !== document.body) {
+        return
+      }
+      const fallback = refineButtonRef.current ?? headingRef.current
+      fallback?.focus()
+    })
+  }, [hasRefinementSurface, headingRef])
 
   useEffect(() => {
     if (isComposing) {
@@ -266,6 +285,12 @@ export function AiGeneratedView({
           onDismiss={onDismiss}
           onTryAgain={tryAgain}
         />
+      ) : null}
+
+      {showsDetachedError ? (
+        <p role="alert" className="text-sm leading-relaxed text-danger">
+          {refinementErrorMessage(refinementError, t, 'ai.refine.error.generic')}
+        </p>
       ) : null}
 
       {showsPendingNotice ? (

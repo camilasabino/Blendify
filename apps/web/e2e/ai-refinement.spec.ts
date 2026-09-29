@@ -276,10 +276,36 @@ test.describe('Create with AI refinement', () => {
     await page.goto('/app/ai')
 
     await expect(page.getByRole('heading', { name: 'Couldn’t prepare these changes' })).toBeVisible()
+    await expect(page.getByText('Your current playlist hasn’t changed.')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Apply changes' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Prepare transfer' })).toHaveCount(0)
     await expect(page.getByRole('list', { name: 'Songs in this playlist' })).toBeVisible()
     await page.getByRole('button', { name: 'Dismiss' }).click()
     await expect(page.getByRole('button', { name: 'Refine playlist' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Prepare transfer' })).toBeEnabled()
+    await expect(page.getByRole('heading', { name: TITLE })).toBeVisible()
+    expect(server.state.refinement).toBeNull()
+  })
+
+  test('a stale tab cannot dismiss a newer pending refinement', async ({ page }) => {
+    await mockGuestSession(page)
+    const server: ServerSession = { state: pendingState(candidateRefinement()) }
+    await restore(page, server)
+    await routeSettlement(page, server)
+    await page.goto('/app/ai')
+    await expect(page.getByRole('heading', { name: 'Proposed changes' })).toBeVisible()
+    server.state = pendingState({ id: 'e2e-refinement-newer', status: 'unchanged' })
+
+    await page.getByRole('button', { name: 'Cancel' }).click()
+
+    await expect(page.getByRole('heading', { name: 'No changes needed' })).toBeFocused()
+    await expect(
+      page.getByText(
+        'That proposal is no longer current. Blendify loaded the latest version of your playlist.',
+      ),
+    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Proposed changes' })).toHaveCount(0)
+    expect(server.state.refinement?.id).toBe('e2e-refinement-newer')
   })
 
   test('restores a pending candidate without submitting, applying or regenerating', async ({

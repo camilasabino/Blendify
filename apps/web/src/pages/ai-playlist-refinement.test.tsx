@@ -103,6 +103,37 @@ describe('Create with AI refinement', () => {
     expect(screen.getByRole('button', { name: 'Prepare transfer' })).toBeInTheDocument()
   })
 
+  it('explains a refinement blocked by a destination from another tab and keeps focus on the playlist', async () => {
+    const user = userEvent.setup()
+    const transferred = generatedAiSessionState(undefined, {
+      status: 'transfer_prepared',
+      transfer: {
+        url: 'https://soundiiz.com/go/import-playlist/abcdefghijklmnop',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        trackCount: 20,
+      },
+    })
+    const states = [generatedAiSessionState(), transferred]
+    await renderPage({
+      [SESSION_ROUTE]: () => jsonResponse(states.length > 1 ? states.shift() : states[0]),
+      [REFINE_ROUTE]: () => apiError(409, 'AI_REFINEMENT_UNAVAILABLE'),
+    })
+    const textarea = await openComposer(user)
+
+    await user.type(textarea, 'Make it more popular')
+    await user.click(screen.getByRole('button', { name: 'Propose changes' }))
+
+    expect(await screen.findByRole('link', { name: /Continue on Soundiiz/ })).toBeVisible()
+    expect(screen.queryByRole('textbox', { name: 'What would you like to change?' })).toBeNull()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This playlist was already saved or transferred, so it can’t be refined. Start over to create another version.',
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: SUGGESTED_TITLE })).toHaveFocus(),
+    )
+    expect(document.body.textContent).not.toContain('server detail')
+  })
+
   it('hides Refine playlist once the playlist has a destination', async () => {
     await renderPage(
       {},
@@ -489,7 +520,7 @@ describe('Create with AI refinement', () => {
 
     await user.click(screen.getByRole('button', { name: 'Apply changes' }))
 
-    expect(await screen.findByText('This request expired. Submit it again.')).toBeInTheDocument()
+    expect(await screen.findByText('This session expired. Submit your request again to start a new one.')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Proposed changes' })).toBeNull()
     expect(sessionStorage.getItem('blendify.aiSession')).toBeNull()
     expect(calls.filter((call) => call.url.endsWith('/apply'))).toHaveLength(1)

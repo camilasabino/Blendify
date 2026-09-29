@@ -523,9 +523,37 @@ describe('Create with AI session restore', () => {
     })
     renderPage()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('This request expired. Submit it again.')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This session expired. Submit your request again to start a new one.',
+    )
     expect(promptField()).toHaveValue(AI_PROMPT)
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
     expect(sessionStorage.getItem('blendify.aiSession')).toBeNull()
+  })
+
+  it('reloads the stored session on Retry after a temporary restore failure', async () => {
+    const user = userEvent.setup()
+    storeAiSession()
+    const responses = [
+      jsonResponse({ statusCode: 503, code: 'SERVICE_UNAVAILABLE', message: 'raw' }, 503),
+      jsonResponse(generatedAiSessionState()),
+    ]
+    const { calls } = stubApi({ [SESSION_ROUTE]: () => responses.shift() ?? jsonResponse({}, 500) })
+    renderPage()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Couldn’t load your previous request. Try again, or submit it again.',
+    )
+    expect(promptField()).toHaveValue(AI_PROMPT)
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+
+    const heading = await screen.findByRole('heading', {
+      name: 'Blendify · Mix · Radiohead + Interpol',
+    })
+    await waitFor(() => expect(heading).toHaveFocus())
+    expect(calls.map((call) => call.method)).toEqual(['GET', 'GET'])
+    expect(interpretCalls(calls)).toEqual([])
   })
 
   it('checks a generation that kept running after a refresh until it finishes', async () => {
