@@ -429,6 +429,7 @@ export const AI_UNSUPPORTED_CONSTRAINT_CATEGORIES = [
   'tempo',
   'progression',
   'artist_attribute',
+  'genre_exclusion',
   'other',
 ] as const;
 export const AI_MOODS = [

@@ -29,6 +29,8 @@ from tests.fakes import (
 DATASET_VERSION, CASES = load_dataset()
 HISTORICAL_V1_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v1.json"
 HISTORICAL_V1_DATASET_SHA256 = "05a16b4a7888c4d8a6e1a8b1da08d0d5e9542b78039f9560f066aa5457dccc17"
+HISTORICAL_V2_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v2.json"
+HISTORICAL_V2_DATASET_SHA256 = "6a8432050f65f2a9c92c15e2f46388f56fe29f628fed07386740d1b49626bcd7"
 CASES_BY_ID = {case.id: case for case in CASES}
 LOCAL_GENRE_ADDITIONS = ("es-add-genre-place", "en-add-genre-place", "pt-add-genre-place")
 ARGENTINE_ROCK_ADDITION = {"genres": [["argentine rock"], ["rock argentino"]]}
@@ -79,6 +81,13 @@ REQUIRED_COVERAGE = {
         "en-more-mainstream-from-balanced",
         "en-add-seed-track",
         "en-combination",
+        "en-genre-exclusion-no-rock-songs",
+        "en-genre-exclusion-avoid-rock",
+        "en-avoid-artist-taylor-swift",
+        "en-duration-ten-minutes-longer",
+        "en-duration-ten-minutes-less",
+        "en-duration-half-hour-more",
+        "en-duration-percentage-longer",
     ],
     "es": [
         "es-add-genre-place",
@@ -98,6 +107,16 @@ REQUIRED_COVERAGE = {
         "es-percentage-popularity-ambiguous",
         "es-remove-seed-track",
         "es-exclude-track",
+        "es-genre-exclusion-sin-canciones-de-rock",
+        "es-genre-exclusion-sin-rock",
+        "es-genre-exclusion-evita-rock",
+        "es-genre-exclusion-next-to-kept-artist",
+        "es-avoid-artist-taylor-swift",
+        "es-remove-seed-genre-sin-rock",
+        "es-duration-ten-minutes-more",
+        "es-duration-ten-minutes-less",
+        "es-duration-a-bit-longer-with-target",
+        "es-duration-absolute-with-target",
         "es-per-artist-limit",
         "es-injection-fake-assistant-text",
     ],
@@ -111,6 +130,10 @@ REQUIRED_COVERAGE = {
         "pt-preserve-first-tracks",
         "pt-unsupported-artist-attribute",
         "pt-combination",
+        "pt-genre-exclusion-no-rock-songs",
+        "pt-avoid-artist-taylor-swift",
+        "pt-duration-ten-minutes-more",
+        "pt-duration-ten-minutes-less",
         "pt-injection-secrets-and-contents",
     ],
 }
@@ -123,12 +146,12 @@ def parsed(output: dict[str, object]) -> Any:
 def test_dataset_is_a_new_versioned_refinement_dataset_with_unique_ids() -> None:
     ids = [case.id for case in CASES]
 
-    assert DATASET_VERSION == "refinement-eval-v2"
-    assert DATASET_PATH.name == "refinement-eval-v2.json"
+    assert DATASET_VERSION == "refinement-eval-v3"
+    assert DATASET_PATH.name == "refinement-eval-v3.json"
     assert len(ids) == len(set(ids))
 
 
-def test_historical_v1_dataset_stays_frozen_and_inside_v2() -> None:
+def test_historical_v1_dataset_stays_frozen_and_inside_the_current_dataset() -> None:
     digest = hashlib.sha256(HISTORICAL_V1_DATASET_PATH.read_bytes()).hexdigest()
     version, cases = load_dataset(HISTORICAL_V1_DATASET_PATH)
 
@@ -143,6 +166,16 @@ def test_historical_v1_dataset_stays_frozen_and_inside_v2() -> None:
         assert "clarificationReason" not in case.expect
         assert (current.language, current.request) == (case.language, case.request)
         assert current.expect == {**case.expect, "clarificationReason": reason}
+
+
+def test_historical_v2_dataset_stays_frozen_and_inside_v3() -> None:
+    digest = hashlib.sha256(HISTORICAL_V2_DATASET_PATH.read_bytes()).hexdigest()
+    version, cases = load_dataset(HISTORICAL_V2_DATASET_PATH)
+
+    assert digest == HISTORICAL_V2_DATASET_SHA256
+    assert version == "refinement-eval-v2"
+    for case in cases:
+        assert CASES_BY_ID[case.id] == case
 
 
 def test_genre_refinements_expect_normalized_additions_and_literal_removals() -> None:
@@ -303,6 +336,121 @@ def as_list(value: object) -> list[object]:
     return value if isinstance(value, list) else [value]
 
 
+GENRE_EXCLUSION_CASES = (
+    "es-genre-exclusion-sin-canciones-de-rock",
+    "es-genre-exclusion-sin-rock",
+    "es-genre-exclusion-evita-rock",
+    "es-genre-exclusion-next-to-kept-artist",
+    "en-genre-exclusion-no-rock-songs",
+    "en-genre-exclusion-avoid-rock",
+    "pt-genre-exclusion-no-rock-songs",
+)
+ADJUSTED_DURATIONS = {
+    "es-duration-ten-minutes-more": 10,
+    "es-duration-ten-minutes-less": -10,
+    "en-duration-ten-minutes-longer": 10,
+    "en-duration-ten-minutes-less": -10,
+    "en-duration-half-hour-more": 30,
+    "pt-duration-ten-minutes-more": 10,
+    "pt-duration-ten-minutes-less": -10,
+}
+
+
+@pytest.mark.parametrize("case_id", GENRE_EXCLUSION_CASES)
+def test_a_genre_exclusion_is_reported_never_expressed_as_an_excluded_artist(case_id: str) -> None:
+    expect = CASES_BY_ID[case_id].expect
+
+    assert expect["unsupportedCategories"] == ["genre_exclusion"]
+    assert "excludeArtists" not in expect["changedWithin"]
+    assert "excludeArtists" not in expect.get("add", {})
+    assert expect["clarificationReason"] == "unsupported_constraint"
+
+
+def excluded_artist_output(name: str) -> Any:
+    return parsed(
+        refinement_output(patch=unchanged_patch(excludeArtists={"add": [name], "remove": []}))
+    )
+
+
+def test_a_genre_treated_as_an_excluded_artist_fails_the_genre_exclusion_cases() -> None:
+    expect = CASES_BY_ID["es-genre-exclusion-sin-canciones-de-rock"].expect
+
+    failures = check_refinement_case(expect, excluded_artist_output("rock"))
+
+    assert any(failure.startswith("changedWithin") for failure in failures)
+    assert any(failure.startswith("unsupportedCategories") for failure in failures)
+
+
+def test_a_reported_genre_exclusion_passes_as_a_clarification() -> None:
+    expect = CASES_BY_ID["es-genre-exclusion-sin-canciones-de-rock"].expect
+    output = refinement_clarification(
+        "unsupported_constraint",
+        [{"category": "genre_exclusion", "userText": "sin canciones de rock"}],
+    )
+
+    assert check_refinement_case(expect, parsed(output)) == []
+
+
+@pytest.mark.parametrize(
+    "case_id", ["es-avoid-artist-taylor-swift", "en-avoid-artist-taylor-swift"]
+)
+def test_a_named_artist_stays_an_artist_exclusion(case_id: str) -> None:
+    expect = CASES_BY_ID[case_id].expect
+
+    assert expect["add"] == {"excludeArtists": ["Taylor Swift"]}
+    assert check_refinement_case(expect, excluded_artist_output("Taylor Swift")) == []
+    assert check_refinement_case(expect, excluded_artist_output("rock")) != []
+
+
+def adjusted_duration_output(delta: int) -> Any:
+    return parsed(
+        refinement_output(
+            patch=unchanged_patch(
+                targetDurationMinutes={"operation": "adjust", "deltaMinutes": delta}
+            )
+        )
+    )
+
+
+@pytest.mark.parametrize(("case_id", "delta"), ADJUSTED_DURATIONS.items())
+def test_a_stated_amount_of_time_expects_an_adjustment_not_a_computed_total(
+    case_id: str, delta: int
+) -> None:
+    case = CASES_BY_ID[case_id]
+    expect = case.expect
+
+    assert expect["adjust"] == {"targetDurationMinutes": delta}
+    assert "set" not in expect
+    assert case.request.intent.target_duration_minutes == 30
+    assert check_refinement_case(expect, adjusted_duration_output(delta)) == []
+    assert check_refinement_case(expect, adjusted_duration_output(delta + 5)) == [
+        f"adjust: expected targetDurationMinutes adjusted by {delta}, got adjust {delta + 5}"
+    ]
+
+
+def test_a_computed_total_fails_an_adjustment_expectation() -> None:
+    expect = CASES_BY_ID["es-duration-ten-minutes-more"].expect
+    output = parsed(
+        refinement_output(
+            patch=unchanged_patch(targetDurationMinutes={"operation": "set", "value": 40})
+        )
+    )
+
+    assert check_refinement_case(expect, output) == [
+        "adjust: expected targetDurationMinutes adjusted by 10, got set 40"
+    ]
+
+
+def test_an_absolute_duration_is_never_expected_as_an_adjustment() -> None:
+    expect = CASES_BY_ID["es-duration-absolute-with-target"].expect
+
+    assert expect["set"] == {"targetDurationMinutes": 60}
+    assert "adjust" not in expect
+    assert check_refinement_case(expect, adjusted_duration_output(30)) == [
+        "set: expected targetDurationMinutes = 60, got adjust 30"
+    ]
+
+
 def test_relative_changes_without_an_amount_never_expect_a_number() -> None:
     for case_id in (
         "en-shorter-ambiguous",
@@ -310,6 +458,8 @@ def test_relative_changes_without_an_amount_never_expect_a_number() -> None:
         "en-percentage-popularity-ambiguous",
         "es-longer-ambiguous",
         "es-percentage-popularity-ambiguous",
+        "es-duration-a-bit-longer-with-target",
+        "en-duration-percentage-longer",
     ):
         expect = CASES_BY_ID[case_id].expect
         assert expect["changedWithin"] == []
@@ -513,8 +663,8 @@ def test_preflight_states_the_refinement_run_bounds() -> None:
 
     assert plan.request_budget == len(CASES) * MAX_OUTPUT_VALIDATION_ATTEMPTS
     assert "Paid real-model refinement eval" in preflight
-    assert "refinement-v2" in preflight
-    assert "refinement-eval-v2" in preflight
+    assert "refinement-v3" in preflight
+    assert "refinement-eval-v3" in preflight
     assert all(case.request.refinement not in preflight for case in CASES)
 
 
@@ -531,7 +681,7 @@ async def test_fake_refinement_run_reports_failed_output_only_for_failed_cases()
     passed, failed = report["results"]  # type: ignore[misc]
 
     assert report["suite"] == "refinement"
-    assert report["promptVersion"] == "refinement-v2"
+    assert report["promptVersion"] == "refinement-v3"
     assert report["modelRequests"] == 3
     assert report["casesRequiringRetry"] == ["en-less-mainstream"]
     assert report["passed"] == 1

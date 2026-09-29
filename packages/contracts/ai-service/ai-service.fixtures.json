@@ -1490,6 +1490,385 @@
       }
     },
     {
+      "name": "refinement patch adding minutes to the duration target",
+      "schema": "PlanRefinementResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": {
+              "operation": "adjust",
+              "deltaMinutes": 10
+            },
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch removing minutes from the duration target",
+      "schema": "PlanRefinementResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": {
+              "operation": "adjust",
+              "deltaMinutes": -10
+            },
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch adjusting the duration without an amount",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": {
+              "operation": "adjust"
+            },
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch adjusting the duration by fractional minutes",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": {
+              "operation": "adjust",
+              "deltaMinutes": 7.5
+            },
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch adjusting the duration with a value instead of a delta",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": {
+              "operation": "adjust",
+              "value": 10
+            },
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement patch adjusting the duration beyond the maximum",
+      "schema": "PlanRefinementResponse",
+      "valid": false,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": {
+              "operation": "adjust",
+              "deltaMinutes": 10081
+            },
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": []
+        }
+      }
+    },
+    {
+      "name": "refinement reporting an unsupported genre exclusion",
+      "schema": "PlanRefinementResponse",
+      "valid": true,
+      "payload": {
+        "promptVersion": "refinement-v0",
+        "result": {
+          "outcome": "interpreted",
+          "patch": {
+            "kind": null,
+            "artists": {
+              "add": [],
+              "remove": []
+            },
+            "genres": {
+              "add": [],
+              "remove": []
+            },
+            "seedTracks": {
+              "add": [],
+              "remove": []
+            },
+            "targetTrackCount": null,
+            "targetDurationMinutes": null,
+            "mood": null,
+            "popularity": null,
+            "orderMode": null,
+            "excludeArtists": {
+              "add": [],
+              "remove": []
+            },
+            "excludeTracks": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "preservation": {
+            "firstTracks": null,
+            "positions": {
+              "add": [],
+              "remove": []
+            },
+            "artists": {
+              "add": [],
+              "remove": []
+            }
+          },
+          "unsupportedConstraints": [
+            {
+              "category": "genre_exclusion",
+              "userText": "sin canciones de rock"
+            }
+          ]
+        }
+      }
+    },
+    {
       "name": "refinement preservation with a zero position",
       "schema": "PlanRefinementResponse",
       "valid": false,

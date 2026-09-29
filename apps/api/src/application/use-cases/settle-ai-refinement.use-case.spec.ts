@@ -206,6 +206,29 @@ describe('Apply and dismiss a pending refinement', () => {
     expect(world.stored()).toBe(applied);
   });
 
+  it('persists a settings-only candidate so the rule outlives the unchanged songs', async () => {
+    const pending = readyPending();
+    if (pending.status !== 'proposed' || pending.candidate.status !== 'ready') {
+      throw new Error('Expected a ready refinement.');
+    }
+    const excluding: AiIntent = { ...INTENT_A, excludeArtists: ['Coldplay'] };
+    const initial = session({
+      ...pending,
+      aiSafe: { ...pending.aiSafe, intent: excluding },
+      candidate: { ...pending.candidate, result: RESULT_A },
+    });
+    const world = setup(initial);
+
+    const { session: applied } = await world.apply.execute(command());
+
+    expect(applied.aiSafe.intent).toEqual(excluding);
+    expect(applied.execution).toMatchObject({
+      status: 'generated',
+      result: RESULT_A,
+    });
+    expect(world.stored()).toBe(applied);
+  });
+
   it('discards the pending refinement and leaves the current state untouched', async () => {
     const initial = session();
     const world = setup(initial);

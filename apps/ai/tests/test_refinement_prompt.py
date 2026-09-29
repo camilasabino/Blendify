@@ -11,10 +11,12 @@ from app.prompts.refinement import (
     build_refinement_model_request,
 )
 from app.prompts.refinement_v1 import REFINEMENT_V1_PROMPT_VERSION, REFINEMENT_V1_SYSTEM_PROMPT
+from app.prompts.refinement_v2 import REFINEMENT_V2_PROMPT_VERSION, REFINEMENT_V2_SYSTEM_PROMPT
 from tests.fakes import current_intent, empty_preservation
 
 INTENT_V3_BASELINE_SHA256 = "4a523cd6a58f3ef21e0812fa209e4466289dc768eb682358474ac1bde7d8cf8f"
 REFINEMENT_V1_BASELINE_SHA256 = "6772d9e633197be47590eeea6503892a2f10e3f97b648696007f831d93a20bf7"
+REFINEMENT_V2_BASELINE_SHA256 = "19c932bed0036dd81b3ba8286e1d0c97b39db52d7bb2815897b56e8132c023f8"
 
 
 def plan_request(refinement: str) -> PlanRefinementRequest:
@@ -26,7 +28,7 @@ def plan_request(refinement: str) -> PlanRefinementRequest:
 def test_refinement_has_its_own_prompt_version() -> None:
     request = build_refinement_model_request(plan_request("Remove Coldplay"))
 
-    assert REFINEMENT_PROMPT_VERSION == "refinement-v2"
+    assert REFINEMENT_PROMPT_VERSION == "refinement-v3"
     assert request.prompt_version == REFINEMENT_PROMPT_VERSION
     assert request.system_prompt == REFINEMENT_SYSTEM_PROMPT
     assert REFINEMENT_SYSTEM_PROMPT != INTENT_SYSTEM_PROMPT
@@ -45,6 +47,14 @@ def test_refinement_v1_stays_frozen_for_the_m4a_contract() -> None:
     assert REFINEMENT_V1_PROMPT_VERSION == "refinement-v1"
     assert digest == REFINEMENT_V1_BASELINE_SHA256
     assert REFINEMENT_V1_SYSTEM_PROMPT != REFINEMENT_SYSTEM_PROMPT
+
+
+def test_refinement_v2_stays_frozen_for_the_accepted_baseline() -> None:
+    digest = hashlib.sha256(REFINEMENT_V2_SYSTEM_PROMPT.encode()).hexdigest()
+
+    assert REFINEMENT_V2_PROMPT_VERSION == "refinement-v2"
+    assert digest == REFINEMENT_V2_BASELINE_SHA256
+    assert REFINEMENT_V2_SYSTEM_PROMPT != REFINEMENT_SYSTEM_PROMPT
 
 
 def test_normalizes_added_genres_like_the_first_turn() -> None:
@@ -92,6 +102,44 @@ def test_forbids_numbers_derived_from_relative_requests() -> None:
     assert "Never compute a new number from the current value" in REFINEMENT_SYSTEM_PROMPT
     assert '"make it shorter"' in REFINEMENT_SYSTEM_PROMPT
     assert "A percentage or number" in REFINEMENT_SYSTEM_PROMPT
+
+
+def test_sends_a_stated_amount_of_time_as_an_adjustment_and_leaves_the_arithmetic_to_blendify() -> (
+    None
+):
+    prompt = " ".join(REFINEMENT_SYSTEM_PROMPT.split())
+
+    for rule in (
+        '{"operation": "adjust", "deltaMinutes": N}',
+        '"10 minutes more" and "add half an hour" are positive',
+        "Send only the amount the user stated",
+        "Blendify does the arithmetic against the current duration",
+        'a percentage, "double" or "half", or words such as "a bit longer" have no amount to send',
+        "targetTrackCount has no adjust operation",
+        '[targetDurationMinutes 30] "Que dure 10 minutos más": targetDurationMinutes adjust 10.',
+        '[targetDurationMinutes 30] "Make it 10 minutes shorter": '
+        "targetDurationMinutes adjust -10.",
+        '[targetDurationMinutes 30] "Hacela una hora": targetDurationMinutes set 60.',
+        '"Hacela un poco más larga": needs_clarification "ambiguous_request"',
+    ):
+        assert rule in prompt
+
+
+def test_keeps_a_genre_out_of_the_excluded_artists() -> None:
+    prompt = " ".join(REFINEMENT_SYSTEM_PROMPT.split())
+
+    for rule in (
+        "excludeArtists holds only names of people or bands, never a genre or style of music",
+        "Blendify cannot exclude songs by genre",
+        "report their words under unsupportedConstraints as genre_exclusion",
+        "Blendify decides what happens to a message that includes a genre exclusion",
+        '[artists Radiohead] "Sin canciones de rock": genre_exclusion "sin canciones de rock"',
+        '[artists Radiohead] "Evitá Taylor Swift": excludeArtists add "Taylor Swift".',
+        '[genres rock, jazz] "Sin rock": genres remove "rock".',
+        '[artists Dua Lipa, Radiohead] "Sin pop pero mantené Dua Lipa": '
+        'preservation artists add "Dua Lipa"; genre_exclusion "sin pop".',
+    ):
+        assert rule in prompt
 
 
 def test_moves_relative_popularity_one_step_and_sets_absolute_popularity_directly() -> None:

@@ -1,4 +1,3 @@
-import { isDeepStrictEqual } from 'node:util';
 import type {
   AiRefinementClarificationReason,
   AiSeedType,
@@ -9,6 +8,8 @@ import type {
   RefinementInterpretation,
 } from '@blendify/contracts/ai-service';
 import { constraintCapability } from './ai-capability-matrix';
+import { isSameEffectiveState } from './ai-effective-state';
+import { isCuratedGenreName } from './ai-genre-seeds';
 import type {
   AiIntent,
   AiIntentClarification,
@@ -18,6 +19,7 @@ import {
   applyIntentPatch,
   applyPreservationPatch,
   conflictingPatchLabels,
+  resolveRelativeDuration,
   type AiPreservation,
 } from './ai-intent-patch';
 import { findIntentClarification, normalizeAiIntent } from './ai-intent-rules';
@@ -72,18 +74,28 @@ export function evaluateRefinement(
     return clarify('conflicting_changes', { names: conflicts });
   }
 
-  const blocking = interpretation.unsupportedConstraints.filter(
-    (constraint) =>
-      constraintCapability(constraint.category) === 'needs_clarification',
-  );
+  const blocking = [
+    ...interpretation.unsupportedConstraints.filter(
+      (constraint) => constraintCapability(constraint.category) !== 'deferred',
+    ),
+    ...genreExclusions(interpretation.patch.excludeArtists.add),
+  ];
   if (blocking.length > 0) {
     return clarify('unsupported_constraint', {
       unsupportedConstraints: blocking,
     });
   }
 
+  const duration = resolveRelativeDuration(input.intent, interpretation.patch);
+  if (duration.status === 'no_target') {
+    return clarify('ambiguous_request');
+  }
+  if (duration.status === 'out_of_range') {
+    return clarify('invalid_duration');
+  }
+
   const intent = normalizeAiIntent(
-    applyIntentPatch(input.intent, interpretation.patch),
+    applyIntentPatch(input.intent, duration.patch),
   );
   const intentClarification = findIntentClarification(intent);
   if (intentClarification) {
@@ -101,9 +113,10 @@ export function evaluateRefinement(
   }
 
   const notApplied = interpretation.unsupportedConstraints;
-  const changed =
-    !isDeepStrictEqual(intent, input.intent) ||
-    !isDeepStrictEqual(preservation, input.preservation);
+  const changed = !isSameEffectiveState(
+    { intent, preservation },
+    { intent: input.intent, preservation: input.preservation },
+  );
   if (changed) {
     return { status: 'proposed', intent, preservation, notApplied };
   }
@@ -113,6 +126,12 @@ export function evaluateRefinement(
     });
   }
   return { status: 'unchanged' };
+}
+
+function genreExclusions(excludedArtists: string[]): AiUnsupportedConstraint[] {
+  return excludedArtists
+    .filter(isCuratedGenreName)
+    .map((name) => ({ category: 'genre_exclusion', userText: name }));
 }
 
 function withExplicitPositions(

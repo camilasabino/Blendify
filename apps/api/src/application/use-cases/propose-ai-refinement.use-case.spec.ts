@@ -917,6 +917,89 @@ describe('ProposeAiRefinementUseCase', () => {
       expect(world.generator.execute).not.toHaveBeenCalled();
     });
 
+    it('stores a settings-only candidate when the excluded artist is not in the playlist', async () => {
+      const world = createWorld();
+      world.planner.planRefinement.mockResolvedValue(
+        interpretedPlan({ excludeArtists: { add: ['Muse'], remove: [] } }),
+      );
+
+      const { session } = await execute(world);
+
+      expect(candidateTrackIds(session)).toEqual(CURRENT_TRACK_IDS);
+      expect(session.pendingRefinement).toMatchObject({
+        status: 'proposed',
+        aiSafe: { intent: { excludeArtists: ['Coldplay', 'Muse'] } },
+        candidate: {
+          status: 'ready',
+          diff: {
+            tracks: { added: [], removed: [], moved: [] },
+            intent: [{ field: 'excludeArtists', added: ['Muse'], removed: [] }],
+          },
+        },
+      });
+      expect(world.generator.execute).not.toHaveBeenCalled();
+    });
+
+    it('reports repeating an active exclusion as unchanged without building a candidate', async () => {
+      const world = createWorld();
+      world.planner.planRefinement.mockResolvedValue(
+        interpretedPlan({ excludeArtists: { add: ['coldplay'], remove: [] } }),
+      );
+
+      const { session } = await execute(world);
+
+      expect(session.pendingRefinement).toMatchObject({ status: 'unchanged' });
+      expect(world.catalogs.forMarket).not.toHaveBeenCalled();
+      expect(world.generator.execute).not.toHaveBeenCalled();
+    });
+
+    it('asks for clarification instead of excluding an artist named like a genre', async () => {
+      const world = createWorld();
+      world.planner.planRefinement.mockResolvedValue(
+        interpretedPlan({ excludeArtists: { add: ['rock'], remove: [] } }),
+      );
+
+      const { session } = await execute(world);
+
+      expect(session.pendingRefinement).toMatchObject({
+        status: 'needs_clarification',
+        clarification: {
+          reason: 'unsupported_constraint',
+          unsupportedConstraints: [
+            { category: 'genre_exclusion', userText: 'rock' },
+          ],
+        },
+      });
+      expect(world.generator.execute).not.toHaveBeenCalled();
+    });
+
+    it('composes a relative duration against the persisted target and validates that target', async () => {
+      const world = createWorld(
+        storedSession({
+          aiSafe: {
+            intent: {
+              ...INTENT,
+              targetTrackCount: null,
+              targetDurationMinutes: 30,
+            },
+            preservation: EMPTY_AI_PRESERVATION,
+          },
+        }),
+      );
+      world.planner.planRefinement.mockResolvedValue(
+        interpretedPlan({
+          targetDurationMinutes: { operation: 'adjust', deltaMinutes: 10 },
+        }),
+      );
+
+      const { session } = await execute(world);
+
+      expect(session.pendingRefinement).toMatchObject({
+        status: 'proposed',
+        aiSafe: { intent: { targetDurationMinutes: 40 } },
+      });
+    });
+
     it('trims a count decrease with zero provider calls', async () => {
       const world = createWorld();
       world.planner.planRefinement.mockResolvedValue(

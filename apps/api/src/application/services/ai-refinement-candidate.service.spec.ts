@@ -337,3 +337,62 @@ describe('AiRefinementCandidateBuilder effective constraints', () => {
     expect(outcome).toMatchObject(CONSTRAINTS_UNMET);
   });
 });
+
+describe('AiRefinementCandidateBuilder settings-only and relative refinements', () => {
+  it('offers a settings-only candidate that keeps every song when the excluded artist is absent', async () => {
+    const { builder, generator } = createBuilder([]);
+
+    const outcome = await refine(builder, { excludeArtists: ['Coldplay'] });
+
+    expect(generator.execute).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({
+      status: 'candidate',
+      strategy: 'transform',
+      candidate: {
+        status: 'ready',
+        diff: {
+          tracks: { added: [], removed: [], moved: [], retainedCount: 10 },
+          intent: [
+            { field: 'excludeArtists', added: ['Coldplay'], removed: [] },
+          ],
+        },
+      },
+    });
+  });
+
+  it('honors a persisted exclusion when a later refinement regenerates songs', async () => {
+    const { builder } = createBuilder([
+      ...tracks('cp', 'Coldplay', 3),
+      ...tracks('new', 'Ed Sheeran', 5),
+    ]);
+    const persisted = { ...BASE_INTENT, excludeArtists: ['Coldplay'] };
+
+    const outcome = await refine(
+      builder,
+      { targetDurationMinutes: 40 },
+      persisted,
+    );
+
+    const ready = outcome.status === 'candidate' && outcome.candidate;
+    expect(ready && ready.status === 'ready').toBe(true);
+    expect(
+      ready && ready.status === 'ready'
+        ? ready.result.playlist.tracks.map((item) => item.artistName)
+        : ['Coldplay'],
+    ).not.toContain('Coldplay');
+  });
+
+  it('validates a relative increase against the persisted target, not the observed duration', async () => {
+    const { builder } = createBuilder(tracks('new', 'Ed Sheeran', 2));
+    const observedShort = CURRENT_TRACKS.slice(0, 9);
+
+    const outcome = await refine(
+      builder,
+      { targetDurationMinutes: TARGET_MINUTES + 10 },
+      BASE_INTENT,
+      observedShort,
+    );
+
+    expect(outcome).toMatchObject(CONSTRAINTS_UNMET);
+  });
+});

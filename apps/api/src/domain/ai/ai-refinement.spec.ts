@@ -34,7 +34,13 @@ function interpreted(
   options: {
     preservation?: Partial<AiPreservationPatch>;
     unsupported?: Array<{
-      category: 'activity' | 'energy' | 'era' | 'other';
+      category:
+        | 'activity'
+        | 'duration'
+        | 'energy'
+        | 'era'
+        | 'genre_exclusion'
+        | 'other';
       userText: string;
     }>;
   } = {},
@@ -567,5 +573,248 @@ describe('genre refinement through the deterministic curated resolver', () => {
         clarification: { reason: 'ambiguous_request' },
       });
     });
+  });
+});
+
+describe('genre versus artist exclusion', () => {
+  it('never turns a genre name into an excluded artist', () => {
+    const result = evaluate(
+      interpreted({ excludeArtists: { add: ['rock'], remove: [] } }),
+    );
+
+    expect(result).toEqual({
+      status: 'needs_clarification',
+      clarification: {
+        reason: 'unsupported_constraint',
+        seedType: null,
+        limit: null,
+        names: [],
+        unsupportedConstraints: [
+          { category: 'genre_exclusion', userText: 'rock' },
+        ],
+      },
+    });
+  });
+
+  it('keeps excluding a named artist', () => {
+    expect(
+      evaluate(
+        interpreted({
+          excludeArtists: { add: ['Taylor Swift'], remove: [] },
+        }),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { excludeArtists: ['Taylor Swift'] },
+    });
+  });
+
+  it('refuses a reported genre exclusion instead of claiming it was applied', () => {
+    const result = evaluate(
+      interpreted(
+        {},
+        {
+          unsupported: [{ category: 'genre_exclusion', userText: 'sin rock' }],
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      status: 'needs_clarification',
+      clarification: {
+        reason: 'unsupported_constraint',
+        unsupportedConstraints: [
+          { category: 'genre_exclusion', userText: 'sin rock' },
+        ],
+      },
+    });
+  });
+
+  it('applies nothing when a genre exclusion comes with executable changes', () => {
+    const result = evaluate(
+      interpreted(
+        { popularity: { operation: 'set', value: 'rarities' } },
+        {
+          unsupported: [{ category: 'genre_exclusion', userText: 'sin rock' }],
+        },
+      ),
+    );
+
+    expect(clarificationReason(result)).toBe('unsupported_constraint');
+  });
+
+  it('does not promise to keep an artist while excluding a genre it cannot verify', () => {
+    const result = evaluate(
+      interpreted(
+        {},
+        {
+          preservation: { artists: { add: ['Dua Lipa'], remove: [] } },
+          unsupported: [{ category: 'genre_exclusion', userText: 'sin pop' }],
+        },
+      ),
+    );
+
+    expect(clarificationReason(result)).toBe('unsupported_constraint');
+  });
+
+  it('still removes a genre that is a seed of the current request', () => {
+    const current = intent({
+      kind: 'genre_mix',
+      artists: [],
+      genres: ['rock', 'jazz'],
+    });
+
+    expect(
+      evaluate(interpreted({ genres: { add: [], remove: ['rock'] } }), current),
+    ).toMatchObject({ status: 'proposed', intent: { genres: ['jazz'] } });
+  });
+});
+
+describe('relative duration', () => {
+  const adjust = (deltaMinutes: number) =>
+    interpreted({
+      targetDurationMinutes: { operation: 'adjust', deltaMinutes },
+    });
+
+  it('adds minutes to the persisted target', () => {
+    expect(
+      evaluate(
+        adjust(10),
+        intent({ targetTrackCount: null, targetDurationMinutes: 30 }),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { targetDurationMinutes: 40 },
+    });
+  });
+
+  it('removes minutes from the persisted target', () => {
+    expect(
+      evaluate(
+        adjust(-10),
+        intent({ targetTrackCount: null, targetDurationMinutes: 30 }),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { targetDurationMinutes: 20 },
+    });
+  });
+
+  it('is not idempotent: repeating it moves the target again', () => {
+    const current = intent({
+      targetTrackCount: null,
+      targetDurationMinutes: 30,
+    });
+    const first = evaluate(adjust(10), current);
+    if (first.status !== 'proposed') {
+      throw new Error('expected a proposal');
+    }
+
+    expect(evaluate(adjust(10), first.intent)).toMatchObject({
+      status: 'proposed',
+      intent: { targetDurationMinutes: 50 },
+    });
+  });
+
+  it('asks for a length when the request has no duration target to move', () => {
+    expect(
+      evaluate(adjust(10), intent({ targetDurationMinutes: null })),
+    ).toMatchObject({
+      status: 'needs_clarification',
+      clarification: { reason: 'ambiguous_request' },
+    });
+  });
+
+  it.each([
+    ['below the minimum', -30],
+    ['under zero', -45],
+    ['above the maximum', 10_080],
+  ])('refuses a target %s instead of clamping it', (_label, deltaMinutes) => {
+    const current = intent({
+      targetTrackCount: null,
+      targetDurationMinutes: 30,
+    });
+
+    expect(evaluate(adjust(deltaMinutes), current)).toMatchObject({
+      status: 'needs_clarification',
+      clarification: { reason: 'invalid_duration' },
+    });
+  });
+
+  it('treats a zero adjustment as unchanged', () => {
+    expect(
+      evaluate(
+        adjust(0),
+        intent({ targetTrackCount: null, targetDurationMinutes: 30 }),
+      ),
+    ).toEqual({ status: 'unchanged' });
+  });
+
+  it('composes with other changes in the same refinement', () => {
+    const result = evaluate(
+      interpreted({
+        targetDurationMinutes: { operation: 'adjust', deltaMinutes: 10 },
+        excludeArtists: { add: ['Coldplay'], remove: [] },
+      }),
+      intent({ targetTrackCount: null, targetDurationMinutes: 30 }),
+    );
+
+    expect(result).toMatchObject({
+      status: 'proposed',
+      intent: { targetDurationMinutes: 40, excludeArtists: ['Coldplay'] },
+    });
+  });
+});
+
+describe('effective state comparison', () => {
+  it('proposes excluding an artist the playlist does not contain, because the rule is persisted', () => {
+    expect(
+      evaluate(
+        interpreted({ excludeArtists: { add: ['Coldplay'], remove: [] } }),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { excludeArtists: ['Coldplay'] },
+    });
+  });
+
+  it('reports an exclusion that is already active as unchanged, whatever its spelling', () => {
+    const current = intent({ excludeArtists: ['Coldplay'] });
+
+    expect(
+      evaluate(
+        interpreted({ excludeArtists: { add: ['coldplay'], remove: [] } }),
+        current,
+      ),
+    ).toEqual({ status: 'unchanged' });
+  });
+
+  it('reports setting a preference to its default as unchanged', () => {
+    const current = intent({ popularity: null, orderMode: null });
+
+    expect(
+      evaluate(
+        interpreted({
+          popularity: { operation: 'set', value: 'balanced' },
+          orderMode: { operation: 'set', value: 'random' },
+        }),
+        current,
+      ),
+    ).toEqual({ status: 'unchanged' });
+  });
+
+  it('reports keeping an already kept position as unchanged', () => {
+    const preservation = { firstTracks: null, positions: [2], artists: [] };
+
+    expect(
+      evaluate(
+        interpreted(
+          {},
+          { preservation: { positions: { add: [2], remove: [] } } },
+        ),
+        intent(),
+        preservation,
+      ),
+    ).toEqual({ status: 'unchanged' });
   });
 });

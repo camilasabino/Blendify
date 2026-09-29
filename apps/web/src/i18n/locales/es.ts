@@ -537,6 +537,7 @@ export const es: Record<MessageKey, string> = {
   'ai.category.tempo': 'Tempo',
   'ai.category.progression': 'Progresión',
   'ai.category.artist_attribute': 'Datos de artistas',
+  'ai.category.genre_exclusion': 'Exclusión de género',
   'ai.category.other': 'Otro',
   'ai.summary.title': 'Esto es lo que entendió Blendify',
   'ai.summary.subtitle':
@@ -667,6 +668,8 @@ export const es: Record<MessageKey, string> = {
     'Termina o descarta el refinamiento actual antes de guardar esta playlist.',
   'ai.refine.review.title':
     'Cambios propuestos',
+  'ai.refine.review.settingsOnlySubtitle':
+    'No cambiaría ninguna canción. Aplica para guardar estos ajustes y Blendify los tendrá en cuenta en tus próximos cambios.',
   'ai.refine.review.subtitle':
     'Todavía no cambió nada. Aplica los cambios para actualizar tu playlist o cancela para quedarte con la actual.',
   'ai.refine.review.apply':
@@ -687,6 +690,8 @@ export const es: Record<MessageKey, string> = {
     'Estas partes de tu refinamiento todavía no son compatibles, así que no se aplicaron.',
   'ai.refine.diff.settings':
     'Ajustes',
+  'ai.refine.diff.noSongChanges':
+    'Tus canciones actuales quedan igual.',
   'ai.refine.diff.tracks':
     'Playlist',
   'ai.refine.diff.to':
@@ -756,7 +761,7 @@ export const es: Record<MessageKey, string> = {
   'ai.refine.unchanged.title':
     'No hace falta cambiar nada',
   'ai.refine.unchanged.body':
-    'Tu playlist ya cumple con ese pedido, así que Blendify no cambió nada.',
+    'Tu playlist y tus ajustes ya cumplen con ese pedido, así que Blendify no cambió nada.',
   'ai.refine.clarify.conflicting':
     'Algunos de estos cambios se contradicen. Prueba otro refinamiento.',
   'ai.refine.clarify.conflictingNamed':
@@ -769,6 +774,8 @@ export const es: Record<MessageKey, string> = {
     'Blendify necesita más detalle para hacer este cambio. Indica un número exacto de canciones o minutos, o qué agregar, quitar o mantener.',
   'ai.refine.clarify.unsupported':
     'Blendify todavía no puede hacer este tipo de cambio. Prueba otro refinamiento.',
+  'ai.refine.clarify.genreExclusion':
+    'Blendify todavía no puede excluir canciones por género de forma confiable, así que no cambió tu playlist. Indica artistas o canciones para dejar afuera, o elige los géneros que quieres.',
   'ai.refine.clarify.unsupportedNamed':
     'Blendify todavía no puede hacer estos cambios: {items}. Prueba otro refinamiento.',
   'ai.refine.clarify.notARefinement':

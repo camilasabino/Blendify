@@ -24,7 +24,7 @@ import {
 } from './ai-seeds';
 
 const MAX_KEEP_SEED_OPTIONS = 5;
-const MIN_TARGET_DURATION_MINUTES = 1;
+export const MIN_TARGET_DURATION_MINUTES = 1;
 const MOOD_ONLY_KIND: PlaylistKind = 'genre_mix';
 
 export function normalizeAiIntent(intent: AiIntent): AiIntent {

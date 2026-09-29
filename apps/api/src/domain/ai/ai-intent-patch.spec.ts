@@ -4,7 +4,8 @@ import {
   applyPreservationPatch,
   conflictingPatchLabels,
   EMPTY_AI_PRESERVATION,
-  type AiIntentPatch,
+  resolveRelativeDuration,
+  type AbsoluteAiIntentPatch,
   type AiPreservationPatch,
 } from './ai-intent-patch';
 
@@ -28,7 +29,9 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
   };
 }
 
-function patch(overrides: Partial<AiIntentPatch> = {}): AiIntentPatch {
+function patch(
+  overrides: Partial<AbsoluteAiIntentPatch> = {},
+): AbsoluteAiIntentPatch {
   return {
     kind: null,
     artists: NO_NAMES,
@@ -250,5 +253,79 @@ describe('conflictingPatchLabels', () => {
         preservationPatch(),
       ),
     ).toEqual([]);
+  });
+});
+
+describe('resolveRelativeDuration', () => {
+  const adjusting = (deltaMinutes: number) => ({
+    ...patch(),
+    targetDurationMinutes: { operation: 'adjust' as const, deltaMinutes },
+  });
+
+  it('turns an adjustment into the absolute target owned by the deterministic layer', () => {
+    expect(
+      resolveRelativeDuration(
+        intent({ targetDurationMinutes: 30 }),
+        adjusting(10),
+      ),
+    ).toEqual({
+      status: 'resolved',
+      patch: {
+        ...patch(),
+        targetDurationMinutes: { operation: 'set', value: 40 },
+      },
+    });
+  });
+
+  it('leaves absolute and untouched durations as they are', () => {
+    const set = { operation: 'set' as const, value: 45 };
+
+    expect(
+      resolveRelativeDuration(intent(), {
+        ...patch(),
+        targetDurationMinutes: set,
+      }),
+    ).toEqual({
+      status: 'resolved',
+      patch: { ...patch(), targetDurationMinutes: set },
+    });
+    expect(resolveRelativeDuration(intent(), patch())).toEqual({
+      status: 'resolved',
+      patch: patch(),
+    });
+  });
+
+  it('has no base without a persisted duration target', () => {
+    expect(
+      resolveRelativeDuration(
+        intent({ targetDurationMinutes: null }),
+        adjusting(10),
+      ),
+    ).toEqual({ status: 'no_target' });
+  });
+
+  it.each([-30, -31, 10_051])(
+    'refuses a resulting target outside the valid range (%i minutes)',
+    (deltaMinutes) => {
+      expect(
+        resolveRelativeDuration(
+          intent({ targetDurationMinutes: 30 }),
+          adjusting(deltaMinutes),
+        ),
+      ).toEqual({ status: 'out_of_range' });
+    },
+  );
+
+  it('accepts the shortest and longest valid targets', () => {
+    const current = intent({ targetDurationMinutes: 30 });
+
+    expect(resolveRelativeDuration(current, adjusting(-29))).toMatchObject({
+      status: 'resolved',
+      patch: { targetDurationMinutes: { value: 1 } },
+    });
+    expect(resolveRelativeDuration(current, adjusting(10_050))).toMatchObject({
+      status: 'resolved',
+      patch: { targetDurationMinutes: { value: 10_080 } },
+    });
   });
 });

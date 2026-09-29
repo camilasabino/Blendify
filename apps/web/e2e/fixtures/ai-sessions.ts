@@ -244,6 +244,39 @@ export function candidateRefinement(
   }
 }
 
+export function settingsOnlyRefinement(
+  base: AiSessionStateDto = generatedState(),
+  id = AI_REFINEMENT_ID,
+): Extract<AiRefinementDto, { status: 'candidate_ready' }> {
+  const current = generatedExecution(base)
+  return {
+    id,
+    status: 'candidate_ready',
+    intent: { ...(base.intent ?? reviewIntent), excludeArtists: ['Coldplay'] },
+    preservation: { firstTracks: null, positions: [], artists: [] },
+    notApplied: [],
+    candidate: {
+      playlist: current.playlist,
+      trackCount: current.trackCount,
+      durationMs: current.durationMs,
+      unmetConstraints: current.unmetConstraints,
+    },
+    diff: {
+      tracks: {
+        added: [],
+        removed: [],
+        moved: [],
+        retainedCount: current.trackCount,
+        replacedCount: 0,
+        before: { trackCount: current.trackCount, durationMs: current.durationMs },
+        after: { trackCount: current.trackCount, durationMs: current.durationMs },
+      },
+      intent: [{ field: 'excludeArtists', added: ['Coldplay'], removed: [] }],
+      preservedPositions: [],
+    },
+  }
+}
+
 export function pendingState(
   refinement: AiRefinementDto,
   base: AiSessionStateDto = generatedState(),

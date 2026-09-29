@@ -6,6 +6,7 @@ from typing import Any
 
 from app.models.intent import IntentTrackReference
 from app.models.refinement import (
+    AdjustDurationMinutes,
     ClearValue,
     InterpretedRefinement,
     NameListPatch,
@@ -21,7 +22,7 @@ from evals.intent_eval import (
     normalize_name,
 )
 
-DATASET_PATH = Path(__file__).resolve().parent / "refinement-eval-v2.json"
+DATASET_PATH = Path(__file__).resolve().parent / "refinement-eval-v3.json"
 
 RefinementResult = InterpretedRefinement | RefinementClarificationNeeded
 ListPatch = NameListPatch | TrackListPatch | PositionListPatch
@@ -55,6 +56,7 @@ EXPECTATION_KEYS = frozenset(
         "changedWithin",
         "set",
         "setIfChanged",
+        "adjust",
         "clear",
         "add",
         "addOneOf",
@@ -124,6 +126,7 @@ def _check_semantics(expect: dict[str, Any], result: RefinementResult) -> list[s
     return [
         *_check_changed(expect, changed),
         *_check_scalars(expect, scalars),
+        *_check_adjustments(expect, scalars),
         *_check_lists(expect, lists),
         *_check_categories(expect, categories),
     ]
@@ -186,6 +189,18 @@ def _check_scalars(expect: dict[str, Any], scalars: dict[str, Any]) -> list[str]
     return failures
 
 
+def _check_adjustments(expect: dict[str, Any], scalars: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
+
+    for path, delta in expect.get("adjust", {}).items():
+        operation = scalars[path]
+        if not isinstance(operation, AdjustDurationMinutes) or operation.delta_minutes != delta:
+            failures.append(
+                f"adjust: expected {path} adjusted by {delta}, got {_describe(operation)}"
+            )
+    return failures
+
+
 def _check_lists(expect: dict[str, Any], lists: dict[str, ListPatch]) -> list[str]:
     failures: list[str] = []
 
@@ -223,7 +238,7 @@ def _check_categories(expect: dict[str, Any], categories: Sequence[str]) -> list
 
 
 def _set_value(operation: Any) -> PatchValue | None:
-    if operation is None or isinstance(operation, ClearValue):
+    if operation is None or isinstance(operation, ClearValue | AdjustDurationMinutes):
         return None
     return operation.value
 
@@ -233,6 +248,8 @@ def _describe(operation: Any) -> str:
         return "unchanged"
     if isinstance(operation, ClearValue):
         return "clear"
+    if isinstance(operation, AdjustDurationMinutes):
+        return f"adjust {operation.delta_minutes}"
     return f"set {operation.value}"
 
 

@@ -1,6 +1,7 @@
 import type { AiUnsupportedConstraintCategory } from '@blendify/contracts';
 
-export type AiConstraintCapability = 'needs_clarification' | 'deferred';
+export type AiConstraintCapability =
+  'needs_clarification' | 'unsupported' | 'deferred';
 
 const CAPABILITY_BY_CATEGORY: Record<
   AiUnsupportedConstraintCategory,
@@ -9,6 +10,7 @@ const CAPABILITY_BY_CATEGORY: Record<
   energy: 'needs_clarification',
   tempo: 'needs_clarification',
   progression: 'needs_clarification',
+  genre_exclusion: 'unsupported',
   duration: 'deferred',
   era: 'deferred',
   mood: 'deferred',

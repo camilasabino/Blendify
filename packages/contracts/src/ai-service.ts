@@ -18,6 +18,8 @@ export const AI_INTENT_TARGET_DURATION_MINUTES_MAX = 10_080;
 export const AI_INTENT_USER_TEXT_MAX_LENGTH = 300;
 export const AI_PROMPT_VERSION_MAX_LENGTH = 64;
 export const AI_REFINEMENT_TEXT_MAX_LENGTH = AI_REFINEMENT_MAX_LENGTH;
+export const AI_REFINEMENT_DURATION_DELTA_MINUTES_MAX =
+  AI_INTENT_TARGET_DURATION_MINUTES_MAX;
 export const AI_REFINEMENT_TRACK_POSITION_MAX = 1_000;
 export const AI_REFINEMENT_PRESERVED_POSITIONS_MAX_ITEMS = MAX_TRACKS;
 export const AI_SERVICE_ERROR_MESSAGE_MAX_LENGTH = 300;
@@ -121,6 +123,23 @@ function nullableValuePatch<T extends z.ZodType>(value: T) {
     .nullable();
 }
 
+const AdjustDurationOperationSchema = z.strictObject({
+  operation: z.literal('adjust'),
+  deltaMinutes: z
+    .number()
+    .int()
+    .min(-AI_REFINEMENT_DURATION_DELTA_MINUTES_MAX)
+    .max(AI_REFINEMENT_DURATION_DELTA_MINUTES_MAX),
+});
+
+export const DurationMinutesPatchSchema = z
+  .discriminatedUnion('operation', [
+    setOperation(DurationMinutesSchema),
+    ClearOperationSchema,
+    AdjustDurationOperationSchema,
+  ])
+  .nullable();
+
 export const NameListPatchSchema = z.strictObject({
   add: IntentNameListSchema,
   remove: IntentNameListSchema,
@@ -144,7 +163,7 @@ export const IntentPatchSchema = z.strictObject({
   genres: NameListPatchSchema,
   seedTracks: TrackListPatchSchema,
   targetTrackCount: nullableValuePatch(TrackCountSchema),
-  targetDurationMinutes: nullableValuePatch(DurationMinutesSchema),
+  targetDurationMinutes: DurationMinutesPatchSchema,
   mood: nullableValuePatch(AiMoodSchema),
   popularity: nullableValuePatch(PopularityModeSchema),
   orderMode: nullableValuePatch(TrackOrderModeSchema),
@@ -235,6 +254,7 @@ export type InterpretIntentResponse = z.infer<
 export type NameListPatch = z.infer<typeof NameListPatchSchema>;
 export type TrackListPatch = z.infer<typeof TrackListPatchSchema>;
 export type PositionListPatch = z.infer<typeof PositionListPatchSchema>;
+export type DurationMinutesPatch = z.infer<typeof DurationMinutesPatchSchema>;
 export type IntentPatch = z.infer<typeof IntentPatchSchema>;
 export type PreservationConstraints = z.infer<
   typeof PreservationConstraintsSchema

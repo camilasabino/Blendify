@@ -12,6 +12,7 @@ import {
   generatedState,
   pendingState,
   refinementResult,
+  settingsOnlyRefinement,
 } from './fixtures/ai-sessions'
 
 const SESSION_URL = `**/api/ai/sessions/${AI_REVIEW_SESSION_ID}`
@@ -251,6 +252,60 @@ test.describe('Create with AI refinement', () => {
 
     await expect(page.getByRole('button', { name: 'Prepare transfer' })).toBeVisible()
     expect(server.state.refinement).toBeNull()
+  })
+
+  test('a settings-only proposal says no song changes and Apply saves the rule', async ({
+    page,
+  }) => {
+    await mockGuestSession(page)
+    const server: ServerSession = { state: generatedState() }
+    await restore(page, server)
+    await routeRefinements(page, server, () => settingsOnlyRefinement())
+    await routeSettlement(page, server)
+    const settlements = trackRequests(page, /\/(apply|dismiss)$/)
+    await page.goto('/app/ai')
+
+    await submitRefinement(page, 'Excluir a Coldplay')
+
+    await expect(page.getByRole('heading', { name: 'Proposed changes' })).toBeFocused()
+    await expect(
+      page.getByText(
+        'No songs would change. Apply to save these settings, and Blendify will follow them in your next changes.',
+      ),
+    ).toBeVisible()
+    await expect(page.getByText('Your current songs stay the same.')).toBeVisible()
+    await expect(page.getByRole('list', { name: 'Songs in the proposed playlist' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Apply changes' }).click()
+
+    await expect(page.getByRole('button', { name: 'Prepare transfer' })).toBeVisible()
+    expect(settlements).toHaveLength(1)
+    expect(server.state.intent?.excludeArtists).toContain('Coldplay')
+  })
+
+  test('a genre exclusion is explained as unsupported and offers no Apply', async ({ page }) => {
+    await mockGuestSession(page)
+    const server: ServerSession = { state: generatedState() }
+    await restore(page, server)
+    await routeRefinements(page, server, () => ({
+      id: AI_REFINEMENT_ID,
+      status: 'needs_clarification',
+      clarification: {
+        reason: 'unsupported_constraint',
+        seedType: null,
+        limit: null,
+        names: [],
+        unsupportedConstraints: [{ category: 'genre_exclusion', userText: 'sin canciones de rock' }],
+      },
+    }))
+    await routeSettlement(page, server)
+    await page.goto('/app/ai')
+
+    await submitRefinement(page, 'Sin canciones de rock')
+
+    await expect(page.getByRole('heading', { name: 'This change needs another try' })).toBeFocused()
+    await expect(page.getByText(/can’t reliably exclude songs by genre yet/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Apply changes' })).toHaveCount(0)
   })
 
   test('a failed candidate keeps the current playlist and can be dismissed', async ({ page }) => {

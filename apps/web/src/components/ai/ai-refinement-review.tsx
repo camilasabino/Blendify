@@ -12,6 +12,7 @@ import { generationFailureView } from './ai-generation-copy'
 import { AiRefinementBadge } from './ai-refinement-badge'
 import { refinementClarificationMessage } from './ai-refinement-copy'
 import { AiRefinementDiff } from './ai-refinement-diff'
+import { changesSongs } from './ai-refinement-effect'
 import { AiUnmetConstraints } from './ai-unmet-constraints'
 
 type AiRefinementReviewProps = Readonly<{
@@ -109,6 +110,7 @@ function CandidateReview({
   const moved = new Set(diff.tracks.moved.map((item) => item.to))
   const kept = new Set(diff.preservedPositions)
   const isBusy = activity !== null
+  const songsChange = changesSongs(diff.tracks)
   const meta = [
     formatSongCount(candidate.trackCount, t),
     candidate.durationMs > 0 ? formatListeningTime(candidate.durationMs) : null,
@@ -143,7 +145,9 @@ function CandidateReview({
 
   return (
     <ReviewPanel title={t('ai.refine.review.title')} headingRef={headingRef} tone="proposed">
-      <p className="text-sm leading-relaxed text-cream-300">{t('ai.refine.review.subtitle')}</p>
+      <p className="text-sm leading-relaxed text-cream-300">
+        {songsChange ? t('ai.refine.review.subtitle') : t('ai.refine.review.settingsOnlySubtitle')}
+      </p>
 
       <AiRefinementDiff diff={diff} currentTracks={currentTracks} proposedTracks={tracks} />
 
@@ -162,20 +166,22 @@ function CandidateReview({
         </div>
       ) : null}
 
-      <div className="space-y-3">
-        <div className="space-y-0.5">
-          <h4 className="font-display text-sm font-semibold text-cream-100">
-            {t('ai.refine.review.proposedPlaylist')}
-          </h4>
-          <p className="text-sm text-cream-400">{meta}</p>
+      {songsChange ? (
+        <div className="space-y-3">
+          <div className="space-y-0.5">
+            <h4 className="font-display text-sm font-semibold text-cream-100">
+              {t('ai.refine.review.proposedPlaylist')}
+            </h4>
+            <p className="text-sm text-cream-400">{meta}</p>
+          </div>
+          <AiUnmetConstraints constraints={candidate.unmetConstraints} />
+          <GeneratedTrackList
+            tracks={tracks}
+            label={t('ai.refine.review.proposedTrackList')}
+            accessory={badgeFor}
+          />
         </div>
-        <AiUnmetConstraints constraints={candidate.unmetConstraints} />
-        <GeneratedTrackList
-          tracks={tracks}
-          label={t('ai.refine.review.proposedTrackList')}
-          accessory={badgeFor}
-        />
-      </div>
+      ) : null}
 
       <ActionError error={error} />
       <Actions>

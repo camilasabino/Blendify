@@ -5,6 +5,7 @@ import { useT } from '@/i18n/use-t'
 import { formatCreditedArtists, formatListeningTime } from '@/lib/utils'
 import { AiRefinementBadge } from './ai-refinement-badge'
 import { intentChangeView, type IntentChangeView } from './ai-refinement-copy'
+import { changesSongs } from './ai-refinement-effect'
 
 type AiRefinementDiffProps = Readonly<{
   diff: AiRefinementDiffDto
@@ -34,8 +35,7 @@ export function AiRefinementDiff({ diff, currentTracks, proposedTracks }: AiRefi
     { key: 'retained', label: t('ai.refine.diff.retained'), value: tracks.retainedCount },
     { key: 'kept', label: t('ai.refine.diff.kept'), value: diff.preservedPositions.length },
   ].filter((stat) => stat.value > 0)
-  const hasTrackDetails =
-    tracks.added.length + tracks.removed.length + tracks.moved.length > 0
+  const songsChange = changesSongs(tracks)
 
   return (
     <div className="space-y-4">
@@ -50,36 +50,31 @@ export function AiRefinementDiff({ diff, currentTracks, proposedTracks }: AiRefi
         </div>
       ) : null}
 
-      <div className="space-y-2">
-        <h4 className="text-eyebrow text-cream-400">{t('ai.refine.diff.tracks')}</h4>
-        <dl className="grid grid-cols-2 gap-3">
-          <ValueChange
-            label={t('ai.refine.diff.songCount')}
-            from={String(tracks.before.trackCount)}
-            to={String(tracks.after.trackCount)}
-          />
-          <ValueChange
-            label={t('ai.refine.diff.length')}
-            from={durationLabel(tracks.before.durationMs)}
-            to={durationLabel(tracks.after.durationMs)}
-          />
-        </dl>
-        {stats.length > 0 ? (
-          <dl className="flex flex-wrap gap-2">
-            {stats.map((stat) => (
-              <div
-                key={stat.key}
-                className="flex items-baseline gap-1.5 rounded-control border border-divider px-2.5 py-1.5"
-              >
-                <dt className="text-xs text-cream-400">{stat.label}</dt>
-                <dd className="text-sm font-medium tabular-nums text-cream-50">{stat.value}</dd>
-              </div>
-            ))}
+      {songsChange ? (
+        <div className="space-y-2">
+          <h4 className="text-eyebrow text-cream-400">{t('ai.refine.diff.tracks')}</h4>
+          <dl className="grid grid-cols-2 gap-3">
+            <ValueChange
+              label={t('ai.refine.diff.songCount')}
+              from={String(tracks.before.trackCount)}
+              to={String(tracks.after.trackCount)}
+            />
+            <ValueChange
+              label={t('ai.refine.diff.length')}
+              from={durationLabel(tracks.before.durationMs)}
+              to={durationLabel(tracks.after.durationMs)}
+            />
           </dl>
-        ) : null}
-      </div>
+          <StatList stats={stats} />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-sm text-cream-300">{t('ai.refine.diff.noSongChanges')}</p>
+          <StatList stats={stats.filter((stat) => stat.key === 'kept')} />
+        </div>
+      )}
 
-      {hasTrackDetails ? (
+      {songsChange ? (
         <details className="group rounded-control border border-divider">
           <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-cream-100 hover:text-cream-50 focus-visible:outline-2 focus-visible:outline-focus">
             {t('ai.refine.diff.details')}
@@ -132,6 +127,25 @@ export function AiRefinementDiff({ diff, currentTracks, proposedTracks }: AiRefi
         </details>
       ) : null}
     </div>
+  )
+}
+
+function StatList({ stats }: Readonly<{ stats: readonly { key: string; label: string; value: number }[] }>) {
+  if (stats.length === 0) {
+    return null
+  }
+  return (
+    <dl className="flex flex-wrap gap-2">
+      {stats.map((stat) => (
+        <div
+          key={stat.key}
+          className="flex items-baseline gap-1.5 rounded-control border border-divider px-2.5 py-1.5"
+        >
+          <dt className="text-xs text-cream-400">{stat.label}</dt>
+          <dd className="text-sm font-medium tabular-nums text-cream-50">{stat.value}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 

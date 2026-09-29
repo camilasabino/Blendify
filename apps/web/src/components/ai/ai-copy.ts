@@ -45,6 +45,7 @@ export const CATEGORY_LABEL_KEYS: Record<AiUnsupportedConstraintCategory, Messag
   tempo: 'ai.category.tempo',
   progression: 'ai.category.progression',
   artist_attribute: 'ai.category.artist_attribute',
+  genre_exclusion: 'ai.category.genre_exclusion',
   other: 'ai.category.other',
 }
 

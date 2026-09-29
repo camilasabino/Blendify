@@ -78,6 +78,21 @@ describe.each(LOCALES)('Create with AI refinement copy (%s)', (locale) => {
     },
   )
 
+  it('states the genre exclusion limit without listing the request as a change', () => {
+    const message = refinementClarificationMessage(
+      clarification('unsupported_constraint', {
+        unsupportedConstraints: [
+          { category: 'activity', userText: 'for running' },
+          { category: 'genre_exclusion', userText: 'sin rock' },
+        ],
+      }),
+      t,
+    )
+
+    expect(message).toBe(t('ai.refine.clarify.genreExclusion'))
+    expect(message).not.toMatch(/\{\w+\}/)
+  })
+
   it('names the artist without claiming it does not exist', () => {
     const message = refinementClarificationMessage(
       clarification('preserved_artist_not_found', { limit: null }),

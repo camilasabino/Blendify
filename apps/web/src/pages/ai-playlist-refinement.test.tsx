@@ -17,6 +17,7 @@ import {
   candidateReadyRefinement,
   generatedAiSessionState,
   pendingAiSessionState,
+  settingsOnlyRefinement,
   storeAiSession,
 } from '@/test/ai-session-fixtures'
 import { AiPlaylistPage } from './ai-playlist-page'
@@ -417,11 +418,80 @@ describe('Create with AI refinement', () => {
     )
 
     expect(screen.getByRole('heading', { name: 'No changes needed' })).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Your playlist and settings already match that request, so Blendify didn’t change anything.',
+      ),
+    ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Apply changes' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Continue with current playlist' }))
 
     await screen.findByRole('button', { name: 'Prepare transfer' })
     expect(calls.filter((call) => call.url.endsWith('/dismiss'))).toHaveLength(1)
+  })
+
+  it('offers Apply for a settings-only proposal and says that no song changes', async () => {
+    const user = userEvent.setup()
+    const { calls } = await renderPage(
+      {
+        [APPLY_ROUTE]: () => jsonResponse(generatedAiSessionState()),
+      },
+      { state: pendingAiSessionState(settingsOnlyRefinement()) },
+    )
+
+    const review = screen.getByRole('heading', { name: 'Proposed changes' }).closest(
+      'section',
+    ) as HTMLElement
+    expect(
+      within(review).getByText(
+        'No songs would change. Apply to save these settings, and Blendify will follow them in your next changes.',
+      ),
+    ).toBeInTheDocument()
+    expect(within(review).getByText('Avoiding artists')).toBeInTheDocument()
+    expect(within(review).getByText(/Muse/)).toBeInTheDocument()
+    expect(within(review).getByText('Your current songs stay the same.')).toBeInTheDocument()
+    expect(within(review).queryByRole('list', { name: 'Songs in the proposed playlist' })).toBeNull()
+    expect(within(review).queryByText('Replacements')).toBeNull()
+    expect(within(review).queryByText('Retained')).toBeNull()
+    expect(within(review).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+
+    await user.click(within(review).getByRole('button', { name: 'Apply changes' }))
+
+    await screen.findByRole('button', { name: 'Prepare transfer' })
+    expect(calls.filter((call) => call.url.endsWith('/apply'))).toHaveLength(1)
+  })
+
+  it('does not present a proposal that changes songs as settings-only', async () => {
+    await renderPage({}, { state: pendingAiSessionState(candidateReadyRefinement()) })
+
+    expect(screen.queryByText('Your current songs stay the same.')).toBeNull()
+    expect(
+      screen.getByRole('list', { name: 'Songs in the proposed playlist' }),
+    ).toBeInTheDocument()
+  })
+
+  it('explains that genres cannot be excluded reliably and never claims a genre was removed', async () => {
+    await renderPage(
+      {},
+      {
+        state: pendingAiSessionState({
+          id: AI_REFINEMENT_ID,
+          status: 'needs_clarification',
+          clarification: {
+            reason: 'unsupported_constraint',
+            seedType: null,
+            limit: null,
+            names: [],
+            unsupportedConstraints: [{ category: 'genre_exclusion', userText: 'sin rock' }],
+          },
+        }),
+      },
+    )
+
+    expect(
+      screen.getByText(/Blendify can’t reliably exclude songs by genre yet/),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Apply changes' })).toBeNull()
   })
 
   it('explains a failed candidate and dismisses it', async () => {

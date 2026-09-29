@@ -33,6 +33,7 @@ UnsupportedConstraintCategory = Literal[
     "tempo",
     "progression",
     "artist_attribute",
+    "genre_exclusion",
     "other",
 ]
 ClarificationReason = Literal[

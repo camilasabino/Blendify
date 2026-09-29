@@ -67,6 +67,14 @@ export function resolveCuratedGenreSeeds(
   };
 }
 
+export function isCuratedGenreName(name: string): boolean {
+  const resolution = resolveGenreExpression(name);
+
+  return (
+    resolution.status === 'resolved' && resolution.match !== 'style_family'
+  );
+}
+
 export function aiGenreKey(expression: string): string {
   const resolution = resolveGenreExpression(expression);
 

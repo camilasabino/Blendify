@@ -1,16 +1,34 @@
-import type {
-  IntentPatch,
-  NameListPatch,
-  PositionListPatch,
-  PreservationConstraints,
-  PreservationPatch,
-  TrackListPatch,
+import {
+  AI_INTENT_TARGET_DURATION_MINUTES_MAX,
+  type IntentPatch,
+  type NameListPatch,
+  type PositionListPatch,
+  type PreservationConstraints,
+  type PreservationPatch,
+  type TrackListPatch,
 } from '@blendify/contracts/ai-service';
 import type { AiIntent, AiTrackReference } from './ai-intent';
 import { aiGenreKey } from './ai-genre-seeds';
-import { aiNameKey, aiTrackKey } from './ai-intent-rules';
+import {
+  MIN_TARGET_DURATION_MINUTES,
+  aiNameKey,
+  aiTrackKey,
+} from './ai-intent-rules';
 
 export type AiIntentPatch = IntentPatch;
+export type AbsoluteAiIntentPatch = Omit<
+  AiIntentPatch,
+  'targetDurationMinutes'
+> & {
+  targetDurationMinutes: Exclude<
+    AiIntentPatch['targetDurationMinutes'],
+    { operation: 'adjust' }
+  >;
+};
+export type RelativeDurationResolution =
+  | { status: 'resolved'; patch: AbsoluteAiIntentPatch }
+  | { status: 'no_target' }
+  | { status: 'out_of_range' };
 export type AiPreservation = PreservationConstraints;
 export type AiPreservationPatch = PreservationPatch;
 
@@ -23,9 +41,41 @@ export const EMPTY_AI_PRESERVATION: AiPreservation = {
 type ValuePatch<T> =
   { operation: 'set'; value: T } | { operation: 'clear' } | null;
 
-export function applyIntentPatch(
+export function resolveRelativeDuration(
   intent: AiIntent,
   patch: AiIntentPatch,
+): RelativeDurationResolution {
+  const { targetDurationMinutes } = patch;
+  if (targetDurationMinutes?.operation !== 'adjust') {
+    return {
+      status: 'resolved',
+      patch: { ...patch, targetDurationMinutes },
+    };
+  }
+  if (intent.targetDurationMinutes === null) {
+    return { status: 'no_target' };
+  }
+
+  const minutes =
+    intent.targetDurationMinutes + targetDurationMinutes.deltaMinutes;
+  if (
+    minutes < MIN_TARGET_DURATION_MINUTES ||
+    minutes > AI_INTENT_TARGET_DURATION_MINUTES_MAX
+  ) {
+    return { status: 'out_of_range' };
+  }
+  return {
+    status: 'resolved',
+    patch: {
+      ...patch,
+      targetDurationMinutes: { operation: 'set', value: minutes },
+    },
+  };
+}
+
+export function applyIntentPatch(
+  intent: AiIntent,
+  patch: AbsoluteAiIntentPatch,
 ): AiIntent {
   return {
     ...intent,

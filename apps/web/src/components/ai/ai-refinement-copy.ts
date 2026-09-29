@@ -130,6 +130,9 @@ function unsupportedRefinementMessage(
   clarification: AiRefinementClarificationDto,
   t: Translate,
 ): string {
+  if (clarification.unsupportedConstraints.some((constraint) => constraint.category === 'genre_exclusion')) {
+    return t('ai.refine.clarify.genreExclusion')
+  }
   const items = clarification.unsupportedConstraints
     .map((constraint) => `“${constraint.userText}”`)
     .join(', ')

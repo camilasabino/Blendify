@@ -20,6 +20,7 @@ from app.models.interpretation import AI_INTENT_PROMPT_MAX_LENGTH, PromptVersion
 from app.models.wire import WireModel
 
 AI_REFINEMENT_TEXT_MAX_LENGTH = AI_INTENT_PROMPT_MAX_LENGTH
+AI_REFINEMENT_DURATION_DELTA_MINUTES_MAX = 10_080
 AI_REFINEMENT_TRACK_POSITION_MAX = 1_000
 AI_REFINEMENT_PRESERVED_POSITIONS_MAX_ITEMS = 50
 
@@ -58,6 +59,18 @@ class SetDurationMinutes(WireModel):
     value: TargetDurationMinutes
 
 
+class AdjustDurationMinutes(WireModel):
+    operation: Literal["adjust"]
+    delta_minutes: Annotated[
+        int,
+        Field(
+            ge=-AI_REFINEMENT_DURATION_DELTA_MINUTES_MAX,
+            le=AI_REFINEMENT_DURATION_DELTA_MINUTES_MAX,
+            strict=True,
+        ),
+    ]
+
+
 class SetMood(WireModel):
     operation: Literal["set"]
     value: Mood
@@ -79,7 +92,9 @@ class SetFirstTracks(WireModel):
 
 
 TrackCountPatch = Annotated[SetTrackCount | ClearValue, Field(discriminator="operation")]
-DurationMinutesPatch = Annotated[SetDurationMinutes | ClearValue, Field(discriminator="operation")]
+DurationMinutesPatch = Annotated[
+    SetDurationMinutes | ClearValue | AdjustDurationMinutes, Field(discriminator="operation")
+]
 MoodPatch = Annotated[SetMood | ClearValue, Field(discriminator="operation")]
 PopularityPatch = Annotated[SetPopularity | ClearValue, Field(discriminator="operation")]
 OrderModePatch = Annotated[SetOrderMode | ClearValue, Field(discriminator="operation")]

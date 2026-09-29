@@ -183,6 +183,38 @@ export function candidateReadyRefinement(
   }
 }
 
+export function settingsOnlyRefinement(
+  id = AI_REFINEMENT_ID,
+): Extract<AiRefinementDto, { status: 'candidate_ready' }> {
+  const tracks = aiTracks(20)
+  return {
+    id,
+    status: 'candidate_ready',
+    intent: { ...aiIntent, excludeArtists: [...aiIntent.excludeArtists, 'Muse'] },
+    preservation: { firstTracks: null, positions: [], artists: [] },
+    notApplied: [],
+    candidate: {
+      playlist: { ...aiGeneration().playlist, tracks },
+      trackCount: tracks.length,
+      durationMs: tracks.length * 180_000,
+      unmetConstraints: [],
+    },
+    diff: {
+      tracks: {
+        added: [],
+        removed: [],
+        moved: [],
+        retainedCount: tracks.length,
+        replacedCount: 0,
+        before: { trackCount: 20, durationMs: 3_600_000 },
+        after: { trackCount: 20, durationMs: 3_600_000 },
+      },
+      intent: [{ field: 'excludeArtists', added: ['Muse'], removed: [] }],
+      preservedPositions: [],
+    },
+  }
+}
+
 export function appliedCandidateState(): AiSessionStateDto {
   const candidate = candidateReadyRefinement()
   return {

@@ -104,6 +104,7 @@
                             "duration",
                             "energy",
                             "era",
+                            "genre_exclusion",
                             "mood",
                             "other",
                             "progression",
@@ -334,6 +335,7 @@
                             "duration",
                             "energy",
                             "era",
+                            "genre_exclusion",
                             "mood",
                             "other",
                             "progression",
@@ -582,6 +584,7 @@
                     "duration",
                     "energy",
                     "era",
+                    "genre_exclusion",
                     "mood",
                     "other",
                     "progression",
@@ -711,6 +714,7 @@
                             "duration",
                             "energy",
                             "era",
+                            "genre_exclusion",
                             "mood",
                             "other",
                             "progression",
@@ -1167,6 +1171,25 @@
                             "type": "object",
                             "additionalProperties": false,
                             "properties": {
+                              "deltaMinutes": {
+                                "type": "integer",
+                                "minimum": -10080,
+                                "maximum": 10080
+                              },
+                              "operation": {
+                                "type": "string",
+                                "const": "adjust"
+                              }
+                            },
+                            "required": [
+                              "deltaMinutes",
+                              "operation"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
                               "operation": {
                                 "type": "string",
                                 "const": "clear"
@@ -1385,6 +1408,7 @@
                         "duration",
                         "energy",
                         "era",
+                        "genre_exclusion",
                         "mood",
                         "other",
                         "progression",

@@ -2999,6 +2999,106 @@ describe('Create with AI sessions over HTTP', () => {
       });
     });
 
+    describe('refinement semantics', () => {
+      const NO_NAMES = { add: [], remove: [] };
+
+      function planOf(
+        patch: Partial<
+          Extract<
+            PlanRefinementResponse['result'],
+            { outcome: 'interpreted' }
+          >['patch']
+        >,
+        unsupportedConstraints: Extract<
+          PlanRefinementResponse['result'],
+          { outcome: 'interpreted' }
+        >['unsupportedConstraints'] = [],
+      ): PlanRefinementResponse {
+        return refinementPlan({
+          outcome: 'interpreted',
+          patch: {
+            kind: null,
+            artists: NO_NAMES,
+            genres: NO_NAMES,
+            seedTracks: NO_NAMES,
+            targetTrackCount: null,
+            targetDurationMinutes: null,
+            mood: null,
+            popularity: null,
+            orderMode: null,
+            excludeArtists: NO_NAMES,
+            excludeTracks: NO_NAMES,
+            ...patch,
+          },
+          preservation: {
+            firstTracks: null,
+            positions: NO_NAMES,
+            artists: NO_NAMES,
+          },
+          unsupportedConstraints,
+        });
+      }
+
+      async function refinementOf(sessionKey: string, text: string) {
+        const response = await refine(sessionKey, { refinement: text }).expect(
+          200,
+        );
+        return AiRefinementResultSchema.parse(response.body).refinement;
+      }
+
+      it('never turns a genre into an excluded artist and keeps the applied state', async () => {
+        const sessionKey = await generatedSession();
+        const applied = world.stored.get(sessionKey)?.aiSafe;
+        const before = providerCallCounts();
+        world.planner.planRefinement.mockResolvedValueOnce(
+          planOf({ excludeArtists: { add: ['rock'], remove: [] } }),
+        );
+
+        const refinement = await refinementOf(sessionKey, 'Sin rock');
+
+        expect(refinement).toMatchObject({
+          status: 'needs_clarification',
+          clarification: {
+            reason: 'unsupported_constraint',
+            unsupportedConstraints: [
+              { category: 'genre_exclusion', userText: 'rock' },
+            ],
+          },
+        });
+        expect(world.stored.get(sessionKey)?.aiSafe).toEqual(applied);
+        expect(providerCallCounts()).toEqual(before);
+      });
+
+      it('reports repeating an active exclusion as unchanged with no provider calls', async () => {
+        const sessionKey = await generatedSession();
+        const before = providerCallCounts();
+        world.planner.planRefinement.mockResolvedValueOnce(
+          planOf({ excludeArtists: { add: ['coldplay'], remove: [] } }),
+        );
+
+        const refinement = await refinementOf(sessionKey, 'Sin Coldplay');
+
+        expect(refinement).toMatchObject({ status: 'unchanged' });
+        expect(providerCallCounts()).toEqual(before);
+      });
+
+      it('asks for a length instead of inventing a base for a relative duration', async () => {
+        const sessionKey = await generatedSession();
+        world.planner.planRefinement.mockResolvedValueOnce(
+          planOf({
+            targetDurationMinutes: { operation: 'adjust', deltaMinutes: 10 },
+          }),
+        );
+
+        const refinement = await refinementOf(sessionKey, '10 minutos más');
+
+        expect(refinement).toMatchObject({
+          status: 'needs_clarification',
+          clarification: { reason: 'ambiguous_request' },
+        });
+      });
+    });
+
     it('keeps the applied state when the refinement interpretation fails', async () => {
       const sessionKey = await generatedSession();
       const applied = world.stored.get(sessionKey);

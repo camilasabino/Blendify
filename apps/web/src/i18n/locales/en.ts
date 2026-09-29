@@ -524,6 +524,7 @@ export const en = {
   'ai.category.tempo': 'Tempo',
   'ai.category.progression': 'Progression',
   'ai.category.artist_attribute': 'Artist details',
+  'ai.category.genre_exclusion': 'Genre exclusion',
   'ai.category.other': 'Other',
   'ai.summary.title': 'Here’s what Blendify understood',
   'ai.summary.subtitle':
@@ -653,6 +654,8 @@ export const en = {
     'Finish or dismiss the current refinement before saving this playlist.',
   'ai.refine.review.title':
     'Proposed changes',
+  'ai.refine.review.settingsOnlySubtitle':
+    'No songs would change. Apply to save these settings, and Blendify will follow them in your next changes.',
   'ai.refine.review.subtitle':
     'Nothing has changed yet. Apply the changes to update your playlist, or cancel to keep the current one.',
   'ai.refine.review.apply':
@@ -673,6 +676,8 @@ export const en = {
     'These parts of your refinement aren’t supported, so they weren’t applied.',
   'ai.refine.diff.settings':
     'Settings',
+  'ai.refine.diff.noSongChanges':
+    'Your current songs stay the same.',
   'ai.refine.diff.tracks':
     'Playlist',
   'ai.refine.diff.to':
@@ -742,7 +747,7 @@ export const en = {
   'ai.refine.unchanged.title':
     'No changes needed',
   'ai.refine.unchanged.body':
-    'Your playlist already matches that request, so Blendify didn’t change anything.',
+    'Your playlist and settings already match that request, so Blendify didn’t change anything.',
   'ai.refine.clarify.conflicting':
     'Some of these changes contradict each other. Try a different refinement.',
   'ai.refine.clarify.conflictingNamed':
@@ -755,6 +760,8 @@ export const en = {
     'Blendify needs more detail to make this change. Give an exact number of songs or minutes, or name what to add, remove or keep.',
   'ai.refine.clarify.unsupported':
     'Blendify can’t make this kind of change yet. Try a different refinement.',
+  'ai.refine.clarify.genreExclusion':
+    'Blendify can’t reliably exclude songs by genre yet, so it didn’t change your playlist. Name artists or songs to leave out, or choose the genres you want instead.',
   'ai.refine.clarify.unsupportedNamed':
     'Blendify can’t make these changes yet: {items}. Try a different refinement.',
   'ai.refine.clarify.notARefinement':
