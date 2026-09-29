@@ -1,4 +1,8 @@
-import type { GeneratedPlaylistDto, GenerationProgress } from '@blendify/contracts'
+import type {
+  GeneratedPlaylistDto,
+  GenerationProgress,
+  PlaylistDetail,
+} from '@blendify/contracts'
 
 const jazzGeneration: GeneratedPlaylistDto['generation'] = {
   version: 1,
@@ -47,4 +51,23 @@ export const guestJazzPlaylistWithTransfer: GeneratedPlaylistDto = {
     token: 'e2e-transfer-token',
     expiresAt: '2099-01-01T00:00:00.000Z',
   },
+}
+
+export const spotifyJazzPlaylist: PlaylistDetail = {
+  id: 'playlist-1',
+  name: 'Blendify · Mix · Jazz',
+  description: '',
+  kind: 'genre_mix',
+  seeds: [{ type: 'genre', id: 'jazz', name: 'Jazz' }],
+  seedCount: 1,
+  trackCount: 1,
+  totalDurationMs: 545_000,
+  spotifyUrl: 'https://open.spotify.com/playlist/playlist-1',
+  spotifyId: 'playlist-1',
+  status: 'COMPLETED',
+  imageUrl: null,
+  createdAt: '2026-09-25T12:00:00.000Z',
+  updatedAt: '2026-09-25T12:00:00.000Z',
+  tracks: [jazzTrack],
+  generation: jazzGeneration,
 }

@@ -79,10 +79,19 @@ coding sessions only need the short summary in `CLAUDE.md`.
   - **Local React state** for local UI state (open/closed, form drafts,
     hover).
   - **Zustand** only for state that is genuinely shared across components and
-    is not a mirror of server data — e.g. `stores/generation-store.ts`
-    (in-flight generation epoch + `AbortController`, read by both playlist
-    forms and the app shell to cancel work on submit/logout). That is a
-    correct use of Zustand.
+    is not a mirror of server data — e.g. `stores/playlist-run-store.ts`
+    (the one active or finished Mix/Discover generation with its
+    `AbortController`) and `stores/generation-store.ts` (epoch +
+    `AbortController` for Create with AI). Those are correct uses of Zustand.
+  - **Client generation lifecycle (Mix/Discover)**: the run lives in
+    `stores/playlist-run-store.ts`, above the route components, and is driven
+    by `lib/playlist-run-coordinator.ts` (request, progress, terminal state,
+    Library/Stats invalidation). Route components only read it through
+    `hooks/use-playlist-run.ts`; never own a generation in component state or
+    a component-scoped mutation, and never abort it on unmount. Only logout,
+    account deletion, or discarding a Guest run when leaving its page cancels
+    it. The run is memory-only by design: there is no operation ID or status
+    endpoint, so it survives navigation inside the tab but not a refresh.
   - **Known violation to fix separately**: `stores/auth-store.ts` +
     `hooks/use-auth.ts` model the current user (server state fetched from
     `/api/auth/me`) in Zustand, with a hand-rolled retry backoff, in-flight

@@ -354,9 +354,9 @@ export const pt: Record<MessageKey, string> = {
     'Alterar estas configurações cria uma nova playlist. A que você acabou de criar continua no Spotify.',
   'create.generateNew': 'Criar nova playlist',
   'create.leaveNoteLibrary':
-    'Você pode sair desta página: a playlist será salva no Spotify e na sua biblioteca mesmo assim.',
+    'Você pode explorar outras seções enquanto ela é criada. A playlist será salva no Spotify e na sua biblioteca. Mantenha esta aba aberta: se você atualizar ou fechar a página, o Blendify não poderá mais mostrar o resultado.',
   'create.leaveNoteSpotify':
-    'Você pode sair desta página: a playlist será salva no Spotify mesmo assim.',
+    'Você pode explorar outras seções enquanto ela é criada. A playlist será salva no Spotify. Mantenha esta aba aberta: se você atualizar ou fechar a página, o Blendify não poderá mais mostrar o resultado.',
   'common.songsOne': '1 música',
   'common.songsMany': '{count} músicas',
   'preview.showAll': 'Ver todas as {count} músicas',
@@ -394,7 +394,7 @@ export const pt: Record<MessageKey, string> = {
   'common.opensNewTab':
     '(abre em uma nova aba)',
   'create.leaveNoteGuest':
-    'Mantenha esta página aberta até a playlist ficar pronta. Ela não é salva em lugar nenhum.',
+    'Mantenha esta página aberta até a playlist ficar pronta. Se você sair, ela é interrompida e nada é salvo.',
   'create.recreateNoteGuest':
     'Alterar estas configurações cria uma nova playlist, que substitui a que aparece aqui.',
   'guestResult.temporary':
@@ -805,4 +805,42 @@ export const pt: Record<MessageKey, string> = {
     'Não foi possível refinar a playlist. Tente de novo.',
   'ai.refine.error.settle':
     'Não foi possível atualizar a playlist. Tente de novo.',
+  'runStatus.label':
+    'Criação de playlist',
+  'runStatus.active.mix':
+    'Criando seu Mix',
+  'runStatus.active.discover':
+    'Criando sua playlist do Discover',
+  'runStatus.succeeded.mix':
+    'Seu Mix está pronto',
+  'runStatus.succeeded.discover':
+    'Sua playlist do Discover está pronta',
+  'runStatus.failed.mix':
+    'Não foi possível criar seu Mix',
+  'runStatus.failed.discover':
+    'Não foi possível criar sua playlist do Discover',
+  'runStatus.uncertain.mix':
+    'A conexão caiu ao criar seu Mix',
+  'runStatus.uncertain.discover':
+    'A conexão caiu ao criar sua playlist do Discover',
+  'runStatus.busy.mix':
+    'Espere seu Mix terminar antes de criar outra playlist.',
+  'runStatus.busy.discover':
+    'Espere sua playlist do Discover terminar antes de criar outra playlist.',
+  'runStatus.viewProgress':
+    'Ver progresso',
+  'runStatus.viewPlaylist':
+    'Ver playlist',
+  'runStatus.viewDetails':
+    'Ver detalhes',
+  'runStatus.dismiss':
+    'Dispensar',
+  'create.uncertainTitle':
+    'A conexão caiu',
+  'create.uncertainLibrary':
+    'O Blendify perdeu a conexão antes de confirmar o resultado. A playlist pode já existir, então confira sua biblioteca ou o Spotify antes de criá-la de novo.',
+  'create.uncertainSpotify':
+    'O Blendify perdeu a conexão antes de confirmar o resultado. A playlist pode já existir, então confira o Spotify antes de criá-la de novo.',
+  'create.openLibrary':
+    'Abrir biblioteca',
 }

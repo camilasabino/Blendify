@@ -3,7 +3,7 @@ import {
   parseGenerationStreamLine,
   readGenerationStream,
 } from '@/lib/generation-stream'
-import { ApiError } from '@/lib/api-error'
+import { ApiError, isGenerationOutcomeUncertain } from '@/lib/api-error'
 import {
   GeneratedPlaylistStreamEventSchema,
   GenerationStreamEventSchema,
@@ -187,5 +187,34 @@ describe('readGenerationStream contracts', () => {
     await expect(
       readGenerationStream(response, GeneratedPlaylistStreamEventSchema),
     ).resolves.toEqual(generatedPlaylist)
+  })
+})
+
+describe('interrupted generation streams', () => {
+  it('flags a stream that ends without a terminal event as an uncertain outcome', async () => {
+    const error = await readGenerationStream(
+      ndjson({ type: 'progress', phase: 'publishing', current: 1, total: 1, percent: 95 }),
+      GenerationStreamEventSchema,
+    ).catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(isGenerationOutcomeUncertain(error)).toBe(true)
+  })
+
+  it('does not treat a typed backend error or an unknown failure as uncertain', () => {
+    expect(
+      isGenerationOutcomeUncertain(
+        new ApiError('No tracks', 422, {
+          statusCode: 422,
+          code: 'NO_TRACKS_FOUND',
+          message: 'No tracks',
+        }),
+      ),
+    ).toBe(false)
+    expect(isGenerationOutcomeUncertain(new Error('bug'))).toBe(false)
+  })
+
+  it('treats a transport failure as uncertain', () => {
+    expect(isGenerationOutcomeUncertain(new TypeError('network error'))).toBe(true)
   })
 })

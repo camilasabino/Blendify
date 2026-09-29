@@ -36,6 +36,17 @@ export async function mockGenres(
   await page.route('**/api/genres', (route) => route.fulfill({ json: { genres } }))
 }
 
+export async function mockEmptyLibrary(page: Page): Promise<void> {
+  await page.route(/\/api\/playlists(\?.*)?$/, (route) =>
+    route.fulfill({
+      json: { playlists: [], total: 0, limit: 10, offset: 0 },
+    }),
+  )
+  await page.route('**/api/playlists/sync', (route) =>
+    route.fulfill({ json: { checkedCount: 0, removedCount: 0 } }),
+  )
+}
+
 function ndjsonBody(events: readonly unknown[]): string {
   return `${events.map((event) => JSON.stringify(event)).join('\n')}\n`
 }

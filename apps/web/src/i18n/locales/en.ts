@@ -347,9 +347,9 @@ export const en = {
     'Changing these settings creates a new playlist. The one you just made stays on Spotify.',
   'create.generateNew': 'Create new playlist',
   'create.leaveNoteLibrary':
-    'You can leave this page. The playlist will still be saved to Spotify and your Library.',
+    'You can browse other sections while this runs. The playlist will be saved to Spotify and your Library. Keep this tab open: if you refresh or close it, Blendify can no longer show the result.',
   'create.leaveNoteSpotify':
-    'You can leave this page. The playlist will still be saved to Spotify.',
+    'You can browse other sections while this runs. The playlist will be saved to Spotify. Keep this tab open: if you refresh or close it, Blendify can no longer show the result.',
   'common.songsOne': '1 song',
   'common.songsMany': '{count} songs',
   'preview.showAll': 'Show all {count} songs',
@@ -387,7 +387,7 @@ export const en = {
   'common.opensNewTab':
     '(opens in a new tab)',
   'create.leaveNoteGuest':
-    'Keep this page open until the playlist is ready. It isn’t saved anywhere.',
+    'Keep this page open until the playlist is ready. Leaving stops it, and nothing is saved.',
   'create.recreateNoteGuest':
     'Changing these settings creates a new playlist that replaces the one shown here.',
   'guestResult.temporary':
@@ -796,6 +796,44 @@ export const en = {
     'Couldn’t refine the playlist. Try again.',
   'ai.refine.error.settle':
     'Couldn’t update the playlist. Try again.',
+  'runStatus.label':
+    'Playlist creation',
+  'runStatus.active.mix':
+    'Creating your Mix',
+  'runStatus.active.discover':
+    'Creating your Discover playlist',
+  'runStatus.succeeded.mix':
+    'Your Mix is ready',
+  'runStatus.succeeded.discover':
+    'Your Discover playlist is ready',
+  'runStatus.failed.mix':
+    'Couldn’t create your Mix',
+  'runStatus.failed.discover':
+    'Couldn’t create your Discover playlist',
+  'runStatus.uncertain.mix':
+    'Lost connection while creating your Mix',
+  'runStatus.uncertain.discover':
+    'Lost connection while creating your Discover playlist',
+  'runStatus.busy.mix':
+    'Wait for your Mix to finish before creating another playlist.',
+  'runStatus.busy.discover':
+    'Wait for your Discover playlist to finish before creating another playlist.',
+  'runStatus.viewProgress':
+    'View progress',
+  'runStatus.viewPlaylist':
+    'View playlist',
+  'runStatus.viewDetails':
+    'View details',
+  'runStatus.dismiss':
+    'Dismiss',
+  'create.uncertainTitle':
+    'Lost connection',
+  'create.uncertainLibrary':
+    'Blendify lost the connection before it could confirm the result. The playlist may already exist, so check your Library or Spotify before creating it again.',
+  'create.uncertainSpotify':
+    'Blendify lost the connection before it could confirm the result. The playlist may already exist, so check Spotify before creating it again.',
+  'create.openLibrary':
+    'Open Library',
 } as const
 
 export type MessageKey = keyof typeof en

@@ -76,3 +76,11 @@ export function outcomeDurationMs(outcome: GenerationOutcome): number {
     0,
   )
 }
+
+export function outcomeRequestedTrackCount(outcome: GenerationOutcome): number {
+  const { generation } = outcome.playlist
+  if (generation.kind === 'artist_mix' || generation.kind === 'genre_mix') {
+    return generation.tracksPerSeed * generation.seeds.length
+  }
+  return generation.targetTrackCount
+}

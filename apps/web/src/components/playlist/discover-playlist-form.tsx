@@ -1,15 +1,12 @@
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import { Compass, X } from 'lucide-react'
 import {
-  getApiErrorMessage,
   type Artist,
   type DiscoverTrackTarget,
   type GenerateDiscoverRequest,
-  type GenerationProgress,
 } from '@/lib/api'
 import type { TrackDto } from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
@@ -24,6 +21,8 @@ import {
   OrderModeSection,
   PopularityModeSection,
 } from '@/components/playlist/generation-form-shared'
+import { runFailureMessage } from '@/components/playlist/generation-result-helpers'
+import { PLAYLIST_RUN_COPY } from '@/components/playlist/playlist-run-copy'
 import {
   buildGenerationSummary,
   buildRecipeSummary,
@@ -45,13 +44,11 @@ import { useCapabilities } from '@/hooks/use-capabilities'
 import { useCopiedLink } from '@/hooks/use-generation-feedback'
 import type { AppMode } from '@/lib/capabilities'
 import {
+  outcomeRequestedTrackCount,
   outcomeTrackCount,
-  runDiscoverGeneration,
-  type GenerationOutcome,
-  type GenerationRun,
 } from '@/lib/playlist-generation'
 import { useGenerationSettingsCollapse } from '@/hooks/use-generation-settings-collapse'
-import { isCurrentGeneration, useGenerationStore } from '@/stores/generation-store'
+import { usePlaylistRun } from '@/hooks/use-playlist-run'
 
 type SeedMode = 'artist' | 'track'
 
@@ -178,16 +175,12 @@ function DiscoverSeedField({
 
 export function DiscoverPlaylistForm() {
   const t = useT()
-  const queryClient = useQueryClient()
   const capabilities = useCapabilities()
+  const playlistRun = usePlaylistRun('discover')
   const [seedMode, setSeedMode] = useState<SeedMode>('artist')
   const [artist, setArtist] = useState<Artist | null>(null)
   const [track, setTrack] = useState<TrackDto | null>(null)
-  const [result, setResult] = useState<GenerationOutcome | null>(null)
-  const [submittedMode, setSubmittedMode] = useState<AppMode>(capabilities.mode)
-  const [progress, setProgress] = useState<GenerationProgress | null>(null)
-  const [requestedTrackCount, setRequestedTrackCount] = useState(0)
-  const [coverError, setCoverError] = useState<string | null>(null)
+  const [preparingMode, setPreparingMode] = useState<AppMode>(capabilities.mode)
   const [isPreparing, setIsPreparing] = useState(false)
   const copiedLink = useCopiedLink()
   const formRef = useRef<HTMLFormElement>(null)
@@ -207,42 +200,6 @@ export function DiscoverPlaylistForm() {
     [track],
   )
 
-  const discoverMutation = useMutation({
-    mutationFn: (
-      run: GenerationRun<GenerateDiscoverRequest> & { epoch: number },
-    ) =>
-      runDiscoverGeneration({
-        ...run,
-        onProgress: (p) => {
-          if (isCurrentGeneration(run.epoch)) {
-            setProgress(p)
-          }
-        },
-      }),
-    onMutate: () => {
-      setProgress(null)
-    },
-    onSuccess: (outcome, run) => {
-      useGenerationStore.getState().finish(run.epoch)
-      if (!isCurrentGeneration(run.epoch)) {
-        return
-      }
-      setResult(outcome)
-      setProgress(null)
-      if (outcome.mode === 'spotify') {
-        void queryClient.invalidateQueries({ queryKey: ['usage-stats'] })
-        void queryClient.invalidateQueries({ queryKey: ['playlists'] })
-      }
-    },
-    onError: (_error, run) => {
-      useGenerationStore.getState().finish(run.epoch)
-      if (!isCurrentGeneration(run.epoch)) {
-        return
-      }
-      setProgress(null)
-    },
-  })
-
   function changeSeedMode(next: SeedMode) {
     setSeedMode(next)
     form.clearErrors('root')
@@ -251,17 +208,22 @@ export function DiscoverPlaylistForm() {
   function selectArtist(next: Artist) {
     setArtist(next)
     form.clearErrors('root')
-    discoverMutation.reset()
+    playlistRun.dismiss()
   }
 
   function selectTrack(next: TrackDto) {
     setTrack(next)
     form.clearErrors('root')
-    discoverMutation.reset()
+    playlistRun.dismiss()
   }
 
   async function onSubmit(values: FormValues) {
-    if (isPreparing || discoverMutation.isPending || !capabilities.isResolved) {
+    if (
+      isPreparing ||
+      playlistRun.isActive ||
+      playlistRun.busyFeature ||
+      !capabilities.isResolved
+    ) {
       return
     }
     const generationMode = capabilities.mode
@@ -275,11 +237,7 @@ export function DiscoverPlaylistForm() {
     }
 
     setIsPreparing(true)
-    setCoverError(null)
-    setResult(null)
-    setRequestedTrackCount(values.targetTrackCount)
-    setSubmittedMode(generationMode)
-    discoverMutation.reset()
+    setPreparingMode(generationMode)
 
     try {
       await startDiscover(values, generationMode)
@@ -290,12 +248,17 @@ export function DiscoverPlaylistForm() {
 
   async function renderDiscoverCover(
     title: string,
-  ): Promise<string | undefined> {
+  ): Promise<{ coverImageBase64?: string; coverFailed: boolean }> {
     try {
-      return await renderPlaylistCoverBase64({ title, kind: 'discover' })
+      return {
+        coverImageBase64: await renderPlaylistCoverBase64({
+          title,
+          kind: 'discover',
+        }),
+        coverFailed: false,
+      }
     } catch {
-      setCoverError(t('create.coverFailed'))
-      return undefined
+      return { coverFailed: true }
     }
   }
 
@@ -309,7 +272,9 @@ export function DiscoverPlaylistForm() {
       generationMode === 'spotify' && values.generateCover
 
     let request: GenerateDiscoverRequest
-    let coverImageBase64: string | undefined
+    let cover: { coverImageBase64?: string; coverFailed: boolean } = {
+      coverFailed: false,
+    }
 
     if (seedMode === 'track') {
       if (!track) {
@@ -336,9 +301,9 @@ export function DiscoverPlaylistForm() {
         }),
         ...sharedBase,
       }
-      coverImageBase64 = shouldRenderCover
-        ? await renderDiscoverCover(playlistName)
-        : undefined
+      if (shouldRenderCover) {
+        cover = await renderDiscoverCover(playlistName)
+      }
     } else {
       if (!artist) {
         return
@@ -358,21 +323,20 @@ export function DiscoverPlaylistForm() {
         }),
         ...sharedBase,
       }
-      coverImageBase64 = shouldRenderCover
-        ? await renderDiscoverCover(playlistName)
-        : undefined
+      if (shouldRenderCover) {
+        cover = await renderDiscoverCover(playlistName)
+      }
     }
 
-    const { epoch, signal } = useGenerationStore.getState().start()
-    discoverMutation.mutate({
+    playlistRun.start({
+      feature: 'discover',
       mode: generationMode,
       request,
       publication: {
-        coverImageBase64,
+        coverImageBase64: cover.coverImageBase64,
         persistToLibrary: readPersistToLibraryPreference(),
       },
-      epoch,
-      signal,
+      coverFailed: cover.coverFailed,
     })
   }
 
@@ -397,19 +361,17 @@ export function DiscoverPlaylistForm() {
     setSeedMode('artist')
     setArtist(null)
     setTrack(null)
-    setResult(null)
-    setProgress(null)
-    setRequestedTrackCount(0)
-    setCoverError(null)
+    playlistRun.dismiss()
     copiedLink.reset()
     form.reset(DEFAULT_VALUES)
-    discoverMutation.reset()
     focusSettings()
   }
 
   const formCopy = generationFormCopy(capabilities.mode, 'discover')
+  const { result, progress, failure } = playlistRun
+  const submittedMode = playlistRun.run?.spec.mode ?? preparingMode
   const workingCopy = generationFormCopy(submittedMode, 'discover')
-  const isGenerating = isPreparing || discoverMutation.isPending
+  const isGenerating = isPreparing || playlistRun.isActive
   const settingsCollapse = useGenerationSettingsCollapse(
     isGenerating,
     result !== null,
@@ -434,12 +396,22 @@ export function DiscoverPlaylistForm() {
       ].join(' · ')
     : null
 
-  const disabledReason = capabilities.isResolved
-    ? discoverDisabledReason(seedMode, Boolean(artist), Boolean(track), t)
-    : t('common.loading')
-  const generationError = discoverMutation.isError
-    ? getApiErrorMessage(discoverMutation.error, t, 'discover.failed')
-    : null
+  const requestedTrackCount = result ? outcomeRequestedTrackCount(result) : 0
+  const spec = playlistRun.run?.spec
+  const libraryAvailable = spec?.publication.persistToLibrary ?? false
+  const failureMessage = runFailureMessage(
+    failure,
+    libraryAvailable,
+    t,
+    'discover.failed',
+  )
+  const coverError = spec?.coverFailed ? t('create.coverFailed') : null
+  let disabledReason: string | null = t('common.loading')
+  if (capabilities.isResolved) {
+    disabledReason = playlistRun.busyFeature
+      ? t(PLAYLIST_RUN_COPY[playlistRun.busyFeature].busy)
+      : discoverDisabledReason(seedMode, Boolean(artist), Boolean(track), t)
+  }
 
   return (
     <PageContainer width="form">
@@ -459,15 +431,17 @@ export function DiscoverPlaylistForm() {
           isGenerating={isGenerating}
           result={result}
           progress={progress}
-          error={generationError}
+          error={failureMessage}
+          isErrorOutcomeUncertain={failure?.isOutcomeUncertain}
+          libraryAvailable={libraryAvailable}
           coverError={coverError}
           requestedTrackCount={requestedTrackCount}
           workingTitleKey={workingCopy.workingTitle}
           workingHintKey={workingCopy.workingHint}
-          requestStarted={discoverMutation.isPending}
+          requestStarted={playlistRun.isActive}
           copied={copiedLink.copied}
           onCopy={(url) => void copiedLink.copy(url)}
-          onRetry={() => void submit()}
+          onRetry={() => void playlistRun.rerun()}
           onAdjust={adjustAndRecreate}
           onCreateAnother={createAnother}
         />

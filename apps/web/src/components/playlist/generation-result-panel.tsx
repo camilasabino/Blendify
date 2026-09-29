@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Blend,
   Check,
@@ -6,6 +7,7 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  Library,
   Plus,
   RotateCcw,
   SlidersHorizontal,
@@ -236,23 +238,56 @@ function ResultActions({
   )
 }
 
-function GenerationErrorState({
-  message,
+function GenerationErrorActions({
+  isOutcomeUncertain,
+  libraryAvailable,
   onRetry,
 }: Readonly<{
-  message: string
+  isOutcomeUncertain: boolean
+  libraryAvailable: boolean
   onRetry: () => void
 }>) {
   const t = useT()
+  if (!isOutcomeUncertain) {
+    return (
+      <Button type="button" variant="secondary" onClick={onRetry}>
+        <RotateCcw aria-hidden className="size-4" />
+        {t('common.retry')}
+      </Button>
+    )
+  }
+  if (!libraryAvailable) {
+    return null
+  }
+  return (
+    <Link to="/app/library" className={buttonVariants({ variant: 'secondary' })}>
+      <Library aria-hidden className="size-4" />
+      {t('create.openLibrary')}
+    </Link>
+  )
+}
+
+function GenerationErrorState({
+  message,
+  isOutcomeUncertain,
+  libraryAvailable,
+  onRetry,
+}: Readonly<{
+  message: string
+  isOutcomeUncertain: boolean
+  libraryAvailable: boolean
+  onRetry: () => void
+}>) {
   return (
     <div className="space-y-4">
       <p role="alert" className="text-sm leading-relaxed text-danger">
         {message}
       </p>
-      <Button type="button" variant="secondary" onClick={onRetry}>
-        <RotateCcw aria-hidden className="size-4" />
-        {t('common.retry')}
-      </Button>
+      <GenerationErrorActions
+        isOutcomeUncertain={isOutcomeUncertain}
+        libraryAvailable={libraryAvailable}
+        onRetry={onRetry}
+      />
     </div>
   )
 }
@@ -498,6 +533,8 @@ export function GenerationResultPanel({
   result,
   progress,
   error,
+  isErrorOutcomeUncertain = false,
+  libraryAvailable = false,
   coverError,
   requestedTrackCount,
   workingTitleKey,
@@ -514,6 +551,8 @@ export function GenerationResultPanel({
   result: GenerationOutcome | null
   progress: GenerationProgress | null
   error: string | null
+  isErrorOutcomeUncertain?: boolean
+  libraryAvailable?: boolean
   coverError: string | null
   requestedTrackCount: number
   workingTitleKey: MessageKey
@@ -540,7 +579,9 @@ export function GenerationResultPanel({
     title = t(workingTitleKey)
   }
   else if (showError) {
-    title = t(failedTitleKey(mode))
+    title = t(
+      isErrorOutcomeUncertain ? 'create.uncertainTitle' : failedTitleKey(mode),
+    )
   }
 
   let announcement = ''
@@ -587,7 +628,12 @@ export function GenerationResultPanel({
         />
       ) : null}
       {showError ? (
-        <GenerationErrorState message={error} onRetry={onRetry} />
+        <GenerationErrorState
+          message={error}
+          isOutcomeUncertain={isErrorOutcomeUncertain}
+          libraryAvailable={libraryAvailable}
+          onRetry={onRetry}
+        />
       ) : null}
       <CoverErrorNotice message={coverError} />
       {showResult ? (

@@ -33,6 +33,24 @@ export function invalidGenerationResponseError(): ApiError {
   })
 }
 
+export const GENERATION_STREAM_INTERRUPTED = 'GENERATION_STREAM_INTERRUPTED'
+
+export function interruptedGenerationError(): ApiError {
+  const message = 'Generation stream ended without a result'
+  return new ApiError(message, 502, {
+    statusCode: 502,
+    code: GENERATION_STREAM_INTERRUPTED,
+    message,
+  })
+}
+
+export function isGenerationOutcomeUncertain(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return error.code === GENERATION_STREAM_INTERRUPTED
+  }
+  return error instanceof TypeError
+}
+
 const REQUEST_LIMIT_MESSAGES: Record<string, MessageKey> = {
   RATE_LIMITED: 'errors.rateLimited',
   CONCURRENCY_LIMITED: 'errors.concurrencyLimited',

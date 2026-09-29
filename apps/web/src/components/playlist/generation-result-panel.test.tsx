@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Sparkles } from 'lucide-react'
+import { MemoryRouter } from 'react-router-dom'
 import type { PlaylistDetail } from '@blendify/contracts'
 import { GenerationResultPanel } from './generation-result-panel'
 import { GenerationSubmitBar } from './generation-form-shared'
@@ -28,9 +29,11 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
     ...overrides,
   }
   const { container } = render(
-    <QueryClientProvider client={new QueryClient()}>
-      <GenerationResultPanel {...props} />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={new QueryClient()}>
+        <GenerationResultPanel {...props} />
+      </QueryClientProvider>
+    </MemoryRouter>,
   )
   return { props, container }
 }
@@ -74,12 +77,44 @@ describe('GenerationResultPanel', () => {
     expect(screen.getByText('10 songs · 40 min')).toBeVisible()
   })
 
-  it('tells people they can leave once the request is running', () => {
+  it('tells people they can browse Blendify but must keep the tab open once the request is running', () => {
     renderPanel({ isGenerating: true, requestStarted: true })
 
     expect(
-      screen.getByText(/You can leave this page\. The playlist will still be saved to Spotify/),
+      screen.getByText(
+        /You can browse other sections while this runs\. The playlist will be saved to Spotify/,
+      ),
     ).toBeVisible()
+    expect(
+      screen.getByText(/if you refresh or close it, Blendify can no longer show the result/),
+    ).toBeVisible()
+  })
+
+  it('does not offer a retry when the outcome of a Spotify creation is uncertain', () => {
+    renderPanel({
+      error: 'Blendify lost the connection before it could confirm the result.',
+      isErrorOutcomeUncertain: true,
+      libraryAvailable: false,
+    })
+
+    expect(screen.getByRole('heading', { name: 'Lost connection' })).toBeVisible()
+    expect(screen.getByRole('alert')).toHaveTextContent('lost the connection')
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Open Library' })).toBeNull()
+  })
+
+  it('points to the Library when an uncertain outcome may already be saved there', () => {
+    renderPanel({
+      error: 'Blendify lost the connection before it could confirm the result.',
+      isErrorOutcomeUncertain: true,
+      libraryAvailable: true,
+    })
+
+    expect(screen.getByRole('link', { name: 'Open Library' })).toHaveAttribute(
+      'href',
+      '/app/library',
+    )
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
 
   it('does not promise background work before the request starts', () => {
@@ -288,7 +323,7 @@ describe('GenerationResultPanel in Guest Mode', () => {
 
     expect(
       screen.getByText(
-        'Keep this page open until the playlist is ready. It isn’t saved anywhere.',
+        'Keep this page open until the playlist is ready. Leaving stops it, and nothing is saved.',
       ),
     ).toBeVisible()
   })

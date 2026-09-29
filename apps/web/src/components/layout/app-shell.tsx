@@ -25,7 +25,9 @@ import {
 import { SpotifyRequiredNotice } from '@/components/layout/spotify-required-notice'
 import { Footer } from '@/components/layout/footer'
 import { ConfirmDialog } from '@/components/ui/dialog'
+import { PlaylistRunStatus } from '@/components/layout/playlist-run-status'
 import { useGenerationStore } from '@/stores/generation-store'
+import { usePlaylistRunStore } from '@/stores/playlist-run-store'
 import { useT } from '@/i18n/use-t'
 import type { MessageKey } from '@/i18n/messages'
 import type { SpotifyOnlyCapability } from '@/lib/capabilities'
@@ -127,8 +129,13 @@ export function AppShell() {
     }
   }
 
-  async function logOut() {
+  function cancelActiveGenerations() {
     useGenerationStore.getState().cancelActive()
+    usePlaylistRunStore.getState().discard()
+  }
+
+  async function logOut() {
+    cancelActiveGenerations()
     navigate('/', { replace: true })
     try {
       await logout()
@@ -163,6 +170,7 @@ export function AppShell() {
       // route guard's own redirect and could strand the user on /app/mix.
       navigate('/app/mix', { replace: true, state: null })
       setDeleteOpen(false)
+      cancelActiveGenerations()
       forgetUserScopedQueries()
     } catch {
       setDeleteFailed(true)
@@ -269,6 +277,8 @@ export function AppShell() {
       </main>
 
       <Footer />
+
+      <PlaylistRunStatus />
 
       <ConfirmDialog
         open={deleteOpen}

@@ -1,6 +1,10 @@
 import type { z } from 'zod'
 import type { ApiErrorResponse, GenerationProgress } from '@blendify/contracts'
-import { ApiError, invalidGenerationResponseError } from '@/lib/api-error'
+import {
+  ApiError,
+  interruptedGenerationError,
+  invalidGenerationResponseError,
+} from '@/lib/api-error'
 
 export type GenerationProgressHandler = (progress: GenerationProgress) => void
 
@@ -101,7 +105,7 @@ export async function readGenerationStream<T>(
 
   const terminal = consumeGenerationLines([buffer], schema, onProgress)
   if (!terminal) {
-    throw new ApiError('Generation stream ended without a result', 502)
+    throw interruptedGenerationError()
   }
   return terminal.playlist
 }

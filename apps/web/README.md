@@ -48,9 +48,11 @@ React 19, Vite, TypeScript, React Router, TanStack Query, React Hook Form and
 Zod, Tailwind CSS 4, and Zustand.
 
 - **Server state** goes through TanStack Query.
-- **Zustand** holds only `stores/generation-store.ts` (in-flight generation
-  and its `AbortController`) and `stores/auth-store.ts` (current user; its
-  migration to TanStack Query is tracked in the code conventions).
+- **Zustand** holds `stores/playlist-run-store.ts` (the single in-flight or
+  finished Mix/Discover generation, which survives navigation inside the app
+  but not a refresh), `stores/generation-store.ts` (epoch and
+  `AbortController` for Create with AI) and `stores/auth-store.ts` (current
+  user; its migration to TanStack Query is tracked in the code conventions).
 - **Design system**: Tailwind tokens in `src/index.css` (charcoal and amber
   palette), primitives in `src/components/ui/`.
 - **i18n**: English, Spanish, and Brazilian Portuguese in `src/i18n/locales/`.
