@@ -635,12 +635,17 @@ Non-secret API variables are declared in `.railway/railway.ts`. Secrets are
 set in Railway service variables (sealed) and declared there with
 `preserve()`. The web variable is a Cloudflare build variable. No secret value belongs in the repository.
 
-### 8.1 Frontend (Cloudflare build variables)
+### 8.1 Frontend (build variables)
+
+Both are Vite build variables compiled into the bundle. The live frontend is
+built by `.github/workflows/deploy-web.yml` (section 3.1), so their production
+values are the `env` of its `npm run build:web` step, not Cloudflare
+dashboard variables.
 
 | Variable | Required | Secret | Value |
 |---|---|---|---|
 | `VITE_API_URL` | Yes (build fails otherwise) | No, public | `https://api.blendify.camilasabino.dev` |
-| `VITE_AI_CREATION_ENABLED` | No (production builds hide `/app/ai` unless it is `true`) | No, public | Unset until the AI service is deployed |
+| `VITE_AI_CREATION_ENABLED` | No (production builds hide `/app/ai` unless it is `true`) | No, public | Unset (not in `deploy-web.yml`) until the AI rollout is approved |
 
 ### 8.1.1 GitHub Actions secrets and variables (repository level)
 
@@ -930,9 +935,11 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 
 - [ ] Within the same minute, from a genuinely different network (for example
       a phone on mobile data), the same request returns `200`.
-- [ ] The `request_limit.rejected` log line's identity hash equals the first
-      12 hex characters of `sha256("ip:<your public IP>")`:
-      `printf 'ip:%s' "$(curl -s https://api.ipify.org)" | shasum -a 256 | cut -c1-12`.
+- [ ] The `request_limit.rejected` log lines of one run of the loop carry the
+      same `identityHash`. The hash is an HMAC keyed with a random
+      per-process secret (section 11), so it cannot be recomputed from your
+      IP address and changes after every restart; the identity itself is
+      proven by the 429 behavior above.
 
 Run the loop with separate connections (one `curl` per request) and once
 more reusing one connection; both must stop at 60.
@@ -975,6 +982,7 @@ Deferred: IPv6 /64 grouping, contextual Guest market.
 | API | Railway → API service → Deployments → redeploy/rollback the previous successful deployment. Migrations are not reverted. |
 | Database | No down migrations. Keep migrations expand-only so the previous API version still works. Restore the pre-migration dump only for a destructive failure (section 7). |
 | Feature gates / limits | Change `GUEST_TRANSFER_ENABLED` or `RATE_LIMIT_OVERRIDES` in Railway; a variable change redeploys. Emergency brake for external transfer: `GUEST_TRANSFER_ENABLED=false`. Emergency brake for generation: `RATE_LIMIT_OVERRIDES=generation=1/3600`. |
+| Create with AI | See [section 19.6](#196-feature-gate-and-kill-switches). Config-only; no database rollback. |
 
 ## 16. Guest transfer gate
 
@@ -1152,22 +1160,80 @@ commits or chat logs.
 `apps/ai` (FastAPI, Python managed by `uv`) interprets user-authored requests
 for Create with AI. It is **not** part of `.railway/railway.ts` yet: declaring
 the resource would make the next `railway config apply` create and deploy it.
-Intended shape when it is added:
+
+### 19.1 Topology
+
+```
+browser ──► Cloudflare (SPA) ── no AI route, no AI URL, no AI credential
+browser ──► api (NestJS, public) ──► ai (FastAPI, private) ──► OpenAI
+                  └──► PostgreSQL, Redis, Spotify, Last.fm, Soundiiz
+```
+
+- The browser never calls `ai`; `ai` has no public domain and no CORS policy.
+- `api` stays the only public backend. It owns sessions, rate limits,
+  ownership checks and the provider-content firewall; AI sessions live in
+  Redis (30-minute TTL, no PostgreSQL history). `ai` is stateless: restarts
+  or replacement lose nothing but the requests in flight.
+- `OPENAI_API_KEY` exists only on `ai`. `AI_SERVICE_TOKEN` exists only on
+  `api` and `ai`.
+- Mix, Discover, Library, publishing and transfer never call `ai`.
+
+### 19.2 Service shape (Railpack)
 
 | Setting | Value |
 |---|---|
-| Service | `ai`, same Railway project, **no public domain** (reached only by `api` over the private network) |
-| Source | Repository root `apps/ai`; Railpack detects `pyproject.toml` + `uv.lock`; watch patterns `apps/ai/**` |
-| Start | `uvicorn --factory app.main:create_app --host :: --port $PORT` (`::` so the private network can reach it) |
-| Health check | `/health` — no auth, no model call; reports whether intent interpretation is available |
-| Variables | `AI_SERVICE_ENV=production`; `AI_SERVICE_TOKEN` as `preserve()`, sealed (≥ 32 random characters; the service refuses to start without it); `AI_PROVIDER=openai` (required in every environment, no code default; `disabled` is the only alternative); `AI_MODEL=gpt-5.6-luna` (required with `openai`, no code default); `OPENAI_API_KEY` as `preserve()`, sealed (required when `AI_PROVIDER=openai`) |
-| `api` variables | `AI_SERVICE_URL=http://ai.railway.internal:<PORT>`, `AI_SERVICE_TOKEN` (same value, sealed) |
+| Service | `ai`, same Railway project and environment, **no public domain**, no TCP proxy |
+| Source | `github("camilasabino/blendify", { branch: "main", checkSuites: true })`, root directory `apps/ai` (the runtime needs nothing outside it) |
+| Builder | `RAILPACK`: detects `pyproject.toml` + `uv.lock`, Python from `apps/ai/.python-version` (3.13), installs with `uv sync --locked --no-dev` into `/app/.venv` (on `PATH`) |
+| Watch patterns | `apps/ai/**` |
+| Start | `sh -c 'exec uvicorn --factory app.main:create_app --host :: --port "$PORT"'` — the shell expands `PORT`, `exec` lets uvicorn receive `SIGTERM`, `::` accepts IPv4 and IPv6 on the private network. No `main.py` exists, so Railpack cannot infer a start command |
+| `PORT` | `8000`, set explicitly so `AI_SERVICE_URL` and the health check use the same port |
+| Health check | `/health`, no auth, no model call |
+| Replicas | 1; one uvicorn worker (enough for current traffic; the process is stateless, so adding replicas later needs no code change) |
+| Restart | `ON_FAILURE` |
+| Draining | `drainingSeconds: 30` (Railway defaults to 0 s, which cuts a model call in flight on every redeploy; a call takes at most two 12 s model requests) |
+
+Startup fails closed with `AI_SERVICE_ENV=production`: the process exits when
+`AI_SERVICE_TOKEN` is shorter than 32 characters, `AI_PROVIDER` is not
+`openai` or `disabled`, or `AI_PROVIDER=openai` lacks `AI_MODEL` or
+`OPENAI_API_KEY`. Production also hides `/docs` and `/openapi.json`.
+
+### 19.3 Variables
+
+| Service | Variable | Secret | Value |
+|---|---|---|---|
+| `ai` | `AI_SERVICE_ENV` | No | `production` |
+| `ai` | `PORT` | No | `8000` |
+| `ai` | `AI_PROVIDER` | No | `openai` (`disabled` keeps the service up with interpretation unavailable) |
+| `ai` | `AI_MODEL` | No | `gpt-5.6-luna` |
+| `ai` | `OPENAI_API_KEY` | Yes, `preserve()`, sealed | Production key, never copied from a local `.env` |
+| `ai` | `AI_SERVICE_TOKEN` | Yes, `preserve()`, sealed | ≥ 32 random characters, for example `openssl rand -base64 48` |
+| `api` | `AI_SERVICE_URL` | No | `http://ai.railway.internal:8000` (`http`: the private network is already encrypted) |
+| `api` | `AI_SERVICE_TOKEN` | Yes, `preserve()`, sealed | Same value as on `ai` |
+| `api` | `AI_REFINEMENTS_PER_SESSION` | No | Unset (default 10) |
 
 Every route except `/health` requires `Authorization: Bearer <AI_SERVICE_TOKEN>`
 (constant-time comparison; with no token configured those routes reject every
-request). The browser never calls the AI service, and `OPENAI_API_KEY` exists
-only on `ai`. The service sends OpenAI the versioned system prompt and the
-user's request text only (`store=false`); it never logs prompts or model output.
+request). The token is never logged and is not an OpenAI credential. Rotating
+it needs both services updated: set the new value on `ai` and `api`, then
+redeploy both; requests between the two deploys fail as AI unavailable (Mix
+and Discover are unaffected).
+
+The service sends OpenAI the versioned system prompt and the user's request
+text only (`store=false`, SDK retries off, 12 s per model request, at most two
+requests when the first output is invalid); it never logs prompts or model
+output. `api` waits up to 30 s for `ai`.
+
+### 19.4 Health
+
+`GET /health` returns `200 {"status":"ok","intentInterpretation":"available"}`
+(`"unavailable"` with `AI_PROVIDER=disabled`). It proves the process is up and
+the configuration was accepted at startup; it never calls OpenAI, so it says
+nothing about the key, billing or model access. Railway runs it only during a
+deploy. `GET /api/health` on `api` does not check `ai`, so an `ai` outage never
+blocks an `api` deploy.
+
+### 19.5 Limits
 
 The public endpoints that call the AI service, `POST /api/ai/sessions` and
 `POST /api/ai/sessions/:id/refinements`, share the rate-limit bucket `interpret`
@@ -1175,26 +1241,55 @@ The public endpoints that call the AI service, `POST /api/ai/sessions` and
 per session by `AI_REFINEMENTS_PER_SESSION` (default 10). A refinement sends the
 AI service only the session's AI-safe intent, the positions or user-authored
 artist names to keep, and the user's refinement text; never tracks, provider IDs
-or destination state. Emergency brake without redeploying `ai`:
-`RATE_LIMIT_OVERRIDES=interpret=1/3600` on `api`.
-
-Kill switch: unset `AI_SERVICE_URL` on `api`. The API then reports AI as
-unavailable without any network call; Mix, Discover, Library, publishing and
-transfer do not depend on the AI service.
+or destination state. There is no global cap across clients: set a monthly
+budget on the OpenAI project as the spending backstop.
 
 Other Create with AI endpoints on `api` (none of them call the AI service):
 clarification answers (`POST /api/ai/sessions/:id/clarification`) use the
 existing `resolve` bucket; `Create playlist` (`POST /api/ai/sessions/:id/generate`)
 uses the existing `generation` bucket and generation concurrency limits, like
 Mix and Discover; `GET /api/ai/sessions/:id` is a Redis-only read without a
-bucket. AI sessions live only in Redis with a 30-minute TTL (no PostgreSQL
-history).
+bucket.
 
-Web entry point: `/app/ai` is compiled into production builds only when the
-Cloudflare build variable `VITE_AI_CREATION_ENABLED=true` is set (development
-builds show it by default). Enable it only after `ai` is deployed and `api` has
-`AI_SERVICE_URL`; to hide the entry point again, rebuild without it.
+### 19.6 Feature gate and kill switches
 
+Web entry point: `/app/ai` and its navigation item are compiled into
+production builds only when `VITE_AI_CREATION_ENABLED=true` is in the
+`build:web` step of `deploy-web.yml` (development builds show it by default).
+Without it, a direct visit to `/app/ai` redirects to `/`. Enable it only after
+`ai` is deployed and `api` reaches it.
+
+| Problem | Action | Effect |
+|---|---|---|
+| Hide the feature fast | Cloudflare → `blendify-web` → Deployments → roll back to the last version built without the flag, or `npx wrangler@4 rollback --config apps/web/wrangler.jsonc` | No rebuild; then remove the flag from `deploy-web.yml` so the next deploy keeps it hidden |
+| Hide the feature durably | Remove `VITE_AI_CREATION_ENABLED` from `deploy-web.yml` and push | Next web deploy has no `/app/ai` |
+| Too much AI traffic | `RATE_LIMIT_OVERRIDES=interpret=1/3600` on `api` | `api` redeploys; interpretations nearly stop |
+| `api` ↔ `ai` integration | Unset `AI_SERVICE_URL` on `api` | `api` redeploys and reports AI unavailable without any network call |
+| `ai` or OpenAI problem | `AI_PROVIDER=disabled` on `ai`, or stop the `ai` deployment | Interpretation unavailable; `api` answers `AI_UNAVAILABLE`, Mix/Discover unaffected |
+
+None of these touches PostgreSQL; AI sessions in Redis expire on their own
+within 30 minutes. Removing the `ai` service is never required for a rollback.
+
+### 19.7 Rollout order
+
+`railway config apply` is not used for this rollout: its plan always contains
+the Redis memory-cap removal of section 4.3. Create and configure `ai`
+explicitly (dashboard or CLI) and review each change:
+
+1. Create service `ai` from `camilasabino/blendify` (`main`, Wait for CI on),
+   with the settings of section 19.2 and no domain.
+2. Set the `ai` variables of section 19.3 (secrets sealed, entered from
+   stdin or the dashboard, never on a command line) as one staged change, then
+   deploy `ai`. Confirm the deploy health check passed and that `ai` has no
+   public domain or TCP proxy.
+3. Set `AI_SERVICE_TOKEN` (sealed, same value) and `AI_SERVICE_URL` on `api` as
+   one staged change; `api` redeploys. Run the Mix/Discover smoke tests
+   (section 13).
+4. With the web flag still off, run the authorized AI smoke through the API,
+   then the VoiceOver check, then add the flag to `deploy-web.yml`.
+5. Declare `ai` and the `api` AI variables in `.railway/railway.ts` (secrets as
+   `preserve()`), `npm run check:railway`, and confirm `railway config plan`
+   shows only the known drift of section 4.3.
 
 ### Real-model evals (manual, paid)
 
