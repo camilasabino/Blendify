@@ -1186,7 +1186,7 @@ browser ──► api (NestJS, public) ──► ai (FastAPI, private) ──►
 | Source | `github("camilasabino/blendify", { branch: "main", checkSuites: true })`, root directory `apps/ai` (the runtime needs nothing outside it) |
 | Builder | `RAILPACK`: detects `pyproject.toml` + `uv.lock`, Python from `apps/ai/.python-version` (3.13), installs with `uv sync --locked --no-dev` into `/app/.venv` (on `PATH`) |
 | Watch patterns | `apps/ai/**` |
-| Start | `sh -c 'exec uvicorn --factory app.main:create_app --host :: --port "$PORT"'` — the shell expands `PORT`, `exec` lets uvicorn receive `SIGTERM`, `::` accepts IPv4 and IPv6 on the private network. No `main.py` exists, so Railpack cannot infer a start command |
+| Start | `python -m app.server`: reads `PORT`, binds one socket on `::` with `IPV6_V6ONLY=0` and runs uvicorn with the `app.main:create_app` factory on it. The dual-stack socket is intentional: Railway deployment health checks arrive over IPv4, while the private network may use IPv6. Do not replace it with `uvicorn --host ::`, which asyncio leaves IPv6-only (health checks fail with `service unavailable`), nor with `--host 0.0.0.0`, which drops IPv6. uvicorn handles `SIGTERM` gracefully. No `main.py` exists, so Railpack cannot infer a start command |
 | `PORT` | `8000`, set explicitly so `AI_SERVICE_URL` and the health check use the same port |
 | Health check | `/health`, no auth, no model call |
 | Replicas | 1; one uvicorn worker (enough for current traffic; the process is stateless, so adding replicas later needs no code change) |
