@@ -196,6 +196,13 @@ data), and [Soundiiz](https://soundiiz.com) (Guest playlist transfer to
 Spotify or another service). Blendify credits Spotify and Last.fm wherever
 their data is shown, per each provider's terms.
 
+## Language deep links
+
+Blendify opens in an explicit language with `?lang=es`, `?lang=en`, or
+`?lang=pt` (for example `https://blendify.camilasabino.dev/?lang=en`).
+Precedence: valid `?lang=` > stored preference > browser language > English.
+A valid `?lang=` is saved as the new preference; invalid values are ignored.
+
 ## Security & privacy
 
 - Spotify tokens live only in PostgreSQL; the browser holds only an

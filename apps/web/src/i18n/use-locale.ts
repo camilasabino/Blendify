@@ -15,7 +15,9 @@ export const DOCUMENT_TITLE: Record<Locale, string> = {
   pt: 'Blendify — Misture e descubra',
 }
 
-function detectLocale(): Locale {
+const LOCALE_QUERY_PARAM = 'lang'
+
+function readStoredLocale(): Locale | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored && isLocale(stored)) {
@@ -23,6 +25,34 @@ function detectLocale(): Locale {
     }
   } catch {
     void 0
+  }
+  return null
+}
+
+function persistLocale(locale: Locale) {
+  try {
+    localStorage.setItem(STORAGE_KEY, locale)
+  } catch {
+    void 0
+  }
+}
+
+export function parseLocaleFromSearch(search: string): Locale | null {
+  const value = new URLSearchParams(search).get(LOCALE_QUERY_PARAM)?.trim().toLowerCase()
+  return value && isLocale(value) ? value : null
+}
+
+export function detectLocale(): Locale {
+  if (typeof window !== 'undefined') {
+    const fromUrl = parseLocaleFromSearch(window.location.search)
+    if (fromUrl) {
+      persistLocale(fromUrl)
+      return fromUrl
+    }
+  }
+  const stored = readStoredLocale()
+  if (stored) {
+    return stored
   }
   if (typeof navigator !== 'undefined') {
     const lang = navigator.language.toLowerCase()
@@ -56,11 +86,7 @@ type LocaleState = {
 export const useLocaleStore = create<LocaleState>((set) => ({
   locale: detectLocale(),
   setLocale: (locale) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, locale)
-    } catch {
-      void 0
-    }
+    persistLocale(locale)
     syncDocumentLocale(locale)
     set({ locale })
   },
