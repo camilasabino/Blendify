@@ -49,7 +49,7 @@ export class SoundiizPlaylistTransferAdapter implements PlaylistTransferGateway 
         headers: {
           'Content-Type': 'application/json',
           'User-Agent':
-            'Blendify/1.0 (https://github.com/camilasabino/Blendify)',
+            'Blendify/1.0 (https://github.com/camilasabino/blendify)',
         },
       },
       { logContent: false },

@@ -13,8 +13,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/camilasabino/Blendify/actions/workflows/ci.yml">
-    <img alt="CI" src="https://github.com/camilasabino/Blendify/actions/workflows/ci.yml/badge.svg" />
+  <a href="https://github.com/camilasabino/blendify/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/camilasabino/blendify/actions/workflows/ci.yml/badge.svg" />
   </a>
   <a href="https://sonarcloud.io/summary/new_code?id=camilasabino_Blendify">
     <img alt="Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=camilasabino_Blendify&metric=alert_status&token=e6a94ec79ca3faaaad1b8770dbc7eb9fbcb47a45" />

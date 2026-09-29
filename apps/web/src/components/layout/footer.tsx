@@ -38,7 +38,7 @@ export function Footer() {
             {t('footer.privacy')}
           </Link>
           <a
-            href="https://github.com/camilasabino/Blendify"
+            href="https://github.com/camilasabino/blendify"
             target="_blank"
             rel="noreferrer"
             className={cn(

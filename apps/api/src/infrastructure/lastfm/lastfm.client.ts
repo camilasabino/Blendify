@@ -110,7 +110,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
         timeout: LASTFM_HTTP_TIMEOUT_MS,
         headers: {
           'User-Agent':
-            'Blendify/1.0 (https://github.com/camilasabino/Blendify)',
+            'Blendify/1.0 (https://github.com/camilasabino/blendify)',
         },
       },
       { logContent: config.get<string>('NODE_ENV') !== 'production' },

@@ -152,7 +152,7 @@ short SHA as the deploy message.
 
 | Setting | Value |
 |---|---|
-| Repository / branch | `camilasabino/Blendify` / `main` |
+| Repository / branch | `camilasabino/blendify` / `main` |
 | Root directory | `/` (repository root, needed for npm workspaces) |
 | Build command | `npm ci && npm run build:web` |
 | Deploy command | `npx wrangler@4 deploy --config apps/web/wrangler.jsonc` |
@@ -200,7 +200,7 @@ pinned as a root devDependency) declares:
 |---|---|
 | `postgres` | Railway PostgreSQL database (`postgres()` helper) |
 | `redis` | Railway Redis database (`redis()` helper) |
-| `api` | Source `github("camilasabino/Blendify", { branch: "main" })`, repository root as build context; builder `RAILPACK`; build `npm run build:api`; watch patterns `apps/api/**`, `packages/contracts/**`, `package.json`, `package-lock.json`, `.nvmrc`; pre-deploy `npm run prisma:deploy -w @blendify/api`; start `npm run start:prod -w @blendify/api`; health check `/api/health`, timeout 120 s; 1 replica; restart `ON_FAILURE` (5 retries); `RAILPACK_NODE_NPM_INSTALL=npm ci`; `PORT=8080`; non-secret variables; `DATABASE_URL`/`REDIS_URL` as typed references to the databases; secrets as `preserve()` |
+| `api` | Source `github("camilasabino/blendify", { branch: "main" })`, repository root as build context; builder `RAILPACK`; build `npm run build:api`; watch patterns `apps/api/**`, `packages/contracts/**`, `package.json`, `package-lock.json`, `.nvmrc`; pre-deploy `npm run prisma:deploy -w @blendify/api`; start `npm run start:prod -w @blendify/api`; health check `/api/health`, timeout 120 s; 1 replica; restart `ON_FAILURE` (5 retries); `RAILPACK_NODE_NPM_INSTALL=npm ci`; `PORT=8080`; non-secret variables; `DATABASE_URL`/`REDIS_URL` as typed references to the databases; secrets as `preserve()` |
 
 `PORT=8080` is set explicitly; when adding the custom domain in the
 dashboard, target port 8080 so the domain and the port Nest listens on match.
@@ -283,7 +283,7 @@ must stay 512 MiB unless it is changed intentionally.
 1. Create an empty Railway project and link the repository:
    `railway init --name Blendify --workspace "<workspace>"` (creates the
    project and links the current directory to its `production` environment).
-   Make sure the Railway GitHub app can access `camilasabino/Blendify`, and
+   Make sure the Railway GitHub app can access `camilasabino/blendify`, and
    that `main` already contains `.railway/railway.ts` and the `build:api`
    script before applying (the created service deploys `main`).
 2. `railway config plan`, review, then `railway config apply`: creates
@@ -379,7 +379,7 @@ supported way the API reaches production:
 | Field | Value |
 |---|---|
 | Provider | `github` |
-| Repository | `camilasabino/Blendify` |
+| Repository | `camilasabino/blendify` |
 | Branch | `main` |
 | Service / environment | `api` / `production` |
 | Wait for CI (`checkSuites`) | `true` |
