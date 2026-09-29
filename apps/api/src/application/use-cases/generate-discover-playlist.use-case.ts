@@ -170,7 +170,7 @@ export class GenerateDiscoverPlaylistUseCase {
       });
 
     this.logger.debug(
-      `Discover artist mix for "${seed.name}": target ${input.targetTrackCount}, ${artists.length} artist(s), ${tracksPerSeed} track(s)/artist`,
+      `Discover artist mix: target ${input.targetTrackCount}, ${artists.length} artist(s), ${tracksPerSeed} track(s)/artist`,
     );
 
     return this.artistMix.execute(
@@ -297,7 +297,7 @@ export class GenerateDiscoverPlaylistUseCase {
       });
 
     this.logger.debug(
-      `Discover track mix for "${seedTrack.name}": ${tracks.length}/${input.targetTrackCount}`,
+      `Discover track mix: ${tracks.length}/${input.targetTrackCount}`,
     );
 
     return GeneratedPlaylist.create({
@@ -505,7 +505,7 @@ export class GenerateDiscoverPlaylistUseCase {
 
     if (out.length < DISCOVER_MIN_SIMILAR_TRACKS) {
       this.logger.debug(
-        `Discover track fallback: top tracks for "${seedArtist}" (have ${out.length})`,
+        `Discover track fallback: top tracks (have ${out.length})`,
       );
       const top = await this.discoveryCatalog.getTopTracksForArtist(
         seedArtist,
@@ -525,7 +525,7 @@ export class GenerateDiscoverPlaylistUseCase {
 
     if (out.length < DISCOVER_MIN_SIMILAR_TRACKS) {
       this.logger.debug(
-        `Discover track fallback: similar artists for "${seedArtist}" (have ${out.length})`,
+        `Discover track fallback: similar artists (have ${out.length})`,
       );
       const similarArtists = await this.discoveryCatalog.getSimilarArtists(
         seedArtist,

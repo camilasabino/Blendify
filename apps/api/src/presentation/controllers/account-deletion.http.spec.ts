@@ -25,6 +25,7 @@ import { createBodyParser } from '@/presentation/http/body-limits';
 import { AccountController } from './account.controller';
 import { AuthController } from './auth.controller';
 import { StatsController } from './stats.controller';
+import { listenOnLoopback } from '@/presentation/http/loopback.testing';
 
 const FRONTEND = 'http://localhost:5173';
 const JWT_SECRET = 'account-deletion-test-secret';
@@ -149,7 +150,7 @@ async function createApp(db: FakeDatabase): Promise<INestApplication> {
   app.use(createBodyParser());
   app.use(cookieParser());
   app.useGlobalFilters(new GlobalExceptionFilter());
-  await app.init();
+  await listenOnLoopback(app);
   return app;
 }
 

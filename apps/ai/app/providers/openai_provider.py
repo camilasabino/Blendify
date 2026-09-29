@@ -8,6 +8,7 @@ from openai.types.responses import Response
 
 from app.providers.model_provider import (
     ModelConfigurationError,
+    ModelConfigurationReason,
     ModelIntentRequest,
     ModelIntentResult,
     ModelInvalidOutputError,
@@ -23,15 +24,16 @@ from app.providers.openai_output_schema import (
     build_model_output_schema,
 )
 
+OPENAI_PROVIDER_NAME = "openai"
 MODEL_MAX_OUTPUT_TOKENS = 4_000
 INSUFFICIENT_QUOTA_ERROR_CODE = "insufficient_quota"
 
-CONFIGURATION_ERRORS: tuple[type[openai.APIStatusError], ...] = (
-    openai.AuthenticationError,
-    openai.PermissionDeniedError,
-    openai.NotFoundError,
-    openai.BadRequestError,
-    openai.UnprocessableEntityError,
+CONFIGURATION_ERRORS: tuple[tuple[type[openai.APIStatusError], ModelConfigurationReason], ...] = (
+    (openai.AuthenticationError, "authentication"),
+    (openai.PermissionDeniedError, "permission_denied"),
+    (openai.NotFoundError, "not_found"),
+    (openai.BadRequestError, "bad_request"),
+    (openai.UnprocessableEntityError, "unprocessable_request"),
 )
 
 
@@ -52,6 +54,10 @@ class OpenAIIntentModelProvider:
             max_retries=0,
             http_client=http_client,
         )
+
+    @property
+    def name(self) -> str:
+        return OPENAI_PROVIDER_NAME
 
     @property
     def is_available(self) -> bool:
@@ -77,10 +83,11 @@ class OpenAIIntentModelProvider:
         except openai.APIError as error:
             raise _to_provider_error(error) from None
 
+        usage = _token_usage(response)
         return ModelIntentResult(
-            payload=_structured_payload(response),
+            payload=_structured_payload(response, usage),
             model=response.model,
-            usage=_token_usage(response),
+            usage=usage,
         )
 
     def _output_schema(self, output: ModelOutputSpec) -> JsonSchema:
@@ -94,27 +101,31 @@ def _to_provider_error(error: openai.APIError) -> Exception:
         return ModelTimeoutError("The model provider timed out")
     if isinstance(error, openai.RateLimitError):
         if error.code == INSUFFICIENT_QUOTA_ERROR_CODE:
-            return ModelConfigurationError("The model provider account has no quota")
+            return ModelConfigurationError("insufficient_quota")
         return ModelRateLimitedError("The model provider is rate limiting requests")
-    if isinstance(error, CONFIGURATION_ERRORS):
-        return ModelConfigurationError(f"The model provider rejected the request: {error.code}")
+    for error_type, reason in CONFIGURATION_ERRORS:
+        if isinstance(error, error_type):
+            return ModelConfigurationError(reason)
     return ModelUnavailableError(f"The model provider is unavailable: {type(error).__name__}")
 
 
-def _structured_payload(response: Response) -> Mapping[str, object]:
+def _structured_payload(response: Response, usage: ModelTokenUsage | None) -> Mapping[str, object]:
+    def invalid(message: str) -> ModelInvalidOutputError:
+        return ModelInvalidOutputError(message, model=response.model, usage=usage)
+
     if response.status != "completed":
-        raise ModelInvalidOutputError(f"The model response is {response.status}")
+        raise invalid(f"The model response is {response.status}")
     if _has_refusal(response):
-        raise ModelInvalidOutputError("The model refused to answer")
+        raise invalid("The model refused to answer")
 
     try:
         decoded = json.loads(response.output_text)
     except json.JSONDecodeError:
-        raise ModelInvalidOutputError("The model output is not JSON") from None
+        raise invalid("The model output is not JSON") from None
 
     result = decoded.get(MODEL_OUTPUT_RESULT_FIELD) if isinstance(decoded, dict) else None
     if not isinstance(result, dict):
-        raise ModelInvalidOutputError("The model output has no result object")
+        raise invalid("The model output has no result object")
     return result
 
 
@@ -133,4 +144,5 @@ def _token_usage(response: Response) -> ModelTokenUsage | None:
     return ModelTokenUsage(
         input_tokens=response.usage.input_tokens,
         output_tokens=response.usage.output_tokens,
+        total_tokens=response.usage.total_tokens,
     )

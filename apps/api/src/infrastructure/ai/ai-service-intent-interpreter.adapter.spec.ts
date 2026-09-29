@@ -10,6 +10,7 @@ import {
   AiInterpretationError,
   type AiInterpretationErrorCode,
 } from '@/domain/errors/ai-interpretation.error';
+import { runWithRequestId } from '@/application/services/request-correlation';
 import {
   AI_SERVICE_INTERPRET_PATH,
   AI_SERVICE_REFINEMENT_PATH,
@@ -17,7 +18,7 @@ import {
   AiServiceIntentInterpreterAdapter,
 } from './ai-service-intent-interpreter.adapter';
 
-const mockPost = jest.fn<Promise<unknown>, [string, unknown]>();
+const mockPost = jest.fn<Promise<unknown>, [string, unknown, unknown]>();
 const mockCreateOutboundHttp = jest.fn((..._args: unknown[]) => ({
   post: mockPost,
 }));
@@ -28,6 +29,7 @@ jest.mock('@/infrastructure/http/outbound-http.logging', () => ({
 
 const AI_SERVICE_URL = 'http://ai.railway.internal:8080';
 const AI_SERVICE_TOKEN = 'internal-service-token-with-32-plus-chars';
+const REQUEST_ID = '3f1c2a9e-7b4d-4e8a-9c1f-2d6b5e8a7c30';
 const PROMPT = 'Indie rock, around 30 tracks. Use Radiohead and Interpol.';
 
 const interpretation: InterpretIntentResponse = {
@@ -102,7 +104,7 @@ describe('AiServiceIntentInterpreterAdapter', () => {
           Authorization: `Bearer ${AI_SERVICE_TOKEN}`,
         }) as unknown,
       }),
-      { logBodies: false },
+      { logContent: false },
     );
   });
 
@@ -111,10 +113,36 @@ describe('AiServiceIntentInterpreterAdapter', () => {
 
     const result = await createAdapter().interpretIntent({ prompt: PROMPT });
 
-    expect(mockPost).toHaveBeenCalledWith(AI_SERVICE_INTERPRET_PATH, {
-      prompt: PROMPT,
-    });
+    expect(mockPost).toHaveBeenCalledWith(
+      AI_SERVICE_INTERPRET_PATH,
+      { prompt: PROMPT },
+      {},
+    );
     expect(result).toEqual(interpretation);
+  });
+
+  it('forwards only the opaque request id for correlation', async () => {
+    mockPost.mockResolvedValue({ data: interpretation });
+
+    await runWithRequestId(REQUEST_ID, () =>
+      createAdapter().interpretIntent({ prompt: PROMPT }),
+    );
+
+    expect(mockPost).toHaveBeenCalledWith(
+      AI_SERVICE_INTERPRET_PATH,
+      { prompt: PROMPT },
+      { headers: { 'X-Request-Id': REQUEST_ID } },
+    );
+    const [line] = log.mock.calls.map((call) => String(call[0]));
+    expect(JSON.parse(line)).toEqual({
+      event: 'ai.service_call',
+      requestId: REQUEST_ID,
+      operation: 'intent_interpretation',
+      result: 'completed',
+      outcome: interpretation.result.outcome,
+      promptVersion: interpretation.promptVersion,
+      durationMs: expect.any(Number) as number,
+    });
   });
 
   it.each([
@@ -312,6 +340,7 @@ describe('AiServiceIntentInterpreterAdapter', () => {
       expect(mockPost).toHaveBeenCalledWith(
         AI_SERVICE_REFINEMENT_PATH,
         REFINEMENT_REQUEST,
+        {},
       );
       expect(result).toEqual(PLAN);
     });
@@ -396,8 +425,18 @@ describe('AiServiceIntentInterpreterAdapter', () => {
         String(call[0]),
       );
       expect(
-        lines.map((line) => (JSON.parse(line) as { event: string }).event),
-      ).toEqual(['ai.refinement.interpreted', 'ai.refinement.failed']);
+        lines.map((line) => {
+          const event = JSON.parse(line) as {
+            event: string;
+            operation: string;
+            result: string;
+          };
+          return [event.event, event.operation, event.result];
+        }),
+      ).toEqual([
+        ['ai.service_call', 'refinement_interpretation', 'completed'],
+        ['ai.service_call', 'refinement_interpretation', 'failed'],
+      ]);
       for (const line of lines) {
         expect(line).not.toContain(REFINEMENT_REQUEST.refinement);
         expect(line).not.toContain('Radiohead');

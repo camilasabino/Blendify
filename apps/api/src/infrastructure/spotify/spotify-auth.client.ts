@@ -16,14 +16,14 @@ export class SpotifyAuthClient {
         baseURL: 'https://accounts.spotify.com',
         timeout: SPOTIFY_HTTP_TIMEOUT_MS,
       },
-      { logBodies: false },
+      { logContent: false },
     );
     this.api = createOutboundHttp(
       {
         baseURL: 'https://api.spotify.com/v1',
         timeout: SPOTIFY_HTTP_TIMEOUT_MS,
       },
-      { logBodies: false },
+      { logContent: false },
     );
   }
 

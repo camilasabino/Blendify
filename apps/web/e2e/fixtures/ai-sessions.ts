@@ -10,6 +10,7 @@ import type {
 } from '@blendify/contracts'
 
 export const AI_REVIEW_SESSION_ID = 'visual-review-session'
+export const AI_REVIEW_ACCESS_KEY = 'visual-review-key'
 export const AI_REVIEW_PROMPT =
   'About an hour of happy deep cuts from Radiohead and Interpol, 30 songs, no Coldplay, for a long run'
 export const AI_REVIEW_COVER_URL = 'https://artwork.blendify.test/cover.svg'

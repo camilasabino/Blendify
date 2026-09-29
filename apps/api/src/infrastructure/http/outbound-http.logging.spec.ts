@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios';
 import {
   buildOutboundHttpLog,
+  contentFreeOutboundUrl,
   createOutboundHttp,
   parseOutboundRequestBody,
   resolveOutboundUrl,
@@ -33,6 +34,30 @@ describe('outbound http logging', () => {
     expect(url).toContain('q=sade');
     expect(url).toContain('type=artist');
   });
+
+  it.each([
+    [
+      'https://api.spotify.com/v1/search?q=artist%3A%22PROVIDER_ARTIST_SENTINEL%22&type=artist&limit=5&market=AR',
+      'https://api.spotify.com/v1/search?q=***&type=artist&limit=5&market=AR',
+    ],
+    [
+      'https://api.spotify.com/v1/playlists/3cEYpjA9oz9GiPac4AsH4n/items?limit=100&offset=0',
+      'https://api.spotify.com/v1/playlists/:id/items?limit=100&offset=0',
+    ],
+    [
+      'https://api.spotify.com/v1/artists/4Z8W4fKeB5YxbusRsdQVPb/top-tracks',
+      'https://api.spotify.com/v1/artists/:id/top-tracks',
+    ],
+    [
+      'https://ws.audioscrobbler.com/2.0/?method=track.getSimilar&artist=Cher&track=Believe&tag=pop&api_key=secret&format=json',
+      'https://ws.audioscrobbler.com/2.0/?method=track.getSimilar&artist=***&track=***&tag=***&api_key=***&format=json',
+    ],
+  ])(
+    'keeps only operational metadata in a content-free URL: %s',
+    (raw, expected) => {
+      expect(contentFreeOutboundUrl(raw)).toBe(expected);
+    },
+  );
 
   it('builds a JSON-friendly outbound log payload', () => {
     const payload = buildOutboundHttpLog({
@@ -128,7 +153,7 @@ describe('outbound http body logging', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  async function logLine(options?: { logBodies?: boolean }): Promise<string> {
+  async function logLine(options?: { logContent?: boolean }): Promise<string> {
     const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     await createOutboundHttp({ adapter }, options).post(
       'https://soundiiz.com/go/import-playlist',
@@ -145,7 +170,7 @@ describe('outbound http body logging', () => {
   });
 
   it('omits bodies when disabled but keeps request metadata', async () => {
-    const line = JSON.parse(await logLine({ logBodies: false })) as Record<
+    const line = JSON.parse(await logLine({ logContent: false })) as Record<
       string,
       unknown
     >;
@@ -157,5 +182,18 @@ describe('outbound http body logging', () => {
       status: 200,
       durationMs: expect.any(Number) as number,
     });
+  });
+
+  it('logs a content-free URL when content logging is disabled', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+
+    await createOutboundHttp({ adapter }, { logContent: false }).get(
+      'https://api.spotify.com/v1/search',
+      { params: { q: 'artist:"PROVIDER_ARTIST_SENTINEL"', type: 'artist' } },
+    );
+
+    const line = String(log.mock.calls[0][0]);
+    expect(line).not.toContain('PROVIDER_ARTIST_SENTINEL');
+    expect(line).toContain('type=artist');
   });
 });

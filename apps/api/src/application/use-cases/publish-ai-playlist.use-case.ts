@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   currentDestination,
   withDestination,
@@ -40,9 +40,12 @@ import {
   requireGeneratedResult,
 } from '@/application/services/ai-session-access';
 import {
-  AiSessionLease,
-  type AiSessionLeaseEvent,
-} from '@/application/services/ai-session-lease';
+  aiErrorCode,
+  logAiDiagnostic,
+  traceAiOperation,
+  type AiOperationTrace,
+} from '@/application/services/ai-observability';
+import { AiSessionLease } from '@/application/services/ai-session-lease';
 import {
   DESTINATION_LEASE_MS,
   DESTINATION_LEASE_RENEW_INTERVAL_MS,
@@ -59,10 +62,15 @@ export interface PublishAiPlaylistCommand {
   persistToLibrary: boolean;
 }
 
+interface PublishAttempt {
+  current: AiSession;
+  playlist: Playlist;
+  user: User;
+  lease: AiSessionLease;
+}
+
 @Injectable()
 export class PublishAiPlaylistUseCase {
-  private readonly logger = new Logger(PublishAiPlaylistUseCase.name);
-
   constructor(
     @Inject(AI_SESSION_REPOSITORY)
     private readonly sessions: AiSessionRepositoryPort,
@@ -74,12 +82,20 @@ export class PublishAiPlaylistUseCase {
     private readonly publisher: PublishPlaylistService,
   ) {}
 
-  async execute(
+  execute(command: PublishAiPlaylistCommand): Promise<AiSessionCommandResult> {
+    return traceAiOperation('destination_publish', (trace) =>
+      this.publishTraced(command, trace),
+    );
+  }
+
+  private async publishTraced(
     command: PublishAiPlaylistCommand,
+    trace: AiOperationTrace,
   ): Promise<AiSessionCommandResult> {
     const session = await this.find(command);
     requireGeneratedResult(session);
     if (hasSettledSpotifyDestination(session)) {
+      trace.record('reused');
       return { token: command.token, session };
     }
     requireNoPendingRefinement(session);
@@ -101,9 +117,11 @@ export class PublishAiPlaylistUseCase {
     try {
       const current = await this.find(command);
       if (hasSettledSpotifyDestination(current)) {
+        trace.record('reused');
         return { token: command.token, session: current };
       }
       if (current.destination?.status === 'publishing') {
+        trace.record('publish_incomplete');
         return await this.settleAbandoned(
           command,
           current,
@@ -116,7 +134,11 @@ export class PublishAiPlaylistUseCase {
         user,
         command.name,
       );
-      return await this.publishOnce(command, current, playlist, user, lease);
+      return await this.publishOnce(
+        command,
+        { current, playlist, user, lease },
+        trace,
+      );
     } finally {
       await lease.release();
     }
@@ -129,7 +151,7 @@ export class PublishAiPlaylistUseCase {
   ): Promise<AiSessionCommandResult> {
     const interrupted = withPublishInterrupted(current, new Date());
     const persisted = await this.persist(command.token, interrupted, attemptId);
-    this.logger.warn(JSON.stringify({ event: 'ai.publish.interrupted' }));
+    logAiDiagnostic('destination_publish', 'publish_interrupted');
     return {
       token: command.token,
       session: persisted ? interrupted : await this.find(command),
@@ -138,10 +160,8 @@ export class PublishAiPlaylistUseCase {
 
   private async publishOnce(
     command: PublishAiPlaylistCommand,
-    current: AiSession,
-    playlist: Playlist,
-    user: User,
-    lease: AiSessionLease,
+    { current, playlist, user, lease }: PublishAttempt,
+    trace: AiOperationTrace,
   ): Promise<AiSessionCommandResult> {
     if (lease.isLost) {
       throw AiSessionError.destinationInProgress();
@@ -150,7 +170,10 @@ export class PublishAiPlaylistUseCase {
     let working = withPublishStarted(current, attemptId, new Date());
     await this.start(command, working, current);
     const remote: { created: AiSpotifyPlaylistLink | null } = { created: null };
-    const startedAt = Date.now();
+    const outcomeFields = {
+      intentKind: playlist.kind,
+      trackCount: playlist.trackCount,
+    };
 
     try {
       const detail = await this.publisher.execute({
@@ -182,9 +205,11 @@ export class PublishAiPlaylistUseCase {
       );
       await this.recordUsage(user.id, playlist);
       if (!(await this.persist(command.token, published, attemptId))) {
-        return this.superseded(command, playlist, startedAt, 'published');
+        trace.record('superseded', outcomeFields);
+        return { token: command.token, session: await this.find(command) };
       }
-      this.logOutcome('ai.publish.completed', playlist, startedAt, {
+      trace.record('published', {
+        ...outcomeFields,
         savedToLibrary: command.persistToLibrary,
       });
       return { token: command.token, session: published };
@@ -198,9 +223,6 @@ export class PublishAiPlaylistUseCase {
           withDestination(working, current.destination, new Date()),
           attemptId,
         );
-        this.logOutcome('ai.publish.failed', playlist, startedAt, {
-          error: errorName(error),
-        });
         throw error;
       }
 
@@ -210,24 +232,16 @@ export class PublishAiPlaylistUseCase {
         new Date(),
       );
       if (!(await this.persist(command.token, incomplete, attemptId))) {
-        return this.superseded(command, playlist, startedAt, 'incomplete');
+        trace.record('superseded', outcomeFields);
+        return { token: command.token, session: await this.find(command) };
       }
-      this.logOutcome('ai.publish.incomplete', playlist, startedAt, {
-        error: errorName(error),
+      trace.record('publish_incomplete', {
+        ...outcomeFields,
+        errorCode: aiErrorCode(error),
         spotifyPlaylistCreated: remote.created !== null,
       });
       return { token: command.token, session: incomplete };
     }
-  }
-
-  private async superseded(
-    command: PublishAiPlaylistCommand,
-    playlist: Playlist,
-    startedAt: number,
-    outcome: 'published' | 'incomplete',
-  ): Promise<AiSessionCommandResult> {
-    this.logOutcome('ai.publish.superseded', playlist, startedAt, { outcome });
-    return { token: command.token, session: await this.find(command) };
   }
 
   private leaseFor(token: string, claimId: string): AiSessionLease {
@@ -241,7 +255,7 @@ export class PublishAiPlaylistUseCase {
         leaseMs: DESTINATION_LEASE_MS,
         renewIntervalMs: DESTINATION_LEASE_RENEW_INTERVAL_MS,
       },
-      (event) => this.logLeaseEvent(event),
+      (event) => logAiDiagnostic('destination_publish', event),
     );
   }
 
@@ -289,50 +303,16 @@ export class PublishAiPlaylistUseCase {
         ttlMs,
       );
     } catch (error) {
-      this.logger.warn(
-        JSON.stringify({
-          event: 'ai.publish.state_not_persisted',
-          destination: session.destination?.status ?? null,
-          error: errorName(error),
-        }),
-      );
+      logAiDiagnostic('destination_publish', 'state_not_persisted', error);
       return true;
     }
-  }
-
-  private logLeaseEvent(event: AiSessionLeaseEvent): void {
-    this.logger.warn(JSON.stringify({ event: `ai.publish.${event}` }));
   }
 
   private async recordUsage(userId: string, playlist: Playlist): Promise<void> {
     try {
       await this.usageStats.recordMix({ userId, ...usageRecordFor(playlist) });
     } catch (error) {
-      this.logger.warn(
-        `Usage stats recording failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-  }
-
-  private logOutcome(
-    event: string,
-    playlist: Playlist,
-    startedAt: number,
-    fields: Record<string, unknown>,
-  ): void {
-    const line = JSON.stringify({
-      event,
-      kind: playlist.kind,
-      trackCount: playlist.trackCount,
-      durationMs: Date.now() - startedAt,
-      ...fields,
-    });
-    if (event === 'ai.publish.completed') {
-      this.logger.log(line);
-    } else {
-      this.logger.warn(line);
+      logAiDiagnostic('destination_publish', 'usage_not_recorded', error);
     }
   }
 }
@@ -365,8 +345,4 @@ function toPlaylist(
     tracks: result.playlist.tracks.map(fromTrackResponse),
     generation: result.recipe,
   });
-}
-
-function errorName(error: unknown): string {
-  return error instanceof Error ? error.name : 'unknown';
 }

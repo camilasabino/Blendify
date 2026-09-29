@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
   AiClarification,
@@ -17,6 +17,7 @@ import {
   ApiError,
   type AiGeneration,
   type AiSession,
+  type AiSessionAccess,
   type AiSessionState,
 } from '@/lib/api'
 import {
@@ -98,7 +99,7 @@ const SESSION_REFRESH_CODES = new Set([
   'AI_PLAYLIST_NOT_GENERATED',
 ])
 
-type GenerationRun = { sessionId: string; epoch: number; signal: AbortSignal }
+type GenerationRun = { access: AiSessionAccess; epoch: number; signal: AbortSignal }
 
 function aiSessionQueryKey(sessionId: string | null) {
   return [AI_SESSION_QUERY_KEY, sessionId] as const
@@ -213,11 +214,15 @@ export function useAiSession() {
   const [generationError, setGenerationError] = useState<unknown>(null)
   const [statusChecks, setStatusChecks] = useState(0)
   const sessionId = stored?.sessionId ?? null
+  const access = useMemo<AiSessionAccess | null>(
+    () => (stored ? { sessionId: stored.sessionId, accessKey: stored.accessKey } : null),
+    [stored],
+  )
 
   const sessionQuery = useQuery({
     queryKey: aiSessionQueryKey(sessionId),
-    queryFn: () => api.getAiSession(sessionId ?? ''),
-    enabled: sessionId !== null,
+    queryFn: () => (access ? api.getAiSession(access) : Promise.reject(new ApiError('Create with AI session missing', 404))),
+    enabled: access !== null,
     staleTime: Infinity,
     refetchOnMount: 'always',
     retry: false,
@@ -256,14 +261,19 @@ export function useAiSession() {
     mutationFn: (prompt: string) => api.createAiSession(prompt),
     onSuccess: (session, prompt) => {
       queryClient.setQueryData(aiSessionQueryKey(session.sessionId), reviewedState(session))
-      remember({ sessionId: session.sessionId, prompt, playlistTitle: null })
+      remember({
+        sessionId: session.sessionId,
+        accessKey: session.accessKey,
+        prompt,
+        playlistTitle: null,
+      })
     },
     onError: setComposeError,
   })
 
   const clarify = useMutation({
-    mutationFn: ({ sessionId: id, optionId }: { sessionId: string; optionId: string }) =>
-      api.answerAiClarification(id, optionId),
+    mutationFn: ({ access: target, optionId }: { access: AiSessionAccess; optionId: string }) =>
+      api.answerAiClarification(target, optionId),
     onSuccess: (session) => {
       queryClient.setQueryData(aiSessionQueryKey(session.sessionId), reviewedState(session))
     },
@@ -276,7 +286,7 @@ export function useAiSession() {
 
   const generation = useMutation({
     mutationFn: (run: GenerationRun) =>
-      api.generateAiPlaylist(run.sessionId, {
+      api.generateAiPlaylist(run.access, {
         signal: run.signal,
         onProgress: (next) => {
           if (isCurrentGeneration(run.epoch)) {
@@ -288,13 +298,13 @@ export function useAiSession() {
       setProgress(null)
       setGenerationError(null)
       setStatusChecks(0)
-      queryClient.setQueryData<AiSessionState>(aiSessionQueryKey(run.sessionId), (current) =>
+      queryClient.setQueryData<AiSessionState>(aiSessionQueryKey(run.access.sessionId), (current) =>
         current ? { ...current, execution: { status: 'generating' } } : current,
       )
     },
     onSuccess: (result, run) => {
       useGenerationStore.getState().finish(run.epoch)
-      queryClient.setQueryData(aiSessionQueryKey(run.sessionId), generatedState(result))
+      queryClient.setQueryData(aiSessionQueryKey(run.access.sessionId), generatedState(result))
     },
     onError: (error, run) => {
       useGenerationStore.getState().finish(run.epoch)
@@ -305,23 +315,23 @@ export function useAiSession() {
       if (isCurrentGeneration(run.epoch)) {
         setGenerationError(error)
       }
-      void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(run.sessionId) })
+      void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(run.access.sessionId) })
     },
   })
 
   const publication = useMutation({
-    mutationFn: ({ sessionId: id, input }: { sessionId: string; input: PublishAiPlaylistRequest }) =>
-      api.publishAiPlaylist(id, input),
+    mutationFn: ({ access: target, input }: { access: AiSessionAccess; input: PublishAiPlaylistRequest }) =>
+      api.publishAiPlaylist(target, input),
     onSuccess: (state) => {
       queryClient.setQueryData(aiSessionQueryKey(state.sessionId), state)
     },
-    onError: (error, { sessionId: id }) => {
+    onError: (error, { access: target }) => {
       if (isSessionNotFound(error)) {
         expire(error)
         return
       }
       if (needsSessionRefresh(error)) {
-        void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(id) })
+        void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(target.sessionId) })
       }
     },
   })
@@ -344,8 +354,8 @@ export function useAiSession() {
   )
 
   const refinement = useMutation({
-    mutationFn: ({ sessionId: id, input }: { sessionId: string; input: CreateAiRefinementRequest }) =>
-      api.refineAiPlaylist(id, input),
+    mutationFn: ({ access: target, input }: { access: AiSessionAccess; input: CreateAiRefinementRequest }) =>
+      api.refineAiPlaylist(target, input),
     onSuccess: (result) => {
       queryClient.setQueryData<AiSessionState>(aiSessionQueryKey(result.sessionId), (current) =>
         current
@@ -353,7 +363,7 @@ export function useAiSession() {
           : current,
       )
     },
-    onError: (error, { sessionId: id }) => handleRefinementError(error, id),
+    onError: (error, { access: target }) => handleRefinementError(error, target.sessionId),
     onSettled: () => {
       refinementBusy.current = false
     },
@@ -361,22 +371,22 @@ export function useAiSession() {
 
   const settlement = useMutation({
     mutationFn: ({
-      sessionId: id,
+      access: target,
       refinementId,
       action,
     }: {
-      sessionId: string
+      access: AiSessionAccess
       refinementId: string
       action: AiRefinementSettlement
     }) =>
       action === 'applied'
-        ? api.applyAiRefinement(id, refinementId)
-        : api.dismissAiRefinement(id, refinementId),
+        ? api.applyAiRefinement(target, refinementId)
+        : api.dismissAiRefinement(target, refinementId),
     onSuccess: (state, { action }) => {
       queryClient.setQueryData(aiSessionQueryKey(state.sessionId), state)
       setRefinementSettlement(action)
     },
-    onError: (error, { sessionId: id }) => handleRefinementError(error, id),
+    onError: (error, { access: target }) => handleRefinementError(error, target.sessionId),
     onSettled: () => {
       refinementBusy.current = false
     },
@@ -473,18 +483,18 @@ export function useAiSession() {
   }
 
   function choose(optionId: string) {
-    if (clarify.isPending || !sessionId) {
+    if (clarify.isPending || !access) {
       return
     }
-    clarify.mutate({ sessionId, optionId })
+    clarify.mutate({ access, optionId })
   }
 
   function generate() {
-    if (generation.isPending || !sessionId) {
+    if (generation.isPending || !access) {
       return
     }
     const { epoch, signal } = useGenerationStore.getState().start()
-    generation.mutate({ sessionId, epoch, signal })
+    generation.mutate({ access, epoch, signal })
   }
 
   function checkStatus() {
@@ -493,33 +503,33 @@ export function useAiSession() {
   }
 
   function publish(input: PublishAiPlaylistRequest) {
-    if (publication.isPending || !sessionId) {
+    if (publication.isPending || !access) {
       return
     }
-    publication.mutate({ sessionId, input })
+    publication.mutate({ access, input })
   }
 
   function refine(input: CreateAiRefinementRequest) {
-    if (refinementBusy.current || !sessionId || session?.refinement) {
+    if (refinementBusy.current || !access || session?.refinement) {
       return
     }
     refinementBusy.current = true
     refinement.reset()
     settlement.reset()
     setRefinementSettlement(null)
-    refinement.mutate({ sessionId, input })
+    refinement.mutate({ access, input })
   }
 
   function settleRefinement(action: AiRefinementSettlement) {
     const refinementId = session?.refinement?.id
-    if (refinementBusy.current || !sessionId || !refinementId) {
+    if (refinementBusy.current || !access || !refinementId) {
       return
     }
     refinementBusy.current = true
     refinement.reset()
     settlement.reset()
     setRefinementSettlement(null)
-    settlement.mutate({ sessionId, refinementId, action })
+    settlement.mutate({ access, refinementId, action })
   }
 
   function clearRefinementError() {
@@ -528,12 +538,12 @@ export function useAiSession() {
   }
 
   async function prepareTransfer(name: string): Promise<PlaylistTransferDto> {
-    if (!sessionId) {
+    if (!access) {
       throw new ApiError('Create with AI session missing', 404)
     }
     try {
-      const state = await api.transferAiPlaylist(sessionId, { name })
-      queryClient.setQueryData(aiSessionQueryKey(sessionId), state)
+      const state = await api.transferAiPlaylist(access, { name })
+      queryClient.setQueryData(aiSessionQueryKey(access.sessionId), state)
       if (state.destination?.status !== 'transfer_prepared') {
         throw new ApiError('Invalid Create with AI response', 502)
       }
@@ -542,7 +552,7 @@ export function useAiSession() {
       if (isSessionNotFound(error)) {
         expire(error)
       } else if (needsSessionRefresh(error)) {
-        void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(sessionId) })
+        void queryClient.invalidateQueries({ queryKey: aiSessionQueryKey(access.sessionId) })
       }
       throw error
     }

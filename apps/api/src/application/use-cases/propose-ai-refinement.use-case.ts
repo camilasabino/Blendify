@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { PositionListPatch } from '@blendify/contracts/ai-service';
 import { ConfigService } from '@nestjs/config';
 import type { AiIntent } from '@/domain/ai/ai-intent';
@@ -33,10 +33,15 @@ import {
   AiRefinementCandidateBuilder,
   type AiRefinementCandidateOutcome,
 } from '@/application/services/ai-refinement-candidate.service';
+import type { AiRefinementStrategy } from '@/domain/ai/ai-refinement-candidate';
 import {
-  AiSessionLease,
-  type AiSessionLeaseEvent,
-} from '@/application/services/ai-session-lease';
+  logAiDiagnostic,
+  traceAiOperation,
+  type AiOperationFields,
+  type AiOperationResult,
+  type AiOperationTrace,
+} from '@/application/services/ai-observability';
+import { AiSessionLease } from '@/application/services/ai-session-lease';
 import {
   AI_REFINEMENT_LEASE_MS,
   AI_REFINEMENT_LEASE_RENEW_INTERVAL_MS,
@@ -44,6 +49,8 @@ import {
   parseAiRefinementsPerSession,
 } from '@/application/services/ai-refinement.policy';
 import type { AiSessionCommandResult } from './create-ai-session.use-case';
+
+type AiRefinementCandidateStrategy = AiRefinementStrategy['kind'];
 
 export interface ProposeAiRefinementCommand {
   token: string;
@@ -54,7 +61,6 @@ export interface ProposeAiRefinementCommand {
 
 @Injectable()
 export class ProposeAiRefinementUseCase {
-  private readonly logger = new Logger(ProposeAiRefinementUseCase.name);
   private readonly refinementsPerSession: number;
 
   constructor(
@@ -70,8 +76,17 @@ export class ProposeAiRefinementUseCase {
     );
   }
 
-  async execute(
+  execute(
     command: ProposeAiRefinementCommand,
+  ): Promise<AiSessionCommandResult> {
+    return traceAiOperation('refinement', (trace) =>
+      this.proposeTraced(command, trace),
+    );
+  }
+
+  private async proposeTraced(
+    command: ProposeAiRefinementCommand,
+    trace: AiOperationTrace,
   ): Promise<AiSessionCommandResult> {
     this.assertRefinable(await this.find(command));
 
@@ -85,7 +100,7 @@ export class ProposeAiRefinementUseCase {
 
     const lease = this.leaseFor(command.token, lockId);
     try {
-      return await this.proposeOnce(command, lease);
+      return await this.proposeOnce(command, lease, trace);
     } finally {
       await lease.release();
     }
@@ -94,8 +109,8 @@ export class ProposeAiRefinementUseCase {
   private async proposeOnce(
     command: ProposeAiRefinementCommand,
     lease: AiSessionLease,
+    trace: AiOperationTrace,
   ): Promise<AiSessionCommandResult> {
-    const startedAt = Date.now();
     const current = await this.find(command);
     this.assertRefinable(current);
 
@@ -103,11 +118,13 @@ export class ProposeAiRefinementUseCase {
     await this.saveOrSupersede(command.token, reserved, current);
 
     const { intent, preservation } = current.aiSafe;
+    const interpretationStartedAt = trace.elapsedMs();
     const plan = await this.planner.planRefinement({
       intent: requiredIntent(intent),
       preservation,
       refinement: command.refinement,
     });
+    const interpretationMs = trace.elapsedMs() - interpretationStartedAt;
 
     const settled = await this.find(command);
     if (
@@ -125,12 +142,14 @@ export class ProposeAiRefinementUseCase {
       playlistTrackCount: generatedTrackCount(settled),
       explicitPositions: command.preservePositions,
     });
-    const { outcome, strategy } = await this.outcomeOf(
+    const candidateStartedAt = trace.elapsedMs();
+    const { outcome, strategy, candidateAttempted } = await this.outcomeOf(
       evaluation,
       requiredIntent(intent),
       settled,
       lease,
     );
+    const candidateMs = trace.elapsedMs() - candidateStartedAt;
     this.requireAuthority(lease);
     const proposed = withPendingRefinement(
       settled,
@@ -140,26 +159,15 @@ export class ProposeAiRefinementUseCase {
     );
     await this.saveOrSupersede(command.token, proposed, settled);
 
-    this.logger.log(
-      JSON.stringify({
-        event: 'ai.refinement.proposed',
-        status: outcome.status,
-        clarificationReason:
-          outcome.status === 'needs_clarification'
-            ? outcome.clarification.reason
-            : null,
-        strategy,
-        candidate:
-          outcome.status === 'proposed' ? outcome.candidate.status : null,
-        failureCode:
-          outcome.status === 'proposed' && outcome.candidate.status === 'failed'
-            ? outcome.candidate.failure.code
-            : null,
-        promptVersion: plan.promptVersion,
-        attempt: proposed.refinementAttempts,
-        durationMs: Date.now() - startedAt,
-      }),
-    );
+    trace.record(refinementResult(outcome), {
+      ...refinementFields(outcome),
+      promptVersion: plan.promptVersion,
+      candidateAttempted,
+      ...(strategy === null ? {} : { candidateStrategy: strategy }),
+      refinementAttempt: proposed.refinementAttempts,
+      interpretationMs,
+      ...(candidateAttempted ? { candidateMs } : {}),
+    });
     return { token: command.token, session: proposed };
   }
 
@@ -168,9 +176,13 @@ export class ProposeAiRefinementUseCase {
     current: AiIntent,
     settled: AiSession,
     lease: AiSessionLease,
-  ): Promise<{ outcome: AiRefinementOutcome; strategy: string | null }> {
+  ): Promise<{
+    outcome: AiRefinementOutcome;
+    strategy: AiRefinementCandidateStrategy | null;
+    candidateAttempted: boolean;
+  }> {
     if (evaluation.status !== 'proposed') {
-      return { outcome: evaluation, strategy: null };
+      return { outcome: evaluation, strategy: null, candidateAttempted: false };
     }
 
     const built: AiRefinementCandidateOutcome = await this.candidates.build({
@@ -181,11 +193,12 @@ export class ProposeAiRefinementUseCase {
       checkpoint: () => this.requireAuthority(lease),
     });
     if (built.status === 'needs_clarification') {
-      return { outcome: built, strategy: null };
+      return { outcome: built, strategy: null, candidateAttempted: true };
     }
     return {
       outcome: { ...evaluation, candidate: built.candidate },
       strategy: built.strategy,
+      candidateAttempted: true,
     };
   }
 
@@ -230,7 +243,6 @@ export class ProposeAiRefinementUseCase {
   }
 
   private superseded(): AiSessionError {
-    this.logger.warn(JSON.stringify({ event: 'ai.refinement.superseded' }));
     return AiSessionError.refinementSuperseded();
   }
 
@@ -245,8 +257,7 @@ export class ProposeAiRefinementUseCase {
         leaseMs: AI_REFINEMENT_LEASE_MS,
         renewIntervalMs: AI_REFINEMENT_LEASE_RENEW_INTERVAL_MS,
       },
-      (event: AiSessionLeaseEvent) =>
-        this.logger.warn(JSON.stringify({ event: `ai.refinement.${event}` })),
+      (event) => logAiDiagnostic('refinement', event),
     );
   }
 
@@ -260,6 +271,34 @@ function requiredIntent<T>(intent: T | null): T {
     throw AiSessionError.notReady();
   }
   return intent;
+}
+
+function refinementResult(outcome: AiRefinementOutcome): AiOperationResult {
+  if (outcome.status !== 'proposed') {
+    return outcome.status;
+  }
+  return outcome.candidate.status === 'ready'
+    ? 'candidate_ready'
+    : 'candidate_failed';
+}
+
+function refinementFields(outcome: AiRefinementOutcome): AiOperationFields {
+  if (outcome.status === 'needs_clarification') {
+    return { clarificationReason: outcome.clarification.reason };
+  }
+  if (outcome.status === 'unchanged') {
+    return {};
+  }
+  if (outcome.candidate.status === 'failed') {
+    return { errorCode: outcome.candidate.failure.code };
+  }
+  const { result, diff } = outcome.candidate;
+  return {
+    candidateTrackCount: result.playlist.tracks.length,
+    addedCount: diff.tracks.added.length,
+    removedCount: diff.tracks.removed.length,
+    movedCount: diff.tracks.moved.length,
+  };
 }
 
 function generatedTrackCount(session: AiSession): number {

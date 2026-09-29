@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '@/infrastructure/auth/jwt-auth.guard';
 import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
 import { PlaylistsController } from './playlists.controller';
 import { inMemoryRequestLimitProviders } from '@/presentation/request-limits/request-limits.testing';
+import { listenOnLoopback } from '@/presentation/http/loopback.testing';
 
 describe('PlaylistsController contracts', () => {
   let app: INestApplication;
@@ -51,7 +52,7 @@ describe('PlaylistsController contracts', () => {
 
     app = module.createNestApplication();
     app.useGlobalFilters(new GlobalExceptionFilter());
-    await app.init();
+    await listenOnLoopback(app);
   });
 
   afterAll(async () => {

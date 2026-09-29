@@ -5,6 +5,7 @@ import { mockAuthenticatedSession, mockGuestSession } from './fixtures/api-mocks
 import {
   AI_REFINEMENT_ID,
   AI_REVIEW_PROMPT,
+  AI_REVIEW_ACCESS_KEY,
   AI_REVIEW_SESSION_ID,
   appliedState,
   candidateRefinement,
@@ -32,6 +33,7 @@ function trackRequests(page: Page, pattern: RegExp): Request[] {
 async function restore(page: Page, server: ServerSession, title: string | null = null) {
   const stored = JSON.stringify({
     sessionId: AI_REVIEW_SESSION_ID,
+    accessKey: AI_REVIEW_ACCESS_KEY,
     prompt: AI_REVIEW_PROMPT,
     playlistTitle: title,
   })
@@ -111,6 +113,8 @@ test.describe('Create with AI refinement', () => {
       ),
     ).toBeVisible()
     expect(refinements).toHaveLength(1)
+    expect(refinements[0].url()).not.toContain(AI_REVIEW_ACCESS_KEY)
+    expect(await refinements[0].headerValue('x-ai-session-key')).toBe(AI_REVIEW_ACCESS_KEY)
     expect(server.state.refinement).toBe(pendingFromOtherTab)
 
     await page.getByRole('button', { name: 'Apply changes' }).click()

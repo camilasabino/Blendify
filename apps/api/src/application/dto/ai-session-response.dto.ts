@@ -3,6 +3,7 @@ import type {
   AiClarificationOption as AiClarificationOptionDto,
   AiIntentSummary,
   AiRefinementCandidateDto,
+  AiSessionCreatedDto,
   AiSessionDto,
 } from '@blendify/contracts';
 import {
@@ -13,6 +14,7 @@ import {
 } from '@/domain/ai/ai-intent';
 import { resolveCuratedGenreSeeds } from '@/domain/ai/ai-genre-seeds';
 import type { AiGenerationResult, AiSession } from '@/domain/ai/ai-session';
+import { aiSessionId } from '@/application/services/ai-session-credential';
 
 export function toAiSessionResponse(
   token: string,
@@ -22,7 +24,7 @@ export function toAiSessionResponse(
   const isReady = intent !== null && session.clarification === null;
 
   return {
-    sessionId: token,
+    sessionId: aiSessionId(token),
     expiresAt: session.expiresAt,
     status: isReady ? 'ready' : 'needs_clarification',
     intent: isReady ? toIntentSummary(intent) : null,
@@ -30,6 +32,13 @@ export function toAiSessionResponse(
       ? toClarification(session.clarification)
       : null,
   };
+}
+
+export function toAiSessionCreatedResponse(
+  token: string,
+  session: AiSession,
+): AiSessionCreatedDto {
+  return { ...toAiSessionResponse(token, session), accessKey: token };
 }
 
 export function toIntentSummary(intent: AiIntent): AiIntentSummary {

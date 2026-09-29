@@ -74,6 +74,7 @@ import { PlaylistsController } from './playlists.controller';
 import { StatsController } from './stats.controller';
 import { TracksController } from './tracks.controller';
 import { TransfersController } from './transfers.controller';
+import { listenOnLoopback } from '@/presentation/http/loopback.testing';
 
 const FRONTEND = 'http://localhost:5173';
 const ANY_IP = expect.stringMatching(/^ip:/) as string;
@@ -319,7 +320,7 @@ async function createApp(
   app.use(createBodyParser());
   app.use(cookieParser());
   app.useGlobalFilters(new GlobalExceptionFilter());
-  await app.init();
+  await listenOnLoopback(app);
   return app;
 }
 

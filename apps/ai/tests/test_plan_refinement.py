@@ -225,7 +225,7 @@ def test_stops_after_bounded_invalid_refinement_outputs(make_client: ClientFacto
     [
         (ModelTimeoutError(), 504, "MODEL_TIMEOUT"),
         (ModelRateLimitedError(), 429, "MODEL_RATE_LIMITED"),
-        (ModelConfigurationError("no quota"), 503, "MODEL_UNAVAILABLE"),
+        (ModelConfigurationError("insufficient_quota"), 503, "MODEL_UNAVAILABLE"),
     ],
 )
 def test_normalizes_model_provider_errors(
@@ -325,15 +325,17 @@ def test_logs_metadata_without_the_refinement_or_the_current_intent(
     events = [
         json.loads(record.getMessage())
         for record in caplog.records
-        if record.name == "app.interpretation.structured_model_call"
+        if record.name == "app.observability.model_call_log"
     ]
     logged = "\n".join(record.getMessage() for record in caplog.records)
-    assert [event["event"] for event in events] == [
-        "refinement.output_invalid",
-        "refinement.planned",
+    assert [(event["event"], event["result"]) for event in events] == [
+        ("ai.model_request", "invalid_output"),
+        ("ai.model_request", "ok"),
+        ("ai.model_call", "completed"),
     ]
+    assert {event["operation"] for event in events} == {"refinement_interpretation"}
     assert events[-1]["promptVersion"] == REFINEMENT_PROMPT_VERSION
-    assert events[-1]["attempts"] == 2
+    assert events[-1]["modelRequests"] == 2
     assert REFINEMENT not in logged
     assert "Radiohead" not in logged
     assert "Coldplay" not in logged

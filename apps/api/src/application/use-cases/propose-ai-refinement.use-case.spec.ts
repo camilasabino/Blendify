@@ -806,15 +806,21 @@ describe('ProposeAiRefinementUseCase', () => {
       .map(([message]) => String(message))
       .join('\n');
     expect(JSON.parse(logged)).toEqual({
-      event: 'ai.refinement.proposed',
-      status: 'proposed',
-      clarificationReason: null,
-      strategy: 'regenerate',
-      candidate: 'ready',
-      failureCode: null,
-      promptVersion: 'refinement-v1',
-      attempt: 1,
+      event: 'ai.operation',
+      requestId: null,
+      operation: 'refinement',
+      result: 'candidate_ready',
       durationMs: expect.any(Number) as number,
+      candidateTrackCount: expect.any(Number) as number,
+      addedCount: expect.any(Number) as number,
+      removedCount: expect.any(Number) as number,
+      movedCount: expect.any(Number) as number,
+      promptVersion: 'refinement-v1',
+      candidateAttempted: true,
+      candidateStrategy: 'regenerate',
+      refinementAttempt: 1,
+      interpretationMs: expect.any(Number) as number,
+      candidateMs: expect.any(Number) as number,
     });
     expect(logged).not.toContain(REFINEMENT);
     expect(logged).not.toContain('Radiohead');

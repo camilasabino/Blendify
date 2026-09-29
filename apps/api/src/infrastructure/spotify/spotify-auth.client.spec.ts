@@ -44,7 +44,7 @@ describe('SpotifyAuthClient', () => {
 
     expect(mockCreateOutboundHttp).toHaveBeenCalledTimes(2);
     for (const call of mockCreateOutboundHttp.mock.calls.slice(-2)) {
-      expect(call[1]).toEqual({ logBodies: false });
+      expect(call[1]).toEqual({ logContent: false });
     }
   });
 

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   clarificationFromModel,
   normalizeAiIntent,
@@ -18,6 +18,10 @@ import {
   INTENT_INTERPRETER,
   type IntentInterpreterPort,
 } from '@/domain/repositories/intent-interpreter.port';
+import {
+  traceAiOperation,
+  type AiOperationTrace,
+} from '@/application/services/ai-observability';
 
 export const AI_SESSION_TTL_MS = 30 * 60_000;
 const AI_SESSION_TOKEN_BYTES = 32;
@@ -29,8 +33,6 @@ export interface AiSessionCommandResult {
 
 @Injectable()
 export class CreateAiSessionUseCase {
-  private readonly logger = new Logger(CreateAiSessionUseCase.name);
-
   constructor(
     @Inject(INTENT_INTERPRETER)
     private readonly interpreter: IntentInterpreterPort,
@@ -38,11 +40,19 @@ export class CreateAiSessionUseCase {
     private readonly sessions: AiSessionRepositoryPort,
   ) {}
 
-  async execute(command: {
+  execute(command: {
     prompt: string;
     userId: string | null;
   }): Promise<AiSessionCommandResult> {
-    const startedAt = Date.now();
+    return traceAiOperation('intent_interpretation', (trace) =>
+      this.create(command, trace),
+    );
+  }
+
+  private async create(
+    command: { prompt: string; userId: string | null },
+    trace: AiOperationTrace,
+  ): Promise<AiSessionCommandResult> {
     const interpretation = await this.interpreter.interpretIntent({
       prompt: command.prompt,
     });
@@ -84,15 +94,14 @@ export class CreateAiSessionUseCase {
     const token = randomBytes(AI_SESSION_TOKEN_BYTES).toString('base64url');
     await this.sessions.save(token, session, AI_SESSION_TTL_MS);
 
-    this.logger.log(
-      JSON.stringify({
-        event: 'ai.session.created',
+    trace.record(
+      session.clarification ? 'needs_clarification' : 'review_ready',
+      {
         promptVersion: session.promptVersion,
-        modelOutcome: interpretation.result.outcome,
-        clarificationReason: session.clarification?.reason ?? null,
+        intentKind: session.aiSafe.intent?.kind,
+        clarificationReason: session.clarification?.reason,
         authenticated: command.userId !== null,
-        durationMs: Date.now() - startedAt,
-      }),
+      },
     );
     return { token, session };
   }

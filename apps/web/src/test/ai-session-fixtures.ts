@@ -5,12 +5,14 @@ import type {
   AiIntentSummary,
   AiRefinementDto,
   AiSessionDestinationDto,
+  AiSessionCreatedDto,
   AiSessionDto,
   AiSessionStateDto,
   TrackDto,
 } from '@blendify/contracts'
 
-export const AI_SESSION_ID = 'session-token'
+export const AI_SESSION_ID = 'session-id'
+export const AI_ACCESS_KEY = 'access-key'
 export const AI_PROMPT = '20 deep cuts from Radiohead and Interpol, no Coldplay'
 const EXPIRES_AT = '2026-09-27T12:30:00.000Z'
 
@@ -56,6 +58,10 @@ export function reviewedAiSession(intent: AiIntentSummary = aiIntent): AiSession
     intent,
     clarification: null,
   }
+}
+
+export function createdAiSession(intent: AiIntentSummary = aiIntent): AiSessionCreatedDto {
+  return { ...reviewedAiSession(intent), accessKey: AI_ACCESS_KEY }
 }
 
 export function aiGeneration(
@@ -129,7 +135,7 @@ export function failedAiSessionState(error: AiGenerationFailureDto): AiSessionSt
 export function storeAiSession(prompt = AI_PROMPT, playlistTitle: string | null = null) {
   sessionStorage.setItem(
     'blendify.aiSession',
-    JSON.stringify({ sessionId: AI_SESSION_ID, prompt, playlistTitle }),
+    JSON.stringify({ sessionId: AI_SESSION_ID, accessKey: AI_ACCESS_KEY, prompt, playlistTitle }),
   )
 }
 

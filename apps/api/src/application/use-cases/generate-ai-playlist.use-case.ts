@@ -1,12 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { AiIntent } from '@/domain/ai/ai-intent';
 import {
   reviewedIntentOf,
   withGenerationCompleted,
   withGenerationFailed,
   withGenerationStarted,
-  type AiGenerationFailure,
   type AiGenerationResult,
   type AiSession,
 } from '@/domain/ai/ai-session';
@@ -31,9 +30,11 @@ import type { Track } from '@/domain/track/track.entity';
 import { toGeneratedPlaylistPreview } from '@/application/dto/playlist-response.dto';
 import { buildAiExecutionPlan } from '@/application/services/ai-execution-plan';
 import {
-  AiSessionLease,
-  type AiSessionLeaseEvent,
-} from '@/application/services/ai-session-lease';
+  logAiDiagnostic,
+  traceAiOperation,
+  type AiOperationTrace,
+} from '@/application/services/ai-observability';
+import { AiSessionLease } from '@/application/services/ai-session-lease';
 import {
   GENERATION_LEASE_MS,
   GENERATION_LEASE_RENEW_INTERVAL_MS,
@@ -48,10 +49,14 @@ import type { ProgressReporter } from '@/application/services/generation-progres
 import { GeneratePlaylistUseCase } from './generate-playlist.use-case';
 import type { AiSessionCommandResult } from './create-ai-session.use-case';
 
+interface GenerateAiPlaylistCommand {
+  token: string;
+  userId: string | null;
+  onProgress?: ProgressReporter;
+}
+
 @Injectable()
 export class GenerateAiPlaylistUseCase {
-  private readonly logger = new Logger(GenerateAiPlaylistUseCase.name);
-
   constructor(
     @Inject(AI_SESSION_REPOSITORY)
     private readonly sessions: AiSessionRepositoryPort,
@@ -59,17 +64,23 @@ export class GenerateAiPlaylistUseCase {
     private readonly generator: GeneratePlaylistUseCase,
   ) {}
 
-  async execute(command: {
-    token: string;
-    userId: string | null;
-    onProgress?: ProgressReporter;
-  }): Promise<AiSessionCommandResult> {
+  execute(command: GenerateAiPlaylistCommand): Promise<AiSessionCommandResult> {
+    return traceAiOperation('initial_generation', (trace) =>
+      this.generateTraced(command, trace),
+    );
+  }
+
+  private async generateTraced(
+    command: GenerateAiPlaylistCommand,
+    trace: AiOperationTrace,
+  ): Promise<AiSessionCommandResult> {
     const session = await findReadableAiSession(
       this.sessions,
       command.token,
       command.userId,
     );
     if (session.execution?.status === 'generated') {
+      trace.record('reused');
       return { token: command.token, session };
     }
     requireReviewedIntent(session);
@@ -93,22 +104,19 @@ export class GenerateAiPlaylistUseCase {
         leaseMs: GENERATION_LEASE_MS,
         renewIntervalMs: GENERATION_LEASE_RENEW_INTERVAL_MS,
       },
-      (event) => this.logLeaseEvent(event),
+      (event) => logAiDiagnostic('initial_generation', event),
     );
     try {
-      return await this.generateOnce(command, lease);
+      return await this.generateOnce(command, lease, trace);
     } finally {
       await lease.release();
     }
   }
 
   private async generateOnce(
-    command: {
-      token: string;
-      userId: string | null;
-      onProgress?: ProgressReporter;
-    },
+    command: GenerateAiPlaylistCommand,
     lease: AiSessionLease,
+    trace: AiOperationTrace,
   ): Promise<AiSessionCommandResult> {
     const current = await findReadableAiSession(
       this.sessions,
@@ -116,38 +124,43 @@ export class GenerateAiPlaylistUseCase {
       command.userId,
     );
     if (current.execution?.status === 'generated') {
+      trace.record('reused');
       return { token: command.token, session: current };
     }
 
     const intent = requireReviewedIntent(current);
     if (current.execution?.status === 'generating') {
-      this.logStaleRecovered(intent);
+      logAiDiagnostic('initial_generation', 'stale_generation_recovered');
     }
     const attemptId = randomUUID();
     const started = withGenerationStarted(current, attemptId, new Date());
     await this.save(command.token, started);
 
-    const startedAt = Date.now();
     try {
       const result = await this.generate(intent, lease, command.onProgress);
       const completed = withGenerationCompleted(started, result, new Date());
       requireAuthority(lease);
       await this.persistOutcome(command.token, completed, attemptId);
-      this.logCompleted(intent, result, Date.now() - startedAt);
+      trace.record('generated', {
+        intentKind: intent.kind,
+        trackCount: result.playlist.tracks.length,
+        unmetConstraints: result.unmetConstraints.map((unmet) => unmet.type),
+      });
       return { token: command.token, session: completed };
     } catch (error) {
       if (isSuperseded(error) || lease.isLost) {
-        this.logSuperseded(intent, Date.now() - startedAt);
         throw AiSessionError.generationSuperseded();
       }
 
       const failure = describeAiGenerationFailure(error);
       const failed = withGenerationFailed(started, failure, new Date());
       if (!(await this.persistFailure(command.token, failed, attemptId))) {
-        this.logSuperseded(intent, Date.now() - startedAt);
         throw AiSessionError.generationSuperseded();
       }
-      this.logFailed(intent, failure, Date.now() - startedAt);
+      trace.record(failure.category, {
+        intentKind: intent.kind,
+        errorCode: failure.code,
+      });
       throw error;
     }
   }
@@ -239,10 +252,8 @@ export class GenerateAiPlaylistUseCase {
         attemptId,
         ttlMs,
       );
-    } catch {
-      this.logger.warn(
-        JSON.stringify({ event: 'ai.generation.failure_not_persisted' }),
-      );
+    } catch (error) {
+      logAiDiagnostic('initial_generation', 'failure_not_persisted', error);
       return true;
     }
   }
@@ -253,61 +264,6 @@ export class GenerateAiPlaylistUseCase {
       throw AiSessionError.notFound();
     }
     await this.sessions.save(token, session, ttlMs);
-  }
-
-  private logCompleted(
-    intent: AiIntent,
-    result: AiGenerationResult,
-    durationMs: number,
-  ): void {
-    this.logger.log(
-      JSON.stringify({
-        event: 'ai.generation.completed',
-        kind: intent.kind,
-        trackCount: result.playlist.tracks.length,
-        unmetConstraints: result.unmetConstraints.map((unmet) => unmet.type),
-        durationMs,
-      }),
-    );
-  }
-
-  private logLeaseEvent(event: AiSessionLeaseEvent): void {
-    this.logger.warn(JSON.stringify({ event: `ai.generation.${event}` }));
-  }
-
-  private logSuperseded(intent: AiIntent, durationMs: number): void {
-    this.logger.warn(
-      JSON.stringify({
-        event: 'ai.generation.superseded',
-        kind: intent.kind,
-        durationMs,
-      }),
-    );
-  }
-
-  private logStaleRecovered(intent: AiIntent): void {
-    this.logger.warn(
-      JSON.stringify({
-        event: 'ai.generation.stale_recovered',
-        kind: intent.kind,
-      }),
-    );
-  }
-
-  private logFailed(
-    intent: AiIntent,
-    failure: AiGenerationFailure,
-    durationMs: number,
-  ): void {
-    this.logger.warn(
-      JSON.stringify({
-        event: 'ai.generation.failed',
-        kind: intent.kind,
-        code: failure.code,
-        category: failure.category,
-        durationMs,
-      }),
-    );
   }
 }
 

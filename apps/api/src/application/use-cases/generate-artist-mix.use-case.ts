@@ -388,7 +388,7 @@ export class GenerateArtistMixUseCase {
         return;
       }
       this.logger.warn(
-        `Artist track search fallback failed for ${artist.name}: ${
+        `Artist track search fallback failed: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
@@ -438,9 +438,7 @@ export class GenerateArtistMixUseCase {
       if (isFatalCatalogError(error)) {
         throw error;
       }
-      this.logger.warn(
-        `Last.fm track fetch failed for "${artist.name}": ${errorMessage(error)}`,
-      );
+      this.logger.warn(`Last.fm track fetch failed: ${errorMessage(error)}`);
       return [];
     }
   }

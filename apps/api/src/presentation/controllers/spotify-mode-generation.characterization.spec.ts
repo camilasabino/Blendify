@@ -42,6 +42,7 @@ import { JwtAuthGuard } from '@/infrastructure/auth/jwt-auth.guard';
 import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.filter';
 import { PlaylistsController } from './playlists.controller';
 import { inMemoryRequestLimitProviders } from '@/presentation/request-limits/request-limits.testing';
+import { listenOnLoopback } from '@/presentation/http/loopback.testing';
 
 const SPOTIFY_PLAYLIST = {
   id: 'spotify-playlist-1',
@@ -237,7 +238,7 @@ async function createApp(world: World): Promise<INestApplication> {
 
   const app = module.createNestApplication({ logger: false });
   app.useGlobalFilters(new GlobalExceptionFilter());
-  await app.init();
+  await listenOnLoopback(app);
   return app;
 }
 

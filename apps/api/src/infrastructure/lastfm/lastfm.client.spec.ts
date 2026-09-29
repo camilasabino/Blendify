@@ -19,7 +19,7 @@ describe('LastFmClient outbound logging', () => {
     create({ NODE_ENV: 'production' });
 
     expect(mockCreateOutboundHttp.mock.calls[0][1]).toEqual({
-      logBodies: false,
+      logContent: false,
     });
   });
 
@@ -27,7 +27,7 @@ describe('LastFmClient outbound logging', () => {
     create({ NODE_ENV: 'development' });
 
     expect(mockCreateOutboundHttp.mock.calls[0][1]).toEqual({
-      logBodies: true,
+      logContent: true,
     });
   });
 });

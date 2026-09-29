@@ -6,6 +6,8 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './presentation/filters/global-exception.filter';
 import { createBodyParser } from './presentation/http/body-limits';
+import { enableFrontendCors } from './presentation/http/cors';
+import { requestCorrelation } from './presentation/http/request-correlation';
 import { parseTrustProxy } from './presentation/request-limits/request-limits.config';
 
 async function bootstrap() {
@@ -15,12 +17,10 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.set('trust proxy', parseTrustProxy(config.get<string>('TRUST_PROXY')));
+  app.use(requestCorrelation);
   app.use(createBodyParser());
   app.use(cookieParser());
-  app.enableCors({
-    origin: config.getOrThrow<string>('FRONTEND_URL'),
-    credentials: true,
-  });
+  enableFrontendCors(app, config.getOrThrow<string>('FRONTEND_URL'));
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.enableShutdownHooks();
 

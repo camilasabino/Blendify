@@ -4,7 +4,8 @@ from collections.abc import Mapping, Sequence
 from app.providers.model_provider import ModelIntentRequest, ModelIntentResult, ModelTokenUsage
 
 FAKE_MODEL = "fake-model"
-FAKE_USAGE = ModelTokenUsage(input_tokens=120, output_tokens=40)
+FAKE_PROVIDER = "fake"
+FAKE_USAGE = ModelTokenUsage(input_tokens=120, output_tokens=40, total_tokens=160)
 
 ScriptedOutput = Mapping[str, object] | Exception
 
@@ -13,6 +14,10 @@ class ScriptedModelProvider:
     def __init__(self, outputs: Sequence[ScriptedOutput]) -> None:
         self._outputs = list(outputs)
         self.requests: list[ModelIntentRequest] = []
+
+    @property
+    def name(self) -> str:
+        return FAKE_PROVIDER
 
     @property
     def is_available(self) -> bool:
@@ -27,6 +32,10 @@ class ScriptedModelProvider:
 
 
 class HangingModelProvider:
+    @property
+    def name(self) -> str:
+        return FAKE_PROVIDER
+
     @property
     def is_available(self) -> bool:
         return True

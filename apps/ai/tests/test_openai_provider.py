@@ -91,7 +91,7 @@ async def test_returns_the_structured_result_with_model_and_token_usage() -> Non
 
     assert result.payload == interpreted_output()
     assert result.model == f"{MODEL}-2026-09-01"
-    assert result.usage == ModelTokenUsage(input_tokens=812, output_tokens=95)
+    assert result.usage == ModelTokenUsage(input_tokens=812, output_tokens=95, total_tokens=907)
 
 
 async def test_requests_strict_structured_output_without_tools_or_storage() -> None:
@@ -167,6 +167,35 @@ async def test_maps_a_connection_failure_to_unavailable() -> None:
 async def test_rejects_unusable_model_output(body: dict[str, Any]) -> None:
     with pytest.raises(ModelInvalidOutputError):
         await generate(json_handler(200, body))
+
+
+async def test_invalid_output_keeps_the_usage_of_that_model_request() -> None:
+    with pytest.raises(ModelInvalidOutputError) as raised:
+        await generate(json_handler(200, responses_body("not json")))
+
+    assert raised.value.model == f"{MODEL}-2026-09-01"
+    assert raised.value.usage == ModelTokenUsage(
+        input_tokens=812, output_tokens=95, total_tokens=907
+    )
+
+
+@pytest.mark.parametrize(
+    ("status_code", "code", "reason"),
+    [
+        (401, "invalid_api_key", "authentication"),
+        (403, "permission_denied", "permission_denied"),
+        (404, "model_not_found", "not_found"),
+        (400, "invalid_request_error", "bad_request"),
+        (429, "insufficient_quota", "insufficient_quota"),
+    ],
+)
+async def test_maps_configuration_failures_to_bounded_reasons(
+    status_code: int, code: str, reason: str
+) -> None:
+    with pytest.raises(ModelConfigurationError) as raised:
+        await generate(json_handler(status_code, error_body(code)))
+
+    assert raised.value.reason == reason
 
 
 def test_interprets_end_to_end_through_the_service_without_logging_secrets_or_content(

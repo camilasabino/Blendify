@@ -51,6 +51,7 @@ describe('PRIVACY_POLICY', () => {
       'Core Web Vitals',
       'Railway',
       'Google Fonts',
+      'OpenAI',
     ]) {
       expect(text).toContain(term)
     }
@@ -68,6 +69,25 @@ describe('PRIVACY_POLICY', () => {
       'anonymous',
       'anónimo',
       'anônimo',
+    ]) {
+      expect(text).not.toContain(term)
+    }
+  })
+
+  it.each(LOCALES)('describes Create with AI without retention or training claims (%s)', (locale) => {
+    const text = JSON.stringify(PRIVACY_POLICY[locale]).toLowerCase()
+    expect(text).toContain('30')
+    expect(text).toContain('openai')
+    for (const term of [
+      'zero retention',
+      'no retention',
+      'never stores',
+      'does not train',
+      'not used to train',
+      'retención cero',
+      'no entrena',
+      'retenção zero',
+      'não treina',
     ]) {
       expect(text).not.toContain(term)
     }

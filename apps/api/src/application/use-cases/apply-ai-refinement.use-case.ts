@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   refinementApplyBlocker,
   withAppliedRefinement,
@@ -11,35 +11,34 @@ import {
   settlePendingRefinement,
   type SettleAiRefinementCommand,
 } from '@/application/services/ai-refinement-settlement';
+import { traceAiOperation } from '@/application/services/ai-observability';
 import type { AiSessionCommandResult } from './create-ai-session.use-case';
 
 @Injectable()
 export class ApplyAiRefinementUseCase {
-  private readonly logger = new Logger(ApplyAiRefinementUseCase.name);
-
   constructor(
     @Inject(AI_SESSION_REPOSITORY)
     private readonly sessions: AiSessionRepositoryPort,
   ) {}
 
-  async execute(
-    command: SettleAiRefinementCommand,
-  ): Promise<AiSessionCommandResult> {
-    const { settled } = await settlePendingRefinement(this.sessions, command, {
-      blockerOf: refinementApplyBlocker,
-      settle: withAppliedRefinement,
-    });
+  execute(command: SettleAiRefinementCommand): Promise<AiSessionCommandResult> {
+    return traceAiOperation('refinement_apply', async (trace) => {
+      const { settled } = await settlePendingRefinement(
+        this.sessions,
+        command,
+        {
+          blockerOf: refinementApplyBlocker,
+          settle: withAppliedRefinement,
+        },
+      );
 
-    this.logger.log(
-      JSON.stringify({
-        event: 'ai.refinement.applied',
-        trackCount:
-          settled.execution?.status === 'generated'
-            ? settled.execution.result.playlist.tracks.length
-            : null,
-        attempt: settled.refinementAttempts,
-      }),
-    );
-    return { token: command.token, session: settled };
+      trace.record('applied', {
+        ...(settled.execution?.status === 'generated'
+          ? { trackCount: settled.execution.result.playlist.tracks.length }
+          : {}),
+        refinementAttempt: settled.refinementAttempts,
+      });
+      return { token: command.token, session: settled };
+    });
   }
 }

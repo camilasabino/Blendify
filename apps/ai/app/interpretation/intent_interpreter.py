@@ -1,20 +1,12 @@
 from app.interpretation.structured_model_call import (
     MAX_OUTPUT_VALIDATION_ATTEMPTS,
     MODEL_CALL_TIMEOUT_SECONDS,
-    ModelCallEvents,
     StructuredModelCaller,
 )
 from app.models.intent import intent_interpretation_adapter
 from app.models.interpretation import InterpretIntentRequest, InterpretIntentResponse
 from app.prompts.intent import build_intent_model_request
 from app.providers.model_provider import IntentModelProvider
-
-INTENT_EVENTS = ModelCallEvents(
-    completed="intent.interpreted",
-    output_invalid="intent.output_invalid",
-    failed="intent.failed",
-    provider_misconfigured="intent.provider_misconfigured",
-)
 
 
 class IntentInterpreter:
@@ -27,6 +19,7 @@ class IntentInterpreter:
     ) -> None:
         self._caller = StructuredModelCaller(
             provider,
+            operation="intent_interpretation",
             model_call_timeout_seconds=model_call_timeout_seconds,
             max_output_validation_attempts=max_output_validation_attempts,
         )
@@ -37,9 +30,7 @@ class IntentInterpreter:
 
     async def interpret(self, request: InterpretIntentRequest) -> InterpretIntentResponse:
         model_request = build_intent_model_request(request.prompt)
-        result = await self._caller.call(
-            model_request, intent_interpretation_adapter, INTENT_EVENTS
-        )
+        result = await self._caller.call(model_request, intent_interpretation_adapter)
 
         return InterpretIntentResponse.model_validate(
             {"promptVersion": model_request.prompt_version, "result": result}

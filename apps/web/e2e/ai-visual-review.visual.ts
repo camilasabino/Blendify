@@ -9,6 +9,7 @@ import {
   candidateRefinement,
   pendingState,
   refinementResult,
+  AI_REVIEW_ACCESS_KEY,
   AI_REVIEW_SESSION_ID,
   clarificationState,
   failedState,
@@ -42,6 +43,7 @@ async function blockUnmockedRequests(page: Page) {
 async function restoreSession(page: Page, sessionState: AiSessionStateDto | null) {
   const stored = JSON.stringify({
     sessionId: AI_REVIEW_SESSION_ID,
+    accessKey: AI_REVIEW_ACCESS_KEY,
     prompt: AI_REVIEW_PROMPT,
     playlistTitle: null,
   })
@@ -74,7 +76,7 @@ async function openRestored(page: Page, sessionState: AiSessionStateDto | null) 
 async function openReviewedLive(page: Page, sessionState: AiSessionStateDto) {
   await blockUnmockedRequests(page)
   await page.route('**/api/ai/sessions', (route) =>
-    route.fulfill({ status: 201, json: { ...sessionState, execution: undefined, destination: undefined, preservation: undefined, refinement: undefined } }),
+    route.fulfill({ status: 201, json: { ...sessionState, accessKey: AI_REVIEW_ACCESS_KEY, execution: undefined, destination: undefined, preservation: undefined, refinement: undefined } }),
   )
   await page.goto('/app/ai')
   await page.getByRole('textbox', { name: 'Playlist request' }).fill(AI_REVIEW_PROMPT)

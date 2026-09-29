@@ -27,6 +27,10 @@ class MeteredModelProvider:
         self.records: list[ProviderRequestRecord] = []
 
     @property
+    def name(self) -> str:
+        return self._provider.name
+
+    @property
     def is_available(self) -> bool:
         return self._provider.is_available
 

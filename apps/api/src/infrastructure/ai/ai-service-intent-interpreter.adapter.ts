@@ -1,3 +1,4 @@
+import { performance } from 'node:perf_hooks';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { type AxiosInstance } from 'axios';
@@ -21,11 +22,16 @@ import type {
   RefinementPlanResult,
   RefinementPlannerPort,
 } from '@/domain/repositories/refinement-planner.port';
+import {
+  currentRequestId,
+  REQUEST_ID_HEADER,
+} from '@/application/services/request-correlation';
 import { createOutboundHttp } from '@/infrastructure/http/outbound-http.logging';
 
 export const AI_SERVICE_TIMEOUT_MS = 30_000;
 export const AI_SERVICE_INTERPRET_PATH = '/v1/intent/interpret';
 export const AI_SERVICE_REFINEMENT_PATH = '/v1/refinement/plan';
+export const AI_SERVICE_CALL_EVENT = 'ai.service_call';
 
 type FailureCategory =
   | 'not_configured'
@@ -40,21 +46,21 @@ interface AiServiceOperation<
   ResponseSchema extends z.ZodType,
 > {
   path: string;
-  event: 'ai.intent' | 'ai.refinement';
+  operation: 'intent_interpretation' | 'refinement_interpretation';
   request: RequestSchema;
   response: ResponseSchema;
 }
 
 const INTERPRET_OPERATION = {
   path: AI_SERVICE_INTERPRET_PATH,
-  event: 'ai.intent',
+  operation: 'intent_interpretation',
   request: InterpretIntentRequestSchema,
   response: InterpretIntentResponseSchema,
 } as const satisfies AiServiceOperation<z.ZodType, z.ZodType>;
 
 const REFINEMENT_OPERATION = {
   path: AI_SERVICE_REFINEMENT_PATH,
-  event: 'ai.refinement',
+  operation: 'refinement_interpretation',
   request: PlanRefinementRequestSchema,
   response: PlanRefinementResponseSchema,
 } as const satisfies AiServiceOperation<z.ZodType, z.ZodType>;
@@ -85,7 +91,7 @@ export class AiServiceIntentInterpreterAdapter
           'Content-Type': 'application/json',
         },
       },
-      { logBodies: false },
+      { logContent: false },
     );
   }
 
@@ -111,7 +117,7 @@ export class AiServiceIntentInterpreterAdapter
     operation: AiServiceOperation<RequestSchema, ResponseSchema>,
     request: unknown,
   ): Promise<z.output<ResponseSchema>> {
-    const startedAt = Date.now();
+    const startedAt = performance.now();
     const safeRequest = operation.request.safeParse(request);
 
     if (!safeRequest.success) {
@@ -123,9 +129,11 @@ export class AiServiceIntentInterpreterAdapter
 
     let data: unknown;
     try {
+      const requestId = currentRequestId();
       const response = await this.http.post<unknown>(
         operation.path,
         safeRequest.data,
+        requestId ? { headers: { [REQUEST_ID_HEADER]: requestId } } : {},
       );
       data = response.data;
     } catch (error) {
@@ -139,10 +147,13 @@ export class AiServiceIntentInterpreterAdapter
 
     this.logger.log(
       JSON.stringify({
-        event: `${operation.event}.interpreted`,
+        event: AI_SERVICE_CALL_EVENT,
+        requestId: currentRequestId(),
+        operation: operation.operation,
+        result: 'completed',
         outcome: parsed.data.result.outcome,
         promptVersion: parsed.data.promptVersion,
-        durationMs: Date.now() - startedAt,
+        durationMs: elapsedMs(startedAt),
       }),
     );
     return parsed.data;
@@ -155,13 +166,20 @@ export class AiServiceIntentInterpreterAdapter
   ): AiInterpretationError {
     this.logger.warn(
       JSON.stringify({
-        event: `${operation.event}.failed`,
+        event: AI_SERVICE_CALL_EVENT,
+        requestId: currentRequestId(),
+        operation: operation.operation,
+        result: 'failed',
         category,
-        durationMs: Date.now() - startedAt,
+        durationMs: elapsedMs(startedAt),
       }),
     );
     return toInterpretationError(category);
   }
+}
+
+function elapsedMs(startedAt: number): number {
+  return Math.round(performance.now() - startedAt);
 }
 
 function classifyHttpError(error: unknown): FailureCategory {

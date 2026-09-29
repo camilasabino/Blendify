@@ -17,6 +17,7 @@ import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.f
 import { OriginCsrfGuard } from '@/presentation/guards/origin-csrf.guard';
 import { createBodyParser } from '@/presentation/http/body-limits';
 import { AuthController } from './auth.controller';
+import { listenOnLoopback } from '@/presentation/http/loopback.testing';
 
 const FRONTEND = 'http://localhost:5173';
 const JWT_SECRET = 'spotify-auth-callback-test-secret';
@@ -96,7 +97,7 @@ async function createApp(world: {
   app.use(createBodyParser());
   app.use(cookieParser());
   app.useGlobalFilters(new GlobalExceptionFilter());
-  await app.init();
+  await listenOnLoopback(app);
   return app;
 }
 

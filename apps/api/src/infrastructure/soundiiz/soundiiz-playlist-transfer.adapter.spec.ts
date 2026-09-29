@@ -114,7 +114,7 @@ describe('SoundiizPlaylistTransferAdapter', () => {
         timeout: SOUNDIIZ_TIMEOUT_MS,
         maxRedirects: 0,
       }),
-      { logBodies: false },
+      { logContent: false },
     );
     expect(SOUNDIIZ_TIMEOUT_MS).toBe(10_000);
   });

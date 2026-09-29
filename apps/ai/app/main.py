@@ -8,6 +8,7 @@ from app.config.settings import Settings, load_settings
 from app.interpretation.intent_interpreter import IntentInterpreter
 from app.interpretation.refinement_planner import RefinementPlanner
 from app.interpretation.structured_model_call import MODEL_CALL_TIMEOUT_SECONDS
+from app.observability.request_correlation import RequestCorrelationMiddleware
 from app.providers.model_provider import IntentModelProvider
 from app.providers.selection import select_model_provider
 
@@ -37,6 +38,7 @@ def create_app(
     app.state.intent_interpreter = IntentInterpreter(model_provider)
     app.state.refinement_planner = RefinementPlanner(model_provider)
 
+    app.add_middleware(RequestCorrelationMiddleware)
     register_error_handlers(app)
     app.include_router(router)
 

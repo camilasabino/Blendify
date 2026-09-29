@@ -4,8 +4,14 @@ from app.providers.model_provider import (
     ModelUnavailableError,
 )
 
+DISABLED_PROVIDER_NAME = "disabled"
+
 
 class DisabledModelProvider:
+    @property
+    def name(self) -> str:
+        return DISABLED_PROVIDER_NAME
+
     @property
     def is_available(self) -> bool:
         return False

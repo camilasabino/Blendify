@@ -8,8 +8,12 @@ import { AiPlaylistPage } from './ai-playlist-page'
 const PROMPT = '30 deep cuts from Radiohead and Interpol, no Coldplay'
 const EXPIRES_AT = '2026-09-27T12:30:00.000Z'
 
+function createdSession(session: AiSessionDto) {
+  return { ...session, accessKey: 'access-key' }
+}
+
 const READY_SESSION: AiSessionDto = {
-  sessionId: 'session-token',
+  sessionId: 'session-id',
   expiresAt: EXPIRES_AT,
   status: 'ready',
   intent: {
@@ -30,7 +34,7 @@ const READY_SESSION: AiSessionDto = {
 }
 
 const CLARIFICATION_SESSION: AiSessionDto = {
-  sessionId: 'session-token',
+  sessionId: 'session-id',
   expiresAt: EXPIRES_AT,
   status: 'needs_clarification',
   intent: null,
@@ -138,7 +142,7 @@ describe('Create with AI page', () => {
     ])
 
     await act(async () => {
-      respond(jsonResponse(READY_SESSION, 201))
+      respond(jsonResponse(createdSession(READY_SESSION), 201))
     })
 
     const heading = await screen.findByRole('heading', {
@@ -184,7 +188,7 @@ describe('Create with AI page', () => {
       'POST /api/ai/sessions': () =>
         jsonResponse(
           {
-            ...READY_SESSION,
+            ...createdSession(READY_SESSION),
             intent: {
               ...READY_SESSION.intent,
               kind: 'genre_mix',
@@ -225,7 +229,7 @@ describe('Create with AI page', () => {
       'POST /api/ai/sessions': () =>
         jsonResponse(
           {
-            ...READY_SESSION,
+            ...createdSession(READY_SESSION),
             intent: {
               ...READY_SESSION.intent,
               kind: 'genre_mix',
@@ -254,7 +258,7 @@ describe('Create with AI page', () => {
   it('submits with Ctrl+Enter but keeps Enter for new lines', async () => {
     const user = userEvent.setup()
     const { calls } = stubApi({
-      'POST /api/ai/sessions': () => jsonResponse(READY_SESSION, 201),
+      'POST /api/ai/sessions': () => jsonResponse(createdSession(READY_SESSION), 201),
     })
     renderPage()
 
@@ -274,8 +278,8 @@ describe('Create with AI page', () => {
   it('focuses a clarification and applies the chosen option', async () => {
     const user = userEvent.setup()
     const { calls } = stubApi({
-      'POST /api/ai/sessions': () => jsonResponse(CLARIFICATION_SESSION, 201),
-      'POST /api/ai/sessions/session-token/clarification': () =>
+      'POST /api/ai/sessions': () => jsonResponse(createdSession(CLARIFICATION_SESSION), 201),
+      'POST /api/ai/sessions/session-id/clarification': () =>
         jsonResponse(READY_SESSION),
     })
     renderPage()
@@ -295,7 +299,7 @@ describe('Create with AI page', () => {
 
     await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
     expect(sessionCalls(calls).at(-1)).toEqual({
-      url: '/api/ai/sessions/session-token/clarification',
+      url: '/api/ai/sessions/session-id/clarification',
       method: 'POST',
       body: { optionId: 'keep_seed:artist:1' },
     })
@@ -305,8 +309,8 @@ describe('Create with AI page', () => {
     const user = userEvent.setup()
     const submitted = 'Music like Radiohead and Interpol'
     stubApi({
-      'POST /api/ai/sessions': () => jsonResponse(CLARIFICATION_SESSION, 201),
-      'POST /api/ai/sessions/session-token/clarification': () => jsonResponse(READY_SESSION),
+      'POST /api/ai/sessions': () => jsonResponse(createdSession(CLARIFICATION_SESSION), 201),
+      'POST /api/ai/sessions/session-id/clarification': () => jsonResponse(READY_SESSION),
     })
     renderPage()
 
@@ -353,7 +357,7 @@ describe('Create with AI page', () => {
 
   it('edits the request from the summary and reviews it again', async () => {
     const user = userEvent.setup()
-    const { calls } = stubApi({ 'POST /api/ai/sessions': () => jsonResponse(READY_SESSION, 201) })
+    const { calls } = stubApi({ 'POST /api/ai/sessions': () => jsonResponse(createdSession(READY_SESSION), 201) })
     renderPage()
 
     await user.type(promptField(), PROMPT)
@@ -380,7 +384,7 @@ describe('Create with AI page', () => {
 
   it('starts over from the summary', async () => {
     const user = userEvent.setup()
-    stubApi({ 'POST /api/ai/sessions': () => jsonResponse(READY_SESSION, 201) })
+    stubApi({ 'POST /api/ai/sessions': () => jsonResponse(createdSession(READY_SESSION), 201) })
     renderPage()
 
     await user.type(promptField(), PROMPT)
@@ -404,7 +408,10 @@ describe('Create with AI page', () => {
       'around fifty songs, favoring rarities over hits, and please avoid anything by Coldplay.'
     stubApi({
       'POST /api/ai/sessions': () =>
-        jsonResponse({ ...READY_SESSION, intent: { ...READY_SESSION.intent!, artists: [] } }, 201),
+        jsonResponse(
+          { ...createdSession(READY_SESSION), intent: { ...READY_SESSION.intent!, artists: [] } },
+          201,
+        ),
     })
     renderPage()
 
@@ -436,7 +443,7 @@ describe('Create with AI page', () => {
 
   it('keeps the compact request card usable in a translated locale', async () => {
     const user = userEvent.setup()
-    stubApi({ 'POST /api/ai/sessions': () => jsonResponse(READY_SESSION, 201) })
+    stubApi({ 'POST /api/ai/sessions': () => jsonResponse(createdSession(READY_SESSION), 201) })
     renderPage()
 
     act(() => {

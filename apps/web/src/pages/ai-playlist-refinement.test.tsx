@@ -10,6 +10,7 @@ import {
   type FetchCall,
 } from '@/test/app-harness'
 import {
+  AI_ACCESS_KEY,
   AI_REFINEMENT_ID,
   AI_SESSION_ID,
   appliedCandidateState,
@@ -155,7 +156,7 @@ describe('Create with AI refinement', () => {
 
   it('shows the proposed changes and applies them without changing the edited title', async () => {
     const user = userEvent.setup()
-    const { calls } = await renderPage(
+    const { calls, fetchMock } = await renderPage(
       {
         [REFINE_ROUTE]: () => refinementResult(candidateReadyRefinement()),
         [APPLY_ROUTE]: () => jsonResponse(appliedCandidateState()),
@@ -198,6 +199,24 @@ describe('Create with AI refinement', () => {
     expect(JSON.parse(sessionStorage.getItem('blendify.aiSession') ?? '{}')).toMatchObject({
       playlistTitle: 'Night run',
     })
+    expect(Object.keys(JSON.parse(sessionStorage.getItem('blendify.aiSession') ?? '{}')).sort()).toEqual([
+      'accessKey',
+      'playlistTitle',
+      'prompt',
+      'sessionId',
+    ])
+    const sessionRequests = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes('/api/ai/sessions/'),
+    )
+    expect(sessionRequests.length).toBeGreaterThanOrEqual(3)
+    for (const [url, init] of sessionRequests) {
+      expect(String(url)).not.toContain(AI_ACCESS_KEY)
+      expect(init?.headers).toMatchObject({ 'X-Ai-Session-Key': AI_ACCESS_KEY })
+    }
+    const storedValues = Array.from({ length: sessionStorage.length }, (_, index) =>
+      sessionStorage.getItem(sessionStorage.key(index) ?? ''),
+    )
+    expect(storedValues.join('\n')).not.toContain('Make it more popular')
   })
 
   it('discards the proposal on Cancel and keeps the current playlist', async () => {

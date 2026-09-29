@@ -89,7 +89,7 @@ describe('SpotifyMusicProvider', () => {
     createProvider('AR', 'production');
 
     expect(jest.mocked(SpotifyApiClient).mock.calls[0][1]).toEqual({
-      logBodies: false,
+      logContent: false,
     });
   });
 
@@ -99,7 +99,7 @@ describe('SpotifyMusicProvider', () => {
     createProvider('AR', 'development');
 
     expect(jest.mocked(SpotifyApiClient).mock.calls[0][1]).toEqual({
-      logBodies: true,
+      logContent: true,
     });
   });
 });

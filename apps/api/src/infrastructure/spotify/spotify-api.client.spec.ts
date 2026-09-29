@@ -20,7 +20,7 @@ const adapter: AxiosAdapter = (config: InternalAxiosRequestConfig) =>
 describe('SpotifyApiClient outbound logging', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  async function logLine(options?: { logBodies?: boolean }): Promise<string> {
+  async function logLine(options?: { logContent?: boolean }): Promise<string> {
     const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     const client = new SpotifyApiClient({} as SpotifyTokenService, options);
     await client.raw('secret-access-token', {
@@ -39,7 +39,7 @@ describe('SpotifyApiClient outbound logging', () => {
   });
 
   it('omits response bodies when disabled but keeps request metadata', async () => {
-    const line = await logLine({ logBodies: false });
+    const line = await logLine({ logContent: false });
 
     expect(JSON.parse(line)).toEqual({
       type: 'outbound_http',
@@ -52,6 +52,7 @@ describe('SpotifyApiClient outbound logging', () => {
     });
     expect(line).not.toContain('Private Catalog Artist');
     expect(line).not.toContain('secret-access-token');
+    expect(line).not.toContain('daft');
   });
 });
 

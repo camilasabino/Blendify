@@ -229,9 +229,7 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
       if (isFatalCatalogError(error)) {
         throw error;
       }
-      this.logger.warn(
-        `resolveTrack failed for "${artist}" — "${title}": ${errorMessage(error)}`,
-      );
+      this.logger.warn(`resolveTrack failed: ${errorMessage(error)}`);
       return null;
     }
   }

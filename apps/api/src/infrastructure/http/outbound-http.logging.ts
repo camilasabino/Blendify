@@ -25,6 +25,25 @@ const SENSITIVE_QUERY_KEYS = new Set([
   'authorization',
 ]);
 
+const OPERATIONAL_QUERY_KEYS = new Set([
+  'method',
+  'type',
+  'limit',
+  'offset',
+  'market',
+  'format',
+  'autocorrect',
+  'fields',
+  'additional_types',
+  'include_groups',
+  'page',
+]);
+
+const STATIC_PATH_SEGMENT = /^(?:v\d+|v?\d+(?:\.\d+)+|[a-z]+(?:[._-][a-z]+)*)$/;
+const REDACTED_PATH_SEGMENT = ':id';
+const REDACTED_QUERY_VALUE = '***';
+const UNPARSEABLE_URL = 'unparseable-url';
+
 const SENSITIVE_BODY_KEYS = new Set([
   'api_key',
   'apikey',
@@ -54,6 +73,28 @@ export function sanitizeOutboundUrl(rawUrl: string): string {
       /([?&](?:api_key|client_secret|access_token|refresh_token|code)=)[^&]*/gi,
       '$1***',
     );
+  }
+}
+
+export function contentFreeOutboundUrl(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    url.pathname = url.pathname
+      .split('/')
+      .map((segment) =>
+        segment === '' || STATIC_PATH_SEGMENT.test(segment)
+          ? segment
+          : REDACTED_PATH_SEGMENT,
+      )
+      .join('/');
+    for (const key of [...url.searchParams.keys()]) {
+      if (!OPERATIONAL_QUERY_KEYS.has(key)) {
+        url.searchParams.set(key, REDACTED_QUERY_VALUE);
+      }
+    }
+    return url.toString();
+  } catch {
+    return UNPARSEABLE_URL;
   }
 }
 
@@ -385,14 +426,14 @@ export function buildOutboundHttpLog(input: {
 }
 
 export interface OutboundHttpLoggingOptions {
-  logBodies?: boolean;
+  logContent?: boolean;
 }
 
 function logOutbound(
   config: InternalAxiosRequestConfig | undefined,
   status: string | number,
   responseBody: unknown,
-  logBodies: boolean,
+  logContent: boolean,
 ): void {
   if (!config) {
     return;
@@ -401,9 +442,10 @@ function logOutbound(
   const startedAt = timed.__outboundStartedAt ?? Date.now();
   const durationMs = Math.max(0, Date.now() - startedAt);
   const method = (config.method ?? 'GET').toUpperCase();
-  const url = resolveOutboundUrl(config);
+  const resolvedUrl = resolveOutboundUrl(config);
+  const url = logContent ? resolvedUrl : contentFreeOutboundUrl(resolvedUrl);
   const request =
-    logBodies && methodMayHaveBody(method) && config.data !== undefined
+    logContent && methodMayHaveBody(method) && config.data !== undefined
       ? parseOutboundRequestBody(config.data)
       : undefined;
   const payload = buildOutboundHttpLog({
@@ -412,7 +454,7 @@ function logOutbound(
     status,
     durationMs,
     ...(request !== undefined ? { request } : {}),
-    ...(logBodies ? { response: responseBody } : {}),
+    ...(logContent ? { response: responseBody } : {}),
   });
   const line = JSON.stringify(payload);
 
@@ -429,7 +471,7 @@ function logOutbound(
 
 export function attachOutboundHttpLogging(
   client: AxiosInstance,
-  { logBodies = true }: OutboundHttpLoggingOptions = {},
+  { logContent = true }: OutboundHttpLoggingOptions = {},
 ): void {
   client.interceptors.request.use((config) => {
     const timed = config as TimedConfig;
@@ -439,14 +481,14 @@ export function attachOutboundHttpLogging(
 
   client.interceptors.response.use(
     (response: AxiosResponse) => {
-      logOutbound(response.config, response.status, response.data, logBodies);
+      logOutbound(response.config, response.status, response.data, logContent);
       return response;
     },
     (error: unknown) => {
       if (axios.isAxiosError(error)) {
         const ax = error as AxiosError;
         const status = ax.response?.status ?? ax.code ?? 'ERROR';
-        logOutbound(ax.config, status, ax.response?.data, logBodies);
+        logOutbound(ax.config, status, ax.response?.data, logContent);
         return Promise.reject(error);
       }
       logger.warn(

@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   currentDestination,
   withTransferPrepared,
@@ -21,6 +21,11 @@ import {
   remainingTtlMs,
   requireGeneratedResult,
 } from '@/application/services/ai-session-access';
+import {
+  logAiDiagnostic,
+  traceAiOperation,
+  type AiOperationTrace,
+} from '@/application/services/ai-observability';
 import { AiSessionLease } from '@/application/services/ai-session-lease';
 import { toAiTransferPlaylist } from '@/application/services/ai-transfer-playlist';
 import {
@@ -37,8 +42,6 @@ export interface TransferAiPlaylistCommand {
 
 @Injectable()
 export class TransferAiPlaylistUseCase {
-  private readonly logger = new Logger(TransferAiPlaylistUseCase.name);
-
   constructor(
     @Inject(AI_SESSION_REPOSITORY)
     private readonly sessions: AiSessionRepositoryPort,
@@ -46,8 +49,15 @@ export class TransferAiPlaylistUseCase {
     private readonly gateway: PlaylistTransferGateway,
   ) {}
 
-  async execute(
+  execute(command: TransferAiPlaylistCommand): Promise<AiSessionCommandResult> {
+    return traceAiOperation('destination_transfer', (trace) =>
+      this.transferTraced(command, trace),
+    );
+  }
+
+  private async transferTraced(
     command: TransferAiPlaylistCommand,
+    trace: AiOperationTrace,
   ): Promise<AiSessionCommandResult> {
     const session = await this.find(command);
     if (command.userId !== null) {
@@ -55,6 +65,7 @@ export class TransferAiPlaylistUseCase {
     }
     requireGeneratedResult(session);
     if (hasPreparedTransfer(session)) {
+      trace.record('reused');
       return { token: command.token, session };
     }
     requireNoPendingRefinement(session);
@@ -79,12 +90,12 @@ export class TransferAiPlaylistUseCase {
         leaseMs: DESTINATION_LEASE_MS,
         renewIntervalMs: DESTINATION_LEASE_RENEW_INTERVAL_MS,
       },
-      (event) =>
-        this.logger.warn(JSON.stringify({ event: `ai.transfer.${event}` })),
+      (event) => logAiDiagnostic('destination_transfer', event),
     );
     try {
       const current = await this.find(command);
       if (hasPreparedTransfer(current)) {
+        trace.record('reused');
         return { token: command.token, session: current };
       }
       requireNoPendingRefinement(current);
@@ -104,6 +115,9 @@ export class TransferAiPlaylistUseCase {
         new Date(),
       );
       await this.saveIfUnchanged(command, prepared, current);
+      trace.record('transfer_prepared', {
+        trackCount: playlist.tracks.length,
+      });
       return { token: command.token, session: prepared };
     } finally {
       await lease.release();

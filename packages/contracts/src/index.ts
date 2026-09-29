@@ -534,6 +534,10 @@ export const AiSessionSchema = z.strictObject({
   clarification: AiClarificationSchema.nullable(),
 });
 
+export const AiSessionCreatedSchema = AiSessionSchema.extend({
+  accessKey: z.string().min(1),
+});
+
 export const AI_REFINEMENT_CLARIFICATION_REASONS = [
   'ambiguous_request',
   'unsupported_constraint',
@@ -928,6 +932,7 @@ export type AiClarificationOption = z.infer<typeof AiClarificationOptionSchema>;
 export type AiClarificationReason = (typeof AI_CLARIFICATION_REASONS)[number];
 export type AiClarification = z.infer<typeof AiClarificationSchema>;
 export type AiSessionDto = z.infer<typeof AiSessionSchema>;
+export type AiSessionCreatedDto = z.infer<typeof AiSessionCreatedSchema>;
 export type AiPreservationDto = z.infer<typeof AiPreservationSchema>;
 export type AiRefinementClarificationReason =
   (typeof AI_REFINEMENT_CLARIFICATION_REASONS)[number];

@@ -232,7 +232,7 @@ async def test_run_never_exceeds_the_attempt_bound_per_case() -> None:
 @pytest.mark.anyio
 async def test_run_stops_at_the_first_provider_configuration_failure() -> None:
     plan = EvalPlan(model="fake", dataset_version="test", cases=[MATCHING_CASE, MISMATCHING_CASE])
-    provider = ScriptedModelProvider([ModelConfigurationError("invalid key")])
+    provider = ScriptedModelProvider([ModelConfigurationError("authentication")])
 
     report = await run_eval(plan, provider)
 

@@ -20,6 +20,7 @@ import {
   TransferAiPlaylistRequestSchema,
   type AiGenerationDto,
   type AiRefinementResultDto,
+  type AiSessionCreatedDto,
   type AiSessionDto,
   type AiSessionStateDto,
   type AnswerAiClarificationRequest,
@@ -36,7 +37,10 @@ import {
   toAiSessionStateResponse,
 } from '@/application/dto/ai-generation-response.dto';
 import { toAiRefinementResponse } from '@/application/dto/ai-refinement-response.dto';
-import { toAiSessionResponse } from '@/application/dto/ai-session-response.dto';
+import {
+  toAiSessionCreatedResponse,
+  toAiSessionResponse,
+} from '@/application/dto/ai-session-response.dto';
 import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
 import { ApplyAiRefinementUseCase } from '@/application/use-cases/apply-ai-refinement.use-case';
@@ -49,6 +53,7 @@ import { PublishAiPlaylistUseCase } from '@/application/use-cases/publish-ai-pla
 import { TransferAiPlaylistUseCase } from '@/application/use-cases/transfer-ai-playlist.use-case';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
 import type { User } from '@/domain/user/user.entity';
+import { AiSessionKey } from '@/presentation/decorators/ai-session-key.decorator';
 import { CurrentUser } from '@/presentation/decorators/current-user.decorator';
 import { GuestTransferGate } from '@/presentation/guards/guest-transfer.gate';
 import {
@@ -58,8 +63,6 @@ import {
 import { ZodValidationPipe } from '@/presentation/pipes/zod-validation.pipe';
 import { LimitGenerationConcurrency } from '@/presentation/request-limits/generation-concurrency.interceptor';
 import { RateLimit } from '@/presentation/request-limits/rate-limit.guard';
-
-const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 type PublishAiPlaylistBody = z.output<typeof PublishAiPlaylistRequestSchema>;
 
@@ -89,12 +92,12 @@ export class AiSessionsController {
     @Body(new ZodValidationPipe(CreateAiSessionRequestSchema))
     body: CreateAiSessionRequest,
     @Req() req: Request,
-  ): Promise<AiSessionDto> {
+  ): Promise<AiSessionCreatedDto> {
     const { token, session } = await this.createSession.execute({
       prompt: body.prompt,
       userId: currentUserId(req),
     });
-    return toAiSessionResponse(token, session);
+    return toAiSessionCreatedResponse(token, session);
   }
 
   @Get(':sessionId')
@@ -102,16 +105,12 @@ export class AiSessionsController {
     summary: 'Read the public state of a Create with AI session',
   })
   async find(
-    @Param('sessionId') sessionId: string,
+    @AiSessionKey() sessionKey: string,
     @Req() req: Request,
   ): Promise<AiSessionStateDto> {
-    if (!SESSION_TOKEN_PATTERN.test(sessionId)) {
-      throw AiSessionError.notFound();
-    }
-
     const userId = currentUserId(req);
     const { token, session } = await this.getSession.execute({
-      token: sessionId,
+      token: sessionKey,
       userId,
     });
     return toAiSessionStateResponse(
@@ -126,17 +125,13 @@ export class AiSessionsController {
   @RateLimit('resolve')
   @ApiOperation({ summary: 'Apply one offered clarification option' })
   async answer(
-    @Param('sessionId') sessionId: string,
+    @AiSessionKey() sessionKey: string,
     @Body(new ZodValidationPipe(AnswerAiClarificationRequestSchema))
     body: AnswerAiClarificationRequest,
     @Req() req: Request,
   ): Promise<AiSessionDto> {
-    if (!SESSION_TOKEN_PATTERN.test(sessionId)) {
-      throw AiSessionError.notFound();
-    }
-
     const { token, session } = await this.answerClarification.execute({
-      token: sessionId,
+      token: sessionKey,
       optionId: body.optionId,
       userId: currentUserId(req),
     });
@@ -151,18 +146,14 @@ export class AiSessionsController {
     summary: 'Create a playlist preview from a reviewed Create with AI session',
   })
   async generate(
-    @Param('sessionId') sessionId: string,
+    @AiSessionKey() sessionKey: string,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AiGenerationDto | void> {
-    if (!SESSION_TOKEN_PATTERN.test(sessionId)) {
-      throw AiSessionError.notFound();
-    }
-
     const userId = currentUserId(req);
     const run = async (onProgress?: ProgressReporter) => {
       const { token, session } = await this.generatePlaylist.execute({
-        token: sessionId,
+        token: sessionKey,
         userId,
         onProgress,
       });
@@ -188,17 +179,13 @@ export class AiSessionsController {
     summary: 'Save the generated Create with AI playlist to Spotify',
   })
   async publish(
-    @Param('sessionId') sessionId: string,
+    @AiSessionKey() sessionKey: string,
     @Body(new ZodValidationPipe(PublishAiPlaylistRequestSchema))
     body: PublishAiPlaylistBody,
     @CurrentUser() user: User,
   ): Promise<AiSessionStateDto> {
-    if (!SESSION_TOKEN_PATTERN.test(sessionId)) {
-      throw AiSessionError.notFound();
-    }
-
     const { token, session } = await this.publishPlaylist.execute({
-      token: sessionId,
+      token: sessionKey,
       userId: user.id,
       name: body.name,
       coverImageBase64: body.coverImageBase64,
@@ -220,18 +207,14 @@ export class AiSessionsController {
       'Prepare a Soundiiz transfer for the generated Create with AI playlist',
   })
   async transfer(
-    @Param('sessionId') sessionId: string,
+    @AiSessionKey() sessionKey: string,
     @Body(new ZodValidationPipe(TransferAiPlaylistRequestSchema))
     body: TransferAiPlaylistRequest,
     @Req() req: Request,
   ): Promise<AiSessionStateDto> {
-    if (!SESSION_TOKEN_PATTERN.test(sessionId)) {
-      throw AiSessionError.notFound();
-    }
-
     const userId = currentUserId(req);
     const { token, session } = await this.transferPlaylist.execute({
-      token: sessionId,
+      token: sessionKey,
       userId,
       name: body.name,
     });
@@ -251,17 +234,13 @@ export class AiSessionsController {
       'Interpret a refinement and build a pending candidate playlist without applying it',
   })
   async refine(
-    @Param('sessionId') sessionId: string,
+    @AiSessionKey() sessionKey: string,
     @Body(new ZodValidationPipe(CreateAiRefinementRequestSchema))
     body: CreateAiRefinementRequest,
     @Req() req: Request,
   ): Promise<AiRefinementResultDto> {
-    if (!SESSION_TOKEN_PATTERN.test(sessionId)) {
-      throw AiSessionError.notFound();
-    }
-
     const { token, session } = await this.proposeRefinement.execute({
-      token: sessionId,
+      token: sessionKey,
       userId: currentUserId(req),
       refinement: body.refinement,
       preservePositions: body.preservePositions,
@@ -277,11 +256,11 @@ export class AiSessionsController {
       'Make the reviewed pending candidate the current playlist without regenerating it',
   })
   async apply(
-    @Param('sessionId') sessionId: string,
+    @AiSessionKey() sessionKey: string,
     @Param('refinementId') refinementId: string,
     @Req() req: Request,
   ): Promise<AiSessionStateDto> {
-    return this.settle(this.applyRefinement, sessionId, refinementId, req);
+    return this.settle(this.applyRefinement, sessionKey, refinementId, req);
   }
 
   @Post(':sessionId/refinements/:refinementId/dismiss')
@@ -291,29 +270,26 @@ export class AiSessionsController {
     summary: 'Discard the pending refinement and keep the current playlist',
   })
   async dismiss(
-    @Param('sessionId') sessionId: string,
+    @AiSessionKey() sessionKey: string,
     @Param('refinementId') refinementId: string,
     @Req() req: Request,
   ): Promise<AiSessionStateDto> {
-    return this.settle(this.dismissRefinement, sessionId, refinementId, req);
+    return this.settle(this.dismissRefinement, sessionKey, refinementId, req);
   }
 
   private async settle(
     useCase: ApplyAiRefinementUseCase | DismissAiRefinementUseCase,
-    sessionId: string,
+    sessionKey: string,
     refinementId: string,
     req: Request,
   ): Promise<AiSessionStateDto> {
-    if (!SESSION_TOKEN_PATTERN.test(sessionId)) {
-      throw AiSessionError.notFound();
-    }
     if (!AiRefinementIdSchema.safeParse(refinementId).success) {
       throw AiSessionError.refinementStale();
     }
 
     const userId = currentUserId(req);
     const { token, session } = await useCase.execute({
-      token: sessionId,
+      token: sessionKey,
       userId,
       refinementId,
     });

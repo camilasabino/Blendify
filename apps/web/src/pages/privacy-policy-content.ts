@@ -1,11 +1,12 @@
 import type { Locale } from '@/i18n/messages'
 
-export const PRIVACY_POLICY_UPDATED = '2026-09-26'
+export const PRIVACY_POLICY_UPDATED = '2026-09-28'
 export const PRIVACY_CONTACT_EMAIL = 'contacto@camilasabino.dev'
 
 export const SPOTIFY_APPS_URL = 'https://www.spotify.com/account/apps/'
 export const SPOTIFY_PRIVACY_URL = 'https://www.spotify.com/legal/privacy-policy/'
 export const LASTFM_PRIVACY_URL = 'https://www.last.fm/legal/privacy'
+export const OPENAI_PRIVACY_URL = 'https://openai.com/policies/privacy-policy/'
 
 const POLICY_DATE_SEPARATOR: Record<Locale, string> = {
   en: '-',
@@ -69,12 +70,26 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         ],
       },
       {
+        title: 'Create with AI',
+        body: [
+          'When Create with AI is available, you can describe the playlist you want in your own words and then ask for changes. Blendify sends the text you write — your request and each change you ask for — to OpenAI, which turns it into a structured summary: for example the artists, songs, genres, mood, length and ordering you asked for. When you ask for a change, Blendify also sends OpenAI the structured summary of your current request, including which songs you asked to keep by their position in the list, so the change can be understood.',
+          'OpenAI receives nothing that comes from Spotify, Last.fm or Soundiiz: no playlist contents, song or artist data from those services, links or images, and never your Spotify account details or tokens. Blendify picks the songs itself after your request is interpreted, as it does for other mixes. Blendify sends these requests with OpenAI’s option to keep responses for later retrieval turned off; OpenAI handles the requests it receives under its own terms and privacy policy.',
+          [
+            'On the Blendify server, a Create with AI session — your first request, its structured summary, the generated playlist, a proposed change waiting for your decision and, if you prepare one, the destination link — is kept in the cache, linked to your Blendify account if you are signed in, and expires about 30 minutes after you send your first request. Later steps do not extend that time.',
+            'The text of each change you ask for is not kept once it has been interpreted; only its structured summary is, and that summary can quote the parts of your request Blendify could not apply.',
+            'No Create with AI conversation is written to the database. A Create with AI playlist reaches your Blendify library only if you save it there when you publish it to Spotify, and then it is stored like any other mix, as described above. Publishing it to Spotify also updates your usage counters, as for other mixes.',
+          ],
+          'Operational logs for Create with AI record metadata only: which step ran, its result or error code, how long it took, which model and instruction version were used, and how many model requests and tokens it needed. They do not contain the text you write, its structured summary or the contents of your playlists.',
+        ],
+      },
+      {
         title: 'Cookies and browser storage',
         body: [
           [
             'blendify_session — an HttpOnly, Secure cookie set on the Blendify API domain. It holds a signed session token and expires 7 days after you sign in. Logging out clears it.',
             'oauth_state — a cookie that lasts 10 minutes and protects the Spotify sign-in against tampering.',
             'Your language choice and your “save to library” preference are stored by your browser on your device only.',
+            'When you use Create with AI, the tab’s session storage keeps a reference to your session, your first request and the playlist title you edit. It is cleared when you close the tab, start over or log out; the text of the changes you ask for is not stored there.',
           ],
           'Blendify sets no advertising cookies and runs no behavioral tracking system of its own. Site usage and page performance are measured through Cloudflare Web Analytics, which does not use cookies for that.',
         ],
@@ -85,6 +100,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
           [
             'Spotify — catalog search, sign-in, publishing playlists and playback control. Cover art and profile images load directly from Spotify’s servers.',
             'Last.fm — receives artist, track and genre names to find similar and popular music. No account, session or device information is sent with them.',
+            'OpenAI — interprets the text you write in Create with AI, when that feature is available. It receives only that text and, for a change, the structured summary described above.',
             'Soundiiz — used by Guest playlist transfer. When that transfer is available and you choose to start it, Blendify sends Soundiiz the minimum metadata the transfer needs: the playlist title, its description when there is one, and for each track the title, the artists and the ISRC when one is known. You pick the destination service on Soundiiz; Blendify does not choose one for you and starts nothing on its own.',
             'Infrastructure — the site is served through Cloudflare, the API, database and cache run on Railway, and fonts load from Google Fonts. These providers necessarily see the requests your browser and the API make, including IP addresses, and handle them under their own policies. Cloudflare also measures traffic and page performance across this domain with Cloudflare Web Analytics, which records page views and web-performance metrics such as Core Web Vitals. It runs without cookies and is not used to follow individual visitors across unrelated websites.',
           ],
@@ -96,9 +112,9 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         body: [
           [
             'Your profile, Spotify tokens, saved playlists and usage counters stay until you remove them or delete your account. Blendify does not expire them on a schedule.',
-            'Cache entries expire on their own: rate-limit counters within about ten minutes, catalog lookups after 5 to 30 minutes, Last.fm results after up to 7 days. Nothing in that cache is written to disk.',
+            'Cache entries expire on their own: rate-limit counters within about ten minutes, catalog lookups after 5 to 30 minutes, Create with AI sessions about 30 minutes after the first request, Last.fm results after up to 7 days. Nothing in that cache is written to disk.',
             'Playlists generated without signing in, playback device lists and transfer links are never written to the database.',
-            'Operational logs record the metadata needed to run and diagnose the service, such as which provider operation or URL was called, the resulting status and how long it took; those URLs contain the artist, track and genre names that were looked up. Authentication credentials, session cookie values, Spotify tokens and application secrets are kept out of those logs. Cloudflare and Railway keep their own request logs.',
+            'Operational logs record the metadata needed to run and diagnose the service, such as which provider operation or URL was called, the resulting status and how long it took. Those URLs are recorded with the search terms, names and IDs replaced by placeholders, so the artist, track and genre names that were looked up are not kept in them. Authentication credentials, session cookie values, Spotify tokens and application secrets are kept out of those logs. Cloudflare and Railway keep their own request logs.',
           ],
         ],
       },
@@ -131,6 +147,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
       { label: 'Manage apps connected to Spotify', href: SPOTIFY_APPS_URL },
       { label: 'Spotify Privacy Policy', href: SPOTIFY_PRIVACY_URL },
       { label: 'Last.fm Privacy Policy', href: LASTFM_PRIVACY_URL },
+      { label: 'OpenAI Privacy Policy', href: OPENAI_PRIVACY_URL },
     ],
     contactLink: 'Email {email}',
   },
@@ -162,12 +179,26 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         ],
       },
       {
+        title: 'Crear con IA',
+        body: [
+          'Cuando Crear con IA está disponible, puedes describir con tus palabras la playlist que quieres y después pedir cambios. Blendify envía el texto que escribes —tu pedido y cada cambio que pides— a OpenAI, que lo convierte en un resumen estructurado: por ejemplo los artistas, canciones, géneros, estado de ánimo, duración y orden que pediste. Cuando pides un cambio, Blendify también le envía a OpenAI el resumen estructurado de tu pedido actual, incluidas las canciones que pediste conservar según su posición en la lista, para que el cambio se pueda entender.',
+          'OpenAI no recibe nada que provenga de Spotify, Last.fm ni Soundiiz: ni contenido de playlists, ni datos de canciones o artistas de esos servicios, ni enlaces ni imágenes, y nunca los datos de tu cuenta de Spotify ni sus tokens. Blendify elige las canciones por su cuenta después de interpretar tu pedido, igual que en las demás mezclas. Blendify envía estas solicitudes con la opción de OpenAI de conservar las respuestas para consultarlas después desactivada; OpenAI trata las solicitudes que recibe según sus propios términos y su política de privacidad.',
+          [
+            'En el servidor de Blendify, una sesión de Crear con IA —tu primer pedido, su resumen estructurado, la playlist generada, un cambio propuesto que espera tu decisión y, si preparas uno, el enlace de destino— se guarda en la caché, vinculada a tu cuenta de Blendify si iniciaste sesión, y expira unos 30 minutos después de que envías tu primer pedido. Los pasos siguientes no extienden ese tiempo.',
+            'El texto de cada cambio que pides no se conserva una vez interpretado; solo se conserva su resumen estructurado, que puede citar las partes de tu pedido que Blendify no pudo aplicar.',
+            'Ninguna conversación de Crear con IA se escribe en la base de datos. Una playlist de Crear con IA llega a tu biblioteca de Blendify solo si la guardas ahí al publicarla en Spotify, y en ese caso se guarda como cualquier otra mezcla, según se describe más arriba. Publicarla en Spotify también actualiza tus contadores de uso, igual que con las demás mezclas.',
+          ],
+          'Los logs operativos de Crear con IA registran solo metadatos: qué paso se ejecutó, su resultado o código de error, cuánto tardó, qué modelo y versión de instrucciones se usaron, y cuántas solicitudes al modelo y tokens necesitó. No contienen el texto que escribes, su resumen estructurado ni el contenido de tus playlists.',
+        ],
+      },
+      {
         title: 'Cookies y almacenamiento del navegador',
         body: [
           [
             'blendify_session: cookie HttpOnly y Secure en el dominio de la API de Blendify. Contiene un token de sesión firmado y expira 7 días después de iniciar sesión. Cerrar sesión la elimina.',
             'oauth_state: cookie que dura 10 minutos y protege el inicio de sesión con Spotify contra manipulaciones.',
             'Tu idioma y tu preferencia de “guardar en la biblioteca” los almacena tu navegador, solo en tu dispositivo.',
+            'Cuando usas Crear con IA, el almacenamiento de sesión de la pestaña guarda una referencia a tu sesión, tu primer pedido y el título de playlist que editas. Se borra al cerrar la pestaña, empezar de nuevo o cerrar sesión; el texto de los cambios que pides no se guarda ahí.',
           ],
           'Blendify no usa cookies de publicidad ni un sistema propio de rastreo de comportamiento. El uso del sitio y el rendimiento de las páginas se miden con Cloudflare Web Analytics, que para eso no usa cookies.',
         ],
@@ -178,6 +209,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
           [
             'Spotify: búsqueda en el catálogo, inicio de sesión, publicación de playlists y control de reproducción. Las portadas y las imágenes de perfil se cargan desde servidores de Spotify.',
             'Last.fm: recibe nombres de artistas, canciones y géneros para encontrar música similar y popular. No se envía información de cuenta, sesión ni dispositivos.',
+            'OpenAI: interpreta el texto que escribes en Crear con IA, cuando esa función está disponible. Recibe solo ese texto y, para un cambio, el resumen estructurado descrito más arriba.',
             'Soundiiz: lo usa la transferencia de playlists en modo invitado. Cuando esa transferencia está disponible y eliges iniciarla, Blendify le envía a Soundiiz los metadatos mínimos que necesita: el título de la playlist, su descripción cuando existe y, de cada canción, el título, los artistas y el ISRC cuando se conoce. El servicio de destino lo eliges en Soundiiz; Blendify no lo elige por ti ni inicia nada por su cuenta.',
             'Infraestructura: el sitio se sirve a través de Cloudflare, la API, la base de datos y la caché funcionan en Railway, y las fuentes se cargan desde Google Fonts. Estos proveedores ven necesariamente las solicitudes que hacen tu navegador y la API, incluidas las direcciones IP, y las tratan según sus propias políticas. Cloudflare además mide el tráfico y el rendimiento de las páginas de este dominio con Cloudflare Web Analytics, que registra vistas de página y métricas de rendimiento web como los Core Web Vitals. Funciona sin cookies y no se usa para seguir a visitantes concretos por sitios ajenos.',
           ],
@@ -189,9 +221,9 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         body: [
           [
             'Tu perfil, los tokens de Spotify, las playlists guardadas y los contadores de uso se conservan hasta que los elimines o elimines tu cuenta. Blendify no los caduca por calendario.',
-            'Las entradas de la caché expiran por sí solas: los contadores de límite de uso en unos diez minutos, las consultas de catálogo entre 5 y 30 minutos, los resultados de Last.fm hasta 7 días. Nada de esa caché se escribe en disco.',
+            'Las entradas de la caché expiran por sí solas: los contadores de límite de uso en unos diez minutos, las consultas de catálogo entre 5 y 30 minutos, las sesiones de Crear con IA unos 30 minutos después del primer pedido, los resultados de Last.fm hasta 7 días. Nada de esa caché se escribe en disco.',
             'Las playlists generadas sin iniciar sesión, las listas de dispositivos de reproducción y los enlaces de transferencia nunca se escriben en la base de datos.',
-            'Los logs operativos registran los metadatos necesarios para operar y diagnosticar el servicio, como qué operación o URL de proveedor se llamó, el estado resultante y cuánto tardó; esas URLs contienen los nombres de artistas, canciones y géneros consultados. Las credenciales de autenticación, los valores de la cookie de sesión, los tokens de Spotify y los secretos de la aplicación quedan fuera de esos logs. Cloudflare y Railway conservan sus propios logs de solicitudes.',
+            'Los logs operativos registran los metadatos necesarios para operar y diagnosticar el servicio, como qué operación o URL de proveedor se llamó, el estado resultante y cuánto tardó. Esas URLs se registran con los términos de búsqueda, nombres e IDs reemplazados por marcadores, así que no conservan los nombres de artistas, canciones y géneros consultados. Las credenciales de autenticación, los valores de la cookie de sesión, los tokens de Spotify y los secretos de la aplicación quedan fuera de esos logs. Cloudflare y Railway conservan sus propios logs de solicitudes.',
           ],
         ],
       },
@@ -224,6 +256,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
       { label: 'Gestionar apps conectadas a Spotify', href: SPOTIFY_APPS_URL },
       { label: 'Política de privacidad de Spotify', href: SPOTIFY_PRIVACY_URL },
       { label: 'Política de privacidad de Last.fm', href: LASTFM_PRIVACY_URL },
+      { label: 'Política de privacidad de OpenAI', href: OPENAI_PRIVACY_URL },
     ],
     contactLink: 'Escribir a {email}',
   },
@@ -255,12 +288,26 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         ],
       },
       {
+        title: 'Criar com IA',
+        body: [
+          'Quando o Criar com IA está disponível, você pode descrever com suas palavras a playlist que quer e depois pedir mudanças. O Blendify envia o texto que você escreve — seu pedido e cada mudança que você pede — à OpenAI, que o transforma em um resumo estruturado: por exemplo os artistas, músicas, gêneros, clima, duração e ordem que você pediu. Quando você pede uma mudança, o Blendify também envia à OpenAI o resumo estruturado do seu pedido atual, incluindo as músicas que você pediu para manter pela posição na lista, para que a mudança possa ser entendida.',
+          'A OpenAI não recebe nada que venha do Spotify, do Last.fm ou do Soundiiz: nenhum conteúdo de playlists, dados de músicas ou artistas desses serviços, links ou imagens, e nunca os dados da sua conta do Spotify nem os tokens. O Blendify escolhe as músicas por conta própria depois de interpretar seu pedido, como nas outras mixagens. O Blendify envia essas requisições com a opção da OpenAI de guardar as respostas para consulta posterior desativada; a OpenAI trata as requisições que recebe conforme os próprios termos e a própria política de privacidade.',
+          [
+            'No servidor do Blendify, uma sessão do Criar com IA — seu primeiro pedido, o resumo estruturado, a playlist gerada, uma mudança proposta aguardando sua decisão e, se você preparar um, o link de destino — fica no cache, vinculada à sua conta do Blendify se você entrou, e expira cerca de 30 minutos depois que você envia seu primeiro pedido. As etapas seguintes não estendem esse tempo.',
+            'O texto de cada mudança que você pede não é guardado depois de interpretado; só o resumo estruturado dela é guardado, e esse resumo pode citar as partes do seu pedido que o Blendify não conseguiu aplicar.',
+            'Nenhuma conversa do Criar com IA é gravada no banco de dados. Uma playlist do Criar com IA só chega à sua biblioteca do Blendify se você a salvar ali ao publicá-la no Spotify, e nesse caso ela é guardada como qualquer outra mixagem, conforme descrito acima. Publicá-la no Spotify também atualiza seus contadores de uso, como nas outras mixagens.',
+          ],
+          'Os logs operacionais do Criar com IA registram apenas metadados: qual etapa foi executada, o resultado ou código de erro, quanto tempo levou, qual modelo e versão de instruções foram usados e quantas requisições ao modelo e tokens foram necessários. Eles não contêm o texto que você escreve, o resumo estruturado nem o conteúdo das suas playlists.',
+        ],
+      },
+      {
         title: 'Cookies e armazenamento do navegador',
         body: [
           [
             'blendify_session: cookie HttpOnly e Secure no domínio da API do Blendify. Contém um token de sessão assinado e expira 7 dias depois do login. Sair da conta o remove.',
             'oauth_state: cookie que dura 10 minutos e protege o login com o Spotify contra manipulação.',
             'Seu idioma e sua preferência de “salvar na biblioteca” são guardados pelo seu navegador, somente no seu dispositivo.',
+            'Quando você usa o Criar com IA, o armazenamento de sessão da aba guarda uma referência à sua sessão, seu primeiro pedido e o título de playlist que você edita. Ele é apagado quando você fecha a aba, recomeça ou sai da conta; o texto das mudanças que você pede não é guardado ali.',
           ],
           'O Blendify não usa cookies de publicidade nem um sistema próprio de rastreamento de comportamento. O uso do site e o desempenho das páginas são medidos com o Cloudflare Web Analytics, que para isso não usa cookies.',
         ],
@@ -271,6 +318,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
           [
             'Spotify: busca no catálogo, login, publicação de playlists e controle de reprodução. As capas e as imagens de perfil são carregadas dos servidores do Spotify.',
             'Last.fm: recebe nomes de artistas, músicas e gêneros para encontrar música semelhante e popular. Nenhuma informação de conta, sessão ou dispositivo é enviada.',
+            'OpenAI: interpreta o texto que você escreve no Criar com IA, quando esse recurso está disponível. Recebe apenas esse texto e, para uma mudança, o resumo estruturado descrito acima.',
             'Soundiiz: usado pela transferência de playlists no modo convidado. Quando essa transferência está disponível e você escolhe iniciá-la, o Blendify envia ao Soundiiz os metadados mínimos de que ela precisa: o título da playlist, a descrição quando existe e, de cada música, o título, os artistas e o ISRC quando conhecido. Você escolhe o serviço de destino no Soundiiz; o Blendify não escolhe por você nem inicia nada sozinho.',
             'Infraestrutura: o site é servido pela Cloudflare, a API, o banco de dados e o cache rodam na Railway, e as fontes são carregadas do Google Fonts. Esses provedores necessariamente veem as requisições que seu navegador e a API fazem, incluindo endereços IP, e as tratam conforme as próprias políticas. A Cloudflare também mede o tráfego e o desempenho das páginas deste domínio com o Cloudflare Web Analytics, que registra visualizações de página e métricas de desempenho web como os Core Web Vitals. Funciona sem cookies e não é usado para seguir visitantes específicos por sites não relacionados.',
           ],
@@ -282,9 +330,9 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         body: [
           [
             'Seu perfil, os tokens do Spotify, as playlists salvas e os contadores de uso ficam até você removê-los ou excluir sua conta. O Blendify não os expira por calendário.',
-            'As entradas do cache expiram sozinhas: os contadores de limite de uso em cerca de dez minutos, as consultas de catálogo entre 5 e 30 minutos, os resultados do Last.fm em até 7 dias. Nada desse cache é gravado em disco.',
+            'As entradas do cache expiram sozinhas: os contadores de limite de uso em cerca de dez minutos, as consultas de catálogo entre 5 e 30 minutos, as sessões do Criar com IA cerca de 30 minutos depois do primeiro pedido, os resultados do Last.fm em até 7 dias. Nada desse cache é gravado em disco.',
             'Playlists geradas sem login, listas de dispositivos de reprodução e links de transferência nunca são gravados no banco de dados.',
-            'Os logs operacionais registram os metadados necessários para operar e diagnosticar o serviço, como qual operação ou URL de provedor foi chamada, o status resultante e quanto tempo levou; essas URLs contêm os nomes de artistas, músicas e gêneros consultados. As credenciais de autenticação, os valores do cookie de sessão, os tokens do Spotify e os segredos da aplicação ficam fora desses logs. A Cloudflare e a Railway mantêm os próprios logs de requisições.',
+            'Os logs operacionais registram os metadados necessários para operar e diagnosticar o serviço, como qual operação ou URL de provedor foi chamada, o status resultante e quanto tempo levou. Essas URLs são registradas com os termos de busca, nomes e IDs substituídos por marcadores, então não guardam os nomes de artistas, músicas e gêneros consultados. As credenciais de autenticação, os valores do cookie de sessão, os tokens do Spotify e os segredos da aplicação ficam fora desses logs. A Cloudflare e a Railway mantêm os próprios logs de requisições.',
           ],
         ],
       },
@@ -317,6 +365,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
       { label: 'Gerenciar apps conectados ao Spotify', href: SPOTIFY_APPS_URL },
       { label: 'Política de privacidade do Spotify', href: SPOTIFY_PRIVACY_URL },
       { label: 'Política de privacidade do Last.fm', href: LASTFM_PRIVACY_URL },
+      { label: 'Política de privacidade da OpenAI', href: OPENAI_PRIVACY_URL },
     ],
     contactLink: 'Enviar e-mail para {email}',
   },

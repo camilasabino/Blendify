@@ -749,7 +749,7 @@ describe('GenerateAiPlaylistUseCase', () => {
       expect(world.sessions.saveGenerationOutcome).not.toHaveBeenCalled();
       expect(world.locks.get(TOKEN)).toBe('someone-else');
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('ai.generation.lease_lost'),
+        expect.stringContaining('"diagnostic":"lease_lost"'),
       );
 
       await jest.advanceTimersByTimeAsync(3 * GENERATION_LEASE_MS);
@@ -827,7 +827,7 @@ describe('GenerateAiPlaylistUseCase', () => {
     expect(result.execution?.status).toBe('generated');
     expect(world.generator.execute).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('ai.generation.stale_recovered'),
+      expect.stringContaining('"diagnostic":"stale_generation_recovered"'),
     );
     expect(world.locks.has(TOKEN)).toBe(false);
   });

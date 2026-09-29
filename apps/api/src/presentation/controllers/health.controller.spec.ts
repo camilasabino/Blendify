@@ -4,6 +4,7 @@ import type { Server } from 'node:http';
 import request from 'supertest';
 import { HealthController } from './health.controller';
 import { PrismaService } from '@/infrastructure/persistence/prisma.service';
+import { listenOnLoopback } from '@/presentation/http/loopback.testing';
 
 describe('HealthController', () => {
   let app: INestApplication;
@@ -18,7 +19,7 @@ describe('HealthController', () => {
       ],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    await listenOnLoopback(app);
   });
 
   afterEach(async () => {

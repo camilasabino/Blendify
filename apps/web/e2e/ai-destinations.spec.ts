@@ -8,6 +8,7 @@ import {
 } from './fixtures/api-mocks'
 import {
   AI_REVIEW_PROMPT,
+  AI_REVIEW_ACCESS_KEY,
   AI_REVIEW_SESSION_ID,
   generatedState,
   reviewedState,
@@ -49,7 +50,7 @@ function generation(state: AiSessionStateDto) {
 async function generateLive(page: Page) {
   const reviewed = reviewedState()
   await page.route('**/api/ai/sessions', (route) =>
-    route.fulfill({ status: 201, json: { ...reviewed, execution: undefined, destination: undefined, preservation: undefined, refinement: undefined } }),
+    route.fulfill({ status: 201, json: { ...reviewed, accessKey: AI_REVIEW_ACCESS_KEY, execution: undefined, destination: undefined, preservation: undefined, refinement: undefined } }),
   )
   const stream = mockGenerationStream(page, `${SESSION_URL}/generate`, [
     { type: 'result', playlist: generation(generatedState()) },

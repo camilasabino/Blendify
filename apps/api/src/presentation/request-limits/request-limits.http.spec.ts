@@ -18,6 +18,7 @@ import {
   type ClientIpSource,
 } from './request-limits.config';
 import { inMemoryRequestLimitProviders } from './request-limits.testing';
+import { listenOnLoopback } from '@/presentation/http/loopback.testing';
 
 let pending: Array<() => void> = [];
 let failNext = false;
@@ -70,7 +71,7 @@ async function createApp(
   }).compile();
   const app = module.createNestApplication({ logger: false });
   app.useGlobalFilters(new GlobalExceptionFilter());
-  await app.init();
+  await listenOnLoopback(app);
   return app;
 }
 

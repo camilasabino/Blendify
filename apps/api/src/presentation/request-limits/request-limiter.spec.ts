@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Logger } from '@nestjs/common';
 import { MemoryRequestLimitStore } from '@/infrastructure/request-limits/memory-request-limit.store';
 import {
@@ -128,6 +129,42 @@ describe('RequestLimiter', () => {
         identityKind: 'ip',
       });
       expect(line).not.toContain('203.0.113.7');
+    });
+
+    it('logs an identity hash that is not the unkeyed digest of the address', async () => {
+      const limiter = new RequestLimiter(
+        null,
+        new MemoryRequestLimitStore(),
+        config(),
+      );
+      await limiter.consume('search', anonymous);
+      await limiter.consume('search', anonymous);
+      await rejection(limiter.consume('search', anonymous));
+
+      const line = String((warn.mock.calls as unknown[][]).at(-1)?.[0]);
+      const { identityHash } = JSON.parse(line) as { identityHash: string };
+      const unkeyed = createHash('sha256')
+        .update(anonymous.key)
+        .digest('hex')
+        .slice(0, identityHash.length);
+      expect(identityHash).toMatch(/^[0-9a-f]{12}$/);
+      expect(identityHash).not.toBe(unkeyed);
+    });
+
+    it('enforces limits on the stable identity key, never on the per-process log hash', async () => {
+      const store = new MemoryRequestLimitStore();
+      const hit = jest.spyOn(store, 'hit');
+      const limiter = new RequestLimiter(null, store, config());
+      await limiter.consume('search', anonymous);
+      await limiter.consume('search', anonymous);
+      await rejection(limiter.consume('search', anonymous));
+
+      const line = String((warn.mock.calls as unknown[][]).at(-1)?.[0]);
+      const { identityHash } = JSON.parse(line) as { identityHash: string };
+      const storeKeys = hit.mock.calls.map(([key]) => key);
+      expect(new Set(storeKeys).size).toBe(1);
+      expect(storeKeys[0]).toContain(anonymous.key);
+      expect(storeKeys[0]).not.toContain(identityHash);
     });
   });
 

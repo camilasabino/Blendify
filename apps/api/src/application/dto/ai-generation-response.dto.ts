@@ -22,6 +22,7 @@ import {
   toGeneratedPreview,
   toIntentSummary,
 } from './ai-session-response.dto';
+import { aiSessionId } from '@/application/services/ai-session-credential';
 
 export interface AiDestinationOptions {
   transferEnabled: boolean;
@@ -40,7 +41,7 @@ export function toAiGenerationResponse(
   }
 
   return {
-    sessionId: token,
+    sessionId: aiSessionId(token),
     expiresAt: session.expiresAt,
     status: 'generated',
     intent: toIntentSummary(intent),

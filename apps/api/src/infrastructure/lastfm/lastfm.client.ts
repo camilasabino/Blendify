@@ -113,7 +113,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
             'Blendify/1.0 (https://github.com/camilasabino/Blendify)',
         },
       },
-      { logBodies: config.get<string>('NODE_ENV') !== 'production' },
+      { logContent: config.get<string>('NODE_ENV') !== 'production' },
     );
   }
 
@@ -155,9 +155,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
         }
 
         this.logger.debug(
-          `Last.fm similar for "${name}"` +
-            (usedVariant !== name ? ` via "${usedVariant}"` : '') +
-            `: ${artists.length} artist(s)`,
+          `Last.fm similar${usedVariant !== name ? ' via a name variant' : ''}: ${artists.length} artist(s)`,
         );
 
         return artists;
@@ -237,11 +235,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
         }
 
         this.logger.debug(
-          `Last.fm similar tracks for "${artist}" — "${track}"` +
-            (usedVariant
-              ? ` via "${usedVariant.artist}" / "${usedVariant.track}"`
-              : '') +
-            `: ${best.length}`,
+          `Last.fm similar tracks${usedVariant ? ' via a name variant' : ''}: ${best.length}`,
         );
 
         return best;
@@ -323,7 +317,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
             Boolean(artist),
           );
 
-        this.logger.debug(`Last.fm tag "${name}": ${artists.length} artist(s)`);
+        this.logger.debug(`Last.fm tag: ${artists.length} artist(s)`);
         return artists;
       },
       () => LASTFM_CACHE_TTL_MS,
@@ -375,9 +369,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
           .map((node) => mapTagTrack(node))
           .filter((track): track is CatalogTrackCandidate => Boolean(track));
 
-        this.logger.debug(
-          `Last.fm tag tracks "${name}" p${safePage}: ${tracks.length}`,
-        );
+        this.logger.debug(`Last.fm tag tracks p${safePage}: ${tracks.length}`);
         return tracks;
       },
       () => LASTFM_CACHE_TTL_MS,
@@ -430,9 +422,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
           .map((node, index) => mapTagTrack(node, name, index + 1))
           .filter((track): track is CatalogTrackCandidate => Boolean(track));
 
-        this.logger.debug(
-          `Last.fm artist tracks "${name}": ${tracks.length} track(s)`,
-        );
+        this.logger.debug(`Last.fm artist tracks: ${tracks.length} track(s)`);
         return tracks;
       },
       () => LASTFM_CACHE_TTL_MS,

@@ -786,19 +786,49 @@ Structured JSON logs go to Railway's log view. They must never contain Spotify
 access/refresh tokens, session JWTs or cookies, transfer tokens, Soundiiz
 share URLs, full tracklists, or secrets.
 
-- Outbound Spotify accounts/profile calls (`/api/token`, `/me`) log method,
-  URL, status and duration only (`logBodies: false`).
-- The shared Spotify Web API client (catalog, search, playlist and playback
-  calls) also runs with `logBodies: false` whenever `NODE_ENV=production`, so
-  no catalog or search response body reaches the logs; method, sanitized URL,
-  status and duration remain.
-- Last.fm response bodies are not logged in production.
+- Outbound Spotify accounts/profile calls (`/api/token`, `/me`), the AI
+  service and Soundiiz always run with `logContent: false`: method,
+  content-free URL, status and duration only.
+- The shared Spotify Web API client and the Last.fm client run with
+  `logContent: false` whenever `NODE_ENV=production`. No request or response
+  body is logged, and the URL is content-free: ID-like path segments become
+  `:id`, and every query value except operational keys (`method`, `type`,
+  `limit`, `offset`, `market`, `format`, `autocorrect`, `fields`,
+  `additional_types`, `include_groups`, `page`) becomes `***`, so search
+  terms and artist/track/genre names are not logged. Outside production the
+  full sanitized URL and redacted bodies are logged for debugging.
 - Soundiiz calls log no bodies; `transfer.created`/`transfer.failed` log
   counts, categories and durations only.
+- Generation diagnostics (Spotify catalog, Last.fm, genre and Discover
+  fallbacks) log counts and error messages, never the artist, track or tag
+  names involved.
 - Query parameters named like tokens, secrets, `code`, or `api_key` are
   redacted.
-- The limiter logs a 12-character SHA-256 hash of the caller identity, never
-  raw IPs or user IDs.
+- The limiter logs a 12-character HMAC-SHA-256 of the caller identity keyed
+  with a random per-process key (an unkeyed hash of an IPv4 address could be
+  reversed), never raw IPs or user IDs. The key rotates on every restart, so
+  the hash correlates events within one process only.
+- Every API request gets an opaque `X-Request-Id` (random UUID, response
+  header). Create with AI events carry it as `requestId`, and the API forwards
+  it to the AI service, which logs it on its model-call events. It is not an
+  auth credential and contains no user data.
+- Unhandled errors log the error class name, `requestId` and stack frames, not
+  the error message (messages can embed request or ORM content).
+- Create with AI logs metadata only (`ai.operation`, `ai.diagnostic`,
+  `ai.service_call` in the API; `ai.model_request`, `ai.model_call` in the AI
+  service). See `docs/engineering/ai-data-handling.md` for the allowlist.
+- Log retention is configured in Railway and Cloudflare, outside this
+  repository; the application does not set or enforce a retention period.
+- The Create with AI ownership credential never appears in a URL. The
+  `/api/ai/sessions/:sessionId` path carries a public identifier derived
+  one-way from that credential; the credential itself travels in the
+  `X-Ai-Session-Key` request header. Edge access logs record request paths and
+  not request headers by default, so do not enable request-header capture (for
+  example Cloudflare Logpush request-header fields) for that header.
+- The rate-limit `identityHash` in `request_limit.rejected` is a log label only:
+  an HMAC keyed with a random per-process secret, so it changes on restart and
+  differs between replicas. Limits are enforced on the stable identity key
+  (`u:<userId>` or `ip:<address>`) in the shared store, never on that hash.
 - Known residual exposure: the edge HTTP logs of the hosting provider record
   request paths, including the one-time OAuth `code`/`state` on the callback.
 

@@ -11,9 +11,10 @@ import {
   AiGenerationSchema,
   AiGenerationStreamEventSchema,
   AiRefinementResultSchema,
+  AiSessionCreatedSchema,
   AiSessionSchema,
   AiSessionStateSchema,
-  type AiSessionDto,
+  type AiSessionCreatedDto,
 } from '@blendify/contracts';
 import type {
   InterpretIntentRequest,
@@ -21,6 +22,10 @@ import type {
   PlanRefinementRequest,
   PlanRefinementResponse,
 } from '@blendify/contracts/ai-service';
+import {
+  AI_SESSION_KEY_HEADER,
+  aiSessionId,
+} from '@/application/services/ai-session-credential';
 import { AiIntentResolver } from '@/application/services/ai-intent-resolver.service';
 import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import { AnswerAiClarificationUseCase } from '@/application/use-cases/answer-ai-clarification.use-case';
@@ -74,13 +79,20 @@ import { GlobalExceptionFilter } from '@/presentation/filters/global-exception.f
 import { GuestTransferGate } from '@/presentation/guards/guest-transfer.gate';
 import { OriginCsrfGuard } from '@/presentation/guards/origin-csrf.guard';
 import { createBodyParser } from '@/presentation/http/body-limits';
+import { enableFrontendCors } from '@/presentation/http/cors';
+import { requestCorrelation } from '@/presentation/http/request-correlation';
 import { DEFAULT_RATE_LIMITS } from '@/presentation/request-limits/request-limits.config';
 import { inMemoryRequestLimitProviders } from '@/presentation/request-limits/request-limits.testing';
 import { AiSessionsController } from './ai-sessions.controller';
+import { listenOnLoopback } from '@/presentation/http/loopback.testing';
 
 const FRONTEND = 'http://localhost:5173';
 const JWT_SECRET = 'ai-sessions-test-secret';
 const SESSIONS_PATH = '/api/ai/sessions';
+
+function sessionRoute(sessionKey: string, suffix = ''): string {
+  return `${SESSIONS_PATH}/${aiSessionId(sessionKey)}${suffix}`;
+}
 const PROMPT = '30 deep cuts from Radiohead and Interpol, no Coldplay';
 const INTERPRET_LIMIT = 3;
 const GENERATION_LIMIT = 2;
@@ -497,10 +509,12 @@ async function createApp(
     logger: false,
     bodyParser: false,
   });
+  app.use(requestCorrelation);
   app.use(createBodyParser());
   app.use(cookieParser());
+  enableFrontendCors(app, FRONTEND);
   app.useGlobalFilters(new GlobalExceptionFilter());
-  await app.init();
+  await listenOnLoopback(app);
   return app;
 }
 
@@ -546,9 +560,10 @@ describe('Create with AI sessions over HTTP', () => {
     return cookie ? req.set('Cookie', cookie) : req;
   }
 
-  function answer(sessionId: string, optionId: string, cookie?: string) {
+  function answer(sessionKey: string, optionId: string, cookie?: string) {
     const req = request(server())
-      .post(`${SESSIONS_PATH}/${sessionId}/clarification`)
+      .post(sessionRoute(sessionKey, '/clarification'))
+      .set(AI_SESSION_KEY_HEADER, sessionKey)
       .set('Origin', FRONTEND)
       .send({ optionId });
     return cookie ? req.set('Cookie', cookie) : req;
@@ -557,7 +572,9 @@ describe('Create with AI sessions over HTTP', () => {
   it('interprets a Guest prompt into a ready intent summary', async () => {
     const response = await createSession().expect(201);
 
-    const session: AiSessionDto = AiSessionSchema.parse(response.body);
+    const session: AiSessionCreatedDto = AiSessionCreatedSchema.parse(
+      response.body,
+    );
     expect(session).toMatchObject({
       status: 'ready',
       clarification: null,
@@ -586,7 +603,7 @@ describe('Create with AI sessions over HTTP', () => {
 
     const response = await createSession().expect(201);
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
       intent: { artists: ['Radiohed', 'Interpol'], seedTrack: null },
     });
@@ -607,7 +624,7 @@ describe('Create with AI sessions over HTTP', () => {
       prompt: 'Start from Teardrop by Massive Attack',
     }).expect(201);
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
       intent: {
         kind: 'discover_track',
@@ -639,7 +656,7 @@ describe('Create with AI sessions over HTTP', () => {
       prompt: 'Happy music to dance at a party',
     }).expect(201);
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
       clarification: null,
       intent: {
@@ -673,7 +690,7 @@ describe('Create with AI sessions over HTTP', () => {
         prompt: `Something ${mood}`,
       }).expect(201);
 
-      expect(AiSessionSchema.parse(response.body)).toMatchObject({
+      expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
         status: 'ready',
         clarification: null,
         intent: { kind: 'genre_mix', genres: [], mood, unmetConstraints: [] },
@@ -704,7 +721,7 @@ describe('Create with AI sessions over HTTP', () => {
       prompt: 'Pop music for an hour',
     }).expect(201);
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
       intent: { genres: ['Pop'], targetDurationMinutes: 60, mood: null },
     });
@@ -727,7 +744,7 @@ describe('Create with AI sessions over HTTP', () => {
       201,
     );
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
       intent: { genres: ['Pop'], mood: 'happy' },
     });
@@ -750,7 +767,9 @@ describe('Create with AI sessions over HTTP', () => {
 
     const response = await createSession().expect(201);
 
-    expect(AiSessionSchema.parse(response.body).clarification).toMatchObject({
+    expect(
+      AiSessionCreatedSchema.parse(response.body).clarification,
+    ).toMatchObject({
       reason: 'unknown_genres',
       names: ['definitely not a genre'],
     });
@@ -774,7 +793,7 @@ describe('Create with AI sessions over HTTP', () => {
       prompt: '1h de canciones de rock de argentina',
     }).expect(201);
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
       intent: {
         genres: ['Argentine Rock'],
@@ -801,7 +820,7 @@ describe('Create with AI sessions over HTTP', () => {
       prompt: 'música instrumental relajante',
     }).expect(201);
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
       clarification: null,
       intent: {
@@ -834,7 +853,7 @@ describe('Create with AI sessions over HTTP', () => {
       201,
     );
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
       intent: { genres: ['Pop Argentino'], unmetConstraints: [] },
     });
@@ -857,7 +876,7 @@ describe('Create with AI sessions over HTTP', () => {
       prompt: 'música acústica relajante',
     }).expect(201);
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'needs_clarification',
       intent: null,
       clarification: {
@@ -877,7 +896,7 @@ describe('Create with AI sessions over HTTP', () => {
 
     const response = await createSession().expect(201);
 
-    expect(AiSessionSchema.parse(response.body)).toMatchObject({
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'needs_clarification',
       intent: null,
       clarification: { reason: 'invalid_duration', options: [] },
@@ -920,7 +939,7 @@ describe('Create with AI sessions over HTTP', () => {
       interpreted({ kind: 'discover_artist', unsupportedConstraints: [] }),
     );
 
-    const created = AiSessionSchema.parse(
+    const created = AiSessionCreatedSchema.parse(
       (await createSession().expect(201)).body,
     );
     expect(created.status).toBe('needs_clarification');
@@ -931,7 +950,7 @@ describe('Create with AI sessions over HTTP', () => {
     });
 
     const answered = await answer(
-      created.sessionId,
+      created.accessKey,
       'keep_seed:artist:0',
     ).expect(200);
 
@@ -951,7 +970,9 @@ describe('Create with AI sessions over HTTP', () => {
 
     const response = await createSession().expect(201);
 
-    expect(AiSessionSchema.parse(response.body).clarification).toMatchObject({
+    expect(
+      AiSessionCreatedSchema.parse(response.body).clarification,
+    ).toMatchObject({
       reason: 'track_count_over_limit',
       limit: 50,
       options: [
@@ -966,34 +987,123 @@ describe('Create with AI sessions over HTTP', () => {
     );
     const cookie = await sessionCookie('user-1');
 
-    const created = AiSessionSchema.parse(
+    const created = AiSessionCreatedSchema.parse(
       (await createSession({ prompt: PROMPT }, cookie).expect(201)).body,
     );
 
     expect([...world.stored.values()][0].ownerUserId).toBe('user-1');
-    await answer(created.sessionId, 'set_track_count:50').expect(404);
-    await answer(created.sessionId, 'set_track_count:50', cookie).expect(200);
+    await answer(created.accessKey, 'set_track_count:50').expect(404);
+    await answer(created.accessKey, 'set_track_count:50', cookie).expect(200);
   });
 
   it.each([
     ['an unknown session', 'unknown-session-token'],
     ['a malformed session id', 'not a token!'],
-  ])('reports %s as expired', async (_label, sessionId) => {
+  ])('reports %s as expired', async (_label, sessionKey) => {
     const response = await answer(
-      encodeURIComponent(sessionId),
+      encodeURIComponent(sessionKey),
       'set_track_count:50',
     ).expect(404);
 
     expect(response.body).toMatchObject({ code: 'AI_SESSION_NOT_FOUND' });
   });
 
+  describe('session credential', () => {
+    async function createdGuestSession() {
+      const created = AiSessionCreatedSchema.parse(
+        (await createSession().expect(201)).body,
+      );
+      return { id: created.sessionId, key: created.accessKey };
+    }
+
+    it('keeps the routable id apart from the ownership key', async () => {
+      const { id, key } = await createdGuestSession();
+
+      expect(id).not.toBe(key);
+      expect(id).toBe(aiSessionId(key));
+      expect(key).not.toContain(id);
+      expect([...world.stored.keys()]).toEqual([key]);
+    });
+
+    it('does not authorize a Guest session by its path id alone', async () => {
+      const { id, key } = await createdGuestSession();
+
+      const noKey = await request(server()).get(`${SESSIONS_PATH}/${id}`);
+      const idAsKey = await request(server())
+        .get(`${SESSIONS_PATH}/${id}`)
+        .set(AI_SESSION_KEY_HEADER, id);
+      const legacyPath = await request(server()).get(`${SESSIONS_PATH}/${key}`);
+
+      for (const response of [noKey, idAsKey, legacyPath]) {
+        expect(response.status).toBe(404);
+        expect(response.body).toMatchObject({ code: 'AI_SESSION_NOT_FOUND' });
+      }
+    });
+
+    it('rejects a key that does not belong to the path id', async () => {
+      const first = await createdGuestSession();
+      const second = await createdGuestSession();
+
+      const crossed = await request(server())
+        .get(`${SESSIONS_PATH}/${first.id}`)
+        .set(AI_SESSION_KEY_HEADER, second.key);
+      const matching = await request(server())
+        .get(`${SESSIONS_PATH}/${first.id}`)
+        .set(AI_SESSION_KEY_HEADER, first.key);
+
+      expect(crossed.status).toBe(404);
+      expect(matching.status).toBe(200);
+    });
+
+    it('still binds an authenticated session to its user when the key is valid', async () => {
+      const owner = await sessionCookie('user-1');
+      const created = AiSessionCreatedSchema.parse(
+        (await createSession({ prompt: PROMPT }, owner).expect(201)).body,
+      );
+
+      const anonymous = await request(server())
+        .get(sessionRoute(created.accessKey))
+        .set(AI_SESSION_KEY_HEADER, created.accessKey);
+      const asOwner = await request(server())
+        .get(sessionRoute(created.accessKey))
+        .set(AI_SESSION_KEY_HEADER, created.accessKey)
+        .set('Cookie', owner);
+
+      expect(anonymous.status).toBe(404);
+      expect(asOwner.status).toBe(200);
+    });
+
+    it('returns the key only when the session is created', async () => {
+      const { id, key } = await createdGuestSession();
+
+      const read = await readSession(key).expect(200);
+      const answered = await answer(key, 'set_track_count:50');
+
+      expect(JSON.stringify(read.body)).not.toContain(key);
+      expect(read.body).toMatchObject({ sessionId: id });
+      expect(answered.body).not.toHaveProperty('accessKey');
+    });
+
+    it('accepts the key header from the browser origin in a CORS preflight', async () => {
+      const preflight = await request(server())
+        .options(`${SESSIONS_PATH}/any/generate`)
+        .set('Origin', FRONTEND)
+        .set('Access-Control-Request-Method', 'POST')
+        .set('Access-Control-Request-Headers', AI_SESSION_KEY_HEADER);
+
+      expect(preflight.headers['access-control-allow-headers']).toMatch(
+        new RegExp(AI_SESSION_KEY_HEADER, 'i'),
+      );
+    });
+  });
+
   it('rejects an option the session did not offer', async () => {
-    const created = AiSessionSchema.parse(
+    const created = AiSessionCreatedSchema.parse(
       (await createSession().expect(201)).body,
     );
 
     const response = await answer(
-      created.sessionId,
+      created.accessKey,
       'set_kind:genre_mix',
     ).expect(409);
 
@@ -1045,9 +1155,10 @@ describe('Create with AI sessions over HTTP', () => {
     expect(response.body).toMatchObject({ code: 'AI_UNAVAILABLE' });
     expectNoProviderCalls(world);
   });
-  function generate(sessionId: string, cookie?: string, accept?: string) {
+  function generate(sessionKey: string, cookie?: string, accept?: string) {
     const req = request(server())
-      .post(`${SESSIONS_PATH}/${sessionId}/generate`)
+      .post(sessionRoute(sessionKey, '/generate'))
+      .set(AI_SESSION_KEY_HEADER, sessionKey)
       .set('Origin', FRONTEND);
     const withCookie = cookie ? req.set('Cookie', cookie) : req;
     return accept ? withCookie.set('Accept', accept) : withCookie;
@@ -1063,15 +1174,15 @@ describe('Create with AI sessions over HTTP', () => {
   it('creates a Guest playlist preview only on the explicit generate command', async () => {
     const catalog = useWorkingProviders();
     const created = await createSession().expect(201);
-    const sessionId = (created.body as AiSessionDto).sessionId;
+    const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
     expect(world.generator.execute).not.toHaveBeenCalled();
     expect(catalog.searchArtists).not.toHaveBeenCalled();
 
-    const response = await generate(sessionId).expect(200);
+    const response = await generate(sessionKey).expect(200);
 
     const generation = AiGenerationSchema.parse(response.body);
     expect(generation).toMatchObject({
-      sessionId,
+      sessionId: aiSessionId(sessionKey),
       status: 'generated',
       intent: {
         artists: ['Radiohead', 'Interpol'],
@@ -1090,7 +1201,7 @@ describe('Create with AI sessions over HTTP', () => {
       'transfer',
     );
     expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
-    expect(world.stored.get(sessionId)?.execution?.status).toBe('generated');
+    expect(world.stored.get(sessionKey)?.execution?.status).toBe('generated');
   });
 
   it('streams generation progress and the preview as NDJSON', async () => {
@@ -1107,7 +1218,7 @@ describe('Create with AI sessions over HTTP', () => {
     const created = await createSession().expect(201);
 
     const response = await generate(
-      (created.body as AiSessionDto).sessionId,
+      (created.body as AiSessionCreatedDto).accessKey,
       undefined,
       'application/x-ndjson',
     ).expect(200);
@@ -1126,7 +1237,7 @@ describe('Create with AI sessions over HTTP', () => {
     const created = await createSession().expect(201);
 
     const response = await generate(
-      (created.body as AiSessionDto).sessionId,
+      (created.body as AiSessionCreatedDto).accessKey,
     ).expect(409);
 
     expect(response.body).toMatchObject({ code: 'AI_SESSION_NOT_READY' });
@@ -1138,10 +1249,10 @@ describe('Create with AI sessions over HTTP', () => {
     useWorkingProviders();
     const owner = await sessionCookie('user-1');
     const created = await createSession({ prompt: PROMPT }, owner).expect(201);
-    const sessionId = (created.body as AiSessionDto).sessionId;
+    const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
 
-    await generate(sessionId).expect(404);
-    await generate(sessionId, owner).expect(200);
+    await generate(sessionKey).expect(404);
+    await generate(sessionKey, owner).expect(200);
   });
 
   it('reports an artist that cannot be found as a typed, editable failure', async () => {
@@ -1152,7 +1263,7 @@ describe('Create with AI sessions over HTTP', () => {
     const created = await createSession().expect(201);
 
     const response = await generate(
-      (created.body as AiSessionDto).sessionId,
+      (created.body as AiSessionCreatedDto).accessKey,
     ).expect(422);
 
     expect(response.body).toEqual({
@@ -1169,11 +1280,11 @@ describe('Create with AI sessions over HTTP', () => {
       interpreted({ artists: ['Radiohed', 'Interpol'] }),
     );
     const created = await createSession().expect(201);
-    const sessionId = (created.body as AiSessionDto).sessionId;
-    await generate(sessionId).expect(422);
+    const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
+    await generate(sessionKey).expect(422);
     world.catalogFactory.forMarket.mockClear();
 
-    const response = await readSession(sessionId).expect(200);
+    const response = await readSession(sessionKey).expect(200);
 
     const execution = AiSessionStateSchema.parse(response.body).execution;
     expect(execution).toEqual({
@@ -1195,7 +1306,7 @@ describe('Create with AI sessions over HTTP', () => {
     const created = await createSession().expect(201);
 
     const response = await generate(
-      (created.body as AiSessionDto).sessionId,
+      (created.body as AiSessionCreatedDto).accessKey,
     ).expect(429);
 
     expect(response.headers['retry-after']).toBe('3600');
@@ -1209,19 +1320,21 @@ describe('Create with AI sessions over HTTP', () => {
   it('limits generation with the existing generation bucket', async () => {
     useWorkingProviders();
     const created = await createSession().expect(201);
-    const sessionId = (created.body as AiSessionDto).sessionId;
+    const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
 
     for (let attempt = 0; attempt < GENERATION_LIMIT; attempt += 1) {
-      await generate(sessionId).expect(200);
+      await generate(sessionKey).expect(200);
     }
-    const response = await generate(sessionId).expect(429);
+    const response = await generate(sessionKey).expect(429);
 
     expect(response.body).toMatchObject({ code: 'RATE_LIMITED' });
     expect(world.generator.execute).toHaveBeenCalledTimes(1);
   });
 
-  function readSession(sessionId: string, cookie?: string) {
-    const req = request(server()).get(`${SESSIONS_PATH}/${sessionId}`);
+  function readSession(sessionKey: string, cookie?: string) {
+    const req = request(server())
+      .get(sessionRoute(sessionKey))
+      .set(AI_SESSION_KEY_HEADER, sessionKey);
     return cookie ? req.set('Cookie', cookie) : req;
   }
 
@@ -1235,13 +1348,13 @@ describe('Create with AI sessions over HTTP', () => {
 
   it('restores a reviewed session and then its generated preview', async () => {
     const created = await createSession().expect(201);
-    const sessionId = (created.body as AiSessionDto).sessionId;
+    const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
 
     const reviewed = AiSessionStateSchema.parse(
-      (await readSession(sessionId).expect(200)).body,
+      (await readSession(sessionKey).expect(200)).body,
     );
     expect(reviewed).toMatchObject({
-      sessionId,
+      sessionId: aiSessionId(sessionKey),
       status: 'ready',
       intent: { artists: ['Radiohead', 'Interpol'], targetTrackCount: 30 },
       execution: null,
@@ -1249,11 +1362,11 @@ describe('Create with AI sessions over HTTP', () => {
     expectNoReadSideEffects(1);
 
     useWorkingProviders();
-    const generated = await generate(sessionId).expect(200);
+    const generated = await generate(sessionKey).expect(200);
     world.catalogFactory.forMarket.mockClear();
     world.generator.execute.mockClear();
 
-    const restored = await readSession(sessionId).expect(200);
+    const restored = await readSession(sessionKey).expect(200);
     const state = AiSessionStateSchema.parse(restored.body);
     const generation = AiGenerationSchema.parse(generated.body);
     expect(state.execution).toEqual({
@@ -1278,8 +1391,11 @@ describe('Create with AI sessions over HTTP', () => {
     const created = await createSession().expect(201);
 
     const state = AiSessionStateSchema.parse(
-      (await readSession((created.body as AiSessionDto).sessionId).expect(200))
-        .body,
+      (
+        await readSession(
+          (created.body as AiSessionCreatedDto).accessKey,
+        ).expect(200)
+      ).body,
     );
 
     expect(state).toMatchObject({
@@ -1293,12 +1409,12 @@ describe('Create with AI sessions over HTTP', () => {
 
   it('exposes only the normalized failure of a failed generation', async () => {
     const created = await createSession().expect(201);
-    const sessionId = (created.body as AiSessionDto).sessionId;
-    await generate(sessionId).expect(429);
+    const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
+    await generate(sessionKey).expect(429);
     world.catalogFactory.forMarket.mockClear();
 
     const state = AiSessionStateSchema.parse(
-      (await readSession(sessionId).expect(200)).body,
+      (await readSession(sessionKey).expect(200)).body,
     );
 
     expect(state.execution).toEqual({
@@ -1315,9 +1431,9 @@ describe('Create with AI sessions over HTTP', () => {
 
   it('reports a live generation as generating and a lease-less one as interrupted, never exposing attempt or lease', async () => {
     const created = await createSession().expect(201);
-    const sessionId = (created.body as AiSessionDto).sessionId;
-    const stored = world.stored.get(sessionId) as AiSession;
-    world.stored.set(sessionId, {
+    const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
+    const stored = world.stored.get(sessionKey) as AiSession;
+    world.stored.set(sessionKey, {
       ...stored,
       execution: {
         status: 'generating',
@@ -1327,7 +1443,7 @@ describe('Create with AI sessions over HTTP', () => {
     });
     world.sessions.hasGenerationLock.mockResolvedValue(true);
 
-    const response = await readSession(sessionId).expect(200);
+    const response = await readSession(sessionKey).expect(200);
 
     expect(AiSessionStateSchema.parse(response.body).execution).toEqual({
       status: 'generating',
@@ -1335,7 +1451,7 @@ describe('Create with AI sessions over HTTP', () => {
     expect(response.text).not.toMatch(/attempt|lease|startedAt/);
 
     world.sessions.hasGenerationLock.mockResolvedValue(false);
-    const interrupted = await readSession(sessionId).expect(200);
+    const interrupted = await readSession(sessionKey).expect(200);
 
     expect(AiSessionStateSchema.parse(interrupted.body).execution).toEqual({
       status: 'generation_failed',
@@ -1347,7 +1463,7 @@ describe('Create with AI sessions over HTTP', () => {
       },
     });
     expect(interrupted.text).not.toMatch(/attempt|lease|startedAt|failedAt/);
-    expect(world.stored.get(sessionId)?.execution?.status).toBe('generating');
+    expect(world.stored.get(sessionKey)?.execution?.status).toBe('generating');
     expectNoReadSideEffects(1);
   });
 
@@ -1355,34 +1471,36 @@ describe('Create with AI sessions over HTTP', () => {
     const owner = await sessionCookie('user-1');
     const intruder = await sessionCookie('user-2');
     const created = await createSession({ prompt: PROMPT }, owner).expect(201);
-    const sessionId = (created.body as AiSessionDto).sessionId;
+    const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
 
     for (const response of [
-      await readSession(sessionId).expect(404),
-      await readSession(sessionId, intruder).expect(404),
+      await readSession(sessionKey).expect(404),
+      await readSession(sessionKey, intruder).expect(404),
       await readSession('unknown-session').expect(404),
       await readSession('bad$token').expect(404),
     ]) {
       expect(response.body).toMatchObject({ code: 'AI_SESSION_NOT_FOUND' });
     }
-    await readSession(sessionId, owner).expect(200);
+    await readSession(sessionKey, owner).expect(200);
     expectNoReadSideEffects(1);
   });
 
   describe('destination actions', () => {
     const PUBLISH = { name: 'My edited title', persistToLibrary: true };
 
-    function publish(sessionId: string, body: object, cookie?: string) {
+    function publish(sessionKey: string, body: object, cookie?: string) {
       const req = request(server())
-        .post(`${SESSIONS_PATH}/${sessionId}/publish`)
+        .post(sessionRoute(sessionKey, '/publish'))
+        .set(AI_SESSION_KEY_HEADER, sessionKey)
         .set('Origin', FRONTEND)
         .send(body);
       return cookie ? req.set('Cookie', cookie) : req;
     }
 
-    function transfer(sessionId: string, body: object, cookie?: string) {
+    function transfer(sessionKey: string, body: object, cookie?: string) {
       const req = request(server())
-        .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+        .post(sessionRoute(sessionKey, '/transfer'))
+        .set(AI_SESSION_KEY_HEADER, sessionKey)
         .set('Origin', FRONTEND)
         .send(body);
       return cookie ? req.set('Cookie', cookie) : req;
@@ -1393,9 +1511,9 @@ describe('Create with AI sessions over HTTP', () => {
       const created = await createSession({ prompt: PROMPT }, cookie).expect(
         201,
       );
-      const sessionId = (created.body as AiSessionDto).sessionId;
-      await generate(sessionId, cookie).expect(200);
-      return sessionId;
+      const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
+      await generate(sessionKey, cookie).expect(200);
+      return sessionKey;
     }
 
     async function restartWithGenerationLimit(limit: number): Promise<void> {
@@ -1418,11 +1536,11 @@ describe('Create with AI sessions over HTTP', () => {
 
     it('performs no destination side effect when generating or restoring', async () => {
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
       const guestSessionId = await generatedSession();
 
       const restored = AiSessionStateSchema.parse(
-        (await readSession(sessionId, owner).expect(200)).body,
+        (await readSession(sessionKey, owner).expect(200)).body,
       );
       const guestRestored = AiSessionStateSchema.parse(
         (await readSession(guestSessionId).expect(200)).body,
@@ -1438,20 +1556,20 @@ describe('Create with AI sessions over HTTP', () => {
     });
 
     it('denies Spotify publishing to Guest sessions without any side effect', async () => {
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
 
-      const response = await publish(sessionId, PUBLISH).expect(401);
+      const response = await publish(sessionKey, PUBLISH).expect(401);
 
       expect(response.body).toMatchObject({ code: 'UNAUTHORIZED' });
-      expect(world.stored.get(sessionId)?.destination).toBeNull();
+      expect(world.stored.get(sessionKey)?.destination).toBeNull();
       expectNoDestinationSideEffects();
     });
 
     it('publishes the server-held playlist under the edited name for the current user', async () => {
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
 
-      const response = await publish(sessionId, PUBLISH, owner).expect(200);
+      const response = await publish(sessionKey, PUBLISH, owner).expect(200);
 
       const state = AiSessionStateSchema.parse(response.body);
       expect(state.destination).toEqual({
@@ -1482,7 +1600,7 @@ describe('Create with AI sessions over HTTP', () => {
       expect(world.generator.execute).toHaveBeenCalledTimes(1);
 
       const restoredBody: unknown = (
-        await readSession(sessionId, owner).expect(200)
+        await readSession(sessionKey, owner).expect(200)
       ).body;
       const restored = AiSessionStateSchema.parse(restoredBody);
       expect(restored.destination).toEqual(state.destination);
@@ -1493,10 +1611,10 @@ describe('Create with AI sessions over HTTP', () => {
 
     it('keeps the playlist out of the Library when the user preference says so', async () => {
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
 
       const response = await publish(
-        sessionId,
+        sessionKey,
         { ...PUBLISH, persistToLibrary: false },
         owner,
       ).expect(200);
@@ -1513,7 +1631,7 @@ describe('Create with AI sessions over HTTP', () => {
     it('never accepts browser-supplied playlist contents or an invalid name', async () => {
       await restartWithGenerationLimit(10);
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
 
       for (const body of [
         { ...PUBLISH, tracks: [{ uri: 'spotify:track:foreign' }] },
@@ -1521,14 +1639,14 @@ describe('Create with AI sessions over HTTP', () => {
         { ...PUBLISH, name: '   ' },
         { ...PUBLISH, name: 'x'.repeat(101) },
       ]) {
-        const response = await publish(sessionId, body, owner).expect(400);
+        const response = await publish(sessionKey, body, owner).expect(400);
         expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
       }
       for (const body of [
         { name: 'Mix', tracks: [{ title: 'Foreign', artists: ['X'] }] },
         { name: '' },
       ]) {
-        await transfer(sessionId, body, owner).expect(400);
+        await transfer(sessionKey, body, owner).expect(400);
       }
       expectNoDestinationSideEffects();
     });
@@ -1536,10 +1654,10 @@ describe('Create with AI sessions over HTTP', () => {
     it('does not create a second Spotify playlist when publish is repeated', async () => {
       await restartWithGenerationLimit(10);
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
 
-      await publish(sessionId, PUBLISH, owner).expect(200);
-      const again = await publish(sessionId, PUBLISH, owner).expect(200);
+      await publish(sessionKey, PUBLISH, owner).expect(200);
+      const again = await publish(sessionKey, PUBLISH, owner).expect(200);
 
       expect(AiSessionStateSchema.parse(again.body).destination).toMatchObject({
         status: 'published',
@@ -1551,7 +1669,7 @@ describe('Create with AI sessions over HTTP', () => {
     it('lets the user retry after a failure that happened before Spotify created anything', async () => {
       await restartWithGenerationLimit(5);
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
       world.spotify.createPlaylist.mockRejectedValueOnce(
         createSpotifyQuotaError({
           retryAfterSeconds: 120,
@@ -1559,16 +1677,16 @@ describe('Create with AI sessions over HTTP', () => {
         }),
       );
 
-      const failed = await publish(sessionId, PUBLISH, owner).expect(429);
+      const failed = await publish(sessionKey, PUBLISH, owner).expect(429);
 
       expect(failed.body).toMatchObject({
         code: 'SPOTIFY_RATE_LIMITED',
         details: { retryAfterSeconds: 120 },
       });
-      expect(world.stored.get(sessionId)?.destination).toBeNull();
+      expect(world.stored.get(sessionKey)?.destination).toBeNull();
       expect(world.claims.size).toBe(0);
 
-      await publish(sessionId, PUBLISH, owner).expect(200);
+      await publish(sessionKey, PUBLISH, owner).expect(200);
       expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(2);
       expect(world.spotify.addTracksToPlaylist).toHaveBeenCalledTimes(1);
     });
@@ -1576,13 +1694,13 @@ describe('Create with AI sessions over HTTP', () => {
     it('reports a partial publish with its Spotify link and never publishes it again', async () => {
       await restartWithGenerationLimit(5);
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
       world.spotify.addTracksToPlaylist.mockRejectedValueOnce(
         new Error('Spotify addTracksToPlaylist failed (500): boom'),
       );
 
-      const partial = await publish(sessionId, PUBLISH, owner).expect(200);
-      const repeated = await publish(sessionId, PUBLISH, owner).expect(200);
+      const partial = await publish(sessionKey, PUBLISH, owner).expect(200);
+      const repeated = await publish(sessionKey, PUBLISH, owner).expect(200);
 
       for (const response of [partial, repeated]) {
         expect(AiSessionStateSchema.parse(response.body).destination).toEqual({
@@ -1597,20 +1715,20 @@ describe('Create with AI sessions over HTTP', () => {
 
     it('treats an unknown creation outcome as uncertain instead of retryable', async () => {
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
       world.spotify.createPlaylist.mockRejectedValueOnce(
         new ProviderOutcomeUnknownError(
           'Spotify createPlaylist failed (undefined): timeout',
         ),
       );
 
-      const response = await publish(sessionId, PUBLISH, owner).expect(200);
+      const response = await publish(sessionKey, PUBLISH, owner).expect(200);
 
       expect(AiSessionStateSchema.parse(response.body).destination).toEqual({
         status: 'publish_incomplete',
         spotifyUrl: null,
       });
-      expect(world.stored.get(sessionId)?.destination).toMatchObject({
+      expect(world.stored.get(sessionKey)?.destination).toMatchObject({
         status: 'publish_incomplete',
       });
       expect(world.claims.size).toBe(0);
@@ -1622,7 +1740,7 @@ describe('Create with AI sessions over HTTP', () => {
       const created = await createSession({ prompt: PROMPT }, owner).expect(
         201,
       );
-      const reviewedId = (created.body as AiSessionDto).sessionId;
+      const reviewedId = (created.body as AiSessionCreatedDto).accessKey;
 
       const notGenerated = await publish(reviewedId, PUBLISH, owner).expect(
         409,
@@ -1640,22 +1758,24 @@ describe('Create with AI sessions over HTTP', () => {
 
     it('limits Spotify publishing with the existing generation bucket', async () => {
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
 
-      await publish(sessionId, PUBLISH, owner).expect(200);
-      const limited = await publish(sessionId, PUBLISH, owner).expect(429);
+      await publish(sessionKey, PUBLISH, owner).expect(200);
+      const limited = await publish(sessionKey, PUBLISH, owner).expect(429);
 
       expect(limited.body).toMatchObject({ code: 'RATE_LIMITED' });
       expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(1);
     });
 
     it('prepares a Guest Soundiiz transfer from the server-held playlist under the edited name', async () => {
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
 
-      const response = await transfer(sessionId, {
+      const response = await transfer(sessionKey, {
         name: '  Edited for Soundiiz ',
       }).expect(200);
-      const repeated = await transfer(sessionId, { name: 'Other' }).expect(200);
+      const repeated = await transfer(sessionKey, { name: 'Other' }).expect(
+        200,
+      );
 
       const expected = {
         status: 'transfer_prepared',
@@ -1683,25 +1803,25 @@ describe('Create with AI sessions over HTTP', () => {
       expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
 
       const restored = AiSessionStateSchema.parse(
-        (await readSession(sessionId).expect(200)).body,
+        (await readSession(sessionKey).expect(200)).body,
       );
       expect(restored.destination).toEqual(expected);
     });
 
     it('keeps the Soundiiz error typed and lets the Guest retry', async () => {
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
       world.soundiiz.createTransfer.mockRejectedValueOnce(
         TransferError.providerUnavailable(30),
       );
 
-      const failed = await transfer(sessionId, { name: 'Mix' }).expect(503);
+      const failed = await transfer(sessionKey, { name: 'Mix' }).expect(503);
 
       expect(failed.body).toMatchObject({
         code: 'TRANSFER_PROVIDER_UNAVAILABLE',
         details: { retryAfterSeconds: 30 },
       });
-      expect(world.stored.get(sessionId)?.destination).toBeNull();
-      await transfer(sessionId, { name: 'Mix' }).expect(200);
+      expect(world.stored.get(sessionKey)?.destination).toBeNull();
+      await transfer(sessionKey, { name: 'Mix' }).expect(200);
       expect(world.soundiiz.createTransfer).toHaveBeenCalledTimes(2);
     });
 
@@ -1712,12 +1832,12 @@ describe('Create with AI sessions over HTTP', () => {
         { provide: INTENT_INTERPRETER, useValue: world.interpreter },
         { transferEnabled: false },
       );
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
 
       const restored = AiSessionStateSchema.parse(
-        (await readSession(sessionId).expect(200)).body,
+        (await readSession(sessionKey).expect(200)).body,
       );
-      await transfer(sessionId, { name: 'Mix' }).expect(404);
+      await transfer(sessionKey, { name: 'Mix' }).expect(404);
 
       expect(restored.execution).toMatchObject({ transferAvailable: false });
       expectNoDestinationSideEffects();
@@ -1725,28 +1845,30 @@ describe('Create with AI sessions over HTTP', () => {
 
     it('denies the Guest Soundiiz transfer in Spotify Mode without any side effect', async () => {
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
 
-      const response = await transfer(sessionId, { name: 'Mix' }, owner).expect(
-        409,
-      );
+      const response = await transfer(
+        sessionKey,
+        { name: 'Mix' },
+        owner,
+      ).expect(409);
 
       expect(response.body).toMatchObject({
         code: 'AI_DESTINATION_UNAVAILABLE',
       });
-      expect(world.stored.get(sessionId)?.destination).toBeNull();
+      expect(world.stored.get(sessionKey)?.destination).toBeNull();
       expect(world.claims.size).toBe(0);
       expectNoDestinationSideEffects();
     });
 
     it('follows the current mode for a Guest session whose owner then connects Spotify', async () => {
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
       const owner = await sessionCookie('user-1');
 
-      const denied = await transfer(sessionId, { name: 'Mix' }, owner).expect(
+      const denied = await transfer(sessionKey, { name: 'Mix' }, owner).expect(
         409,
       );
-      const published = await publish(sessionId, PUBLISH, owner).expect(200);
+      const published = await publish(sessionKey, PUBLISH, owner).expect(200);
 
       expect(denied.body).toMatchObject({ code: 'AI_DESTINATION_UNAVAILABLE' });
       expect(AiSessionStateSchema.parse(published.body)).toMatchObject({
@@ -1756,7 +1878,9 @@ describe('Create with AI sessions over HTTP', () => {
       expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(1);
       expect(world.soundiiz.createTransfer).not.toHaveBeenCalled();
 
-      const guestAgain = await transfer(sessionId, { name: 'Mix' }).expect(409);
+      const guestAgain = await transfer(sessionKey, { name: 'Mix' }).expect(
+        409,
+      );
       expect(guestAgain.body).toMatchObject({
         code: 'AI_DESTINATION_UNAVAILABLE',
       });
@@ -1766,23 +1890,23 @@ describe('Create with AI sessions over HTTP', () => {
     it('asks for Spotify reauthorization when the stored authorization was revoked, and lets the user publish again after reconnecting', async () => {
       await restartWithGenerationLimit(5);
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
+      const sessionKey = await generatedSession(owner);
       world.spotify.createPlaylist.mockRejectedValueOnce(
         new SpotifyReauthRequiredError(),
       );
 
-      const failed = await publish(sessionId, PUBLISH, owner).expect(401);
+      const failed = await publish(sessionKey, PUBLISH, owner).expect(401);
 
       expect(failed.body).toMatchObject({ code: 'SPOTIFY_REAUTH_REQUIRED' });
       const restored = AiSessionStateSchema.parse(
-        (await readSession(sessionId, owner).expect(200)).body,
+        (await readSession(sessionKey, owner).expect(200)).body,
       );
       expect(restored.destination).toBeNull();
       expect(restored.execution).toMatchObject({ status: 'generated' });
       expect(world.claims.size).toBe(0);
       expect(world.spotify.addTracksToPlaylist).not.toHaveBeenCalled();
 
-      await publish(sessionId, PUBLISH, owner).expect(200);
+      await publish(sessionKey, PUBLISH, owner).expect(200);
       expect(world.spotify.createPlaylist).toHaveBeenCalledTimes(2);
       expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
       expect(world.generator.execute).toHaveBeenCalledTimes(1);
@@ -1793,9 +1917,10 @@ describe('Create with AI sessions over HTTP', () => {
     const REFINEMENT =
       'Less mainstream, drop Interpol, keep the first two, for running';
 
-    function refine(sessionId: string, body: object, cookie?: string) {
+    function refine(sessionKey: string, body: object, cookie?: string) {
       const req = request(server())
-        .post(`${SESSIONS_PATH}/${sessionId}/refinements`)
+        .post(sessionRoute(sessionKey, '/refinements'))
+        .set(AI_SESSION_KEY_HEADER, sessionKey)
         .set('Origin', FRONTEND)
         .send(body);
       return cookie ? req.set('Cookie', cookie) : req;
@@ -1803,24 +1928,25 @@ describe('Create with AI sessions over HTTP', () => {
 
     function settle(
       action: 'apply' | 'dismiss',
-      sessionId: string,
+      sessionKey: string,
       refinementId: string,
       cookie?: string,
     ) {
       const req = request(server())
         .post(
-          `${SESSIONS_PATH}/${sessionId}/refinements/${refinementId}/${action}`,
+          sessionRoute(sessionKey, `/refinements/${refinementId}/${action}`),
         )
+        .set(AI_SESSION_KEY_HEADER, sessionKey)
         .set('Origin', FRONTEND);
       return cookie ? req.set('Cookie', cookie) : req;
     }
 
-    async function dismissPending(sessionId: string): Promise<void> {
-      const pending = world.stored.get(sessionId)?.pendingRefinement;
+    async function dismissPending(sessionKey: string): Promise<void> {
+      const pending = world.stored.get(sessionKey)?.pendingRefinement;
       if (!pending) {
         throw new Error('Expected a pending refinement to dismiss.');
       }
-      await settle('dismiss', sessionId, pending.id).expect(200);
+      await settle('dismiss', sessionKey, pending.id).expect(200);
     }
 
     async function generatedSession(cookie?: string): Promise<string> {
@@ -1828,9 +1954,9 @@ describe('Create with AI sessions over HTTP', () => {
       const created = await createSession({ prompt: PROMPT }, cookie).expect(
         201,
       );
-      const sessionId = (created.body as AiSessionDto).sessionId;
-      await generate(sessionId, cookie).expect(200);
-      return sessionId;
+      const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
+      await generate(sessionKey, cookie).expect(200);
+      return sessionKey;
     }
 
     function providerCallCounts() {
@@ -1848,18 +1974,18 @@ describe('Create with AI sessions over HTTP', () => {
     }
 
     it('builds a pending candidate with one bounded generation and zero destination calls', async () => {
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
       const before = providerCallCounts();
 
-      const response = await refine(sessionId, {
+      const response = await refine(sessionKey, {
         refinement: REFINEMENT,
       }).expect(200);
 
       expect(AiRefinementResultSchema.parse(response.body)).toEqual({
-        sessionId,
-        expiresAt: world.stored.get(sessionId)?.expiresAt,
+        sessionId: aiSessionId(sessionKey),
+        expiresAt: world.stored.get(sessionKey)?.expiresAt,
         refinement: {
-          id: world.stored.get(sessionId)?.pendingRefinement?.id,
+          id: world.stored.get(sessionKey)?.pendingRefinement?.id,
           status: 'candidate_ready',
           intent: expect.objectContaining({
             artists: ['Radiohead'],
@@ -1900,25 +2026,25 @@ describe('Create with AI sessions over HTTP', () => {
       expectNoDestinationCalls();
       expect(world.interpreter.interpretIntent).toHaveBeenCalledTimes(1);
       expect(world.planner.planRefinement).toHaveBeenCalledWith({
-        intent: world.stored.get(sessionId)?.aiSafe.intent,
+        intent: world.stored.get(sessionKey)?.aiSafe.intent,
         preservation: { firstTracks: null, positions: [], artists: [] },
         refinement: REFINEMENT,
       });
     });
 
     it('restores the applied preview next to the pending candidate without provider or model calls', async () => {
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
       const before = AiSessionStateSchema.parse(
-        (await readSession(sessionId).expect(200)).body,
+        (await readSession(sessionKey).expect(200)).body,
       );
-      await refine(sessionId, { refinement: REFINEMENT }).expect(200);
+      await refine(sessionKey, { refinement: REFINEMENT }).expect(200);
       const calls = {
         ...providerCallCounts(),
         planner: world.planner.planRefinement.mock.calls.length,
       };
 
       const restored = AiSessionStateSchema.parse(
-        (await readSession(sessionId).expect(200)).body,
+        (await readSession(sessionKey).expect(200)).body,
       );
 
       expect(restored).toEqual({
@@ -1949,8 +2075,8 @@ describe('Create with AI sessions over HTTP', () => {
     });
 
     it('keeps the applied preview and stores a typed candidate failure when Spotify is limited', async () => {
-      const sessionId = await generatedSession();
-      const applied = world.stored.get(sessionId);
+      const sessionKey = await generatedSession();
+      const applied = world.stored.get(sessionKey);
       world.generator.execute.mockRejectedValueOnce(
         createSpotifyQuotaError({
           retryAfterSeconds: 3_600,
@@ -1958,7 +2084,7 @@ describe('Create with AI sessions over HTTP', () => {
         }),
       );
 
-      const response = await refine(sessionId, {
+      const response = await refine(sessionKey, {
         refinement: REFINEMENT,
       }).expect(200);
 
@@ -1973,7 +2099,7 @@ describe('Create with AI sessions over HTTP', () => {
           },
         }),
       );
-      expect(world.stored.get(sessionId)).toMatchObject({
+      expect(world.stored.get(sessionKey)).toMatchObject({
         aiSafe: applied?.aiSafe,
         execution: applied?.execution,
         destination: null,
@@ -1982,11 +2108,12 @@ describe('Create with AI sessions over HTTP', () => {
     });
 
     it('refuses the Guest transfer while a candidate is pending, with zero Soundiiz calls', async () => {
-      const sessionId = await generatedSession();
-      await refine(sessionId, { refinement: REFINEMENT }).expect(200);
+      const sessionKey = await generatedSession();
+      await refine(sessionKey, { refinement: REFINEMENT }).expect(200);
 
       const refused = await request(server())
-        .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+        .post(sessionRoute(sessionKey, '/transfer'))
+        .set(AI_SESSION_KEY_HEADER, sessionKey)
         .set('Origin', FRONTEND)
         .send({ name: 'Mix' })
         .expect(409);
@@ -1996,16 +2123,17 @@ describe('Create with AI sessions over HTTP', () => {
       });
       expectNoDestinationCalls();
       expect(world.sessions.acquireDestinationClaim).not.toHaveBeenCalled();
-      expect(world.stored.get(sessionId)?.destination).toBeNull();
+      expect(world.stored.get(sessionKey)?.destination).toBeNull();
     });
 
     it('refuses Spotify publishing while a candidate is pending, with zero Spotify calls', async () => {
       const owner = await sessionCookie('user-1');
-      const sessionId = await generatedSession(owner);
-      await refine(sessionId, { refinement: REFINEMENT }, owner).expect(200);
+      const sessionKey = await generatedSession(owner);
+      await refine(sessionKey, { refinement: REFINEMENT }, owner).expect(200);
 
       const refused = await request(server())
-        .post(`${SESSIONS_PATH}/${sessionId}/publish`)
+        .post(sessionRoute(sessionKey, '/publish'))
+        .set(AI_SESSION_KEY_HEADER, sessionKey)
         .set('Origin', FRONTEND)
         .set('Cookie', owner)
         .send({ name: 'Mix' })
@@ -2020,7 +2148,7 @@ describe('Create with AI sessions over HTTP', () => {
     });
 
     it('refuses destinations while a refinement clarification is pending', async () => {
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
       world.planner.planRefinement.mockResolvedValueOnce(
         refinementPlan({
           outcome: 'needs_clarification',
@@ -2030,10 +2158,11 @@ describe('Create with AI sessions over HTTP', () => {
           },
         }),
       );
-      await refine(sessionId, { refinement: 'make it shorter' }).expect(200);
+      await refine(sessionKey, { refinement: 'make it shorter' }).expect(200);
 
       await request(server())
-        .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+        .post(sessionRoute(sessionKey, '/transfer'))
+        .set(AI_SESSION_KEY_HEADER, sessionKey)
         .set('Origin', FRONTEND)
         .send({ name: 'Mix' })
         .expect(409);
@@ -2042,13 +2171,13 @@ describe('Create with AI sessions over HTTP', () => {
     });
 
     it('shares the paid-model interpret bucket with first-turn requests', async () => {
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
 
-      await refine(sessionId, { refinement: REFINEMENT }).expect(200);
-      await dismissPending(sessionId);
-      await refine(sessionId, { refinement: REFINEMENT }).expect(200);
-      await dismissPending(sessionId);
-      const limited = await refine(sessionId, {
+      await refine(sessionKey, { refinement: REFINEMENT }).expect(200);
+      await dismissPending(sessionKey);
+      await refine(sessionKey, { refinement: REFINEMENT }).expect(200);
+      await dismissPending(sessionKey);
+      const limited = await refine(sessionKey, {
         refinement: REFINEMENT,
       }).expect(429);
 
@@ -2065,11 +2194,11 @@ describe('Create with AI sessions over HTTP', () => {
         { provide: INTENT_INTERPRETER, useValue: world.interpreter },
         { refinementsPerSession: 1 },
       );
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
 
-      await refine(sessionId, { refinement: REFINEMENT }).expect(200);
-      await dismissPending(sessionId);
-      const refused = await refine(sessionId, {
+      await refine(sessionKey, { refinement: REFINEMENT }).expect(200);
+      await dismissPending(sessionKey);
+      const refused = await refine(sessionKey, {
         refinement: REFINEMENT,
       }).expect(409);
 
@@ -2080,10 +2209,10 @@ describe('Create with AI sessions over HTTP', () => {
     });
 
     it('answers a concurrent refinement of the same session with a typed in-progress error', async () => {
-      const sessionId = await generatedSession();
-      world.refinementLocks.set(sessionId, 'another-request');
+      const sessionKey = await generatedSession();
+      world.refinementLocks.set(sessionKey, 'another-request');
 
-      const busy = await refine(sessionId, { refinement: REFINEMENT }).expect(
+      const busy = await refine(sessionKey, { refinement: REFINEMENT }).expect(
         409,
       );
 
@@ -2092,14 +2221,15 @@ describe('Create with AI sessions over HTTP', () => {
     });
 
     it('refuses to refine a preview that was already transferred', async () => {
-      const sessionId = await generatedSession();
+      const sessionKey = await generatedSession();
       await request(server())
-        .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+        .post(sessionRoute(sessionKey, '/transfer'))
+        .set(AI_SESSION_KEY_HEADER, sessionKey)
         .set('Origin', FRONTEND)
         .send({ name: 'Mix' })
         .expect(200);
 
-      const refused = await refine(sessionId, {
+      const refused = await refine(sessionKey, {
         refinement: REFINEMENT,
       }).expect(409);
 
@@ -2112,10 +2242,10 @@ describe('Create with AI sessions over HTTP', () => {
       const owner = await sessionCookie('user-1');
       const intruder = await sessionCookie('user-2');
       const reviewed = (await createSession({ prompt: PROMPT }).expect(201))
-        .body as AiSessionDto;
+        .body as AiSessionCreatedDto;
       const owned = await generatedSession(owner);
 
-      await refine(reviewed.sessionId, { refinement: REFINEMENT }).expect(409);
+      await refine(reviewed.accessKey, { refinement: REFINEMENT }).expect(409);
       for (const response of [
         await refine(owned, { refinement: REFINEMENT }, intruder).expect(404),
         await refine(owned, { refinement: REFINEMENT }).expect(404),
@@ -2137,9 +2267,9 @@ describe('Create with AI sessions over HTTP', () => {
     ])(
       'rejects bodies outside the public refinement contract: %j',
       async (body) => {
-        const sessionId = await generatedSession();
+        const sessionKey = await generatedSession();
 
-        await refine(sessionId, body).expect(400);
+        await refine(sessionKey, body).expect(400);
 
         expect(world.planner.planRefinement).not.toHaveBeenCalled();
       },
@@ -2149,7 +2279,7 @@ describe('Create with AI sessions over HTTP', () => {
       const CANDIDATE_TRACKS = ['n1', 'n2', 'n3'];
 
       async function proposeCandidate(
-        sessionId: string,
+        sessionKey: string,
         cookie?: string,
         body: object = { refinement: 'More popular' },
         plan: PlanRefinementResponse = popularPlan(),
@@ -2158,7 +2288,7 @@ describe('Create with AI sessions over HTTP', () => {
         world.generator.execute.mockResolvedValueOnce(
           generatedPlaylist(CANDIDATE_TRACKS),
         );
-        const response = await refine(sessionId, body, cookie).expect(200);
+        const response = await refine(sessionKey, body, cookie).expect(200);
         const { refinement } = AiRefinementResultSchema.parse(response.body);
         expect(refinement.status).toBe('candidate_ready');
         return refinement.id;
@@ -2187,13 +2317,13 @@ describe('Create with AI sessions over HTTP', () => {
       }
 
       it('makes the reviewed Guest candidate current without any model or provider call', async () => {
-        const sessionId = await generatedSession();
-        const refinementId = await proposeCandidate(sessionId);
-        const before = world.stored.get(sessionId);
+        const sessionKey = await generatedSession();
+        const refinementId = await proposeCandidate(sessionKey);
+        const before = world.stored.get(sessionKey);
         const pending = before?.pendingRefinement;
         const calls = sideEffectCounts();
 
-        const response = await settle('apply', sessionId, refinementId).expect(
+        const response = await settle('apply', sessionKey, refinementId).expect(
           200,
         );
 
@@ -2205,7 +2335,7 @@ describe('Create with AI sessions over HTTP', () => {
         expect(sideEffectCounts()).toEqual(calls);
         expectNoDestinationCalls();
 
-        const stored = world.stored.get(sessionId);
+        const stored = world.stored.get(sessionKey);
         expect(pending?.status).toBe('proposed');
         if (
           pending?.status !== 'proposed' ||
@@ -2228,7 +2358,7 @@ describe('Create with AI sessions over HTTP', () => {
         });
 
         const restored = AiSessionStateSchema.parse(
-          (await readSession(sessionId).expect(200)).body,
+          (await readSession(sessionKey).expect(200)).body,
         );
         expect(restored).toEqual(state);
         expect(sideEffectCounts()).toEqual(calls);
@@ -2236,12 +2366,13 @@ describe('Create with AI sessions over HTTP', () => {
 
       it('publishes the applied candidate under the edited title for the Spotify owner', async () => {
         const owner = await sessionCookie('user-1');
-        const sessionId = await generatedSession(owner);
-        const refinementId = await proposeCandidate(sessionId, owner);
+        const sessionKey = await generatedSession(owner);
+        const refinementId = await proposeCandidate(sessionKey, owner);
 
-        await settle('apply', sessionId, refinementId, owner).expect(200);
+        await settle('apply', sessionKey, refinementId, owner).expect(200);
         await request(server())
-          .post(`${SESSIONS_PATH}/${sessionId}/publish`)
+          .post(sessionRoute(sessionKey, '/publish'))
+          .set(AI_SESSION_KEY_HEADER, sessionKey)
           .set('Origin', FRONTEND)
           .set('Cookie', owner)
           .send({ name: 'Night run' })
@@ -2257,17 +2388,18 @@ describe('Create with AI sessions over HTTP', () => {
       });
 
       it('publishes a candidate a Guest applied after the user connects Spotify', async () => {
-        const sessionId = await generatedSession();
-        const refinementId = await proposeCandidate(sessionId);
+        const sessionKey = await generatedSession();
+        const refinementId = await proposeCandidate(sessionKey);
         const owner = await sessionCookie('user-1');
 
         const pending = AiSessionStateSchema.parse(
-          (await readSession(sessionId, owner).expect(200)).body,
+          (await readSession(sessionKey, owner).expect(200)).body,
         );
         expect(pending.refinement?.id).toBe(refinementId);
-        await settle('apply', sessionId, refinementId, owner).expect(200);
+        await settle('apply', sessionKey, refinementId, owner).expect(200);
         await request(server())
-          .post(`${SESSIONS_PATH}/${sessionId}/publish`)
+          .post(sessionRoute(sessionKey, '/publish'))
+          .set(AI_SESSION_KEY_HEADER, sessionKey)
           .set('Origin', FRONTEND)
           .set('Cookie', owner)
           .send({ name: 'Night run' })
@@ -2281,12 +2413,13 @@ describe('Create with AI sessions over HTTP', () => {
       });
 
       it('transfers the applied candidate for a Guest', async () => {
-        const sessionId = await generatedSession();
-        const refinementId = await proposeCandidate(sessionId);
+        const sessionKey = await generatedSession();
+        const refinementId = await proposeCandidate(sessionKey);
 
-        await settle('apply', sessionId, refinementId).expect(200);
+        await settle('apply', sessionKey, refinementId).expect(200);
         await request(server())
-          .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+          .post(sessionRoute(sessionKey, '/transfer'))
+          .set(AI_SESSION_KEY_HEADER, sessionKey)
           .set('Origin', FRONTEND)
           .send({ name: 'Night run' })
           .expect(200);
@@ -2301,14 +2434,14 @@ describe('Create with AI sessions over HTTP', () => {
       });
 
       it('keeps the current playlist after dismissing a candidate and transfers it', async () => {
-        const sessionId = await generatedSession();
-        const applied = world.stored.get(sessionId);
-        const refinementId = await proposeCandidate(sessionId);
+        const sessionKey = await generatedSession();
+        const applied = world.stored.get(sessionKey);
+        const refinementId = await proposeCandidate(sessionKey);
         const calls = sideEffectCounts();
 
         const response = await settle(
           'dismiss',
-          sessionId,
+          sessionKey,
           refinementId,
         ).expect(200);
 
@@ -2316,7 +2449,7 @@ describe('Create with AI sessions over HTTP', () => {
         expect(currentTrackIds(state)).toEqual(['r1', 'r2']);
         expect(state.refinement).toBeNull();
         expect(sideEffectCounts()).toEqual(calls);
-        expect(world.stored.get(sessionId)).toMatchObject({
+        expect(world.stored.get(sessionKey)).toMatchObject({
           aiSafe: applied?.aiSafe,
           execution: applied?.execution,
           destination: null,
@@ -2324,7 +2457,8 @@ describe('Create with AI sessions over HTTP', () => {
         });
 
         await request(server())
-          .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+          .post(sessionRoute(sessionKey, '/transfer'))
+          .set(AI_SESSION_KEY_HEADER, sessionKey)
           .set('Origin', FRONTEND)
           .send({ name: 'Mix' })
           .expect(200);
@@ -2337,9 +2471,10 @@ describe('Create with AI sessions over HTTP', () => {
         });
       });
 
-      function transfer(sessionId: string) {
+      function transfer(sessionKey: string) {
         return request(server())
-          .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+          .post(sessionRoute(sessionKey, '/transfer'))
+          .set(AI_SESSION_KEY_HEADER, sessionKey)
           .set('Origin', FRONTEND)
           .send({ name: 'Mix' });
       }
@@ -2353,16 +2488,16 @@ describe('Create with AI sessions over HTTP', () => {
       }
 
       it('discards a Soundiiz link prepared while another tab applied a refinement', async () => {
-        const sessionId = await generatedSession();
+        const sessionKey = await generatedSession();
         world.soundiiz.createTransfer.mockImplementationOnce(
           async (playlist) => {
-            const refinementId = await proposeCandidate(sessionId);
-            await settle('apply', sessionId, refinementId).expect(200);
+            const refinementId = await proposeCandidate(sessionKey);
+            await settle('apply', sessionKey, refinementId).expect(200);
             return soundiizLink(playlist);
           },
         );
 
-        const refused = await transfer(sessionId).expect(409);
+        const refused = await transfer(sessionKey).expect(409);
 
         expect(refused.body).toMatchObject({
           code: 'AI_REFINEMENT_SUPERSEDED',
@@ -2376,12 +2511,12 @@ describe('Create with AI sessions over HTTP', () => {
           }),
         );
         const state = AiSessionStateSchema.parse(
-          (await readSession(sessionId).expect(200)).body,
+          (await readSession(sessionKey).expect(200)).body,
         );
         expect(currentTrackIds(state)).toEqual(CANDIDATE_TRACKS);
         expect(state.destination).toBeNull();
 
-        await transfer(sessionId).expect(200);
+        await transfer(sessionKey).expect(200);
         expect(world.soundiiz.createTransfer).toHaveBeenLastCalledWith(
           expect.objectContaining({
             tracks: CANDIDATE_TRACKS.map((id) => ({
@@ -2393,19 +2528,19 @@ describe('Create with AI sessions over HTTP', () => {
       });
 
       it('discards a Soundiiz link prepared while a refinement became pending and keeps it pending', async () => {
-        const sessionId = await generatedSession();
+        const sessionKey = await generatedSession();
         world.soundiiz.createTransfer.mockImplementationOnce(
           async (playlist) => {
-            await proposeCandidate(sessionId);
+            await proposeCandidate(sessionKey);
             return soundiizLink(playlist);
           },
         );
 
-        const refused = await transfer(sessionId).expect(409);
+        const refused = await transfer(sessionKey).expect(409);
 
         expect(refused.body).toMatchObject({ code: 'AI_REFINEMENT_PENDING' });
         const state = AiSessionStateSchema.parse(
-          (await readSession(sessionId).expect(200)).body,
+          (await readSession(sessionKey).expect(200)).body,
         );
         expect(currentTrackIds(state)).toEqual(['r1', 'r2']);
         expect(state.refinement?.status).toBe('candidate_ready');
@@ -2414,12 +2549,13 @@ describe('Create with AI sessions over HTTP', () => {
 
       it('publishes the current playlist after the Spotify owner dismisses a candidate', async () => {
         const owner = await sessionCookie('user-1');
-        const sessionId = await generatedSession(owner);
-        const refinementId = await proposeCandidate(sessionId, owner);
+        const sessionKey = await generatedSession(owner);
+        const refinementId = await proposeCandidate(sessionKey, owner);
 
-        await settle('dismiss', sessionId, refinementId, owner).expect(200);
+        await settle('dismiss', sessionKey, refinementId, owner).expect(200);
         await request(server())
-          .post(`${SESSIONS_PATH}/${sessionId}/publish`)
+          .post(sessionRoute(sessionKey, '/publish'))
+          .set(AI_SESSION_KEY_HEADER, sessionKey)
           .set('Origin', FRONTEND)
           .set('Cookie', owner)
           .send({ name: 'Mix' })
@@ -2480,31 +2616,32 @@ describe('Create with AI sessions over HTTP', () => {
       it.each(pendingArrangements)(
         'refuses a new refinement while %s is pending without any model or provider call',
         async (status, arrange) => {
-          const sessionId = await generatedSession();
+          const sessionKey = await generatedSession();
           arrange();
           const pending = AiRefinementResultSchema.parse(
-            (await refine(sessionId, { refinement: 'Change it' }).expect(200))
+            (await refine(sessionKey, { refinement: 'Change it' }).expect(200))
               .body,
           ).refinement;
           expect(pending.status).toBe(status);
-          const stored = world.stored.get(sessionId);
+          const stored = world.stored.get(sessionKey);
           const calls = sideEffectCounts();
           const lockAttempts =
             world.sessions.acquireRefinementLock.mock.calls.length;
 
-          const refused = await refine(sessionId, {
+          const refused = await refine(sessionKey, {
             refinement: 'Make it less mainstream',
           }).expect(409);
 
           expect(refused.body).toMatchObject({ code: 'AI_REFINEMENT_PENDING' });
           expect(sideEffectCounts()).toEqual(calls);
-          expect(world.stored.get(sessionId)).toEqual(stored);
+          expect(world.stored.get(sessionKey)).toEqual(stored);
           expect(world.sessions.acquireRefinementLock).toHaveBeenCalledTimes(
             lockAttempts,
           );
 
           const state = await request(server())
-            .get(`${SESSIONS_PATH}/${sessionId}`)
+            .get(sessionRoute(sessionKey))
+            .set(AI_SESSION_KEY_HEADER, sessionKey)
             .set('Origin', FRONTEND)
             .expect(200);
           expect(AiSessionStateSchema.parse(state.body).refinement).toEqual(
@@ -2516,20 +2653,20 @@ describe('Create with AI sessions over HTTP', () => {
       it.each(pendingArrangements.slice(1))(
         'dismisses a %s refinement and restores destinations with zero side effects',
         async (status, arrange) => {
-          const sessionId = await generatedSession();
-          const applied = world.stored.get(sessionId);
+          const sessionKey = await generatedSession();
+          const applied = world.stored.get(sessionKey);
           arrange();
           const proposed = AiRefinementResultSchema.parse(
-            (await refine(sessionId, { refinement: 'Change it' }).expect(200))
+            (await refine(sessionKey, { refinement: 'Change it' }).expect(200))
               .body,
           ).refinement;
           expect(proposed.status).toBe(status);
           const calls = sideEffectCounts();
 
-          await settle('apply', sessionId, proposed.id).expect(409);
+          await settle('apply', sessionKey, proposed.id).expect(409);
           const response = await settle(
             'dismiss',
-            sessionId,
+            sessionKey,
             proposed.id,
           ).expect(200);
 
@@ -2537,14 +2674,15 @@ describe('Create with AI sessions over HTTP', () => {
             AiSessionStateSchema.parse(response.body).refinement,
           ).toBeNull();
           expect(sideEffectCounts()).toEqual(calls);
-          expect(world.stored.get(sessionId)).toMatchObject({
+          expect(world.stored.get(sessionKey)).toMatchObject({
             aiSafe: applied?.aiSafe,
             execution: applied?.execution,
             destination: null,
             pendingRefinement: null,
           });
           await request(server())
-            .post(`${SESSIONS_PATH}/${sessionId}/transfer`)
+            .post(sessionRoute(sessionKey, '/transfer'))
+            .set(AI_SESSION_KEY_HEADER, sessionKey)
             .set('Origin', FRONTEND)
             .send({ name: 'Mix' })
             .expect(200);
@@ -2552,7 +2690,7 @@ describe('Create with AI sessions over HTTP', () => {
       );
 
       it('refuses to apply a refinement that is not a ready candidate', async () => {
-        const sessionId = await generatedSession();
+        const sessionKey = await generatedSession();
         world.planner.planRefinement.mockResolvedValueOnce(
           refinementPlan({
             outcome: 'needs_clarification',
@@ -2563,64 +2701,70 @@ describe('Create with AI sessions over HTTP', () => {
           }),
         );
         const { refinement } = AiRefinementResultSchema.parse(
-          (await refine(sessionId, { refinement: 'Hmm' }).expect(200)).body,
+          (await refine(sessionKey, { refinement: 'Hmm' }).expect(200)).body,
         );
-        const pending = world.stored.get(sessionId)?.pendingRefinement;
+        const pending = world.stored.get(sessionKey)?.pendingRefinement;
 
-        const refused = await settle('apply', sessionId, refinement.id).expect(
+        const refused = await settle('apply', sessionKey, refinement.id).expect(
           409,
         );
 
         expect(refused.body).toMatchObject({
           code: 'AI_REFINEMENT_NOT_APPLICABLE',
         });
-        expect(world.stored.get(sessionId)?.pendingRefinement).toEqual(pending);
+        expect(world.stored.get(sessionKey)?.pendingRefinement).toEqual(
+          pending,
+        );
       });
 
       it('rejects a stale refinement id without touching the newer pending refinement', async () => {
-        const sessionId = await generatedSession();
-        const reviewed = await proposeCandidate(sessionId);
-        await settle('dismiss', sessionId, reviewed).expect(200);
-        const newer = await proposeCandidate(sessionId, undefined, {
+        const sessionKey = await generatedSession();
+        const reviewed = await proposeCandidate(sessionKey);
+        await settle('dismiss', sessionKey, reviewed).expect(200);
+        const newer = await proposeCandidate(sessionKey, undefined, {
           refinement: 'Even more popular',
         });
-        const pending = world.stored.get(sessionId)?.pendingRefinement;
+        const pending = world.stored.get(sessionKey)?.pendingRefinement;
         expect(newer).not.toBe(reviewed);
 
         for (const action of ['apply', 'dismiss'] as const) {
-          const refused = await settle(action, sessionId, reviewed).expect(409);
+          const refused = await settle(action, sessionKey, reviewed).expect(
+            409,
+          );
           expect(refused.body).toMatchObject({ code: 'AI_REFINEMENT_STALE' });
         }
-        expect(world.stored.get(sessionId)?.pendingRefinement).toEqual(pending);
+        expect(world.stored.get(sessionKey)?.pendingRefinement).toEqual(
+          pending,
+        );
       });
 
       it('treats a repeated apply or dismiss as stale and keeps the settled state', async () => {
-        const sessionId = await generatedSession();
-        const applied = await proposeCandidate(sessionId);
-        await settle('apply', sessionId, applied).expect(200);
-        const afterApply = world.stored.get(sessionId);
+        const sessionKey = await generatedSession();
+        const applied = await proposeCandidate(sessionKey);
+        await settle('apply', sessionKey, applied).expect(200);
+        const afterApply = world.stored.get(sessionKey);
 
-        const repeated = await settle('apply', sessionId, applied).expect(409);
+        const repeated = await settle('apply', sessionKey, applied).expect(409);
         expect(repeated.body).toMatchObject({ code: 'AI_REFINEMENT_STALE' });
-        expect(world.stored.get(sessionId)).toEqual(afterApply);
+        expect(world.stored.get(sessionKey)).toEqual(afterApply);
 
         const dismissed = await proposeCandidate(
-          sessionId,
+          sessionKey,
           undefined,
           { refinement: REFINEMENT },
           lessMainstreamPlan(),
         );
-        await settle('dismiss', sessionId, dismissed).expect(200);
-        const afterDismiss = world.stored.get(sessionId);
-        await settle('dismiss', sessionId, dismissed).expect(409);
-        await settle('apply', sessionId, dismissed).expect(409);
-        expect(world.stored.get(sessionId)).toEqual(afterDismiss);
+        await settle('dismiss', sessionKey, dismissed).expect(200);
+        const afterDismiss = world.stored.get(sessionKey);
+        await settle('dismiss', sessionKey, dismissed).expect(409);
+        await settle('apply', sessionKey, dismissed).expect(409);
+        expect(world.stored.get(sessionKey)).toEqual(afterDismiss);
       });
 
       it('retries the fenced write when the session version moved but the same refinement is still pending', async () => {
-        const sessionId = await generatedSession();
-        const refinementId = await proposeCandidate(sessionId);
-        const pending = world.stored.get(sessionId)?.pendingRefinement;
+        const sessionKey = await generatedSession();
+        const refinementId = await proposeCandidate(sessionKey);
+        const pending = world.stored.get(sessionKey)?.pendingRefinement;
         world.sessions.saveIfUnchanged.mockImplementationOnce(
           (token: string) => {
             const current = world.stored.get(token);
@@ -2636,9 +2780,9 @@ describe('Create with AI sessions over HTTP', () => {
           },
         );
 
-        await settle('apply', sessionId, refinementId).expect(200);
+        await settle('apply', sessionKey, refinementId).expect(200);
 
-        const stored = world.stored.get(sessionId);
+        const stored = world.stored.get(sessionKey);
         expect(stored?.pendingRefinement).toBeNull();
         if (pending?.status !== 'proposed') {
           throw new Error('Expected a proposed refinement');
@@ -2650,14 +2794,16 @@ describe('Create with AI sessions over HTTP', () => {
       it('hides foreign, unknown and expired sessions with the not-found error', async () => {
         const owner = await sessionCookie('user-1');
         const intruder = await sessionCookie('user-2');
-        const sessionId = await generatedSession(owner);
-        const refinementId = await proposeCandidate(sessionId, owner);
-        const pending = world.stored.get(sessionId)?.pendingRefinement;
+        const sessionKey = await generatedSession(owner);
+        const refinementId = await proposeCandidate(sessionKey, owner);
+        const pending = world.stored.get(sessionKey)?.pendingRefinement;
 
         for (const action of ['apply', 'dismiss'] as const) {
           for (const response of [
-            await settle(action, sessionId, refinementId, intruder).expect(404),
-            await settle(action, sessionId, refinementId).expect(404),
+            await settle(action, sessionKey, refinementId, intruder).expect(
+              404,
+            ),
+            await settle(action, sessionKey, refinementId).expect(404),
             await settle(action, 'bad$token', refinementId, owner).expect(404),
             await settle(action, 'unknown', refinementId, owner).expect(404),
           ]) {
@@ -2666,18 +2812,20 @@ describe('Create with AI sessions over HTTP', () => {
             });
           }
         }
-        expect(world.stored.get(sessionId)?.pendingRefinement).toEqual(pending);
+        expect(world.stored.get(sessionKey)?.pendingRefinement).toEqual(
+          pending,
+        );
 
-        const stored = world.stored.get(sessionId);
+        const stored = world.stored.get(sessionKey);
         if (stored) {
-          world.stored.set(sessionId, {
+          world.stored.set(sessionKey, {
             ...stored,
             expiresAt: new Date(Date.now() - 1_000).toISOString(),
           });
         }
         const expired = await settle(
           'apply',
-          sessionId,
+          sessionKey,
           refinementId,
           owner,
         ).expect(404);
@@ -2685,26 +2833,28 @@ describe('Create with AI sessions over HTTP', () => {
       });
 
       it('answers a malformed refinement id or a session without a pending refinement as stale', async () => {
-        const sessionId = await generatedSession();
+        const sessionKey = await generatedSession();
 
         for (const refinementId of ['not%20valid', 'a'.repeat(65), 'missing']) {
-          const refused = await settle('apply', sessionId, refinementId).expect(
-            409,
-          );
+          const refused = await settle(
+            'apply',
+            sessionKey,
+            refinementId,
+          ).expect(409);
           expect(refused.body).toMatchObject({ code: 'AI_REFINEMENT_STALE' });
         }
       });
 
       it('interprets the next refinement against the applied intent and preservation', async () => {
-        const sessionId = await generatedSession();
+        const sessionKey = await generatedSession();
         const first = AiRefinementResultSchema.parse(
-          (await refine(sessionId, { refinement: REFINEMENT }).expect(200))
+          (await refine(sessionKey, { refinement: REFINEMENT }).expect(200))
             .body,
         ).refinement;
-        await settle('apply', sessionId, first.id).expect(200);
-        const applied = world.stored.get(sessionId);
+        await settle('apply', sessionKey, first.id).expect(200);
+        const applied = world.stored.get(sessionKey);
 
-        await proposeCandidate(sessionId);
+        await proposeCandidate(sessionKey);
 
         expect(world.planner.planRefinement).toHaveBeenLastCalledWith({
           intent: applied?.aiSafe.intent,
@@ -2713,7 +2863,7 @@ describe('Create with AI sessions over HTTP', () => {
         });
         expect(applied?.aiSafe.intent?.artists).toEqual(['Radiohead']);
         const state = AiSessionStateSchema.parse(
-          (await readSession(sessionId).expect(200)).body,
+          (await readSession(sessionKey).expect(200)).body,
         );
         expect(state.preservation).toEqual({
           firstTracks: 2,
@@ -2724,14 +2874,14 @@ describe('Create with AI sessions over HTTP', () => {
       });
 
       it('keeps explicitly selected positions in the candidate and only makes them current on apply', async () => {
-        const sessionId = await generatedSession();
-        const refinementId = await proposeCandidate(sessionId, undefined, {
+        const sessionKey = await generatedSession();
+        const refinementId = await proposeCandidate(sessionKey, undefined, {
           refinement: 'More popular',
           preservePositions: { add: [2], remove: [] },
         });
 
         const pending = AiSessionStateSchema.parse(
-          (await readSession(sessionId).expect(200)).body,
+          (await readSession(sessionKey).expect(200)).body,
         );
         expect(pending.preservation?.positions).toEqual([]);
         expect(pending.refinement).toMatchObject({
@@ -2753,7 +2903,7 @@ describe('Create with AI sessions over HTTP', () => {
         );
 
         const applied = AiSessionStateSchema.parse(
-          (await settle('apply', sessionId, refinementId).expect(200)).body,
+          (await settle('apply', sessionKey, refinementId).expect(200)).body,
         );
         expect(applied.preservation).toEqual({
           firstTracks: null,
@@ -2764,12 +2914,12 @@ describe('Create with AI sessions over HTTP', () => {
       });
 
       it('asks for clarification when selected positions contradict the written refinement', async () => {
-        const sessionId = await generatedSession();
+        const sessionKey = await generatedSession();
         world.planner.planRefinement.mockResolvedValueOnce(
           popularPlan({ positions: { add: [], remove: [2] } }),
         );
 
-        const response = await refine(sessionId, {
+        const response = await refine(sessionKey, {
           refinement: 'Stop keeping the second song',
           preservePositions: { add: [2], remove: [] },
         }).expect(200);
@@ -2787,10 +2937,10 @@ describe('Create with AI sessions over HTTP', () => {
       });
 
       it('asks for clarification when a selected position is outside the current playlist', async () => {
-        const sessionId = await generatedSession();
+        const sessionKey = await generatedSession();
         world.planner.planRefinement.mockResolvedValueOnce(popularPlan());
 
-        const response = await refine(sessionId, {
+        const response = await refine(sessionKey, {
           refinement: 'More popular',
           preservePositions: { add: [9], remove: [] },
         }).expect(200);
@@ -2811,23 +2961,351 @@ describe('Create with AI sessions over HTTP', () => {
     });
 
     it('keeps the applied state when the refinement interpretation fails', async () => {
-      const sessionId = await generatedSession();
-      const applied = world.stored.get(sessionId);
+      const sessionKey = await generatedSession();
+      const applied = world.stored.get(sessionKey);
       world.planner.planRefinement.mockRejectedValueOnce(
         AiInterpretationError.unavailable(),
       );
 
-      const failed = await refine(sessionId, { refinement: REFINEMENT }).expect(
-        503,
-      );
+      const failed = await refine(sessionKey, {
+        refinement: REFINEMENT,
+      }).expect(503);
 
       expect(failed.body).toMatchObject({ code: 'AI_UNAVAILABLE' });
-      expect(world.stored.get(sessionId)).toMatchObject({
+      expect(world.stored.get(sessionKey)).toMatchObject({
         aiSafe: applied?.aiSafe,
         execution: applied?.execution,
         destination: null,
         pendingRefinement: null,
       });
+    });
+  });
+  describe('observability', () => {
+    const SENTINELS = {
+      prompt: 'SECRET_USER_PROMPT_SENTINEL',
+      refinement: 'SECRET_REFINEMENT_SENTINEL',
+      userArtist: 'USER_AUTHORED_ARTIST_SENTINEL',
+      providerTrack: 'PROVIDER_TRACK_SENTINEL',
+      providerArtist: 'PROVIDER_ARTIST_SENTINEL',
+      providerId: 'PROVIDER_ID_SENTINEL',
+      spotifyUrl: 'SPOTIFY_URL_SENTINEL',
+      title: 'PLAYLIST_TITLE_SENTINEL',
+      soundiizLink: 'SOUNDIIZ_LINK_SENTINEL',
+      accessToken: 'ACCESS_TOKEN_SENTINEL',
+      refreshToken: 'REFRESH_TOKEN_SENTINEL',
+      providerResponse: 'PROVIDER_RESPONSE_SENTINEL',
+      modelOutput: 'RAW_MODEL_OUTPUT_SENTINEL',
+    };
+    const OPERATION_EVENT_KEYS = new Set([
+      'event',
+      'requestId',
+      'operation',
+      'result',
+      'durationMs',
+      'errorCode',
+      'promptVersion',
+      'intentKind',
+      'clarificationReason',
+      'authenticated',
+      'trackCount',
+      'unmetConstraints',
+      'candidateAttempted',
+      'candidateStrategy',
+      'candidateTrackCount',
+      'addedCount',
+      'removedCount',
+      'movedCount',
+      'refinementAttempt',
+      'pendingStatus',
+      'savedToLibrary',
+      'spotifyPlaylistCreated',
+      'interpretationMs',
+      'candidateMs',
+    ]);
+    const LOGGER_METHODS = [
+      'log',
+      'warn',
+      'error',
+      'debug',
+      'verbose',
+    ] as const;
+
+    function captureLogs(): () => string[] {
+      const spies = LOGGER_METHODS.map((method) =>
+        jest.spyOn(Logger.prototype, method).mockImplementation(),
+      );
+      return () =>
+        spies
+          .flatMap((spy) =>
+            spy.mock.calls.map((call, index) => ({
+              order: spy.mock.invocationCallOrder[index],
+              line: call.map(String).join('\n'),
+            })),
+          )
+          .sort((left, right) => left.order - right.order)
+          .map(({ line }) => line);
+    }
+
+    function operationEvents(lines: string[]) {
+      return lines
+        .map((line) => line.split('\n')[0])
+        .filter((line) => line.startsWith('{'))
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .filter((event) => event.event === 'ai.operation');
+    }
+
+    function expectNoSentinel(lines: string[], ...credentials: string[]): void {
+      const logged = lines.join('\n');
+      for (const sentinel of [...Object.values(SENTINELS), ...credentials]) {
+        expect(logged).not.toContain(sentinel);
+      }
+    }
+
+    function sentinelPlaylist(): GeneratedPlaylist {
+      const tracks = [1, 2, 3].map((index) =>
+        Track.create({
+          id: TrackId.create(`${SENTINELS.providerId}${index}`),
+          name: `${SENTINELS.providerTrack} ${index}`,
+          artistId: ArtistId.create(`${SENTINELS.providerId}-artist`),
+          artistName: SENTINELS.providerArtist,
+          durationMs: 240_000,
+          popularity: 40,
+          uri: `spotify:track:${SENTINELS.providerId}${index}`,
+        }),
+      );
+      return GeneratedPlaylist.create({
+        name: `Blendify · ${SENTINELS.providerArtist}`,
+        generation: {
+          version: 1,
+          kind: 'artist_mix',
+          tracksPerSeed: 15,
+          seeds: [{ id: SENTINELS.providerId, name: SENTINELS.providerArtist }],
+          popularity: 'rarities',
+          orderMode: 'random',
+        },
+        seeds: [
+          {
+            type: 'artist',
+            id: SENTINELS.providerId,
+            name: SENTINELS.providerArtist,
+          },
+        ],
+        tracks,
+      });
+    }
+
+    function useSentinelProviders(): void {
+      const catalog = workingCatalog();
+      world.catalogFactory.forMarket.mockImplementation(() => catalog);
+      world.generator.execute.mockResolvedValue(sentinelPlaylist());
+      world.interpreter.interpretIntent.mockResolvedValue(
+        interpreted({
+          artists: ['Radiohead', SENTINELS.userArtist],
+          unsupportedConstraints: [
+            { category: 'mood', userText: SENTINELS.prompt },
+          ],
+        }),
+      );
+    }
+
+    function post(path: string, body: object = {}, cookie?: string) {
+      const req = request(server())
+        .post(`${SESSIONS_PATH}${path}`)
+        .set('Origin', FRONTEND)
+        .send(body);
+      return cookie ? req.set('Cookie', cookie) : req;
+    }
+
+    function postTo(
+      sessionKey: string,
+      suffix: string,
+      body: object = {},
+      cookie?: string,
+    ) {
+      const req = request(server())
+        .post(sessionRoute(sessionKey, suffix))
+        .set(AI_SESSION_KEY_HEADER, sessionKey)
+        .set('Origin', FRONTEND)
+        .send(body);
+      return cookie ? req.set('Cookie', cookie) : req;
+    }
+
+    async function generated(cookie?: string): Promise<string> {
+      const created = await post(
+        '',
+        { prompt: `${SENTINELS.prompt} ${PROMPT}` },
+        cookie,
+      ).expect(201);
+      const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
+      await postTo(sessionKey, '/generate', {}, cookie).expect(200);
+      return sessionKey;
+    }
+
+    function pendingId(sessionKey: string): string {
+      const pending = world.stored.get(sessionKey)?.pendingRefinement;
+      if (!pending) {
+        throw new Error('Expected a pending refinement.');
+      }
+      return pending.id;
+    }
+
+    it('records every Guest AI operation with allowlisted metadata and no content', async () => {
+      const logs = captureLogs();
+      useSentinelProviders();
+      world.soundiiz.createTransfer.mockImplementation((playlist) =>
+        Promise.resolve({
+          url: `https://soundiiz.com/go/import-playlist/${SENTINELS.soundiizLink}`,
+          expiresAt: new Date(Date.now() + 60 * 60_000),
+          trackCount: playlist.tracks.length,
+        }),
+      );
+
+      const sessionKey = await generated();
+      const refinement = `${SENTINELS.refinement} less mainstream`;
+      await postTo(sessionKey, '/refinements', { refinement }).expect(200);
+      await postTo(
+        sessionKey,
+        `/refinements/${pendingId(sessionKey)}/apply`,
+      ).expect(200);
+      await postTo(sessionKey, '/refinements', { refinement }).expect(200);
+      const blocked = await postTo(sessionKey, '/transfer', {
+        name: SENTINELS.title,
+      }).expect(409);
+      await postTo(
+        sessionKey,
+        `/refinements/${pendingId(sessionKey)}/dismiss`,
+      ).expect(200);
+      await postTo(sessionKey, '/transfer', { name: SENTINELS.title }).expect(
+        200,
+      );
+
+      const events = operationEvents(logs());
+      expect(events.map((event) => [event.operation, event.result])).toEqual([
+        ['intent_interpretation', 'review_ready'],
+        ['initial_generation', 'generated'],
+        ['refinement', expect.any(String)],
+        ['refinement_apply', 'applied'],
+        ['refinement', expect.any(String)],
+        ['destination_transfer', 'rejected'],
+        ['refinement_dismiss', 'dismissed'],
+        ['destination_transfer', 'transfer_prepared'],
+      ]);
+      expect(events[5].errorCode).toBe((blocked.body as { code: string }).code);
+      for (const event of events) {
+        expect(
+          Object.keys(event).filter((key) => !OPERATION_EVENT_KEYS.has(key)),
+        ).toEqual([]);
+        expect(event.requestId).toEqual(expect.any(String));
+      }
+      expectNoSentinel(logs(), sessionKey, aiSessionId(sessionKey));
+      expect(JSON.stringify(world.stored.get(sessionKey))).not.toContain(
+        SENTINELS.refinement,
+      );
+    });
+
+    it('correlates operation events with the response request id', async () => {
+      const logs = captureLogs();
+      useSentinelProviders();
+
+      const created = await post('', { prompt: PROMPT }).expect(201);
+
+      const [event] = operationEvents(logs());
+      expect(created.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+      expect(event.requestId).toBe(created.headers['x-request-id']);
+    });
+
+    it('keeps Spotify destination outcomes and failures content-free', async () => {
+      await app.close();
+      app = await createApp(
+        world,
+        { provide: INTENT_INTERPRETER, useValue: world.interpreter },
+        { generationLimit: 10 },
+      );
+      const logs = captureLogs();
+      useSentinelProviders();
+      const owner = await sessionCookie('user-1');
+      world.spotify.createPlaylist.mockResolvedValue({
+        id: SENTINELS.providerId,
+        url: `https://open.spotify.com/playlist/${SENTINELS.spotifyUrl}`,
+      });
+      world.usageStats.recordMix.mockRejectedValue(
+        new Error(`prisma data: ${SENTINELS.providerArtist}`),
+      );
+      const published = await generated(owner);
+      await postTo(
+        published,
+        '/publish',
+        { name: SENTINELS.title, persistToLibrary: true },
+        owner,
+      ).expect(200);
+
+      world.spotify.addTracksToPlaylist.mockRejectedValue(
+        new Error(
+          `${SENTINELS.providerResponse} Bearer ${SENTINELS.accessToken} ${SENTINELS.refreshToken}`,
+        ),
+      );
+      const incomplete = await generated(owner);
+      await postTo(
+        incomplete,
+        '/publish',
+        { name: SENTINELS.title, persistToLibrary: false },
+        owner,
+      ).expect(200);
+
+      const lines = logs();
+      const publishEvents = operationEvents(lines).filter(
+        (event) => event.operation === 'destination_publish',
+      );
+      expect(publishEvents).toEqual([
+        expect.objectContaining({
+          result: 'published',
+          savedToLibrary: true,
+          trackCount: 3,
+        }),
+        expect.objectContaining({
+          result: 'publish_incomplete',
+          errorCode: 'INTERNAL_ERROR',
+          spotifyPlaylistCreated: true,
+        }),
+      ]);
+      expect(lines.join('\n')).toContain('"diagnostic":"usage_not_recorded"');
+      expectNoSentinel(lines, published);
+      expect(world.playlists.save).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(world.playlists.save.mock.calls)).not.toContain(
+        SENTINELS.prompt,
+      );
+    });
+
+    it('records typed model failures without the prompt or raw model output', async () => {
+      const logs = captureLogs();
+      useSentinelProviders();
+      const sessionKey = await generated();
+      world.interpreter.interpretIntent.mockRejectedValueOnce(
+        AiInterpretationError.timedOut(),
+      );
+      world.planner.planRefinement.mockRejectedValueOnce(
+        new Error(`unexpected ${SENTINELS.modelOutput}`),
+      );
+
+      await post('', { prompt: SENTINELS.prompt }).expect(504);
+      await postTo(sessionKey, '/refinements', {
+        refinement: SENTINELS.refinement,
+      }).expect(500);
+
+      const failures = operationEvents(logs()).filter(
+        (event) => event.result === 'failed',
+      );
+      expect(failures).toEqual([
+        expect.objectContaining({
+          operation: 'intent_interpretation',
+          errorCode: 'AI_TIMEOUT',
+        }),
+        expect.objectContaining({
+          operation: 'refinement',
+          errorCode: 'INTERNAL_ERROR',
+        }),
+      ]);
+      expectNoSentinel(logs());
     });
   });
 });

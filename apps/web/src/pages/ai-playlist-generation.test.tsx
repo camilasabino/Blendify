@@ -14,6 +14,7 @@ import {
   type PendingNdjsonStream,
 } from '@/test/app-harness'
 import {
+  AI_ACCESS_KEY,
   AI_PROMPT,
   AI_SESSION_ID,
   aiGeneration,
@@ -22,7 +23,7 @@ import {
   failedAiSessionState,
   generatedAiSessionState,
   generatingAiSessionState,
-  reviewedAiSession,
+  createdAiSession,
   reviewedAiSessionState,
   storeAiSession,
 } from '@/test/ai-session-fixtures'
@@ -89,7 +90,7 @@ async function failGeneration(
   const user = userEvent.setup()
   const sessionStates = [failedAiSessionState(persisted)]
   const { calls } = stubApi({
-    [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(), 201),
+    [CREATE_ROUTE]: () => jsonResponse(createdAiSession(), 201),
     [GENERATE_ROUTE]: () => ndjsonResponse(streamError),
     [SESSION_ROUTE]: () => jsonResponse(sessionStates[0]),
   })
@@ -115,7 +116,7 @@ afterEach(() => {
 describe('Create with AI generation', () => {
   it('offers Create playlist only once the request is reviewed', async () => {
     const user = userEvent.setup()
-    stubApi({ [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(), 201) })
+    stubApi({ [CREATE_ROUTE]: () => jsonResponse(createdAiSession(), 201) })
     renderPage()
 
     expect(screen.queryByRole('button', { name: 'Create playlist' })).toBeNull()
@@ -134,7 +135,7 @@ describe('Create with AI generation', () => {
     const user = userEvent.setup()
     let stream: PendingNdjsonStream | null = null
     const { calls, fetchMock } = stubApi({
-      [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(), 201),
+      [CREATE_ROUTE]: () => jsonResponse(createdAiSession(), 201),
       [GENERATE_ROUTE]: (_call, signal) => {
         stream = pendingNdjsonResponse(signal)
         return stream.response
@@ -200,7 +201,7 @@ describe('Create with AI generation', () => {
   it('shows the generated playlist as a preview with only the Guest destination action', async () => {
     const user = userEvent.setup()
     stubApi({
-      [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(), 201),
+      [CREATE_ROUTE]: () => jsonResponse(createdAiSession(), 201),
       [GENERATE_ROUTE]: () => ndjsonResponse({ type: 'result', playlist: aiGeneration() }),
     })
     renderPage()
@@ -240,7 +241,7 @@ describe('Create with AI generation', () => {
     const user = userEvent.setup()
     const intent = { ...aiIntent, targetTrackCount: 30, targetDurationMinutes: 60, mood: 'happy' as const }
     stubApi({
-      [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(intent), 201),
+      [CREATE_ROUTE]: () => jsonResponse(createdAiSession(intent), 201),
       [GENERATE_ROUTE]: () =>
         ndjsonResponse({
           type: 'result',
@@ -287,7 +288,7 @@ describe('Create with AI generation', () => {
       mood: 'happy' as const,
     }
     stubApi({
-      [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(intent), 201),
+      [CREATE_ROUTE]: () => jsonResponse(createdAiSession(intent), 201),
       [GENERATE_ROUTE]: () =>
         ndjsonResponse({
           type: 'result',
@@ -316,8 +317,8 @@ describe('Create with AI generation', () => {
   it('renders the same generated playlist in Spotify Mode', async () => {
     setAuthState(testUser)
     const user = userEvent.setup()
-    const { calls } = stubApi({
-      [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(), 201),
+    const { calls, fetchMock } = stubApi({
+      [CREATE_ROUTE]: () => jsonResponse(createdAiSession(), 201),
       [GENERATE_ROUTE]: () => ndjsonResponse({ type: 'result', playlist: aiGeneration() }),
     })
     renderPage()
@@ -331,6 +332,9 @@ describe('Create with AI generation', () => {
       'POST /api/ai/sessions',
       `POST /api/ai/sessions/${AI_SESSION_ID}/generate`,
     ])
+    const generate = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/generate'))
+    expect(generate?.[1]?.headers).toMatchObject({ 'X-Ai-Session-Key': AI_ACCESS_KEY })
+    expect(String(generate?.[0])).not.toContain(AI_ACCESS_KEY)
   })
 })
 
@@ -420,7 +424,7 @@ describe('Create with AI generation failures', () => {
   it('keeps the reviewed request when Blendify limits the generate call itself', async () => {
     const user = userEvent.setup()
     stubApi({
-      [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(), 201),
+      [CREATE_ROUTE]: () => jsonResponse(createdAiSession(), 201),
       [GENERATE_ROUTE]: () =>
         jsonResponse(
           { statusCode: 429, code: 'RATE_LIMITED', message: 'Too many', details: { retryAfterSeconds: 30 } },
@@ -440,7 +444,7 @@ describe('Create with AI generation failures', () => {
   it('shows the authoritative result when the stream reports another attempt', async () => {
     const user = userEvent.setup()
     stubApi({
-      [CREATE_ROUTE]: () => jsonResponse(reviewedAiSession(), 201),
+      [CREATE_ROUTE]: () => jsonResponse(createdAiSession(), 201),
       [GENERATE_ROUTE]: () =>
         ndjsonResponse(failureError('AI_GENERATION_SUPERSEDED', 'Superseded', 409)),
       [SESSION_ROUTE]: () => jsonResponse(generatedAiSessionState()),
@@ -669,7 +673,10 @@ describe('Create with AI playlist title', () => {
     storeAiSession(AI_PROMPT, 'Night drive')
     stubApi({
       [SESSION_ROUTE]: () => jsonResponse(generatedAiSessionState()),
-      [CREATE_ROUTE]: () => jsonResponse({ ...reviewedAiSession(), sessionId: 'next-session' }, 201),
+      [CREATE_ROUTE]: () => jsonResponse(
+          { ...createdAiSession(), sessionId: 'next-session', accessKey: 'next-key' },
+          201,
+        ),
     })
     renderPage()
     await screen.findByRole('heading', { name: 'Night drive' })
@@ -680,6 +687,7 @@ describe('Create with AI playlist title', () => {
 
     expect(JSON.parse(sessionStorage.getItem('blendify.aiSession') ?? '{}')).toEqual({
       sessionId: 'next-session',
+      accessKey: 'next-key',
       prompt: AI_PROMPT,
       playlistTitle: null,
     })

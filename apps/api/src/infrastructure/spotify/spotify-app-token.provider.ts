@@ -31,7 +31,7 @@ export class SpotifyAppTokenProvider {
         baseURL: 'https://accounts.spotify.com',
         timeout: SPOTIFY_HTTP_TIMEOUT_MS,
       },
-      { logBodies: false },
+      { logContent: false },
     );
   }
 

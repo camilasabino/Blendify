@@ -1,6 +1,15 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
+
+ModelConfigurationReason = Literal[
+    "authentication",
+    "permission_denied",
+    "not_found",
+    "bad_request",
+    "unprocessable_request",
+    "insufficient_quota",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +30,7 @@ class ModelIntentRequest:
 class ModelTokenUsage:
     input_tokens: int
     output_tokens: int
+    total_tokens: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +41,9 @@ class ModelIntentResult:
 
 
 class IntentModelProvider(Protocol):
+    @property
+    def name(self) -> str: ...
+
     @property
     def is_available(self) -> bool: ...
 
@@ -46,7 +59,9 @@ class ModelUnavailableError(ModelProviderError):
 
 
 class ModelConfigurationError(ModelProviderError):
-    pass
+    def __init__(self, reason: ModelConfigurationReason) -> None:
+        super().__init__(f"The model provider rejected the configuration: {reason}")
+        self.reason: ModelConfigurationReason = reason
 
 
 class ModelRateLimitedError(ModelProviderError):
@@ -58,4 +73,13 @@ class ModelTimeoutError(ModelProviderError):
 
 
 class ModelInvalidOutputError(ModelProviderError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        model: str | None = None,
+        usage: ModelTokenUsage | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.model = model
+        self.usage = usage

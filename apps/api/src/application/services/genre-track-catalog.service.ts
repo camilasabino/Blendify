@@ -191,9 +191,7 @@ export class GenreTrackCatalogService {
       if (isFatalCatalogError(error)) {
         throw error;
       }
-      this.logger.warn(
-        `Tag chart resolve failed for "${tag}": ${errorMessage(error)}`,
-      );
+      this.logger.warn(`Tag chart resolve failed: ${errorMessage(error)}`);
       return [];
     }
   }
@@ -288,7 +286,7 @@ export class GenreTrackCatalogService {
         return 'stop';
       }
       this.logger.warn(
-        `Genre artist search failed for ${artist.name}: ${
+        `Genre artist search failed: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
@@ -393,7 +391,7 @@ export class GenreTrackCatalogService {
         throw error;
       }
       this.logger.warn(
-        `Seed artist resolve failed for "${tag}": ${errorMessage(error)}`,
+        `Genre seed artist resolve failed: ${errorMessage(error)}`,
       );
       return [];
     }
@@ -434,7 +432,7 @@ export class GenreTrackCatalogService {
         return 'stop';
       }
       this.logger.warn(
-        `Seed artist resolve failed for ${candidateName}: ${
+        `Seed artist resolve failed: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );

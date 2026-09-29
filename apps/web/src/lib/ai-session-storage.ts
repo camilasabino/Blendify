@@ -2,6 +2,7 @@ const STORAGE_KEY = 'blendify.aiSession'
 
 export type StoredAiSession = Readonly<{
   sessionId: string
+  accessKey: string
   prompt: string
   playlistTitle: string | null
 }>
@@ -11,10 +12,13 @@ function isStoredAiSession(value: unknown): value is StoredAiSession {
     typeof value === 'object' &&
     value !== null &&
     'sessionId' in value &&
+    'accessKey' in value &&
     'prompt' in value &&
     'playlistTitle' in value &&
     typeof value.sessionId === 'string' &&
     value.sessionId.length > 0 &&
+    typeof value.accessKey === 'string' &&
+    value.accessKey.length > 0 &&
     typeof value.prompt === 'string' &&
     (value.playlistTitle === null || typeof value.playlistTitle === 'string')
   )

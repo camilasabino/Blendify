@@ -2,6 +2,7 @@ import {
   AiGenerationSchema,
   AiGenerationStreamEventSchema,
   AiRefinementResultSchema,
+  AiSessionCreatedSchema,
   AiSessionSchema,
   AiSessionStateSchema,
   GeneratedPlaylistSchema,
@@ -12,6 +13,7 @@ import {
   type AiGenerationDto,
   type AiRefinementResultDto,
   type CreateAiRefinementRequest,
+  type AiSessionCreatedDto,
   type AiSessionDto,
   type AiSessionStateDto,
   type PublishAiPlaylistRequest,
@@ -57,6 +59,7 @@ import {
 
 export type User = UserDto
 export type AiSession = AiSessionDto
+export type AiSessionCreated = AiSessionCreatedDto
 export type AiSessionState = AiSessionStateDto
 export type AiGeneration = AiGenerationDto
 export type Artist = ArtistDto
@@ -123,12 +126,39 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return payload as T
 }
 
+export type AiSessionAccess = { sessionId: string; accessKey: string }
+
+const AI_SESSION_KEY_HEADER = 'X-Ai-Session-Key'
+
+function aiSessionPath({ sessionId }: AiSessionAccess, suffix = '') {
+  return `/api/ai/sessions/${encodeURIComponent(sessionId)}${suffix}`
+}
+
+function aiSessionHeaders({ accessKey }: AiSessionAccess) {
+  return { [AI_SESSION_KEY_HEADER]: accessKey }
+}
+
 async function requestAiSession(
   path: string,
   body: Record<string, string>,
+  access: AiSessionAccess,
 ): Promise<AiSession> {
   const parsed = AiSessionSchema.safeParse(
-    await request<unknown>(path, { method: 'POST', body }),
+    await request<unknown>(path, {
+      method: 'POST',
+      body,
+      headers: aiSessionHeaders(access),
+    }),
+  )
+  if (!parsed.success) {
+    throw new ApiError('Invalid Create with AI response', 502)
+  }
+  return parsed.data
+}
+
+async function requestCreatedAiSession(prompt: string): Promise<AiSessionCreated> {
+  const parsed = AiSessionCreatedSchema.safeParse(
+    await request<unknown>('/api/ai/sessions', { method: 'POST', body: { prompt } }),
   )
   if (!parsed.success) {
     throw new ApiError('Invalid Create with AI response', 502)
@@ -138,11 +168,16 @@ async function requestAiSession(
 
 async function requestAiSessionState(
   path: string,
+  access: AiSessionAccess,
   body?: PublishAiPlaylistRequest | TransferAiPlaylistRequest,
   method: 'GET' | 'POST' = body ? 'POST' : 'GET',
 ): Promise<AiSessionState> {
   const parsed = AiSessionStateSchema.safeParse(
-    await request<unknown>(path, body ? { method, body } : { method }),
+    await request<unknown>(path, {
+      method,
+      headers: aiSessionHeaders(access),
+      ...(body ? { body } : {}),
+    }),
   )
   if (!parsed.success) {
     throw new ApiError('Invalid Create with AI response', 502)
@@ -153,9 +188,14 @@ async function requestAiSessionState(
 async function requestAiRefinement(
   path: string,
   body: CreateAiRefinementRequest,
+  access: AiSessionAccess,
 ): Promise<AiRefinementResultDto> {
   const parsed = AiRefinementResultSchema.safeParse(
-    await request<unknown>(path, { method: 'POST', body }),
+    await request<unknown>(path, {
+      method: 'POST',
+      body,
+      headers: aiSessionHeaders(access),
+    }),
   )
   if (!parsed.success) {
     throw new ApiError('Invalid Create with AI response', 502)
@@ -163,8 +203,8 @@ async function requestAiRefinement(
   return parsed.data
 }
 
-function refinementPath(sessionId: string, refinementId: string, action: 'apply' | 'dismiss') {
-  return `/api/ai/sessions/${encodeURIComponent(sessionId)}/refinements/${encodeURIComponent(refinementId)}/${action}`
+function refinementPath(access: AiSessionAccess, refinementId: string, action: 'apply' | 'dismiss') {
+  return aiSessionPath(access, `/refinements/${encodeURIComponent(refinementId)}/${action}`)
 }
 
 const AI_GENERATION: GenerationContract<AiGeneration> = {
@@ -193,6 +233,7 @@ async function requestGeneration<T>(
   contract: GenerationContract<T>,
   onProgress?: GenerationProgressHandler,
   signal?: AbortSignal,
+  headers?: Record<string, string>,
 ): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
@@ -200,6 +241,7 @@ async function requestGeneration<T>(
     headers: {
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       Accept: 'application/x-ndjson',
+      ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
     signal,
@@ -442,48 +484,36 @@ export const api = {
   listPlaybackDevices: () =>
     request<{ devices: PlaybackDeviceDto[] }>('/api/player/devices'),
 
-  createAiSession: (prompt: string) =>
-    requestAiSession('/api/ai/sessions', { prompt }),
+  createAiSession: (prompt: string) => requestCreatedAiSession(prompt),
 
-  answerAiClarification: (sessionId: string, optionId: string) =>
-    requestAiSession(
-      `/api/ai/sessions/${encodeURIComponent(sessionId)}/clarification`,
-      { optionId },
-    ),
+  answerAiClarification: (access: AiSessionAccess, optionId: string) =>
+    requestAiSession(aiSessionPath(access, '/clarification'), { optionId }, access),
 
-  getAiSession: (sessionId: string) =>
-    requestAiSessionState(`/api/ai/sessions/${encodeURIComponent(sessionId)}`),
+  getAiSession: (access: AiSessionAccess) =>
+    requestAiSessionState(aiSessionPath(access), access),
 
-  publishAiPlaylist: (sessionId: string, input: PublishAiPlaylistRequest) =>
-    requestAiSessionState(
-      `/api/ai/sessions/${encodeURIComponent(sessionId)}/publish`,
-      input,
-    ),
+  publishAiPlaylist: (access: AiSessionAccess, input: PublishAiPlaylistRequest) =>
+    requestAiSessionState(aiSessionPath(access, '/publish'), access, input),
 
-  transferAiPlaylist: (sessionId: string, input: TransferAiPlaylistRequest) =>
-    requestAiSessionState(
-      `/api/ai/sessions/${encodeURIComponent(sessionId)}/transfer`,
-      input,
-    ),
+  transferAiPlaylist: (access: AiSessionAccess, input: TransferAiPlaylistRequest) =>
+    requestAiSessionState(aiSessionPath(access, '/transfer'), access, input),
 
-  refineAiPlaylist: (sessionId: string, input: CreateAiRefinementRequest) =>
-    requestAiRefinement(
-      `/api/ai/sessions/${encodeURIComponent(sessionId)}/refinements`,
-      input,
-    ),
+  refineAiPlaylist: (access: AiSessionAccess, input: CreateAiRefinementRequest) =>
+    requestAiRefinement(aiSessionPath(access, '/refinements'), input, access),
 
-  applyAiRefinement: (sessionId: string, refinementId: string) =>
-    requestAiSessionState(refinementPath(sessionId, refinementId, 'apply'), undefined, 'POST'),
+  applyAiRefinement: (access: AiSessionAccess, refinementId: string) =>
+    requestAiSessionState(refinementPath(access, refinementId, 'apply'), access, undefined, 'POST'),
 
-  dismissAiRefinement: (sessionId: string, refinementId: string) =>
-    requestAiSessionState(refinementPath(sessionId, refinementId, 'dismiss'), undefined, 'POST'),
+  dismissAiRefinement: (access: AiSessionAccess, refinementId: string) =>
+    requestAiSessionState(refinementPath(access, refinementId, 'dismiss'), access, undefined, 'POST'),
 
-  generateAiPlaylist: (sessionId: string, options: GenerationOptions = {}) =>
+  generateAiPlaylist: (access: AiSessionAccess, options: GenerationOptions = {}) =>
     requestGeneration(
-      `/api/ai/sessions/${encodeURIComponent(sessionId)}/generate`,
+      aiSessionPath(access, '/generate'),
       undefined,
       AI_GENERATION,
       options.onProgress,
       options.signal,
+      aiSessionHeaders(access),
     ),
 }

@@ -4,6 +4,7 @@ import type {
 } from '@blendify/contracts';
 import type { AiPendingRefinement, AiSession } from '@/domain/ai/ai-session';
 import { toGeneratedPreview, toIntentSummary } from './ai-session-response.dto';
+import { aiSessionId } from '@/application/services/ai-session-credential';
 
 export function toAiRefinementResponse(
   token: string,
@@ -14,7 +15,7 @@ export function toAiRefinementResponse(
   }
 
   return {
-    sessionId: token,
+    sessionId: aiSessionId(token),
     expiresAt: session.expiresAt,
     refinement: toRefinement(session.pendingRefinement),
   };

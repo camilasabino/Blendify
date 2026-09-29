@@ -396,13 +396,14 @@ describe('Spotify Mode routing', () => {
     sessionStorage.setItem(
       'blendify.aiSession',
       JSON.stringify({
-        sessionId: 'session-token',
+        sessionId: 'session-id',
+        accessKey: 'access-key',
         prompt: 'Music like Björk',
         playlistTitle: 'My run',
       }),
     )
     stubApi({
-      'GET /api/ai/sessions/session-token': () =>
+      'GET /api/ai/sessions/session-id': () =>
         jsonResponse({ statusCode: 500, code: 'INTERNAL_ERROR', message: 'Error' }, 500),
       'POST /api/auth/logout': () => jsonResponse({ ok: true }),
     })

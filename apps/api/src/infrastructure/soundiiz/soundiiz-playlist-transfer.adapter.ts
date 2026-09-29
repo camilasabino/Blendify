@@ -52,7 +52,7 @@ export class SoundiizPlaylistTransferAdapter implements PlaylistTransferGateway 
             'Blendify/1.0 (https://github.com/camilasabino/Blendify)',
         },
       },
-      { logBodies: false },
+      { logContent: false },
     );
   }
 
