@@ -12,6 +12,7 @@ import type {
 } from './ai-intent';
 import type { AiPreservation } from './ai-intent-patch';
 import { findIntentClarification } from './ai-intent-rules';
+import { unsatisfiedRefinementConstraints } from './ai-refinement-constraints';
 import type { AiRefinementClarification } from './ai-refinement';
 import type { AiRefinementDiff } from './ai-refinement-diff';
 
@@ -430,6 +431,18 @@ export function refinementApplyBlocker(
     return 'destination_exists';
   }
   if (pending.status !== 'proposed' || pending.candidate.status !== 'ready') {
+    return 'not_applicable';
+  }
+
+  const current = generatedResultOf(session);
+  if (
+    current === null ||
+    unsatisfiedRefinementConstraints({
+      intent: pending.aiSafe.intent,
+      current,
+      candidate: pending.candidate.result,
+    }).length > 0
+  ) {
     return 'not_applicable';
   }
   return null;

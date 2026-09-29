@@ -277,6 +277,27 @@ describe('Apply and dismiss a pending refinement', () => {
     expect(world.stored().aiSafe.intent).toBe(INTENT_A);
   });
 
+  it('re-validates a ready candidate against its intent and refuses one that misses the duration', async () => {
+    const pending = readyPending();
+    if (pending.status !== 'proposed') {
+      throw new Error('Expected a proposed refinement.');
+    }
+    const initial = session({
+      ...pending,
+      aiSafe: {
+        ...pending.aiSafe,
+        intent: { ...INTENT_B, targetDurationMinutes: 30 },
+      },
+    });
+    const world = setup(initial);
+
+    await expect(world.apply.execute(command())).rejects.toMatchObject({
+      code: 'AI_REFINEMENT_NOT_APPLICABLE',
+    });
+    expect(world.sessions.saveIfUnchanged).not.toHaveBeenCalled();
+    expect(world.stored()).toBe(initial);
+  });
+
   it('gives up with a stale error when the session keeps changing', async () => {
     const world = setup(session());
     world.sessions.saveIfUnchanged.mockResolvedValue(false);

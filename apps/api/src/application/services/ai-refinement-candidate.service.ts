@@ -16,6 +16,7 @@ import {
   diffIntents,
   diffPlaylistTracks,
 } from '@/domain/ai/ai-refinement-diff';
+import { unsatisfiedRefinementConstraints } from '@/domain/ai/ai-refinement-constraints';
 import { resolvePreservation } from '@/domain/ai/ai-refinement-preservation';
 import type {
   AiGenerationFailure,
@@ -44,6 +45,7 @@ import { AiIntentResolver } from '@/application/services/ai-intent-resolver.serv
 import { GeneratePlaylistUseCase } from '@/application/use-cases/generate-playlist.use-case';
 
 const POSITIONS_UNFILLED_CODE = 'AI_REFINEMENT_POSITIONS_UNFILLED';
+const CONSTRAINTS_UNMET_CODE = 'AI_REFINEMENT_CONSTRAINTS_UNMET';
 
 export interface AiRefinementCandidateInput {
   current: AiIntent;
@@ -147,6 +149,20 @@ export class AiRefinementCandidateBuilder {
     }
 
     const result = this.resultOf(input, generated, assembly.tracks);
+    const unsatisfied = unsatisfiedRefinementConstraints({
+      intent: input.proposed,
+      current: input.currentResult,
+      candidate: result,
+    });
+    if (unsatisfied.length > 0) {
+      return failed({
+        code: CONSTRAINTS_UNMET_CODE,
+        category: 'insufficient_results',
+        retryAfterSeconds: null,
+        seedNotFound: null,
+      });
+    }
+
     return {
       status: 'candidate',
       strategy: strategy.kind,

@@ -949,7 +949,7 @@ describe('ProposeAiRefinementUseCase', () => {
       });
     });
 
-    it('never runs a second generation when the pool cannot fill the candidate', async () => {
+    it('never runs a second generation and refuses the candidate when the pool cannot reach the requested count', async () => {
       const world = createWorld();
       world.generator.execute.mockResolvedValue(
         freshGeneration([CURRENT_TRACK_IDS[0]]),
@@ -961,12 +961,16 @@ describe('ProposeAiRefinementUseCase', () => {
       const { session } = await execute(world);
 
       expect(world.generator.execute).toHaveBeenCalledTimes(1);
-      expect(pendingCandidate(session)).toMatchObject({
-        status: 'ready',
-        result: {
-          unmetConstraints: [{ type: 'track_count', requested: 10, actual: 3 }],
+      expect(pendingCandidate(session)).toEqual({
+        status: 'failed',
+        failure: {
+          code: 'AI_REFINEMENT_CONSTRAINTS_UNMET',
+          category: 'insufficient_results',
+          retryAfterSeconds: null,
+          seedNotFound: null,
         },
       });
+      expect(session.execution).toBe(GENERATED);
     });
 
     it.each([
