@@ -55,17 +55,31 @@ describe('auth bootstrap', () => {
 })
 
 describe('Landing', () => {
-  it('lets visitors try Blendify first and connect Spotify optionally', async () => {
+  beforeEach(() => {
     setAuthState(null)
     stubApi({})
+  })
+
+  it('sends Guests into the app home and offers Spotify as an alternative', async () => {
     renderApp('/')
 
     expect(
-      await screen.findByRole('link', { name: 'Try Blendify' }),
-    ).toHaveAttribute('href', '/app/mix')
+      await screen.findByRole('link', { name: 'Continue without Spotify' }),
+    ).toHaveAttribute('href', '/app')
+    expect(screen.queryByText(/Try Blendify/i)).toBeNull()
     expect(
       screen.getAllByRole('button', { name: 'Connect Spotify' }).length,
     ).toBeGreaterThan(0)
+  })
+
+  it('keeps the Blendify logo pointing at the landing page itself', async () => {
+    renderApp('/')
+
+    await screen.findByRole('link', { name: 'Continue without Spotify' })
+    expect(screen.getByRole('link', { name: 'Blendify' })).toHaveAttribute(
+      'href',
+      '/',
+    )
   })
 })
 
@@ -124,25 +138,31 @@ describe('Guest routing', () => {
     expect(screen.queryByText('Add a cover image')).toBeNull()
   })
 
-  it('redirects /app to Mix', async () => {
+  it('opens the app home at /app instead of redirecting to Mix', async () => {
     renderApp('/app')
 
     expect(
-      await screen.findByRole('heading', { name: 'Create your mix' }),
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'What do you want to create?',
+      }),
     ).toBeVisible()
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/app$/)
   })
 
   it.each([
     ['/app/library', 'Connect Spotify to use your Library.'],
     ['/app/stats', 'Connect Spotify to see your stats.'],
-  ])('sends %s to Mix with a Spotify notice', async (route, notice) => {
+  ])('sends %s to the app home with a Spotify notice', async (route, notice) => {
     const user = userEvent.setup()
     renderApp(route)
 
     expect(
-      await screen.findByRole('heading', { name: 'Create your mix' }),
+      await screen.findByRole('heading', {
+        name: 'What do you want to create?',
+      }),
     ).toBeVisible()
-    expect(screen.getByTestId('location')).toHaveTextContent('/app/mix')
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/app$/)
     const status = screen.getByText(notice).closest('[role="status"]')
     expect(status).not.toBeNull()
     expect(
@@ -273,7 +293,7 @@ describe('account deletion', () => {
     expect(deleteCalls[0].method).toBe('DELETE')
     expect(deleteCalls[0].body).toBeUndefined()
     await waitFor(() =>
-      expect(screen.getByTestId('location')).toHaveTextContent('/app/mix'),
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/app$/),
     )
     expect(screen.queryByText('Connect Spotify to use your Library.')).toBeNull()
     expect(screen.queryByRole('link', { name: 'Library' })).toBeNull()
@@ -361,55 +381,47 @@ describe('Spotify Mode routing', () => {
     expect(screen.getByTestId('location')).toHaveTextContent(route)
   })
 
-  it.each(['/app/library', '/app/stats', '/app/mix', '/app/discover'])(
-    'logs out from %s into the Guest landing page',
-    async (route) => {
-      const user = userEvent.setup()
-      const { calls } = stubApi({
-        'POST /api/auth/logout': () => jsonResponse({ ok: true }),
-      })
-      renderApp(route)
+  it.each([
+    '/app',
+    '/app/library',
+    '/app/stats',
+    '/app/mix',
+    '/app/discover',
+    '/app/ai',
+  ])('logs out from %s into the Guest app home', async (route) => {
+    const user = userEvent.setup()
+    const { calls } = stubApi({
+      'POST /api/auth/logout': () => jsonResponse({ ok: true }),
+    })
+    renderApp(route)
 
-      await user.click(
-        await screen.findByRole('button', { name: 'Account menu: Camila' }),
-      )
-      await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
-
-      expect(screen.getByTestId('location')).toHaveTextContent('/')
-      expect(
-        await screen.findByRole('link', { name: 'Try Blendify' }),
-      ).toBeVisible()
-      expect(
-        screen.queryByRole('button', { name: 'Account menu: Camila' }),
-      ).toBeNull()
-      expect(screen.queryByRole('heading', { name: 'Create your mix' })).toBeNull()
-      await waitFor(() =>
-        expect(
-          calls.filter((call) => call.url === '/api/auth/logout'),
-        ).toHaveLength(1),
-      )
-    },
-  )
-
-  it('returns to Create with AI once after a Spotify reconnect started there', async () => {
-    sessionStorage.setItem('blendify.aiReturnAfterLogin', String(Date.now()))
-    const { calls } = stubApi({})
-    renderApp('/app/mix')
+    await user.click(
+      await screen.findByRole('button', { name: 'Account menu: Camila' }),
+    )
+    await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
 
     expect(
-      await screen.findByRole('heading', { name: 'Describe the playlist you want' }),
+      await screen.findByRole('heading', {
+        name: 'What do you want to create?',
+      }),
     ).toBeVisible()
-    expect(screen.getByTestId('location')).toHaveTextContent('/app/ai')
-    expect(sessionStorage.getItem('blendify.aiReturnAfterLogin')).toBeNull()
-    expect(calls.filter((call) => call.url.startsWith('/api/ai/'))).toEqual([])
-  })
-
-  it('stays on Mix after an ordinary Spotify login', async () => {
-    stubApi({})
-    renderApp('/app/mix')
-
-    expect(await screen.findByRole('heading', { name: 'Create your mix' })).toBeVisible()
-    expect(screen.getByTestId('location')).toHaveTextContent('/app/mix')
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/app$/)
+    expect(
+      screen.queryByRole('button', { name: 'Account menu: Camila' }),
+    ).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Library' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Stats' })).toBeNull()
+    expect(
+      screen.queryByText('Connect Spotify to use your Library.'),
+    ).toBeNull()
+    expect(
+      screen.getAllByRole('button', { name: 'Connect Spotify' }).length,
+    ).toBeGreaterThan(0)
+    await waitFor(() =>
+      expect(
+        calls.filter((call) => call.url === '/api/auth/logout'),
+      ).toHaveLength(1),
+    )
   })
 
   it('forgets the Create with AI session on logout', async () => {
@@ -435,7 +447,7 @@ describe('Spotify Mode routing', () => {
     )
     await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
 
-    await screen.findByRole('link', { name: 'Try Blendify' })
+    await screen.findByRole('heading', { name: 'What do you want to create?' })
     expect(sessionStorage.getItem('blendify.aiSession')).toBeNull()
   })
 
@@ -461,8 +473,8 @@ describe('Spotify Mode routing', () => {
     )
     await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/')
-    await screen.findByRole('link', { name: 'Try Blendify' })
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/app$/)
+    await screen.findByRole('heading', { name: 'What do you want to create?' })
 
     // The generation resolves after logout already completed; its result
     // must not resurrect the authenticated UI or update stale caches.
@@ -470,7 +482,7 @@ describe('Spotify Mode routing', () => {
     pending.close()
     await Promise.resolve()
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/')
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/app$/)
     expect(
       screen.queryByRole('button', { name: 'Account menu: Camila' }),
     ).toBeNull()

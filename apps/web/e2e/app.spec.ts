@@ -6,6 +6,25 @@ test.describe('Guest bootstrap and shell', () => {
     await mockGuestSession(page)
   })
 
+  test('enters the app home from the landing page', async ({ page }) => {
+    await page.goto('/')
+
+    await page
+      .getByRole('link', { name: 'Continue without Spotify' })
+      .click()
+
+    await expect(page).toHaveURL(/\/app$/)
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: 'What do you want to create?',
+      }),
+    ).toBeVisible()
+    const actions = page.getByRole('list', { name: 'Ways to create' })
+    await expect(actions.getByRole('link')).toHaveCount(3)
+    await expect(page.getByRole('link', { name: 'Library' })).toHaveCount(0)
+  })
+
   test('loads as Guest with Guest-only navigation', async ({ page }) => {
     await page.goto('/app/mix')
 
@@ -30,15 +49,15 @@ test.describe('Guest bootstrap and shell', () => {
     ).toHaveCount(0)
   })
 
-  test('sends a direct visit to a protected route back to Mix with a Spotify notice', async ({
+  test('sends a direct visit to a protected route back to the app home with a Spotify notice', async ({
     page,
   }) => {
     await page.goto('/app/library')
 
     await expect(
-      page.getByRole('heading', { name: 'Create your mix' }),
+      page.getByRole('heading', { name: 'What do you want to create?' }),
     ).toBeVisible()
-    await expect(page).toHaveURL(/\/app\/mix$/)
+    await expect(page).toHaveURL(/\/app$/)
 
     const notice = page
       .getByRole('status')
@@ -64,7 +83,9 @@ test.describe('Spotify connection failure feedback', () => {
     await expect(notice).toContainText(
       "isn’t authorized for Spotify-connected features",
     )
-    await expect(page.getByRole('link', { name: 'Try Blendify' })).toBeVisible()
+    await expect(
+      page.getByRole('link', { name: 'Continue without Spotify' }),
+    ).toBeVisible()
 
     // The outcome is consumed once so a reload of the landing page stays clean.
     await expect(page).toHaveURL(/\/$/)

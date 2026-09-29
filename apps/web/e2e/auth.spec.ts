@@ -43,18 +43,21 @@ test.describe('Logout', () => {
     await mockLogout(page)
   })
 
-  test('returns to the Guest landing page and drops authenticated navigation', async ({
+  test('returns to the Guest app home and drops authenticated navigation', async ({
     page,
   }) => {
     await page.goto('/app/mix')
     await page.getByRole('button', { name: 'Account menu: Camila' }).click()
     await page.getByRole('menuitem', { name: 'Log out' }).click()
 
-    await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('link', { name: 'Try Blendify' })).toBeVisible()
+    await expect(page).toHaveURL(/\/app$/)
+    await expect(
+      page.getByRole('heading', { name: 'What do you want to create?' }),
+    ).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Account menu: Camila' }),
     ).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Library' })).toHaveCount(0)
   })
 
   test('aborts an in-flight generation request and still lands on Guest', async ({
@@ -82,8 +85,10 @@ test.describe('Logout', () => {
     await page.getByRole('button', { name: 'Account menu: Camila' }).click()
     await page.getByRole('menuitem', { name: 'Log out' }).click()
 
-    await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('link', { name: 'Try Blendify' })).toBeVisible()
+    await expect(page).toHaveURL(/\/app$/)
+    await expect(
+      page.getByRole('heading', { name: 'What do you want to create?' }),
+    ).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Account menu: Camila' }),
     ).toHaveCount(0)

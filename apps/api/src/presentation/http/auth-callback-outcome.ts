@@ -16,6 +16,8 @@ export type AuthCallbackError = (typeof AUTH_CALLBACK_ERRORS)[number];
 
 export const AUTH_ERROR_QUERY_PARAM = 'auth_error';
 
+export const POST_LOGIN_PATH = '/app';
+
 /** Maps the `error` Spotify sends back on the authorization screen. */
 export function classifyAuthorizeError(
   providerError: string | undefined,
@@ -36,10 +38,17 @@ export function classifyCallbackFailure(error: unknown): AuthCallbackError {
     : 'connection_failed';
 }
 
+function frontendOrigin(frontendUrl: string): string {
+  return frontendUrl.replace(/\/+$/, '');
+}
+
+export function postLoginRedirectUrl(frontendUrl: string): string {
+  return `${frontendOrigin(frontendUrl)}${POST_LOGIN_PATH}`;
+}
+
 export function authErrorRedirectUrl(
   frontendUrl: string,
   error: AuthCallbackError,
 ): string {
-  const base = frontendUrl.replace(/\/+$/, '');
-  return `${base}/?${AUTH_ERROR_QUERY_PARAM}=${error}`;
+  return `${frontendOrigin(frontendUrl)}/?${AUTH_ERROR_QUERY_PARAM}=${error}`;
 }

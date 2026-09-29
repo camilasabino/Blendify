@@ -251,7 +251,7 @@ describe('Create with AI Spotify destination', () => {
       await user.keyboard('{Enter}')
 
       expect(loginUrl).toHaveBeenCalledTimes(1)
-      expect(sessionStorage.getItem('blendify.aiReturnAfterLogin')).not.toBeNull()
+      expect(sessionStorage.getItem('blendify.appReturnTo')).toContain('/app/ai')
       expect(sessionStorage.getItem('blendify.aiSession')).not.toBeNull()
       expect(destinationCalls(calls)).toHaveLength(1)
     },

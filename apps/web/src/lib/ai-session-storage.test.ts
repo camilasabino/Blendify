@@ -1,7 +1,5 @@
 import {
   clearStoredAiSession,
-  consumeAiReturnAfterLogin,
-  markAiReturnAfterLogin,
   readStoredAiSession,
   writeStoredAiSession,
 } from './ai-session-storage'
@@ -58,23 +56,6 @@ describe('ai session storage', () => {
     expect(() => writeStoredAiSession({ sessionId: 'a', accessKey: 'k', prompt: 'b', playlistTitle: null })).not.toThrow()
     expect(readStoredAiSession()).toBeNull()
     expect(() => clearStoredAiSession()).not.toThrow()
-    expect(() => markAiReturnAfterLogin()).not.toThrow()
-    expect(consumeAiReturnAfterLogin()).toBe(false)
   })
 
-  it('returns to Create with AI only once after a recent reconnect', () => {
-    markAiReturnAfterLogin(1_000)
-
-    expect(consumeAiReturnAfterLogin(61_000)).toBe(true)
-    expect(consumeAiReturnAfterLogin(61_000)).toBe(false)
-  })
-
-  it('forgets an old or malformed reconnect intent', () => {
-    markAiReturnAfterLogin(0)
-    expect(consumeAiReturnAfterLogin(16 * 60_000)).toBe(false)
-    expect(sessionStorage.getItem('blendify.aiReturnAfterLogin')).toBeNull()
-
-    sessionStorage.setItem('blendify.aiReturnAfterLogin', 'soon')
-    expect(consumeAiReturnAfterLogin()).toBe(false)
-  })
 })

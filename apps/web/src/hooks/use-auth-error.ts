@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   AUTH_ERROR_PARAM,
@@ -6,17 +6,25 @@ import {
   type AuthError,
 } from '@/lib/auth-error'
 
+export type AuthErrorReport = {
+  error: AuthError | null
+  hasReport: boolean
+  dismiss: () => void
+}
+
 /**
  * Reads the outcome of a failed Spotify login once and drops it from the URL,
- * so reloading the page does not bring a stale notice back.
+ * so reloading the page does not bring a stale notice back. The outcome is read
+ * on the first render, before any auth-driven redirect can run, and `hasReport`
+ * stays true after a dismissal so the redirect cannot swallow the feedback.
  */
-export function useAuthError(): {
-  error: AuthError | null
-  dismiss: () => void
-} {
+export function useAuthError(): AuthErrorReport {
   const location = useLocation()
   const navigate = useNavigate()
-  const [error, setError] = useState<AuthError | null>(null)
+  const [error, setError] = useState<AuthError | null>(() =>
+    parseAuthError(new URLSearchParams(location.search).get(AUTH_ERROR_PARAM)),
+  )
+  const reported = useRef(error !== null)
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -24,7 +32,9 @@ export function useAuthError(): {
       return
     }
 
+    reported.current = true
     setError(parseAuthError(params.get(AUTH_ERROR_PARAM)))
+
     params.delete(AUTH_ERROR_PARAM)
     const search = params.toString()
     navigate(
@@ -37,5 +47,5 @@ export function useAuthError(): {
     setError(null)
   }, [])
 
-  return { error, dismiss }
+  return { error, hasReport: reported.current, dismiss }
 }

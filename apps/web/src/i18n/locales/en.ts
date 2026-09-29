@@ -2,6 +2,8 @@ export const en = {
   'brand.tagline': 'Blend the music you love into new playlists.',
   'brand.description':
     'Mix artists or genres, or start from a single artist or song. Blendify builds the playlist; connect Spotify to save it to your account.',
+  'brand.descriptionWithAi':
+    'Mix artists or genres, start from one artist or song, or just describe what you want. Blendify builds the playlist; connect Spotify to save it to your account.',
   'nav.logOut': 'Log out',
   'nav.deleteAccount': 'Delete account',
   'account.delete.title': 'Delete your Blendify account?',
@@ -19,6 +21,7 @@ export const en = {
   'nav.library': 'Library',
   'nav.stats': 'Stats',
   'nav.main': 'Main menu',
+  'nav.appHome': 'Blendify home',
   'nav.skipToContent': 'Skip to content',
   'playlist.description.empty': 'Made with Blendify.',
   'playlist.description.one': 'Made with Blendify from {name}.',
@@ -364,8 +367,8 @@ export const en = {
   'stats.overview': 'Overview',
   'nav.connectSpotify':
     'Connect Spotify',
-  'landing.ctaTry':
-    'Try Blendify',
+  'landing.ctaGuest': 'Continue without Spotify',
+  'landing.ctaOpenApp': 'Go to Blendify',
   'spotifyRequired.library':
     'Connect Spotify to use your Library.',
   'spotifyRequired.stats':
@@ -834,6 +837,18 @@ export const en = {
     'Blendify lost the connection before it could confirm the result. The playlist may already exist, so check Spotify before creating it again.',
   'create.openLibrary':
     'Open Library',
+  'home.eyebrow': 'Home',
+  'home.title': 'What do you want to create?',
+  'home.subtitle': 'Choose where to start. Blendify builds the playlist and you decide where it goes.',
+  'home.actionsLabel': 'Ways to create',
+  'home.mixDescription': 'Combine artists or genres into one playlist.',
+  'home.discoverDescription': 'Start with one artist or song and explore related music.',
+  'home.aiDescription': 'Describe the playlist you have in mind.',
+  'home.secondaryTitle': 'Also in Blendify',
+  'home.libraryDescription': 'Playlists you saved in Blendify.',
+  'home.statsDescription': 'Your most-used artists and genres.',
+  'home.connectTitle': 'Want to save playlists straight to Spotify?',
+  'home.connectBody': 'Connect Spotify to publish playlists to your account, keep a Library and see your stats. Everything above works without it.',
 } as const
 
 export type MessageKey = keyof typeof en

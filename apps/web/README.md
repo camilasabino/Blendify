@@ -9,16 +9,44 @@ Product overview and setup: [root README](../../README.md). Deployment:
 
 ## Routes
 
+`/` is the public landing (how to get in) and `/app` is the application home
+(what to do). They are different responsibilities: the landing is the
+acquisition surface, `/app` is the product home and works in both Guest and
+Spotify Mode.
+
 | Route | Screen | Availability |
 |---|---|---|
-| `/` | Landing | Everyone |
+| `/` | Landing | Everyone; a valid Spotify session is sent to `/app` |
 | `/privacy` | Privacy policy | Everyone |
-| `/app/mix`, `/app/discover` | Mix and Discover (`/app` redirects to `/app/mix`) | Guest and Spotify |
+| `/app` | App Home (Mix, Discover, Create with AI) | Guest and Spotify |
+| `/app/mix`, `/app/discover` | Mix and Discover | Guest and Spotify |
 | `/app/ai` | Create with AI | Guest and Spotify, behind the feature flag below |
-| `/app/library`, `/app/stats` | Library and Stats | Spotify only; Guests are redirected to Mix with a notice |
+| `/app/library`, `/app/stats` | Library and Stats | Spotify only; Guests are redirected to `/app` with a notice |
 
 Routes live in `src/App.tsx` and are lazy-loaded. Access is derived from the
 current session in `src/lib/capabilities.ts` (`guest` or `spotify` mode).
+
+`/app` is also where the app converges: the App Shell logo links to it, a
+successful Spotify callback lands there by default, and logout and account
+deletion both end there in Guest Mode.
+
+## Entering and leaving Spotify Mode
+
+A login started from the landing page ends on `/app`. A connection or
+reconnection started from a Guest-capable route inside the app comes back to
+that route: `src/lib/app-return-target.ts` remembers it in `sessionStorage`
+and `src/components/layout/app-shell.tsx` consumes it when the callback lands
+on `/app`. The target is one-shot, expires after 15 minutes, and is only ever
+one of `/app/mix`, `/app/discover` or `/app/ai` (the last one only while the
+Create with AI flag is on) — absolute URLs, `//host`, query strings, fragments
+and Spotify-only routes are refused, and a failed attempt drops any pending
+target so it cannot redirect a later login. Create with AI uses the same
+mechanism: its session stays in `sessionStorage`, nothing is published
+automatically, and Save is available again after the reconnect.
+
+Logout moves from Spotify Mode to Guest Mode rather than leaving the product:
+it cancels auth-bound work, clears user-scoped queries and ends on `/app`.
+Successful account deletion ends there too.
 
 ## Guest and Spotify capabilities
 

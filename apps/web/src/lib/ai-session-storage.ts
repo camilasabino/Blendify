@@ -1,6 +1,4 @@
 const STORAGE_KEY = 'blendify.aiSession'
-const RETURN_AFTER_LOGIN_KEY = 'blendify.aiReturnAfterLogin'
-const RETURN_AFTER_LOGIN_TTL_MS = 15 * 60_000
 
 export type StoredAiSession = Readonly<{
   sessionId: string
@@ -52,29 +50,5 @@ export function clearStoredAiSession(): void {
     sessionStorage.removeItem(STORAGE_KEY)
   } catch {
     return
-  }
-}
-
-export function markAiReturnAfterLogin(now: number = Date.now()): void {
-  try {
-    sessionStorage.setItem(RETURN_AFTER_LOGIN_KEY, String(now))
-  } catch {
-    return
-  }
-}
-
-export function consumeAiReturnAfterLogin(now: number = Date.now()): boolean {
-  try {
-    const raw = sessionStorage.getItem(RETURN_AFTER_LOGIN_KEY)
-    sessionStorage.removeItem(RETURN_AFTER_LOGIN_KEY)
-    const markedAt = Number(raw)
-    return (
-      raw !== null &&
-      Number.isFinite(markedAt) &&
-      now >= markedAt &&
-      now - markedAt <= RETURN_AFTER_LOGIN_TTL_MS
-    )
-  } catch {
-    return false
   }
 }

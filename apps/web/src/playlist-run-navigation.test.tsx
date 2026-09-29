@@ -328,7 +328,7 @@ describe('Spotify generation lifecycle boundaries', () => {
     await user.click(screen.getByRole('button', { name: 'Account menu: Camila' }))
     await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
 
-    await screen.findByRole('link', { name: 'Try Blendify' })
+    await screen.findByRole('heading', { name: 'What do you want to create?' })
     expect(streams[0].signal?.aborted).toBe(true)
     expect(usePlaylistRunStore.getState().run).toBeNull()
     expect(screen.queryByRole('region', { name: 'Playlist creation' })).toBeNull()

@@ -4,6 +4,8 @@ export const pt: Record<MessageKey, string> = {
   'brand.tagline': 'Misture as músicas que você ama em novas playlists.',
   'brand.description':
     'Misture artistas ou gêneros, ou comece por um artista ou uma música. O Blendify monta a playlist; conecte o Spotify para salvá-la na sua conta.',
+  'brand.descriptionWithAi':
+    'Misture artistas ou gêneros, comece por um artista ou uma música, ou simplesmente descreva o que você quer. O Blendify monta a playlist; conecte o Spotify para salvá-la na sua conta.',
   'nav.logOut': 'Sair',
   'nav.deleteAccount': 'Excluir conta',
   'account.delete.title': 'Excluir sua conta do Blendify?',
@@ -21,6 +23,7 @@ export const pt: Record<MessageKey, string> = {
   'nav.library': 'Biblioteca',
   'nav.stats': 'Estatísticas',
   'nav.main': 'Menu principal',
+  'nav.appHome': 'Início do Blendify',
   'nav.skipToContent': 'Pular para o conteúdo',
   'playlist.description.empty': 'Criada com o Blendify.',
   'playlist.description.one': 'Criada com o Blendify a partir de {name}.',
@@ -371,8 +374,8 @@ export const pt: Record<MessageKey, string> = {
   'stats.overview': 'Resumo',
   'nav.connectSpotify':
     'Conectar Spotify',
-  'landing.ctaTry':
-    'Experimentar o Blendify',
+  'landing.ctaGuest': 'Continuar sem o Spotify',
+  'landing.ctaOpenApp': 'Ir para o Blendify',
   'spotifyRequired.library':
     'Conecte o Spotify para usar sua Biblioteca.',
   'spotifyRequired.stats':
@@ -843,4 +846,16 @@ export const pt: Record<MessageKey, string> = {
     'O Blendify perdeu a conexão antes de confirmar o resultado. A playlist pode já existir, então confira o Spotify antes de criá-la de novo.',
   'create.openLibrary':
     'Abrir biblioteca',
+  'home.eyebrow': 'Início',
+  'home.title': 'O que você quer criar?',
+  'home.subtitle': 'Escolha por onde começar. O Blendify monta a playlist e você decide onde guardá-la.',
+  'home.actionsLabel': 'Formas de criar',
+  'home.mixDescription': 'Combine artistas ou gêneros em uma playlist.',
+  'home.discoverDescription': 'Comece por um artista ou uma música e explore músicas relacionadas.',
+  'home.aiDescription': 'Descreva a playlist que você tem em mente.',
+  'home.secondaryTitle': 'Também no Blendify',
+  'home.libraryDescription': 'As playlists que você salvou no Blendify.',
+  'home.statsDescription': 'Seus artistas e gêneros mais usados.',
+  'home.connectTitle': 'Quer salvar suas playlists direto no Spotify?',
+  'home.connectBody': 'Conecte o Spotify para publicar playlists na sua conta, ter uma biblioteca e ver suas estatísticas. Tudo acima funciona sem isso.',
 }

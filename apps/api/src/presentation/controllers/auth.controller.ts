@@ -8,6 +8,7 @@ import {
   authErrorRedirectUrl,
   classifyAuthorizeError,
   classifyCallbackFailure,
+  postLoginRedirectUrl,
   type AuthCallbackError,
 } from '@/presentation/http/auth-callback-outcome';
 import type { AuthSession, OkResponse } from '@blendify/contracts';
@@ -72,7 +73,7 @@ export class AuthController {
       const { token } = await this.auth.handleCallback(code);
       this.auth.setSessionCookie(res, token);
       this.auth.clearOAuthStateCookie(res);
-      res.redirect(`${frontend}/app/mix`);
+      res.redirect(postLoginRedirectUrl(frontend));
     } catch (err) {
       const outcome = classifyCallbackFailure(err);
       this.logger.warn(`Spotify authorization unsuccessful: ${outcome}`);

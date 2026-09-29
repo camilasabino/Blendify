@@ -1,6 +1,6 @@
 import { SpotifyIcon } from '@/components/brand/spotify-mark'
 import { Button, type ButtonProps } from '@/components/ui/button'
-import { useAuth } from '@/hooks/use-auth'
+import { useConnectSpotify } from '@/hooks/use-connect-spotify'
 import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 
@@ -16,14 +16,14 @@ export function ConnectSpotifyButton({
   className,
   compact = false,
 }: ConnectSpotifyButtonProps) {
-  const { login } = useAuth()
+  const connectSpotify = useConnectSpotify()
   const t = useT()
 
   return (
     <Button
       size={size}
       variant={variant}
-      onClick={login}
+      onClick={connectSpotify}
       className={cn('gap-[11px]', className)}
     >
       <SpotifyIcon />

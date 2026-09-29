@@ -35,7 +35,7 @@ describe('Create with AI disabled', () => {
     const { calls } = await renderAppWithAiCreationDisabled('/app/ai')
 
     expect(
-      await screen.findByRole('link', { name: 'Try Blendify' }),
+      await screen.findByRole('link', { name: 'Continue without Spotify' }),
     ).toBeVisible()
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
     expect(calls.filter((call) => call.url.startsWith('/api/ai/'))).toEqual([])
@@ -53,13 +53,35 @@ describe('Create with AI disabled', () => {
     ).toEqual(['Mix', 'Discover'])
   })
 
-  it('stays on Mix after a Spotify reconnect that started from Create with AI', async () => {
-    sessionStorage.setItem('blendify.aiReturnAfterLogin', String(Date.now()))
-    await renderAppWithAiCreationDisabled('/app/mix')
+  it('offers only Mix and Discover on the app home', async () => {
+    await renderAppWithAiCreationDisabled('/app')
+
+    await screen.findByRole('heading', {
+      level: 1,
+      name: 'What do you want to create?',
+    })
+    const actions = screen.getByRole('list', { name: 'Ways to create' })
+    expect(
+      within(actions)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/app/mix', '/app/discover'])
+    expect(screen.queryByRole('link', { name: /Create with AI/ })).toBeNull()
+  })
+
+  it('refuses a stored Create with AI return target', async () => {
+    sessionStorage.setItem(
+      'blendify.appReturnTo',
+      JSON.stringify({ target: '/app/ai', markedAt: Date.now() }),
+    )
+    await renderAppWithAiCreationDisabled('/app')
 
     expect(
-      await screen.findByRole('heading', { name: 'Create your mix' }),
+      await screen.findByRole('heading', {
+        name: 'What do you want to create?',
+      }),
     ).toBeVisible()
-    expect(screen.getByTestId('location')).toHaveTextContent('/app/mix')
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/app$/)
+    expect(sessionStorage.getItem('blendify.appReturnTo')).toBeNull()
   })
 })

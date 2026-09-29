@@ -2,6 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { Spinner } from '@/components/ui/spinner'
 import { useCapabilities } from '@/hooks/use-capabilities'
 import { useT } from '@/i18n/use-t'
+import { APP_HOME_PATH } from '@/lib/app-routes'
 import type { SpotifyOnlyCapability } from '@/lib/capabilities'
 import type {
   SpotifyOnlyFeature,
@@ -31,7 +32,7 @@ export function SpotifyOnlyRoute({
 
   if (!capabilities[capability]) {
     const state: SpotifyRequiredState = { spotifyRequired: feature }
-    return <Navigate to="/app/mix" replace state={state} />
+    return <Navigate to={APP_HOME_PATH} replace state={state} />
   }
 
   return <Outlet />

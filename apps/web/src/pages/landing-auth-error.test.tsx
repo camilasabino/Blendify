@@ -28,7 +28,7 @@ function renderApp(route: string) {
 
 /** Waits for the landing page itself, past the lazy-route loading state. */
 async function landing(): Promise<void> {
-  await screen.findByRole('link', { name: /Try Blendify/i })
+  await screen.findByRole('link', { name: /Continue without Spotify/i })
 }
 
 beforeEach(() => {
@@ -51,7 +51,9 @@ describe('Spotify connection failures on the landing page', () => {
       /isn’t authorized for Spotify-connected features/i,
     )
     expect(notice).toHaveTextContent(/Guest Mode/i)
-    expect(screen.getByRole('link', { name: /Try Blendify/i })).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: /Continue without Spotify/i }),
+    ).toBeVisible()
     expect(
       screen.getAllByRole('button', { name: 'Connect Spotify' }).length,
     ).toBeGreaterThan(0)

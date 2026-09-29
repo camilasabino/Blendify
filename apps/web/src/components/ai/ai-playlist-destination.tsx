@@ -8,11 +8,10 @@ import type {
 } from '@blendify/contracts'
 import { SoundiizTransfer } from '@/components/playlist/transfer-action'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { useAuth } from '@/hooks/use-auth'
+import { useConnectSpotify } from '@/hooks/use-connect-spotify'
 import { useT } from '@/i18n/use-t'
 import { isSpotifyDestination, type AiSpotifyDestination } from './ai-destination-state'
 import { ApiError, getApiErrorMessage } from '@/lib/api'
-import { markAiReturnAfterLogin } from '@/lib/ai-session-storage'
 import type { AppMode } from '@/lib/capabilities'
 import { readPersistToLibraryPreference } from '@/lib/persist-to-library-preference'
 import { renderPlaylistCoverBase64, type PlaylistCoverKind } from '@/lib/playlist-cover'
@@ -100,7 +99,7 @@ function AiSpotifyPublish({
   onPublish: (input: PublishAiPlaylistRequest) => void
 }>) {
   const t = useT()
-  const { login } = useAuth()
+  const connectSpotify = useConnectSpotify()
   const headingId = useId()
   const hintId = useId()
   const [isPreparing, setIsPreparing] = useState(false)
@@ -122,11 +121,6 @@ function AiSpotifyPublish({
       reconnectRef.current?.focus()
     }
   }, [showsReconnect])
-
-  function reconnect() {
-    markAiReturnAfterLogin()
-    login()
-  }
 
   async function save() {
     if (isBusy || isRequesting.current) {
@@ -162,7 +156,7 @@ function AiSpotifyPublish({
         </p>
       ) : null}
       {showsReconnect ? (
-        <Button ref={reconnectRef} type="button" className="w-full sm:w-auto" onClick={reconnect}>
+        <Button ref={reconnectRef} type="button" className="w-full sm:w-auto" onClick={connectSpotify}>
           {t('nav.connectSpotify')}
         </Button>
       ) : (

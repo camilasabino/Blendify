@@ -6,7 +6,13 @@ import { AppShell } from '@/components/layout/app-shell'
 import { SpotifyOnlyRoute } from '@/components/layout/spotify-only-route'
 import { Spinner } from '@/components/ui/spinner'
 import { isAiCreationEnabled } from '@/lib/ai-creation'
+import { APP_HOME_PATH } from '@/lib/app-routes'
 
+const AppHomePage = lazy(() =>
+  import('@/pages/app-home-page').then((module) => ({
+    default: module.AppHomePage,
+  })),
+)
 const LandingPage = lazy(() =>
   import('@/pages/landing-page').then((module) => ({
     default: module.LandingPage,
@@ -51,8 +57,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/app" element={<AppShell />}>
-          <Route index element={<Navigate to="mix" replace />} />
+        <Route path={APP_HOME_PATH} element={<AppShell />}>
+          <Route index element={<AppHomePage />} />
           <Route path="mix" element={<MixPlaylistPage />} />
           <Route path="discover" element={<DiscoverPlaylistPage />} />
           {isAiCreationEnabled() ? (

@@ -18,10 +18,9 @@ import { AccountMenu } from '@/components/layout/account-menu'
 import { ConnectSpotifyButton } from '@/components/layout/connect-spotify-button'
 import { readSpotifyRequiredState } from '@/lib/spotify-required'
 import { isAiCreationEnabled } from '@/lib/ai-creation'
-import {
-  clearStoredAiSession,
-  consumeAiReturnAfterLogin,
-} from '@/lib/ai-session-storage'
+import { clearStoredAiSession } from '@/lib/ai-session-storage'
+import { consumeAppReturnTarget } from '@/lib/app-return-target'
+import { APP_HOME_PATH } from '@/lib/app-routes'
 import { SpotifyRequiredNotice } from '@/components/layout/spotify-required-notice'
 import { Footer } from '@/components/layout/footer'
 import { ConfirmDialog } from '@/components/ui/dialog'
@@ -40,8 +39,6 @@ type NavItem = {
   icon: typeof Blend
   requires?: SpotifyOnlyCapability
 }
-
-const POST_LOGIN_PATH = '/app/mix'
 
 const AI_NAV_ITEM: NavItem = {
   to: '/app/ai',
@@ -112,12 +109,12 @@ export function AppShell() {
       : null
 
   useEffect(() => {
-    if (
-      consumeAiReturnAfterLogin() &&
-      location.pathname === POST_LOGIN_PATH &&
-      isAiCreationEnabled()
-    ) {
-      navigate(AI_NAV_ITEM.to, { replace: true })
+    if (location.pathname !== APP_HOME_PATH) {
+      return
+    }
+    const returnTarget = consumeAppReturnTarget()
+    if (returnTarget) {
+      navigate(returnTarget, { replace: true })
     }
   }, [location.pathname, navigate])
 
@@ -136,7 +133,7 @@ export function AppShell() {
 
   async function logOut() {
     cancelActiveGenerations()
-    navigate('/', { replace: true })
+    navigate(APP_HOME_PATH, { replace: true, state: null })
     try {
       await logout()
     } finally {
@@ -167,8 +164,8 @@ export function AppShell() {
       await deleteAccount()
       // Only the deleted session navigates, and only once it is really gone.
       // Navigating before the request and undoing it on failure raced with the
-      // route guard's own redirect and could strand the user on /app/mix.
-      navigate('/app/mix', { replace: true, state: null })
+      // route guard's own redirect and could strand the user on the App Home.
+      navigate(APP_HOME_PATH, { replace: true, state: null })
       setDeleteOpen(false)
       cancelActiveGenerations()
       forgetUserScopedQueries()
@@ -202,13 +199,15 @@ export function AppShell() {
           )}
         >
           <NavLink
-            to="/app/mix"
+            to={APP_HOME_PATH}
+            end
+            aria-label={t('nav.appHome')}
             className={cn(
               'inline-flex shrink-0 items-center justify-self-start rounded-control transition-opacity hover:opacity-80',
               focusRing,
             )}
           >
-            <BlendifyMark />
+            <BlendifyMark decorative />
           </NavLink>
 
           <nav

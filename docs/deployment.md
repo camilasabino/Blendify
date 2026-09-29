@@ -892,8 +892,10 @@ Testing).
 
 ### Guest (signed out, fresh browser profile)
 
-- [ ] `https://blendify.camilasabino.dev` loads; a hard reload on
+- [ ] `https://blendify.camilasabino.dev` loads; a hard reload on `/app`,
       `/app/discover` and `/privacy` returns the page (SPA fallback, no 404).
+- [ ] `/app`: the App Home offers Mix, Discover and Create with AI, and does
+      not redirect to Mix.
 - [ ] `/app/mix`: artist search shows results with a Spotify link per result;
       selected chips link to Spotify.
 - [ ] `/app/discover`: artist and track seeds work; genre list loads.
@@ -903,18 +905,19 @@ Testing).
 - [ ] Transfer present: the Soundiiz card offers `Prepare transfer`; it calls
       `POST /api/transfers` and then shows an explicit `Continue on Soundiiz`
       link. Nothing redirects or opens a window on its own.
-- [ ] `/app/library` redirects to Mix with the Spotify-required notice.
+- [ ] `/app/library` redirects to `/app` with the Spotify-required notice.
 - [ ] Footer "Privacy" opens `/privacy`; the contact link is
       `mailto:contacto@camilasabino.dev`.
 
 ### Spotify Mode (allowlisted account)
 
-- [ ] Connect Spotify → consent → callback lands on `/app/mix`.
+- [ ] Connect Spotify from the landing page → consent → callback lands on
+      `/app`; started from `/app/mix` it comes back to `/app/mix`.
 - [ ] Publish a Mix and a Discover playlist with "Add a cover image" on; they
       appear in Spotify with the Blendify graphic cover (no Spotify artist or
       album artwork in it).
 - [ ] Library and Stats load.
-- [ ] Log out → Guest Mix works.
+- [ ] Log out → the Guest App Home at `/app` works.
 
 ### Security and operations
 

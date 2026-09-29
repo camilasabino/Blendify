@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom'
-import { ArrowDown, ArrowRight, Blend, Compass, Lock } from 'lucide-react'
+import { useEffect } from 'react'
+import { Link, Navigate } from 'react-router-dom'
+import { ArrowDown, ArrowRight, Blend, Lock } from 'lucide-react'
 import { useAuthError } from '@/hooks/use-auth-error'
 import { useCapabilities } from '@/hooks/use-capabilities'
 import { buttonVariants } from '@/components/ui/button'
@@ -9,6 +10,10 @@ import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { BlendifyMark } from '@/components/brand/blendify-mark'
 import { Footer } from '@/components/layout/footer'
 import { useT } from '@/i18n/use-t'
+import { isAiCreationEnabled } from '@/lib/ai-creation'
+import { clearAppReturnTarget } from '@/lib/app-return-target'
+import { APP_HOME_PATH } from '@/lib/app-routes'
+import type { AppCapabilities } from '@/lib/capabilities'
 import { buildDefaultPlaylistName } from '@/lib/playlist-name'
 import { formatSongCount } from '@/lib/song-count'
 import { cn, focusRing, shellGutter } from '@/lib/utils'
@@ -21,8 +26,22 @@ export function LandingPage() {
   const capabilities = useCapabilities()
   const isAuthenticated = capabilities.mode === 'spotify'
   const showConnect = capabilities.isResolved && !isAuthenticated
-  const { error: authError, dismiss: dismissAuthError } = useAuthError()
+  const {
+    error: authError,
+    hasReport: hasAuthReport,
+    dismiss: dismissAuthError,
+  } = useAuthError()
   const t = useT()
+
+  useEffect(() => {
+    if (hasAuthReport) {
+      clearAppReturnTarget()
+    }
+  }, [hasAuthReport])
+
+  if (capabilities.isResolved && isAuthenticated && !hasAuthReport) {
+    return <Navigate to={APP_HOME_PATH} replace />
+  }
 
   return (
     <div className="bg-atmosphere bg-grain relative flex min-h-svh flex-col overflow-x-hidden">
@@ -73,57 +92,17 @@ export function LandingPage() {
             className="animate-fade-up max-w-md text-base leading-relaxed text-cream-300 sm:text-lg"
             style={{ animationDelay: '140ms' }}
           >
-            {t('brand.description')}
+            {t(
+              isAiCreationEnabled()
+                ? 'brand.descriptionWithAi'
+                : 'brand.description',
+            )}
           </p>
           <div
             className="animate-fade-up flex flex-wrap items-center gap-3 pt-2"
             style={{ animationDelay: '200ms' }}
           >
-            {isAuthenticated ? (
-              <>
-                <Link
-                  to="/app/mix"
-                  className={cn(buttonVariants({ size: 'lg' }))}
-                >
-                  <Blend aria-hidden className="size-4" />
-                  {t('nav.create')}
-                </Link>
-                <Link
-                  to="/app/discover"
-                  className={cn(
-                    buttonVariants({ size: 'lg', variant: 'outline' }),
-                  )}
-                >
-                  <Compass aria-hidden className="size-4" />
-                  {t('nav.discover')}
-                </Link>
-              </>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link
-                    to="/app/mix"
-                    className={cn(
-                      buttonVariants({ size: 'lg' }),
-                      'animate-pulse-glow',
-                    )}
-                  >
-                    {t('landing.ctaTry')}
-                    <ArrowRight aria-hidden className="size-4" />
-                  </Link>
-                  {showConnect ? (
-                    <ConnectSpotifyButton size="lg" variant="outline" />
-                  ) : null}
-                </div>
-                <p className="flex items-start gap-1.5 text-sm text-cream-400">
-                  <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-                  {t('landing.trust')}
-                </p>
-                <p className="max-w-md text-sm text-cream-500">
-                  {t('landing.spotifyAccess')}
-                </p>
-              </div>
-            )}
+            <LandingActions capabilities={capabilities} />
           </div>
         </div>
 
@@ -137,6 +116,47 @@ export function LandingPage() {
       </main>
 
       <Footer />
+    </div>
+  )
+}
+
+function LandingActions({
+  capabilities,
+}: Readonly<{ capabilities: AppCapabilities }>) {
+  const t = useT()
+
+  if (!capabilities.isResolved) {
+    return null
+  }
+
+  if (capabilities.mode === 'spotify') {
+    return (
+      <Link to={APP_HOME_PATH} className={cn(buttonVariants({ size: 'lg' }))}>
+        {t('landing.ctaOpenApp')}
+        <ArrowRight aria-hidden className="size-4" />
+      </Link>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          to={APP_HOME_PATH}
+          className={cn(buttonVariants({ size: 'lg' }), 'animate-pulse-glow')}
+        >
+          {t('landing.ctaGuest')}
+          <ArrowRight aria-hidden className="size-4" />
+        </Link>
+        <ConnectSpotifyButton size="lg" variant="outline" />
+      </div>
+      <p className="flex items-start gap-1.5 text-sm text-cream-400">
+        <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+        {t('landing.trust')}
+      </p>
+      <p className="max-w-md text-sm text-cream-500">
+        {t('landing.spotifyAccess')}
+      </p>
     </div>
   )
 }

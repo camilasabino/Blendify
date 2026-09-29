@@ -169,7 +169,7 @@ test.describe('Create with AI destinations', () => {
 
     const reconnect = page.getByRole('main').getByRole('button', { name: 'Connect Spotify' })
     await expect(reconnect).toBeFocused()
-    const callbackUrl = new URL('/app/mix', page.url()).href
+    const callbackUrl = new URL('/app', page.url()).href
     await page.route('**/api/auth/spotify', (route) =>
       route.fulfill({ status: 302, headers: { location: callbackUrl } }),
     )

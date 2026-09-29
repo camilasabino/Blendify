@@ -153,10 +153,10 @@ describe('GET /api/auth/spotify/callback', () => {
     await app.close();
   });
 
-  it('keeps the successful flow intact', async () => {
+  it('sends a successful login to the application home', async () => {
     const response = await callback({ code: CODE, state: STATE }).expect(302);
 
-    expect(response.headers.location).toBe(`${FRONTEND}/app/mix`);
+    expect(response.headers.location).toBe(`${FRONTEND}/app`);
     expect(sessionCookie(response)).toBeDefined();
     expect(clearsOAuthState(response)).toBe(true);
     expect(users.upsertWithTokens).toHaveBeenCalledTimes(1);
