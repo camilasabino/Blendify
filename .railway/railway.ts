@@ -56,8 +56,36 @@ export default defineRailway(() => {
       SPOTIFY_CLIENT_SECRET: preserve(),
       JWT_SECRET: preserve(),
       LASTFM_API_KEY: preserve(),
+      AI_SERVICE_URL: 'http://ai.railway.internal:8000',
+      AI_SERVICE_TOKEN: preserve(),
     },
   })
 
-  return project('Blendify', { resources: [db, cache, api] })
+  const ai = service('ai', {
+    source: github('camilasabino/blendify', {
+      branch: 'main',
+      checkSuites: true,
+      rootDirectory: 'apps/ai',
+    }),
+    build: {
+      builder: 'RAILPACK',
+      watchPatterns: ['apps/ai/**'],
+    },
+    deploy: {
+      startCommand: 'python -m app.server',
+      healthcheckPath: '/health',
+      drainingSeconds: 30,
+    },
+    regions: { sfo: 1 },
+    env: {
+      AI_SERVICE_ENV: 'production',
+      PORT: '8000',
+      AI_PROVIDER: 'openai',
+      AI_MODEL: 'gpt-5.6-luna',
+      OPENAI_API_KEY: preserve(),
+      AI_SERVICE_TOKEN: preserve(),
+    },
+  })
+
+  return project('Blendify', { resources: [db, cache, api, ai] })
 })
