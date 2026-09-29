@@ -2111,9 +2111,14 @@
         "changed": [
           "genres"
         ],
-        "add": {
+        "addOneOf": {
           "genres": [
-            "argentine rock"
+            [
+              "argentine rock"
+            ],
+            [
+              "rock argentino"
+            ]
           ]
         },
         "remove": {
@@ -2269,9 +2274,14 @@
         "changed": [
           "genres"
         ],
-        "add": {
+        "addOneOf": {
           "genres": [
-            "argentine rock"
+            [
+              "argentine rock"
+            ],
+            [
+              "rock argentino"
+            ]
           ]
         },
         "remove": {
@@ -2464,9 +2474,14 @@
         "changed": [
           "genres"
         ],
-        "add": {
+        "addOneOf": {
           "genres": [
-            "argentine rock"
+            [
+              "argentine rock"
+            ],
+            [
+              "rock argentino"
+            ]
           ]
         },
         "remove": {

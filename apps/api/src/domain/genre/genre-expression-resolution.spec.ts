@@ -83,6 +83,22 @@ describe('resolveGenreExpression', () => {
   );
 
   it.each([
+    ['rock argentino', 'argentine-rock'],
+    ['Rock Argentino', 'argentine-rock'],
+    ['jazz brasileiro', 'brazilian-jazz'],
+    ['  JAZZ   brasileiro ', 'brazilian-jazz'],
+  ])(
+    'resolves the local form %s to the English-named catalog genre',
+    (expression, id) => {
+      expect(resolveGenreExpression(expression)).toMatchObject({
+        status: 'resolved',
+        match: 'alias',
+      });
+      expect(resolvedIds(expression)).toEqual([id]);
+    },
+  );
+
+  it.each([
     ['pop argentino', 'pop-argentino'],
     ['Trap Argentino', 'trap-argentino'],
     ['folklore argentino', 'folklore-argentino'],
@@ -147,7 +163,7 @@ describe('resolveGenreExpression', () => {
     ).toEqual(['musica-instrumental-cristiana']);
   });
 
-  it.each(['rock argentino', 'argentine folk rock', 'rock surf latin'])(
+  it.each(['argentine folk rock', 'rock surf latin'])(
     'rejects %s when its tokens only overlap catalog genres partially',
     (expression) => {
       expect(resolveGenreExpression(expression)).toEqual({

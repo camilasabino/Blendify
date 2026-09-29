@@ -57,6 +57,7 @@ EXPECTATION_KEYS = frozenset(
         "setIfChanged",
         "clear",
         "add",
+        "addOneOf",
         "remove",
         "removeOneOf",
         "unsupportedCategories",
@@ -197,12 +198,12 @@ def _check_lists(expect: dict[str, Any], lists: dict[str, ListPatch]) -> list[st
                 failures.append(
                     f"{direction}: expected {path} {expected_items}, got {actual_items}"
                 )
-    for path, alternatives in expect.get("removeOneOf", {}).items():
-        actual_items = _comparable(lists[path].remove)
-        if actual_items not in [_comparable(items) for items in alternatives]:
-            failures.append(
-                f"removeOneOf: expected {path} one of {alternatives}, got {actual_items}"
-            )
+        for path, alternatives in expect.get(f"{direction}OneOf", {}).items():
+            actual_items = _comparable(getattr(lists[path], direction))
+            if actual_items not in [_comparable(items) for items in alternatives]:
+                failures.append(
+                    f"{direction}OneOf: expected {path} one of {alternatives}, got {actual_items}"
+                )
     return failures
 
 

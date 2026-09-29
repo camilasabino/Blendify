@@ -402,6 +402,48 @@ describe('genre refinement through the deterministic curated resolver', () => {
     ).toEqual({ status: 'unchanged' });
   });
 
+  it('adds a local-language genre expression through its curated alias', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: ['rock argentino'], remove: [] } }),
+        genreIntent(['indie rock']),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['indie rock', 'rock argentino'] },
+    });
+    expect(
+      evaluate(
+        interpreted({ genres: { add: ['jazz brasileiro'], remove: [] } }),
+        genreIntent(['indie rock']),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['indie rock', 'jazz brasileiro'] },
+    });
+  });
+
+  it('removes a genre named by its local-language alias', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: [], remove: ['rock argentino'] } }),
+        genreIntent(['argentine rock', 'indie rock']),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['indie rock'] },
+    });
+  });
+
+  it('treats adding the local-language alias of a present genre as unchanged', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: ['jazz brasileiro'], remove: [] } }),
+        genreIntent(['brazilian jazz']),
+      ),
+    ).toEqual({ status: 'unchanged' });
+  });
+
   it('swaps a genre for instrumental music through its curated genres', () => {
     expect(
       evaluate(

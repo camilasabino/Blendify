@@ -922,8 +922,13 @@
         "outcome": "interpreted",
         "kind": "genre_mix",
         "artists": [],
-        "genres": [
-          "argentine rock"
+        "genresOneOf": [
+          [
+            "argentine rock"
+          ],
+          [
+            "rock argentino"
+          ]
         ],
         "targetDurationMinutes": 60,
         "unsupportedCategories": []
@@ -937,8 +942,13 @@
         "outcome": "interpreted",
         "kind": "genre_mix",
         "artists": [],
-        "genres": [
-          "argentine rock"
+        "genresOneOf": [
+          [
+            "rock argentino"
+          ],
+          [
+            "argentine rock"
+          ]
         ],
         "unsupportedCategories": []
       }
@@ -951,8 +961,13 @@
         "outcome": "interpreted",
         "kind": "genre_mix",
         "artists": [],
-        "genres": [
-          "argentine rock"
+        "genresOneOf": [
+          [
+            "rock argentino"
+          ],
+          [
+            "argentine rock"
+          ]
         ],
         "targetDurationMinutes": 60,
         "unsupportedCategories": []
@@ -1087,8 +1102,13 @@
         "outcome": "interpreted",
         "kind": "genre_mix",
         "artists": [],
-        "genres": [
-          "argentine rock"
+        "genresOneOf": [
+          [
+            "argentine rock"
+          ],
+          [
+            "rock argentino"
+          ]
         ],
         "unsupportedCategories": []
       }
@@ -1207,8 +1227,13 @@
         "outcome": "interpreted",
         "kind": "genre_mix",
         "artists": [],
-        "genres": [
-          "argentine rock"
+        "genresOneOf": [
+          [
+            "rock argentino"
+          ],
+          [
+            "argentine rock"
+          ]
         ],
         "unsupportedCategories": []
       }
@@ -1221,8 +1246,13 @@
         "outcome": "interpreted",
         "kind": "genre_mix",
         "artists": [],
-        "genres": [
-          "brazilian jazz"
+        "genresOneOf": [
+          [
+            "jazz brasileiro"
+          ],
+          [
+            "brazilian jazz"
+          ]
         ],
         "unsupportedCategories": []
       }

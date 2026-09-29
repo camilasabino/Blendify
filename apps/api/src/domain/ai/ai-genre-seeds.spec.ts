@@ -65,6 +65,29 @@ describe('resolveCuratedGenreSeeds', () => {
     });
   });
 
+  it('resolves local-language genre expressions to their English-named catalog seeds', () => {
+    expect(
+      resolveCuratedGenreSeeds(['rock argentino', 'jazz brasileiro']),
+    ).toEqual({
+      genres: [
+        { id: 'argentine-rock', name: 'Argentine Rock' },
+        { id: 'brazilian-jazz', name: 'Brazilian Jazz' },
+      ],
+      unknown: [],
+      ambiguous: [],
+    });
+  });
+
+  it('resolves a local-language form and its English catalog name to one seed', () => {
+    expect(
+      resolveCuratedGenreSeeds(['argentine rock', 'rock argentino']),
+    ).toEqual({
+      genres: [{ id: 'argentine-rock', name: 'Argentine Rock' }],
+      unknown: [],
+      ambiguous: [],
+    });
+  });
+
   it('never accepts custom genre ids through the AI path', () => {
     expect(resolveCuratedGenreSeeds(['custom:acid%20jazz'])).toEqual({
       genres: [],
@@ -92,6 +115,8 @@ describe('aiGenreKey', () => {
     expect(aiGenreKey('indie rock')).not.toBe(aiGenreKey('rock'));
     expect(aiGenreKey('Argentine pop')).toBe(aiGenreKey('pop argentino'));
     expect(aiGenreKey('brazilian popular music')).toBe(aiGenreKey('MPB'));
+    expect(aiGenreKey('rock argentino')).toBe(aiGenreKey('Argentine Rock'));
+    expect(aiGenreKey('jazz brasileiro')).toBe(aiGenreKey('brazilian jazz'));
     expect(aiGenreKey('instrumental')).not.toBe(
       aiGenreKey('instrumental rock'),
     );

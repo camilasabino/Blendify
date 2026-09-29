@@ -88,9 +88,6 @@ def test_historical_v3_dataset_stays_frozen_and_inside_v4() -> None:
 
 GENRE_COVERAGE = {
     "es": {
-        "es-genre-place-rock-de-argentina": ["argentine rock"],
-        "es-genre-place-rock-argentino": ["argentine rock"],
-        "es-genre-place-hour": ["argentine rock"],
         "es-artist-nationality-artists-of-rock": ["rock"],
         "es-artist-nationality-rock-by-artists": ["rock"],
         "es-genre-instrumental": ["instrumental"],
@@ -100,7 +97,6 @@ GENRE_COVERAGE = {
         "es-genre-unknown-fictional": ["glorptrance"],
     },
     "en": {
-        "en-genre-place-argentine-rock": ["argentine rock"],
         "en-artist-nationality-rock-by-artists": ["rock"],
         "en-genre-instrumental": ["instrumental"],
         "en-genre-instrumental-calm": ["instrumental"],
@@ -109,7 +105,6 @@ GENRE_COVERAGE = {
         "en-genre-unknown-fictional": ["glorptrance"],
     },
     "pt": {
-        "pt-genre-place-rock-argentino": ["argentine rock"],
         "pt-artist-nationality-rock-by-artists": ["rock"],
         "pt-genre-instrumental": ["instrumental"],
         "pt-genre-instrumental-calm": ["instrumental"],
@@ -128,6 +123,12 @@ def test_dataset_covers_genre_semantics_in_each_language(language: str) -> None:
 
 
 LOCAL_GENRE_ALTERNATIVES = {
+    "es-genre-place-rock-de-argentina": ("es", "argentine rock", "rock argentino"),
+    "es-genre-place-rock-argentino": ("es", "rock argentino", "argentine rock"),
+    "es-genre-place-hour": ("es", "rock argentino", "argentine rock"),
+    "en-genre-place-argentine-rock": ("en", "argentine rock", "rock argentino"),
+    "pt-genre-place-rock-argentino": ("pt", "rock argentino", "argentine rock"),
+    "pt-genre-place-jazz-brasileiro": ("pt", "jazz brasileiro", "brazilian jazz"),
     "es-genre-local-pop-argentino": ("es", "pop argentino", "argentine pop"),
     "es-genre-local-trap-argentino": ("es", "trap argentino", "argentine trap"),
     "es-genre-local-folklore-argentino": ("es", "folklore argentino", "argentine folklore"),
@@ -136,6 +137,45 @@ LOCAL_GENRE_ALTERNATIVES = {
     "pt-genre-local-trap-brasileiro": ("pt", "trap brasileiro", "brazilian trap"),
     "pt-genre-local-mpb": ("pt", "mpb", "brazilian popular music"),
 }
+
+
+APPROVED_GENRE_EQUIVALENTS = {
+    frozenset(forms) for _language, *forms in LOCAL_GENRE_ALTERNATIVES.values()
+}
+
+
+def test_dataset_offers_genre_alternatives_only_for_approved_equivalents() -> None:
+    with_alternatives = {case.id for case in CASES if "genresOneOf" in case.expect}
+
+    assert with_alternatives == set(LOCAL_GENRE_ALTERNATIVES)
+    assert {
+        frozenset({"pop argentino", "argentine pop"}),
+        frozenset({"trap argentino", "argentine trap"}),
+        frozenset({"folklore argentino", "argentine folklore"}),
+        frozenset({"funk carioca", "brazilian funk"}),
+        frozenset({"trap brasileiro", "brazilian trap"}),
+        frozenset({"mpb", "brazilian popular music"}),
+        frozenset({"rock argentino", "argentine rock"}),
+        frozenset({"jazz brasileiro", "brazilian jazz"}),
+    } == APPROVED_GENRE_EQUIVALENTS
+
+
+def test_check_accepts_only_the_approved_forms_of_a_local_genre() -> None:
+    by_id = {case.id: case.expect for case in CASES}
+    rock = by_id["es-genre-place-rock-argentino"]
+    jazz = by_id["pt-genre-place-jazz-brasileiro"]
+
+    def failed_keys(expect: dict[str, Any], genres: list[str]) -> list[str]:
+        result = interpretation(kind="genre_mix", artists=[], excludeArtists=[], genres=genres)
+        return [failure.split(":")[0] for failure in check_case(expect, result)]
+
+    assert failed_keys(rock, ["Rock Argentino"]) == []
+    assert failed_keys(rock, ["argentine rock"]) == []
+    assert failed_keys(jazz, ["jazz brasileiro"]) == []
+    assert failed_keys(jazz, ["Brazilian Jazz"]) == []
+    for genres in (["rock"], ["rock nacional"], ["rock de argentina"], ["argentine rock", "rock"]):
+        assert failed_keys(rock, genres) == ["genresOneOf"]
+    assert failed_keys(jazz, ["jazz"]) == ["genresOneOf"]
 
 
 @pytest.mark.parametrize("case_id", sorted(LOCAL_GENRE_ALTERNATIVES))

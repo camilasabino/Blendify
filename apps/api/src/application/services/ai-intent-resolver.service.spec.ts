@@ -145,6 +145,30 @@ describe('AiIntentResolver', () => {
     expect(catalog.searchTracks).not.toHaveBeenCalled();
   });
 
+  it('resolves local-language genre expressions through the curated aliases', async () => {
+    const { catalog, resolver } = createResolver();
+
+    const resolution = await resolver.resolve(
+      intent({
+        kind: 'genre_mix',
+        genres: ['rock argentino', 'jazz brasileiro'],
+      }),
+    );
+
+    expect(resolution).toEqual({
+      status: 'resolved',
+      seeds: {
+        artists: [],
+        genres: [
+          { id: 'argentine-rock', name: 'Argentine Rock' },
+          { id: 'brazilian-jazz', name: 'Brazilian Jazz' },
+        ],
+        track: null,
+      },
+    });
+    expect(catalog.searchArtists).not.toHaveBeenCalled();
+  });
+
   it('never executes an ambiguous genre expression', async () => {
     const { catalog, resolver } = createResolver();
 

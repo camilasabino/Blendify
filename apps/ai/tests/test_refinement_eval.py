@@ -30,6 +30,8 @@ DATASET_VERSION, CASES = load_dataset()
 HISTORICAL_V1_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v1.json"
 HISTORICAL_V1_DATASET_SHA256 = "05a16b4a7888c4d8a6e1a8b1da08d0d5e9542b78039f9560f066aa5457dccc17"
 CASES_BY_ID = {case.id: case for case in CASES}
+LOCAL_GENRE_ADDITIONS = ("es-add-genre-place", "en-add-genre-place", "pt-add-genre-place")
+ARGENTINE_ROCK_ADDITION = {"genres": [["argentine rock"], ["rock argentino"]]}
 V1_CASES_WITH_A_REQUIRED_CLARIFICATION_REASON = {
     "en-shorter-ambiguous": "ambiguous_request",
     "en-few-more-songs-ambiguous": "ambiguous_request",
@@ -144,8 +146,9 @@ def test_historical_v1_dataset_stays_frozen_and_inside_v2() -> None:
 
 
 def test_genre_refinements_expect_normalized_additions_and_literal_removals() -> None:
-    for case_id in ("es-add-genre-place", "en-add-genre-place", "pt-add-genre-place"):
-        assert CASES_BY_ID[case_id].expect["add"] == {"genres": ["argentine rock"]}
+    for case_id in LOCAL_GENRE_ADDITIONS:
+        assert "add" not in CASES_BY_ID[case_id].expect
+        assert CASES_BY_ID[case_id].expect["addOneOf"] == ARGENTINE_ROCK_ADDITION
     for case_id in ("es-remove-genre", "en-remove-genre"):
         case = CASES_BY_ID[case_id]
         assert case.expect["remove"] == {"genres": ["indie rock"]}
@@ -175,6 +178,63 @@ def test_a_local_genre_named_in_english_may_be_removed_by_its_supported_alias() 
     assert check_refinement_case(case.expect, parsed(other)) == [
         "removeOneOf: expected genres one of [['pop argentino'], ['argentine pop']], "
         "got ['indie rock']"
+    ]
+
+
+def genre_output(*, add: list[str], remove: list[str]) -> Any:
+    return parsed(refinement_output(patch=unchanged_patch(genres={"add": add, "remove": remove})))
+
+
+def test_only_add_expectations_offer_genre_alternatives_and_only_approved_equivalents() -> None:
+    offered = {case.id: case.expect["addOneOf"] for case in CASES if "addOneOf" in case.expect}
+
+    assert offered == dict.fromkeys(LOCAL_GENRE_ADDITIONS, ARGENTINE_ROCK_ADDITION)
+
+
+@pytest.mark.parametrize("case_id", LOCAL_GENRE_ADDITIONS)
+@pytest.mark.parametrize("added", [["argentine rock"], ["rock argentino"], ["Rock Argentino"]])
+def test_accepts_either_approved_form_of_an_added_local_genre(
+    case_id: str, added: list[str]
+) -> None:
+    expect = CASES_BY_ID[case_id].expect
+
+    assert check_refinement_case(expect, genre_output(add=added, remove=[])) == []
+
+
+@pytest.mark.parametrize(
+    "added",
+    [["rock"], ["rock nacional"], ["rock de argentina"], ["argentine rock", "rock"]],
+)
+def test_rejects_unrelated_or_extra_forms_of_an_added_local_genre(added: list[str]) -> None:
+    expect = CASES_BY_ID["es-add-genre-place"].expect
+
+    assert check_refinement_case(expect, genre_output(add=added, remove=[])) == [
+        "addOneOf: expected genres one of [['argentine rock'], ['rock argentino']], "
+        f"got {sorted(added)}"
+    ]
+
+
+def test_genre_alternatives_keep_additions_and_removals_distinct() -> None:
+    add_expect = CASES_BY_ID["es-add-genre-place"].expect
+    remove_expect = {
+        "outcome": "interpreted",
+        "changed": ["genres"],
+        "removeOneOf": ARGENTINE_ROCK_ADDITION,
+        "add": {"genres": []},
+    }
+
+    assert check_refinement_case(add_expect, genre_output(add=[], remove=["rock argentino"])) == [
+        "addOneOf: expected genres one of [['argentine rock'], ['rock argentino']], got []",
+        "remove: expected genres [], got ['rock argentino']",
+    ]
+    assert (
+        check_refinement_case(remove_expect, genre_output(add=[], remove=["rock argentino"])) == []
+    )
+    assert check_refinement_case(
+        remove_expect, genre_output(add=["rock argentino"], remove=[])
+    ) == [
+        "add: expected genres [], got ['rock argentino']",
+        "removeOneOf: expected genres one of [['argentine rock'], ['rock argentino']], got []",
     ]
 
 
@@ -222,6 +282,7 @@ def test_every_expectation_uses_known_keys_paths_and_vocabularies(case: Any) -> 
         *expect.get("setIfChanged", {}),
         *expect.get("clear", []),
         *expect.get("add", {}),
+        *expect.get("addOneOf", {}),
         *expect.get("remove", {}),
         *expect.get("removeOneOf", {}),
     ]
