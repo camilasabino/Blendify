@@ -37,6 +37,7 @@ jobs:
       - run: npm run build:web
         env:
           VITE_API_URL: https://api.blendify.camilasabino.dev
+          VITE_AI_CREATION_ENABLED: 'true'
 
       - name: Deploy to Cloudflare Workers
         run: npx wrangler@4 deploy --config apps/web/wrangler.jsonc

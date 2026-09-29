@@ -84,7 +84,8 @@ is uploaded by CI:
   `workflow_run` once "CI" finishes on `main`, and only runs its `deploy` job
   when that CI run's conclusion is `success`. It checks out the exact commit
   CI tested (`workflow_run.head_sha`), runs `npm run build:web` with
-  `VITE_API_URL=https://api.blendify.camilasabino.dev`, then
+  `VITE_API_URL=https://api.blendify.camilasabino.dev` and
+  `VITE_AI_CREATION_ENABLED=true`, then
   `npx wrangler@4 deploy --config apps/web/wrangler.jsonc` using the
   `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` repository secrets
   (section 8.1), followed by a non-destructive HTTP smoke check against
@@ -141,7 +142,7 @@ Manual deploy from a local clean checkout is still available as a fallback:
 ```sh
 nvm use                      # Node 22 from .nvmrc
 npm ci
-VITE_API_URL=https://api.blendify.camilasabino.dev npm run build:web
+VITE_API_URL=https://api.blendify.camilasabino.dev VITE_AI_CREATION_ENABLED=true npm run build:web
 npx wrangler@4 deploy --config apps/web/wrangler.jsonc
 ```
 
@@ -659,7 +660,7 @@ dashboard variables.
 | Variable | Required | Secret | Value |
 |---|---|---|---|
 | `VITE_API_URL` | Yes (build fails otherwise) | No, public | `https://api.blendify.camilasabino.dev` |
-| `VITE_AI_CREATION_ENABLED` | No (production builds hide `/app/ai` unless it is `true`) | No, public | Unset (not in `deploy-web.yml`) until the AI rollout is approved |
+| `VITE_AI_CREATION_ENABLED` | No (production builds hide `/app/ai` unless it is `true`) | No, public | `true` |
 
 ### 8.1.1 GitHub Actions secrets and variables (repository level)
 
@@ -1287,9 +1288,9 @@ production builds only when `VITE_AI_CREATION_ENABLED=true` is in the
 `build:web` step of `deploy-web.yml` (development builds show it by default).
 Without it, a direct visit to `/app/ai` redirects to `/` and the SPA sends no
 `/api/ai/*` request. The flag is a build-time value: changing it needs a new
-web build and deploy, and it is not a runtime kill switch. Enable it only
-after the provider-backed production smoke (Guest and Spotify Mode) and the
-VoiceOver check have passed.
+web build and deploy, and it is not a runtime kill switch. Production builds
+set it to `true`; it was enabled only after the provider-backed production
+smoke (Guest and Spotify Mode) and the VoiceOver check had passed.
 
 | Problem | Action | Effect |
 |---|---|---|
@@ -1323,11 +1324,15 @@ Deployment order (dependencies first; each step is its own reviewed change):
    shows only the known drift of section 4.3.
 5. With the web flag still off, an authorized real-model smoke through the
    API, then an authorized provider-backed smoke (Guest and Spotify Mode,
-   including refinement and reauthorization), then the VoiceOver check.
+   including refinement and an explicit publish), then the VoiceOver check.
 6. Add `VITE_AI_CREATION_ENABLED=true` to the `build:web` step of
    `deploy-web.yml` and push.
+7. Through the public `/app/ai` UI, a Guest smoke and a Spotify
+   reauthorization smoke (revoked access, `Save to Spotify`, `Connect
+   Spotify`, return to the restored session without an automatic publish).
 
-Steps 1–4 are complete in production; the web flag is still off.
+Steps 1–6 are complete in production; the web build sets
+`VITE_AI_CREATION_ENABLED=true`.
 
 `railway config apply` is not used for this service: its plan always contains
 the Redis memory-cap removal of section 4.3. Change `ai` explicitly (dashboard
