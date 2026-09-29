@@ -880,6 +880,12 @@ tests → remove the generated Railway domain.
 
 ## 13. Post-deploy smoke tests
 
+These checks verify the deployment and environment-specific integration
+(hosting, networking, OAuth callback, production configuration). They are not
+a substitute for local functional validation: functional fixes are reproduced
+and validated locally first (see `docs/engineering/code-conventions.md` →
+Testing).
+
 ### Guest (signed out, fresh browser profile)
 
 - [ ] `https://blendify.camilasabino.dev` loads; a hard reload on

@@ -85,6 +85,10 @@ Never execute paid/external AI-provider calls or real-model evals without explic
 
 No normal command (dev, start, test, lint, format, build, git/install hooks, CI) may trigger a real model call. `eval:ai` stays manual-only: it refuses to run unless `OPENAI_API_KEY`, `AI_PROVIDER=openai`, `AI_MODEL`, a command-line `ALLOW_PAID_AI_EVALS=true` (never persisted in an env file), and `--confirm` are all present.
 
+## Functional fixes are local-first
+
+Reproduce, debug and validate functional changes and bug fixes locally (deterministic tests, local services, mocks, local E2E) before any commit or deploy. Never use production to discover, reproduce, debug or iteratively validate a functional bug, and never deploy just to prove a fix that can be validated representatively in local development. Post-deploy production checks stay minimal and non-destructive: deployment/infrastructure/configuration health and integration properties that cannot be represented locally (real hosting/networking, production OAuth callback configuration, an explicitly authorized provider smoke). Production smokes never substitute for missing local regression coverage, and the paid-provider approval rule above still applies. Full rule: `docs/engineering/code-conventions.md` → Testing.
+
 ## Quality analysis
 
 CI sends coverage/analysis for API, web, and contracts to SonarCloud (`sonar-project.properties`). SonarCloud Automatic Analysis must stay disabled for the CI-based scan to run.

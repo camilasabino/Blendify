@@ -305,6 +305,30 @@ abstraction for control flow that's local to one file.
   land in `apps/web/test-results/` and `apps/web/playwright-report/`, both
   gitignored.
 
+### Validation environment: functional fixes are local-first
+
+- Reproduce every functional bug locally before fixing it: a failing
+  deterministic test, or a local run against the real local HTTP boundary
+  (Nest app with the production middleware order, local PostgreSQL/Redis,
+  mocked providers, local E2E), with representative inputs measured locally.
+- Implement the fix and its regression test locally, and complete all
+  functional validation (`lint`, `format:check`, `test`, `build`, and the
+  AI-service checks when relevant) before committing or pushing.
+- Production is never the primary environment to discover, reproduce, debug or
+  iteratively validate a functional bug. A deploy is not required to prove a
+  fix that local development can represent meaningfully, and no artificial
+  production request should be built just to confirm a code change.
+- After a deploy, production checks stay minimal and non-destructive. They
+  cover deployment, infrastructure and configuration health, plus integration
+  properties that cannot be represented locally: real hosting/networking,
+  production OAuth callback and cookie/origin configuration, or an explicitly
+  authorized provider integration smoke.
+- Production smokes never substitute for missing local regression coverage;
+  if a production check finds a functional bug, add the local reproduction and
+  regression test first.
+- This does not relax the paid-provider rule: real OpenAI/model/provider calls
+  still need explicit approval for each run.
+
 ## Key smells to keep watching for
 
 - Broad `catch` blocks that swallow a real bug alongside an expected failure
