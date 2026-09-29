@@ -35,6 +35,22 @@ describe('bodyLimitFor', () => {
     expect(bodyLimitFor('POST', '/api/transfers')).toBe('64kb');
   });
 
+  it('matches a route parameter against exactly one path segment', () => {
+    expect(bodyLimitFor('POST', '/api/ai/sessions/abc123/publish')).toBe(
+      '512kb',
+    );
+    expect(bodyLimitFor('POST', '/API/AI/Sessions/abc123/Publish/')).toBe(
+      '512kb',
+    );
+    expect(bodyLimitFor('GET', '/api/ai/sessions/abc123/publish')).toBe('16kb');
+    expect(bodyLimitFor('POST', '/api/ai/sessions//publish')).toBe('16kb');
+    expect(bodyLimitFor('POST', '/api/ai/sessions/a/b/publish')).toBe('16kb');
+    expect(bodyLimitFor('POST', '/api/ai/sessions/abc123/transfer')).toBe(
+      '16kb',
+    );
+    expect(bodyLimitFor('POST', '/api/ai/sessions')).toBe('16kb');
+  });
+
   it('declares the approved profiles', () => {
     expect(BODY_LIMITS).toEqual({
       default: '16kb',
@@ -43,7 +59,7 @@ describe('bodyLimitFor', () => {
       publicGeneration: '32kb',
       transfer: '64kb',
     });
-    expect(ROUTE_BODY_LIMITS).toHaveLength(6);
+    expect(ROUTE_BODY_LIMITS).toHaveLength(7);
   });
 });
 
@@ -74,6 +90,24 @@ describe('createBodyParser', () => {
       .post('/api/playlists/mix')
       .set('Content-Type', 'application/json')
       .send(jsonOfSize(530_000))
+      .expect(413);
+  });
+
+  it('accepts AI publish cover payloads above the default limit', async () => {
+    await request(app())
+      .post('/api/ai/sessions/abc123/publish')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfSize(450_000))
+      .expect(200);
+    await request(app())
+      .post('/api/ai/sessions/abc123/publish')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfSize(530_000))
+      .expect(413);
+    await request(app())
+      .post('/api/ai/sessions/abc123/transfer')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfSize(17_000))
       .expect(413);
   });
 

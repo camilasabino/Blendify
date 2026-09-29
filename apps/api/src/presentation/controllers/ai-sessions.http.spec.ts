@@ -96,6 +96,7 @@ function sessionRoute(sessionKey: string, suffix = ''): string {
 const PROMPT = '30 deep cuts from Radiohead and Interpol, no Coldplay';
 const INTERPRET_LIMIT = 3;
 const GENERATION_LIMIT = 2;
+const MAX_COVER_IMAGE_BASE64_LENGTH = 400_000;
 
 function interpreted(
   overrides: Record<string, unknown> = {},
@@ -1626,6 +1627,44 @@ describe('Create with AI sessions over HTTP', () => {
       });
       expect(world.playlists.save).not.toHaveBeenCalled();
       expect(world.usageStats.recordMix).toHaveBeenCalledTimes(1);
+    });
+
+    it('accepts the largest supported cover image with the publish request', async () => {
+      const owner = await sessionCookie('user-1');
+      const sessionKey = await generatedSession(owner);
+      const coverImageBase64 = 'A'.repeat(MAX_COVER_IMAGE_BASE64_LENGTH);
+
+      const response = await publish(
+        sessionKey,
+        { ...PUBLISH, coverImageBase64 },
+        owner,
+      ).expect(200);
+
+      expect(response.headers['access-control-allow-origin']).toBe(FRONTEND);
+      expect(AiSessionStateSchema.parse(response.body).destination).toEqual({
+        status: 'published',
+        spotifyUrl: SPOTIFY_PLAYLIST.url,
+        savedToLibrary: true,
+      });
+      expect(world.spotify.uploadPlaylistCover).toHaveBeenCalledWith(
+        SPOTIFY_PLAYLIST.id,
+        coverImageBase64,
+      );
+    });
+
+    it('rejects a publish request above the route body limit before any side effect', async () => {
+      const owner = await sessionCookie('user-1');
+      const sessionKey = await generatedSession(owner);
+
+      const response = await publish(
+        sessionKey,
+        { ...PUBLISH, coverImageBase64: 'A'.repeat(530_000) },
+        owner,
+      ).expect(413);
+
+      expect(response.body).toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
+      expect(world.stored.get(sessionKey)?.destination).toBeNull();
+      expectNoDestinationSideEffects();
     });
 
     it('never accepts browser-supplied playlist contents or an invalid name', async () => {

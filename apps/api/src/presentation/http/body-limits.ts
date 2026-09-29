@@ -46,6 +46,11 @@ export const ROUTE_BODY_LIMITS: RouteBodyLimit[] = [
     limit: BODY_LIMITS.publicGeneration,
   },
   { method: 'POST', path: '/api/transfers', limit: BODY_LIMITS.transfer },
+  {
+    method: 'POST',
+    path: '/api/ai/sessions/:sessionId/publish',
+    limit: BODY_LIMITS.spotifyGeneration,
+  },
 ];
 
 export function bodyLimitFor(
@@ -55,11 +60,11 @@ export function bodyLimitFor(
   defaultLimit: string = BODY_LIMITS.default,
 ): string {
   const normalizedMethod = method.toUpperCase();
-  const normalizedPath = normalizePath(path);
+  const pathSegments = normalizePath(path).split('/');
   const route = routes.find(
     (candidate) =>
       candidate.method === normalizedMethod &&
-      normalizePath(candidate.path) === normalizedPath,
+      matchesPath(normalizePath(candidate.path).split('/'), pathSegments),
   );
   return route?.limit ?? defaultLimit;
 }
@@ -125,6 +130,17 @@ export function bodyParserErrorResponse(error: unknown): ApiErrorResponse {
     code: 'INVALID_REQUEST_BODY',
     message: 'Invalid request body.',
   };
+}
+
+function matchesPath(pattern: string[], segments: string[]): boolean {
+  return (
+    pattern.length === segments.length &&
+    pattern.every(
+      (part, index) =>
+        part === segments[index] ||
+        (part.startsWith(':') && segments[index] !== ''),
+    )
+  );
 }
 
 function normalizePath(path: string): string {
