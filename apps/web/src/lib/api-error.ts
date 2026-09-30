@@ -89,12 +89,29 @@ export function formatWaitLabel(
     return null
   }
   if (seconds < 90) {
-    return t('errors.wait.seconds', { n: Math.ceil(seconds) })
+    return waitCountLabel(t, Math.ceil(seconds), 'errors.wait.oneSecond', 'errors.wait.seconds')
   }
   if (seconds < 3600) {
-    return t('errors.wait.minutes', { n: Math.ceil(seconds / 60) })
+    return waitCountLabel(
+      t,
+      Math.ceil(seconds / 60),
+      'errors.wait.oneMinute',
+      'errors.wait.minutes',
+    )
   }
-  return t('errors.wait.hours', { n: Math.ceil(seconds / 3600) })
+  return waitCountLabel(t, Math.ceil(seconds / 3600), 'errors.wait.oneHour', 'errors.wait.hours')
+}
+
+function waitCountLabel(
+  t: Translate,
+  n: number,
+  one: 'errors.wait.oneSecond' | 'errors.wait.oneMinute' | 'errors.wait.oneHour',
+  many: 'errors.wait.seconds' | 'errors.wait.minutes' | 'errors.wait.hours',
+): string {
+  if (n === 1) {
+    return t(one)
+  }
+  return t(many, { n })
 }
 
 function formatRetryWaitLabel(

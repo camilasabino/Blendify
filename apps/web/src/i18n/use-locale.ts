@@ -4,9 +4,9 @@ import { isLocale, type Locale } from './messages'
 const STORAGE_KEY = 'blendify.locale'
 
 const META_DESCRIPTION: Record<Locale, string> = {
-  en: 'Blendify — Create and discover Spotify playlists.',
-  es: 'Blendify — Crea y descubre playlists en Spotify.',
-  pt: 'Blendify — Crie e descubra playlists no Spotify.',
+  en: 'Blendify builds playlists from artists, genres, or a song. Connect Spotify to save them.',
+  es: 'Blendify arma playlists a partir de artistas, géneros o una canción. Conecta Spotify para guardarlas.',
+  pt: 'O Blendify monta playlists a partir de artistas, gêneros ou uma música. Conecte o Spotify para salvá-las.',
 }
 
 export const DOCUMENT_TITLE: Record<Locale, string> = {

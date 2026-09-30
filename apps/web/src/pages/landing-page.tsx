@@ -163,7 +163,10 @@ function LandingActions({
 
 function HeroDemo() {
   const t = useT()
-  const playlistName = buildDefaultPlaylistName({ names: DEMO_ARTISTS })
+  const playlistName = buildDefaultPlaylistName({
+    names: DEMO_ARTISTS,
+    translate: t,
+  })
 
   return (
     <div className="w-full max-w-md rounded-feature border border-accent-line/40 bg-panel bg-linear-to-br from-amber-500/[0.12] to-transparent to-60% p-5 shadow-[0_0_80px_-24px_rgb(232_168_56_/_0.45)] sm:p-6">

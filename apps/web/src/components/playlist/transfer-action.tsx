@@ -120,10 +120,14 @@ export function SoundiizTransfer({
       {transfer && continueUrl ? (
         <div className="space-y-3">
           <output className="block text-xs text-cream-400">
-            {t('transfer.ready', {
-              count: transfer.trackCount,
-              expires: formatDateTime(transfer.expiresAt, locale),
-            })}
+            {transfer.trackCount === 1
+              ? t('transfer.readyOne', {
+                  expires: formatDateTime(transfer.expiresAt, locale),
+                })
+              : t('transfer.readyMany', {
+                  count: transfer.trackCount,
+                  expires: formatDateTime(transfer.expiresAt, locale),
+                })}
           </output>
           <a
             ref={continueRef}

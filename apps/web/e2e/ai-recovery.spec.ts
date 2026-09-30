@@ -106,7 +106,7 @@ test.describe('Create with AI failure recovery', () => {
     await page.getByRole('button', { name: 'Try again' }).click()
 
     await expect(page.getByRole('heading', { name: 'Here’s what Blendify understood' })).toBeFocused()
-    await expect(page.getByRole('button', { name: 'Create playlist' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Create preview' })).toBeEnabled()
     expect(interpretations.map((request) => request.postDataJSON())).toEqual([
       { prompt: AI_REVIEW_PROMPT },
       { prompt: AI_REVIEW_PROMPT },
@@ -140,7 +140,7 @@ test.describe('Create with AI failure recovery', () => {
     })
     await page.goto('/app/ai')
     await submitPrompt(page)
-    await page.getByRole('button', { name: 'Create playlist' }).click()
+    await page.getByRole('button', { name: 'Create preview' }).click()
 
     await expect(page.getByRole('heading', { name: 'Couldn’t create your playlist' })).toBeFocused()
     await expect(page.getByRole('alert')).toHaveText(

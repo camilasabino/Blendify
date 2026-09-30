@@ -203,7 +203,7 @@ describe('Create with AI refinement', () => {
       'section',
     ) as HTMLElement
     expect(within(review).getByText('Familiarity')).toBeInTheDocument()
-    expect(within(review).getByText('Deep cuts')).toBeInTheDocument()
+    expect(within(review).getByText('Lesser-known')).toBeInTheDocument()
     expect(within(review).getByText('Popular')).toBeInTheDocument()
     expect(within(review).getByText('Replacements')).toBeInTheDocument()
     expect(within(review).getByText('“more energetic”')).toBeInTheDocument()
@@ -540,7 +540,7 @@ describe('Create with AI refinement', () => {
     )
     const textarea = await openComposer(user)
 
-    expect(screen.getByText('Songs already kept in place: 1')).toBeInTheDocument()
+    expect(screen.getByText('1 song already kept in place')).toBeInTheDocument()
     expect(screen.queryByRole('checkbox', { name: 'Keep “Song 1” in place' })).toBeNull()
     expect(screen.getByRole('checkbox', { name: 'Keep “Song 3” in place' })).toBeChecked()
     await user.click(screen.getByRole('checkbox', { name: 'Keep “Song 2” in place' }))

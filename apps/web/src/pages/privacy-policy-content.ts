@@ -63,10 +63,10 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
           [
             'your Spotify user ID, display name, email address and profile image URL;',
             'the Spotify access token and refresh token, and when the access token expires — kept on the server, never sent to your browser, and used only to call Spotify on your behalf;',
-            'the playlists you choose to save to your Blendify library: name, description, tracks, the recipe used to build them and the Spotify link;',
-            'usage counters: how many mixes you have created, and which artists and genres you used as seeds and how often.',
+            'the playlists you choose to save to your Blendify library: name, description, songs, the settings used to build them and the Spotify link;',
+            'usage counters: how many mixes you have created, which artists and genres you started from, and how often.',
           ],
-          'Blendify reads the IDs of the playlists in your Spotify account so it can tell which of the playlists it created are still there. It does not read your listening history or your saved tracks, and it does not read the contents of playlists it did not create. When you publish a mix, Blendify writes that playlist — and its cover image, if you add one — to your Spotify account. Playback controls list your active Spotify devices and start playback on the one you pick; those devices are used live and not stored.',
+          'Blendify reads the IDs of the playlists in your Spotify account so it can tell which of the playlists it created are still there. It does not read your listening history or your saved tracks, and it does not read the contents of playlists it did not create. When you save a mix to Spotify, Blendify writes that private playlist — and its cover image, if you add one — to your Spotify account. Playback controls list your active Spotify devices and start playback on the one you pick; those devices are used live and not stored.',
         ],
       },
       {
@@ -77,7 +77,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
           [
             'On the Blendify server, a Create with AI session — your first request, its structured summary, the generated playlist, a proposed change waiting for your decision and, if you prepare one, the destination link — is kept in the cache, linked to your Blendify account if you are signed in, and expires about 30 minutes after you send your first request. Later steps do not extend that time.',
             'The text of each change you ask for is not kept once it has been interpreted; only its structured summary is, and that summary can quote the parts of your request Blendify could not apply.',
-            'No Create with AI conversation is written to the database. A Create with AI playlist reaches your Blendify library only if you save it there when you publish it to Spotify, and then it is stored like any other mix, as described above. Publishing it to Spotify also updates your usage counters, as for other mixes.',
+            'No Create with AI conversation is written to the database. A Create with AI playlist reaches your Blendify library only if you save it to Spotify, and then it is stored like any other mix, as described above. Saving it to Spotify also updates your usage counters, as for other mixes.',
           ],
           'Operational logs for Create with AI record metadata only: which step ran, its result or error code, how long it took, which model and instruction version were used, and how many model requests and tokens it needed. They do not contain the text you write, its structured summary or the contents of your playlists.',
         ],
@@ -98,10 +98,10 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         title: 'Services Blendify relies on',
         body: [
           [
-            'Spotify — catalog search, sign-in, publishing playlists and playback control. Cover art and profile images load directly from Spotify’s servers.',
+            'Spotify — catalog search, sign-in, saving playlists and playback control. Cover art and profile images load directly from Spotify’s servers.',
             'Last.fm — receives artist, track and genre names to find similar and popular music. No account, session or device information is sent with them.',
             'OpenAI — interprets the text you write in Create with AI, when that feature is available. It receives only that text and, for a change, the structured summary described above.',
-            'Soundiiz — used by Guest playlist transfer. When that transfer is available and you choose to start it, Blendify sends Soundiiz the minimum metadata the transfer needs: the playlist title, its description when there is one, and for each track the title, the artists and the ISRC when one is known. You pick the destination service on Soundiiz; Blendify does not choose one for you and starts nothing on its own.',
+            'Soundiiz — used when you transfer a playlist without connecting Spotify. When that transfer is available and you choose to start it, Blendify sends Soundiiz the minimum metadata the transfer needs: the playlist title, its description when there is one, and for each track the title, the artists and the ISRC when one is known. You pick the destination service on Soundiiz; Blendify does not choose one for you and starts nothing on its own.',
             'Infrastructure — the site is served through Cloudflare, the API, database and cache run on Railway, and fonts load from Google Fonts. These providers necessarily see the requests your browser and the API make, including IP addresses, and handle them under their own policies. Cloudflare also measures traffic and page performance across this domain with Cloudflare Web Analytics, which records page views and web-performance metrics such as Core Web Vitals. It runs without cookies and is not used to follow individual visitors across unrelated websites.',
           ],
           'Blendify does not sell personal information and does not use it for advertising.',
@@ -126,8 +126,8 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'You can remove individual playlists from your Blendify library whenever you want, and reset your usage statistics from the Stats page.',
             'Delete account, in the account menu, asks you to confirm and then deletes your Blendify user record together with your stored Spotify tokens, your saved playlists and your usage data, and ends your session. You do not need to email anyone to do it.',
           ],
-          'Deleting your Blendify account does not delete your Spotify account, does not remove playlists already published to Spotify, and does not revoke Blendify’s access inside Spotify — you can remove that access yourself from your Spotify account settings. If you connect the same Spotify account again later, Blendify starts a new, empty account for it.',
-          'Database dumps taken before earlier changes are kept outside the running service so it can be restored after a failure. They are not rewritten, so a dump made before you deleted your account can still contain data from that time.',
+          'Deleting your Blendify account does not delete your Spotify account and does not remove playlists already saved to Spotify. Blendify deletes the Spotify tokens it stored. It does not ask Spotify to disconnect Blendify; you can remove that connection in your Spotify account settings. If you connect the same Spotify account again later, the previous library and stats are gone.',
+          'Backup copies of the database taken before earlier changes are kept outside the running service so it can be restored after a failure. They are not rewritten, so a copy made before you deleted your account can still contain data from that time.',
         ],
       },
       {
@@ -172,10 +172,10 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
           [
             'tu ID de usuario de Spotify, nombre visible, dirección de email y URL de imagen de perfil;',
             'el token de acceso y el token de actualización de Spotify, y cuándo expira el token de acceso: quedan en el servidor, nunca se envían a tu navegador y solo se usan para llamar a Spotify en tu nombre;',
-            'las playlists que eliges guardar en tu biblioteca de Blendify: nombre, descripción, canciones, la receta con la que se armaron y el enlace de Spotify;',
-            'contadores de uso: cuántas mezclas creaste y qué artistas y géneros usaste como semillas, y con qué frecuencia.',
+            'las playlists que eliges guardar en tu biblioteca de Blendify: nombre, descripción, canciones, la configuración con la que se armaron y el enlace de Spotify;',
+            'contadores de uso: cuántas mezclas creaste, qué artistas y géneros elegiste como punto de partida, y con qué frecuencia.',
           ],
-          'Blendify lee los IDs de las playlists de tu cuenta de Spotify para saber cuáles de las que creó siguen ahí. No lee tu historial de escucha ni tus canciones guardadas, y no lee el contenido de playlists que no creó. Cuando publicas una mezcla, Blendify escribe esa playlist —y su portada, si agregas una— en tu cuenta de Spotify. Los controles de reproducción listan tus dispositivos activos de Spotify y empiezan la reproducción en el que elijas; esos dispositivos se usan en el momento y no se guardan.',
+          'Blendify lee los IDs de las playlists de tu cuenta de Spotify para saber cuáles de las que creó siguen ahí. No lee tu historial de escucha ni tus canciones guardadas, y no lee el contenido de playlists que no creó. Cuando guardas una mezcla en Spotify, Blendify escribe esa playlist privada —y su portada, si agregas una— en tu cuenta de Spotify. Los controles de reproducción listan tus dispositivos activos de Spotify y empiezan la reproducción en el que elijas; esos dispositivos se usan en el momento y no se guardan.',
         ],
       },
       {
@@ -186,7 +186,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
           [
             'En el servidor de Blendify, una sesión de Crear con IA —tu primer pedido, su resumen estructurado, la playlist generada, un cambio propuesto que espera tu decisión y, si preparas uno, el enlace de destino— se guarda en la caché, vinculada a tu cuenta de Blendify si iniciaste sesión, y expira unos 30 minutos después de que envías tu primer pedido. Los pasos siguientes no extienden ese tiempo.',
             'El texto de cada cambio que pides no se conserva una vez interpretado; solo se conserva su resumen estructurado, que puede citar las partes de tu pedido que Blendify no pudo aplicar.',
-            'Ninguna conversación de Crear con IA se escribe en la base de datos. Una playlist de Crear con IA llega a tu biblioteca de Blendify solo si la guardas ahí al publicarla en Spotify, y en ese caso se guarda como cualquier otra mezcla, según se describe más arriba. Publicarla en Spotify también actualiza tus contadores de uso, igual que con las demás mezclas.',
+            'Ninguna conversación de Crear con IA se escribe en la base de datos. Una playlist de Crear con IA llega a tu biblioteca de Blendify solo si la guardas en Spotify, y entonces se guarda como cualquier otra mezcla, según se describe más arriba. Guardarla en Spotify también actualiza tus contadores de uso, igual que con las demás mezclas.',
           ],
           'Los logs operativos de Crear con IA registran solo metadatos: qué paso se ejecutó, su resultado o código de error, cuánto tardó, qué modelo y versión de instrucciones se usaron, y cuántas solicitudes al modelo y tokens necesitó. No contienen el texto que escribes, su resumen estructurado ni el contenido de tus playlists.',
         ],
@@ -207,10 +207,10 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         title: 'Servicios de los que depende Blendify',
         body: [
           [
-            'Spotify: búsqueda en el catálogo, inicio de sesión, publicación de playlists y control de reproducción. Las portadas y las imágenes de perfil se cargan desde servidores de Spotify.',
+            'Spotify: búsqueda en el catálogo, inicio de sesión, guardar playlists y control de reproducción. Las portadas y las imágenes de perfil se cargan desde servidores de Spotify.',
             'Last.fm: recibe nombres de artistas, canciones y géneros para encontrar música similar y popular. No se envía información de cuenta, sesión ni dispositivos.',
             'OpenAI: interpreta el texto que escribes en Crear con IA, cuando esa función está disponible. Recibe solo ese texto y, para un cambio, el resumen estructurado descrito más arriba.',
-            'Soundiiz: lo usa la transferencia de playlists en modo invitado. Cuando esa transferencia está disponible y eliges iniciarla, Blendify le envía a Soundiiz los metadatos mínimos que necesita: el título de la playlist, su descripción cuando existe y, de cada canción, el título, los artistas y el ISRC cuando se conoce. El servicio de destino lo eliges en Soundiiz; Blendify no lo elige por ti ni inicia nada por su cuenta.',
+            'Soundiiz: se usa al transferir una playlist sin conectar Spotify. Cuando esa transferencia está disponible y eliges iniciarla, Blendify le envía a Soundiiz los metadatos mínimos que necesita: el título de la playlist, su descripción cuando existe y, de cada canción, el título, los artistas y el ISRC cuando se conoce. El servicio de destino lo eliges en Soundiiz; Blendify no lo elige por ti ni inicia nada por su cuenta.',
             'Infraestructura: el sitio se sirve a través de Cloudflare, la API, la base de datos y la caché funcionan en Railway, y las fuentes se cargan desde Google Fonts. Estos proveedores ven necesariamente las solicitudes que hacen tu navegador y la API, incluidas las direcciones IP, y las tratan según sus propias políticas. Cloudflare además mide el tráfico y el rendimiento de las páginas de este dominio con Cloudflare Web Analytics, que registra vistas de página y métricas de rendimiento web como los Core Web Vitals. Funciona sin cookies y no se usa para seguir a visitantes concretos por sitios ajenos.',
           ],
           'Blendify no vende información personal ni la usa para publicidad.',
@@ -235,8 +235,8 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'Puedes eliminar playlists de tu biblioteca de Blendify cuando quieras y reiniciar tus estadísticas de uso desde la página de estadísticas.',
             'Eliminar cuenta, en el menú de cuenta, te pide confirmación y luego borra tu registro de usuario de Blendify junto con los tokens de Spotify guardados, tus playlists guardadas y tus datos de uso, y cierra tu sesión. No necesitas escribirle a nadie para hacerlo.',
           ],
-          'Eliminar tu cuenta de Blendify no elimina tu cuenta de Spotify, no borra las playlists ya publicadas en Spotify y no revoca el acceso de Blendify dentro de Spotify: ese acceso lo quitas tú desde la configuración de tu cuenta de Spotify. Si vuelves a conectar la misma cuenta de Spotify más adelante, Blendify crea para ella una cuenta nueva y vacía.',
-          'Los volcados de la base de datos tomados antes de cambios anteriores se conservan fuera del servicio en funcionamiento para poder restaurarlo tras una falla. No se reescriben, así que un volcado hecho antes de que elimines tu cuenta todavía puede contener datos de ese momento.',
+          'Eliminar tu cuenta de Blendify no elimina tu cuenta de Spotify ni borra las playlists ya guardadas en Spotify. Blendify borra los tokens de Spotify que tenía guardados. No pide a Spotify que desconecte Blendify; esa conexión la quitas tú en la configuración de tu cuenta de Spotify. Si vuelves a conectar la misma cuenta de Spotify, la biblioteca y las estadísticas anteriores ya no están.',
+          'Las copias de respaldo de la base de datos tomadas antes de cambios anteriores se conservan fuera del servicio en funcionamiento para poder restaurarlo tras una falla. No se reescriben, así que una copia hecha antes de que elimines tu cuenta todavía puede contener datos de ese momento.',
         ],
       },
       {
@@ -281,10 +281,10 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
           [
             'seu ID de usuário do Spotify, nome de exibição, endereço de e-mail e URL da imagem de perfil;',
             'o token de acesso e o token de atualização do Spotify, e quando o token de acesso expira: ficam no servidor, nunca são enviados ao seu navegador e servem apenas para chamar o Spotify em seu nome;',
-            'as playlists que você escolhe salvar na sua biblioteca do Blendify: nome, descrição, músicas, a receita usada para montá-las e o link do Spotify;',
-            'contadores de uso: quantas mixagens você criou e quais artistas e gêneros usou como sementes, e com que frequência.',
+            'as playlists que você escolhe salvar na sua biblioteca do Blendify: nome, descrição, músicas, a configuração usada para montá-las e o link do Spotify;',
+            'contadores de uso: quantas misturas você criou, quais artistas e gêneros escolheu como ponto de partida e com que frequência;',
           ],
-          'O Blendify lê os IDs das playlists da sua conta do Spotify para saber quais das que ele criou ainda estão lá. Ele não lê seu histórico de audição nem suas músicas salvas, e não lê o conteúdo de playlists que não criou. Quando você publica uma mixagem, o Blendify grava essa playlist — e a capa, se você adicionar uma — na sua conta do Spotify. Os controles de reprodução listam seus dispositivos ativos do Spotify e iniciam a reprodução no que você escolher; esses dispositivos são usados na hora e não são armazenados.',
+          'O Blendify lê os IDs das playlists da sua conta do Spotify para saber quais das que ele criou ainda estão lá. Ele não lê seu histórico de audição nem suas músicas salvas, e não lê o conteúdo de playlists que não criou. Quando você salva uma mistura no Spotify, o Blendify grava essa playlist privada — e a capa, se você adicionar uma — na sua conta do Spotify. Os controles de reprodução listam seus dispositivos ativos do Spotify e iniciam a reprodução no que você escolher; esses dispositivos são usados na hora e não são armazenados.',
         ],
       },
       {
@@ -295,7 +295,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
           [
             'No servidor do Blendify, uma sessão do Criar com IA — seu primeiro pedido, o resumo estruturado, a playlist gerada, uma mudança proposta aguardando sua decisão e, se você preparar um, o link de destino — fica no cache, vinculada à sua conta do Blendify se você entrou, e expira cerca de 30 minutos depois que você envia seu primeiro pedido. As etapas seguintes não estendem esse tempo.',
             'O texto de cada mudança que você pede não é guardado depois de interpretado; só o resumo estruturado dela é guardado, e esse resumo pode citar as partes do seu pedido que o Blendify não conseguiu aplicar.',
-            'Nenhuma conversa do Criar com IA é gravada no banco de dados. Uma playlist do Criar com IA só chega à sua biblioteca do Blendify se você a salvar ali ao publicá-la no Spotify, e nesse caso ela é guardada como qualquer outra mixagem, conforme descrito acima. Publicá-la no Spotify também atualiza seus contadores de uso, como nas outras mixagens.',
+            'Nenhuma conversa do Criar com IA é gravada no banco de dados. Uma playlist do Criar com IA só chega à sua biblioteca do Blendify se você a salvar no Spotify, e nesse caso ela é guardada como qualquer outra mistura, conforme descrito acima. Salvá-la no Spotify também atualiza seus contadores de uso, como nas outras misturas.',
           ],
           'Os logs operacionais do Criar com IA registram apenas metadados: qual etapa foi executada, o resultado ou código de erro, quanto tempo levou, qual modelo e versão de instruções foram usados e quantas requisições ao modelo e tokens foram necessários. Eles não contêm o texto que você escreve, o resumo estruturado nem o conteúdo das suas playlists.',
         ],
@@ -316,10 +316,10 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
         title: 'Serviços dos quais o Blendify depende',
         body: [
           [
-            'Spotify: busca no catálogo, login, publicação de playlists e controle de reprodução. As capas e as imagens de perfil são carregadas dos servidores do Spotify.',
+            'Spotify: busca no catálogo, login, salvar playlists e controle de reprodução. As capas e as imagens de perfil são carregadas dos servidores do Spotify.',
             'Last.fm: recebe nomes de artistas, músicas e gêneros para encontrar música semelhante e popular. Nenhuma informação de conta, sessão ou dispositivo é enviada.',
             'OpenAI: interpreta o texto que você escreve no Criar com IA, quando esse recurso está disponível. Recebe apenas esse texto e, para uma mudança, o resumo estruturado descrito acima.',
-            'Soundiiz: usado pela transferência de playlists no modo convidado. Quando essa transferência está disponível e você escolhe iniciá-la, o Blendify envia ao Soundiiz os metadados mínimos de que ela precisa: o título da playlist, a descrição quando existe e, de cada música, o título, os artistas e o ISRC quando conhecido. Você escolhe o serviço de destino no Soundiiz; o Blendify não escolhe por você nem inicia nada sozinho.',
+            'Soundiiz: usado ao transferir uma playlist sem conectar o Spotify. Quando essa transferência está disponível e você escolhe iniciá-la, o Blendify envia ao Soundiiz os metadados mínimos de que ela precisa: o título da playlist, a descrição quando existe e, de cada música, o título, os artistas e o ISRC quando conhecido. Você escolhe o serviço de destino no Soundiiz; o Blendify não escolhe por você nem inicia nada sozinho.',
             'Infraestrutura: o site é servido pela Cloudflare, a API, o banco de dados e o cache rodam na Railway, e as fontes são carregadas do Google Fonts. Esses provedores necessariamente veem as requisições que seu navegador e a API fazem, incluindo endereços IP, e as tratam conforme as próprias políticas. A Cloudflare também mede o tráfego e o desempenho das páginas deste domínio com o Cloudflare Web Analytics, que registra visualizações de página e métricas de desempenho web como os Core Web Vitals. Funciona sem cookies e não é usado para seguir visitantes específicos por sites não relacionados.',
           ],
           'O Blendify não vende informações pessoais e não as usa para publicidade.',
@@ -344,8 +344,8 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'Você pode remover playlists da sua biblioteca do Blendify quando quiser e zerar suas estatísticas de uso na página de estatísticas.',
             'Excluir conta, no menu de conta, pede confirmação e então apaga seu registro de usuário do Blendify junto com os tokens do Spotify guardados, suas playlists salvas e seus dados de uso, e encerra sua sessão. Você não precisa escrever para ninguém para fazer isso.',
           ],
-          'Excluir sua conta do Blendify não exclui sua conta do Spotify, não remove as playlists já publicadas no Spotify e não revoga o acesso do Blendify dentro do Spotify: esse acesso você remove nas configurações da sua conta do Spotify. Se você conectar a mesma conta do Spotify novamente mais tarde, o Blendify cria para ela uma conta nova e vazia.',
-          'Os dumps do banco de dados feitos antes de mudanças anteriores são mantidos fora do serviço em funcionamento para que ele possa ser restaurado após uma falha. Eles não são reescritos, então um dump feito antes de você excluir sua conta ainda pode conter dados daquele momento.',
+          'Excluir sua conta do Blendify não exclui sua conta do Spotify nem remove as playlists já salvas no Spotify. O Blendify apaga os tokens do Spotify que tinha guardado. Ele não pede ao Spotify para desconectar o Blendify; você remove essa conexão nas configurações da sua conta do Spotify. Se você conectar a mesma conta do Spotify de novo, a biblioteca e as estatísticas anteriores não estão mais lá.',
+          'As cópias de backup do banco de dados feitas antes de mudanças anteriores são mantidas fora do serviço em funcionamento para que ele possa ser restaurado após uma falha. Elas não são reescritas, então uma cópia feita antes de você excluir sua conta ainda pode conter dados daquele momento.',
         ],
       },
       {

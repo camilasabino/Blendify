@@ -3,20 +3,20 @@ import type { MessageKey } from './en'
 export const es: Record<MessageKey, string> = {
   'brand.tagline': 'Mezcla la música que te gusta en nuevas playlists.',
   'brand.description':
-    'Mezcla artistas o géneros, o empieza desde un artista o una canción. Blendify arma la playlist; conecta Spotify para guardarla en tu cuenta.',
+    'Mezcla artistas o géneros, o empieza desde un artista o una canción. Guarda la playlist en Spotify o sigue sin conectar Spotify.',
   'brand.descriptionWithAi':
-    'Mezcla artistas o géneros, empieza desde un artista o una canción, o simplemente describe lo que quieres. Blendify arma la playlist; conecta Spotify para guardarla en tu cuenta.',
+    'Mezcla artistas o géneros, empieza desde un artista o una canción, o describe lo que quieres. Guarda la playlist en Spotify o sigue sin conectar Spotify.',
   'nav.logOut': 'Cerrar sesión',
   'nav.deleteAccount': 'Eliminar cuenta',
   'account.delete.title': '¿Eliminar tu cuenta de Blendify?',
   'account.delete.body':
     'Esto elimina tu cuenta de Blendify del servicio: tu perfil, los tokens de Spotify guardados para ti, tu biblioteca de Blendify y tus estadísticas de uso. No se puede deshacer.',
   'account.delete.spotifyNote':
-    'Tu cuenta de Spotify no se ve afectada y las playlists ya publicadas siguen en Spotify. Blendify conserva el acceso que le diste hasta que lo quites desde la configuración de tu cuenta de Spotify.',
+    'Tu cuenta de Spotify no se ve afectada y las playlists ya guardadas ahí siguen en Spotify. Blendify borra el acceso de Spotify que tenía guardado. No desconecta Blendify en tu cuenta de Spotify; eso puedes quitarlo en la configuración de Spotify.',
   'account.delete.confirm': 'Eliminar mi cuenta',
   'account.delete.working': 'Eliminando tu cuenta…',
   'account.delete.error':
-    'No pudimos eliminar tu cuenta. No se borró nada; volvé a intentarlo.',
+    'No se borró nada. Vuelve a intentarlo.',
   'nav.account': 'Menú de cuenta',
   'nav.create': 'Mezclar',
   'nav.discover': 'Descubrir',
@@ -25,6 +25,10 @@ export const es: Record<MessageKey, string> = {
   'nav.main': 'Menú principal',
   'nav.appHome': 'Inicio de Blendify',
   'nav.skipToContent': 'Saltar al contenido',
+  'playlist.name.mix': 'Blendify · Mezcla · {seeds}',
+  'playlist.name.mixEmpty': 'Blendify · Mezcla',
+  'playlist.name.discover': 'Blendify · Descubrir · {seed}',
+  'playlist.name.discoverFallback': 'Descubrir',
   'playlist.description.empty': 'Creada con Blendify.',
   'playlist.description.one': 'Creada con Blendify a partir de {name}.',
   'playlist.description.two':
@@ -66,10 +70,8 @@ export const es: Record<MessageKey, string> = {
   'discover.generate': 'Crear playlist',
   'discover.generating': 'Creando…',
   'discover.working': 'Creando tu playlist',
-  'discover.workingHint':
-    'Buscando canciones relacionadas y agregándolas a Spotify…',
-  'discover.failed':
-    'No se pudo crear la playlist. Prueba con otro artista o canción.',
+  'discover.workingHint': 'Buscando canciones relacionadas…',
+  'discover.failed': 'No se pudo crear la playlist. Vuelve a intentarlo.',
   'discover.notEnoughSimilar':
     'No hay suficiente música relacionada. Prueba con otro artista o canción.',
   'discover.resolveFailed':
@@ -83,10 +85,7 @@ export const es: Record<MessageKey, string> = {
   'create.stepSource': 'Artistas o géneros',
   'create.stepDetails': 'Tamaño y portada',
   'create.generateCover': 'Agregar una portada',
-  'create.coverScopeHint':
-    'Si la portada no se carga, cierra sesión y vuelve a entrar para renovar los permisos de Spotify.',
-  'create.coverFailed':
-    'No se pudo agregar la portada. La playlist se creará de todos modos.',
+  'create.coverFailed': 'No se pudo agregar la portada.',
   'create.artists': 'Artistas',
   'create.genres': 'Géneros',
   'create.paste': 'Pegar una lista de artistas',
@@ -98,7 +97,8 @@ export const es: Record<MessageKey, string> = {
     'No encontramos algunos artistas. Revisa los nombres e intenta de nuevo.',
   'create.tracksPerArtist': 'Canciones por artista',
   'create.tracksPerGenre': 'Canciones por género',
-  'create.tracksMaxHint': 'Hasta {max} con esta selección',
+  'create.tracksMaxPerArtist': 'Hasta {max} canciones por artista',
+  'create.tracksMaxPerGenre': 'Hasta {max} canciones por género',
   'create.tracksAdjusted': 'Ajustado a {count}',
   'create.reach': 'Familiaridad',
   'create.mix.popular': 'Más conocidas',
@@ -143,7 +143,7 @@ export const es: Record<MessageKey, string> = {
   'create.showSettings': 'Mostrar configuración',
   'create.hideSettings': 'Ocultar configuración',
   'create.summaryMore': '+{count} más',
-  'create.workingHint': 'Buscando canciones y agregándolas a Spotify…',
+  'create.workingHint': 'Buscando canciones para tu playlist…',
   'create.workingHintSlow':
     'Creando la playlist. Esto puede tardar un momento…',
   'create.workingHintLong':
@@ -216,9 +216,12 @@ export const es: Record<MessageKey, string> = {
     'Blendify está ocupado en este momento. Intenta de nuevo en {wait}.',
   'errors.serviceUnavailable':
     'Blendify no está disponible temporalmente. Intenta de nuevo en {wait}.',
-  'errors.wait.seconds': 'unos {n} segundos',
-  'errors.wait.minutes': 'unos {n} minutos',
-  'errors.wait.hours': 'unas {n} horas',
+  'errors.wait.oneSecond': 'cerca de 1 segundo',
+  'errors.wait.seconds': 'cerca de {n} segundos',
+  'errors.wait.oneMinute': 'cerca de 1 minuto',
+  'errors.wait.minutes': 'cerca de {n} minutos',
+  'errors.wait.oneHour': 'cerca de 1 hora',
+  'errors.wait.hours': 'cerca de {n} horas',
   'errors.wait.severalHours': 'varias horas',
   'errors.lastfmMissing':
     'Las recomendaciones de música relacionada no están disponibles. Intenta más tarde.',
@@ -231,8 +234,8 @@ export const es: Record<MessageKey, string> = {
   'errors.artistResolveNamed':
     'No encontramos «{name}» en Spotify. Intenta buscarlo.',
   'errors.trackResolveNamed':
-    'No encontramos la canción «{name}» en Spotify. Prueba con otra semilla.',
-  'genre.searchPlaceholder': 'Buscar géneros o subgéneros…',
+    'No encontramos la canción «{name}» en Spotify. Prueba con otra.',
+  'genre.searchPlaceholder': 'Buscar géneros…',
   'genre.loadError': 'No se pudieron cargar los géneros. Inténtalo de nuevo.',
   'genre.empty': 'No se encontraron géneros coincidentes.',
   'genre.remove': 'Quitar {name}',
@@ -311,7 +314,8 @@ export const es: Record<MessageKey, string> = {
   'library.selectAllVisible': 'Seleccionar todas',
   'library.deselectAll': 'Deseleccionar todas',
   'library.selectHint': 'Selecciona las playlists que quieres quitar.',
-  'library.selectedCount': '{count} seleccionadas',
+  'library.selectedCountOne': '1 seleccionada',
+  'library.selectedCountMany': '{count} seleccionadas',
   'library.selectItem': 'Seleccionar {name}',
   'library.editSelection': 'Seleccionar',
   'library.doneSelecting': 'Cancelar',
@@ -372,7 +376,7 @@ export const es: Record<MessageKey, string> = {
   'preview.showAll': 'Ver las {count} canciones',
   'preview.showFewer': 'Ver menos',
   'library.kindMix': 'Mezcla',
-  'library.kindDiscover': 'Descubrimiento',
+  'library.kindDiscover': 'Descubrir',
   'library.titleMany': '{first}, {second} y {count} más',
   'landing.trust':
     'Conectar Spotify es opcional. Las playlists que guardes se crean como privadas en tu cuenta de Spotify.',
@@ -388,7 +392,7 @@ export const es: Record<MessageKey, string> = {
   'spotifyRequired.stats':
     'Conecta Spotify para ver tus estadísticas.',
   'authError.restricted':
-    'Esta cuenta de Spotify no está habilitada para conectarse con Blendify. Por una limitación de Spotify, en esta etapa solo pueden conectarse las cuentas habilitadas para la integración. Puedes seguir usando Blendify sin conectar Spotify.',
+    'Esta cuenta de Spotify no está habilitada para conectarse con Blendify. Por una limitación de Spotify, solo pueden conectarse las cuentas habilitadas para la integración. Puedes seguir usando Blendify sin conectar Spotify.',
   'authError.denied':
     'No terminaste de conectar tu cuenta de Spotify. Puedes intentarlo de nuevo o seguir usando Blendify sin Spotify.',
   'authError.failed':
@@ -408,7 +412,7 @@ export const es: Record<MessageKey, string> = {
   'spotifyAccess.whyTitle':
     'Por qué sucede',
   'spotifyAccess.whyBody':
-    'Blendify usa actualmente el Development Mode de Spotify. En ese modo, Spotify solo permite que se conecten las cuentas habilitadas para esta app.',
+    'Blendify usa el modo de desarrollo de Spotify. En ese modo, solo pueden conectarse las cuentas de Spotify habilitadas para Blendify.',
   'spotifyAccess.retry':
     'Intentarlo de nuevo con la misma cuenta no elimina esa restricción.',
   'spotifyAccess.optionsTitle':
@@ -459,7 +463,9 @@ export const es: Record<MessageKey, string> = {
     'Preparar transferencia',
   'transfer.preparing':
     'Preparando transferencia…',
-  'transfer.ready':
+  'transfer.readyOne':
+    'Transferencia preparada para 1 canción. Disponible hasta el {expires}.',
+  'transfer.readyMany':
     'Transferencia preparada para {count} canciones. Disponible hasta el {expires}.',
   'transfer.continue':
     'Continuar en Soundiiz',
@@ -499,11 +505,11 @@ export const es: Record<MessageKey, string> = {
   'ai.requestTitle': 'Tu pedido',
   'ai.promptLabel': 'Pedido de playlist',
   'ai.promptPlaceholder':
-    'Por ejemplo: 30 temas menos conocidos de Soda Stereo y Los Fabulosos Cadillacs, nada de Maná',
+    'Por ejemplo: 30 canciones menos conocidas de Soda Stereo y Los Fabulosos Cadillacs, nada de Maná',
   'ai.promptHint': 'Presiona Ctrl+Enter o ⌘+Enter para enviar.',
   'ai.promptRequired': 'Primero describe la playlist que quieres.',
   'ai.suggestionsLabel': 'Prueba un ejemplo',
-  'ai.suggestion.artists': '30 temas menos conocidos de Radiohead e Interpol',
+  'ai.suggestion.artists': '30 canciones menos conocidas de Radiohead e Interpol',
   'ai.suggestion.genres': 'Shoegaze y dream pop, unas 40 canciones',
   'ai.suggestion.discoverArtist': 'Música parecida a Björk',
   'ai.suggestion.discoverTrack': 'Empezar desde Teardrop de Massive Attack',
@@ -511,7 +517,7 @@ export const es: Record<MessageKey, string> = {
   'ai.submitting': 'Leyendo tu pedido…',
   'ai.interpreting': 'Leyendo tu pedido…',
   'ai.error.unavailable':
-    'Crear con IA no está disponible en este momento. Mix y Descubrir siguen funcionando.',
+    'Crear con IA no está disponible en este momento. Mezclar y Descubrir siguen funcionando.',
   'ai.error.timeout': 'Leer tu pedido tardó demasiado. Vuelve a intentarlo.',
   'ai.error.rateLimited':
     'Crear con IA está ocupado en este momento. Vuelve a intentarlo en un rato.',
@@ -534,9 +540,9 @@ export const es: Record<MessageKey, string> = {
   'ai.clarify.mixedSeeds':
     'Blendify parte de un solo tipo de punto de partida a la vez. ¿Cuál debería usar?',
   'ai.clarify.tooManyArtists':
-    'Un mix puede usar hasta {limit} artistas y tu pedido nombra {count}. Edítalo para quedarte con los que quieras.',
+    'Una mezcla puede usar hasta {limit} artistas y tu pedido nombra {count}. Edítalo para quedarte con los que quieras.',
   'ai.clarify.tooManyGenres':
-    'Un mix puede usar hasta {limit} géneros y tu pedido nombra {count}. Edítalo para quedarte con los que quieras.',
+    'Una mezcla puede usar hasta {limit} géneros y tu pedido nombra {count}. Edítalo para quedarte con los que quieras.',
   'ai.clarify.singleArtist':
     'Descubrir parte de un solo artista. Elige uno o mézclalos.',
   'ai.clarify.singleArtistOnly': 'Descubrir parte de un solo artista. Elige uno.',
@@ -548,7 +554,7 @@ export const es: Record<MessageKey, string> = {
   'ai.clarify.unknownGenres':
     'Blendify no reconoce estos géneros: {names}. Prueba con otro nombre.',
   'ai.clarify.ambiguousGenres':
-    'Estos géneros son demasiado amplios para un solo mix: {names}. Nombra un género o estilo más específico.',
+    'Estos géneros son demasiado amplios para una sola mezcla: {names}. Nombra un género o estilo más específico.',
   'ai.clarify.invalidDuration':
     'Esa duración no sirve. Pide una duración de al menos un minuto.',
   'ai.clarify.optionsLabel': 'Elige una opción',
@@ -596,7 +602,7 @@ export const es: Record<MessageKey, string> = {
     'Estos detalles todavía no son compatibles, por lo que no afectarán esta playlist.',
   'ai.editRequest': 'Editar pedido',
   'ai.startOver': 'Empezar de nuevo',
-  'ai.createPlaylist': 'Crear playlist',
+  'ai.createPlaylist': 'Crear vista previa',
   'ai.createHint': 'Blendify creará una vista previa de tu playlist.',
   'ai.cancelEdit': 'Cancelar edición',
   'ai.restoring': 'Cargando tu pedido…',
@@ -679,10 +685,10 @@ export const es: Record<MessageKey, string> = {
     'Cancelar',
   'ai.refine.keepHint':
     'Selecciona canciones abajo para mantenerlas en su posición actual.',
-  'ai.refine.keepSelected':
-    'Canciones seleccionadas para mantener: {count}',
-  'ai.refine.keptAlready':
-    'Canciones que ya se mantienen en su lugar: {count}',
+  'ai.refine.keepSelectedOne': '1 canción seleccionada para mantener',
+  'ai.refine.keepSelectedMany': '{count} canciones seleccionadas para mantener',
+  'ai.refine.keptAlreadyOne': '1 canción ya mantenida en su lugar',
+  'ai.refine.keptAlreadyMany': '{count} canciones ya mantenidas en su lugar',
   'ai.refine.keepLabel':
     'Mantener',
   'ai.refine.keepTrack':
@@ -746,9 +752,9 @@ export const es: Record<MessageKey, string> = {
   'ai.refine.diff.movedFrom':
     'Movida de la posición {from} a la {to}',
   'ai.refine.diff.addedItems':
-    'Agregado: {items}',
+    'Se agrega: {items}',
   'ai.refine.diff.removedItems':
-    'Quitado: {items}',
+    'Se quita: {items}',
   'ai.refine.diff.notSet':
     'Sin definir',
   'ai.refine.diff.noMood':
@@ -818,13 +824,13 @@ export const es: Record<MessageKey, string> = {
   'ai.refine.clarify.artistNotKept':
     'No hay canciones de {names} en la playlist actual para mantener.',
   'ai.refine.clarify.singleArtist':
-    'Descubrir parte de un solo artista. Prueba un refinamiento que nombre solo uno o pide un mix.',
+    'Descubrir parte de un solo artista. Prueba un refinamiento que nombre solo uno o pide una mezcla.',
   'ai.refine.clarify.singleTrack':
     'Descubrir parte de una sola canción. Prueba un refinamiento que nombre solo una.',
   'ai.refine.clarify.tooManyArtists':
-    'Un mix puede usar hasta {limit} artistas y este cambio usaría {count}. Prueba un refinamiento con menos artistas.',
+    'Una mezcla puede usar hasta {limit} artistas y este cambio usaría {count}. Prueba un refinamiento con menos artistas.',
   'ai.refine.clarify.tooManyGenres':
-    'Un mix puede usar hasta {limit} géneros y este cambio usaría {count}. Prueba un refinamiento con menos géneros.',
+    'Una mezcla puede usar hasta {limit} géneros y este cambio usaría {count}. Prueba un refinamiento con menos géneros.',
   'ai.refine.error.inProgress':
     'Esta playlist ya se está refinando. Espera un momento y vuelve a intentarlo.',
   'ai.refine.error.limit':
@@ -844,25 +850,25 @@ export const es: Record<MessageKey, string> = {
   'runStatus.label':
     'Creación de playlist',
   'runStatus.active.mix':
-    'Creando tu Mix',
+    'Creando tu mezcla',
   'runStatus.active.discover':
-    'Creando tu playlist de Discover',
+    'Creando en Descubrir',
   'runStatus.succeeded.mix':
-    'Tu Mix está listo',
+    'Tu mezcla está lista',
   'runStatus.succeeded.discover':
-    'Tu playlist de Discover está lista',
+    'Listo en Descubrir',
   'runStatus.failed.mix':
-    'No se pudo crear tu Mix',
+    'No se pudo crear tu mezcla',
   'runStatus.failed.discover':
-    'No se pudo crear tu playlist de Discover',
+    'No se pudo crear en Descubrir',
   'runStatus.uncertain.mix':
-    'Se perdió la conexión al crear tu Mix',
+    'Se perdió la conexión al crear tu mezcla',
   'runStatus.uncertain.discover':
-    'Se perdió la conexión al crear tu playlist de Discover',
+    'Se perdió la conexión en Descubrir',
   'runStatus.busy.mix':
-    'Espera a que termine tu Mix antes de crear otra playlist.',
+    'Espera a que termine tu mezcla antes de crear otra playlist.',
   'runStatus.busy.discover':
-    'Espera a que termine tu playlist de Discover antes de crear otra playlist.',
+    'Espera a que termine Descubrir antes de crear otra playlist.',
   'runStatus.viewProgress':
     'Ver progreso',
   'runStatus.viewPlaylist':
@@ -870,7 +876,7 @@ export const es: Record<MessageKey, string> = {
   'runStatus.viewDetails':
     'Ver detalles',
   'runStatus.dismiss':
-    'Descartar',
+    'Cerrar',
   'create.uncertainTitle':
     'Se perdió la conexión',
   'create.uncertainLibrary':
@@ -881,7 +887,8 @@ export const es: Record<MessageKey, string> = {
     'Abrir biblioteca',
   'home.eyebrow': 'Inicio',
   'home.title': '¿Qué quieres crear?',
-  'home.subtitle': 'Elige por dónde empezar. Blendify arma la playlist y tú decides dónde guardarla.',
+  'home.subtitle':
+    'Elige por dónde empezar. Blendify arma la playlist. Guardarla en Spotify es opcional.',
   'home.actionsLabel': 'Formas de crear',
   'home.mixDescription': 'Combina artistas o géneros en una playlist.',
   'home.discoverDescription': 'Empieza con un artista o una canción y explora música relacionada.',
@@ -890,5 +897,6 @@ export const es: Record<MessageKey, string> = {
   'home.libraryDescription': 'Las playlists que guardaste en Blendify.',
   'home.statsDescription': 'Tus artistas y géneros más usados.',
   'home.connectTitle': '¿Quieres guardar tus playlists directo en Spotify?',
-  'home.connectBody': 'Conecta Spotify para publicar playlists en tu cuenta, tener una biblioteca y ver tus estadísticas. Todo lo de arriba funciona sin eso.',
+  'home.connectBody':
+    'Conecta Spotify para guardar playlists privadas en tu cuenta, tener una biblioteca y ver tus estadísticas. Las opciones de arriba funcionan sin conectar.',
 }

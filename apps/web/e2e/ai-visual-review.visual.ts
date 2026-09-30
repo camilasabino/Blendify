@@ -117,7 +117,7 @@ test.describe('Create with AI visual review', () => {
 
   test('03 reviewed', async ({ page }) => {
     await openReviewedLive(page, reviewedState(reviewIntent))
-    await expect(page.getByRole('button', { name: 'Create playlist' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Create preview' })).toBeVisible()
     await capture(page, '03-reviewed')
   })
 
@@ -130,7 +130,7 @@ test.describe('Create with AI visual review', () => {
   test('05 generating', async ({ page }) => {
     await openReviewedLive(page, reviewedState(unsupportedIntent))
     await page.route(`${SESSION_URL}/generate`, () => new Promise<void>(() => undefined))
-    await page.getByRole('button', { name: 'Create playlist' }).click()
+    await page.getByRole('button', { name: 'Create preview' }).click()
     await expect(page.getByRole('heading', { name: 'Creating your playlist…' })).toBeVisible()
     await capture(page, '05-generating')
   })
@@ -303,7 +303,7 @@ test.describe('Create with AI visual review', () => {
 
   test('18 restored reviewed', async ({ page }) => {
     await openRestored(page, reviewedState(unsupportedIntent))
-    await expect(page.getByRole('button', { name: 'Create playlist' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Create preview' })).toBeVisible()
     await expect(page.getByText('Not used')).toBeVisible()
     await capture(page, '18-restored-reviewed')
   })

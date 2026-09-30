@@ -151,13 +151,13 @@ describe('Create with AI page', () => {
     await waitFor(() => expect(heading).toHaveFocus())
     const summary = heading.closest('section') as HTMLElement
     expect(within(summary).getByText('Radiohead · Interpol')).toBeVisible()
-    expect(within(summary).getByText('Deep cuts')).toBeVisible()
+    expect(within(summary).getByText('Lesser-known')).toBeVisible()
     expect(within(summary).getByText('Coldplay')).toBeVisible()
     expect(within(summary).getByText('Not used')).toBeVisible()
     expect(within(summary).getByText(/rainy afternoon/)).toBeVisible()
     expect(within(summary).queryByRole('button', { name: 'Edit request' })).toBeNull()
     expect(within(summary).getByRole('button', { name: 'Start over' })).toBeEnabled()
-    expect(within(summary).getByRole('button', { name: 'Create playlist' })).toBeEnabled()
+    expect(within(summary).getByRole('button', { name: 'Create preview' })).toBeEnabled()
     expect(
       within(summary).getByText('Blendify will create a preview of your playlist.'),
     ).toBeVisible()
@@ -216,7 +216,7 @@ describe('Create with AI page', () => {
     expect(within(summary).getByText('Happy')).toBeVisible()
     expect(within(summary).getByText('About 60 min')).toBeVisible()
     expect(within(summary).getByText(/to dance at a party/)).toBeVisible()
-    expect(within(summary).getByRole('button', { name: 'Create playlist' })).toBeEnabled()
+    expect(within(summary).getByRole('button', { name: 'Create preview' })).toBeEnabled()
   })
 
   it.each([

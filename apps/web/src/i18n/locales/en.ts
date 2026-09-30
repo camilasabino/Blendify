@@ -1,16 +1,16 @@
 export const en = {
   'brand.tagline': 'Blend the music you love into new playlists.',
   'brand.description':
-    'Mix artists or genres, or start from a single artist or song. Blendify builds the playlist; connect Spotify to save it to your account.',
+    'Mix artists or genres, or start from a single artist or song. Save the playlist to Spotify, or continue without connecting Spotify.',
   'brand.descriptionWithAi':
-    'Mix artists or genres, start from one artist or song, or just describe what you want. Blendify builds the playlist; connect Spotify to save it to your account.',
+    'Mix artists or genres, start from one artist or song, or describe what you want. Save the playlist to Spotify, or continue without connecting Spotify.',
   'nav.logOut': 'Log out',
   'nav.deleteAccount': 'Delete account',
   'account.delete.title': 'Delete your Blendify account?',
   'account.delete.body':
     'This removes your Blendify account from the service: your profile, the Spotify tokens stored for you, your Blendify library and your usage stats. You cannot undo it.',
   'account.delete.spotifyNote':
-    'Your Spotify account is not affected, and playlists already published stay in Spotify. Blendify keeps the access you granted until you remove it from your Spotify account settings.',
+    'Your Spotify account is not affected, and playlists already saved there stay in Spotify. Blendify deletes the Spotify access it stored. It does not disconnect Blendify in your Spotify account; you can remove that in Spotify’s settings.',
   'account.delete.confirm': 'Delete my account',
   'account.delete.working': 'Deleting your account…',
   'account.delete.error':
@@ -23,6 +23,10 @@ export const en = {
   'nav.main': 'Main menu',
   'nav.appHome': 'Blendify home',
   'nav.skipToContent': 'Skip to content',
+  'playlist.name.mix': 'Blendify · Mix · {seeds}',
+  'playlist.name.mixEmpty': 'Blendify · Mix',
+  'playlist.name.discover': 'Blendify · Discover · {seed}',
+  'playlist.name.discoverFallback': 'Discover',
   'playlist.description.empty': 'Made with Blendify.',
   'playlist.description.one': 'Made with Blendify from {name}.',
   'playlist.description.two': 'Made with Blendify from {first} and {second}.',
@@ -63,8 +67,8 @@ export const en = {
   'discover.generate': 'Create playlist',
   'discover.generating': 'Creating…',
   'discover.working': 'Creating your playlist',
-  'discover.workingHint': 'Finding related songs and adding them to Spotify…',
-  'discover.failed': 'Couldn’t create the playlist. Try another artist or song.',
+  'discover.workingHint': 'Finding related songs for your playlist…',
+  'discover.failed': 'Couldn’t create the playlist. Please try again.',
   'discover.notEnoughSimilar':
     'There isn’t enough related music for this choice. Try another artist or song.',
   'discover.resolveFailed':
@@ -78,10 +82,7 @@ export const en = {
   'create.stepSource': 'Artists or genres',
   'create.stepDetails': 'Size and cover',
   'create.generateCover': 'Add a cover image',
-  'create.coverScopeHint':
-    'If the cover doesn’t upload, log out and back in once to refresh Spotify permissions.',
-  'create.coverFailed':
-    'Couldn’t add the cover. The playlist will still be created.',
+  'create.coverFailed': 'Couldn’t add the cover.',
   'create.artists': 'Artists',
   'create.genres': 'Genres',
   'create.paste': 'Paste a list of artists',
@@ -92,17 +93,18 @@ export const en = {
   'create.resolveError': 'Some artists couldn’t be found. Check the names and try again.',
   'create.tracksPerArtist': 'Songs per artist',
   'create.tracksPerGenre': 'Songs per genre',
-  'create.tracksMaxHint': 'Up to {max} with this selection',
+  'create.tracksMaxPerArtist': 'Up to {max} songs per artist',
+  'create.tracksMaxPerGenre': 'Up to {max} songs per genre',
   'create.tracksAdjusted': 'Adjusted to {count}',
   'create.reach': 'Familiarity',
   'create.mix.popular': 'Popular',
   'create.mix.balanced': 'Balanced',
-  'create.mix.rarities': 'Deep cuts',
+  'create.mix.rarities': 'Lesser-known',
   'create.mixHint': 'Choose how familiar the songs should feel.',
   'create.mix.popular.hint': 'Favor well-known songs.',
   'create.mix.balanced.hint':
     'Mix popular songs with lesser-known selections.',
-  'create.mix.rarities.hint': 'Favor deeper cuts and lesser-known songs.',
+  'create.mix.rarities.hint': 'Favor lesser-known songs.',
   'create.order': 'Playlist order',
   'create.orderHint': 'How songs are arranged in the playlist.',
   'create.order.artist': 'Artist A–Z',
@@ -135,7 +137,7 @@ export const en = {
   'create.showSettings': 'Show settings',
   'create.hideSettings': 'Hide settings',
   'create.summaryMore': '+{count} more',
-  'create.workingHint': 'Finding songs and adding them to Spotify…',
+  'create.workingHint': 'Finding songs for your playlist…',
   'create.workingHintSlow':
     'Building the mix — this can take a little while…',
   'create.workingHintLong':
@@ -212,8 +214,11 @@ export const en = {
     'Blendify is busy right now. Try again in {wait}.',
   'errors.serviceUnavailable':
     'Blendify is temporarily unavailable. Try again in {wait}.',
+  'errors.wait.oneSecond': 'about 1 second',
   'errors.wait.seconds': 'about {n} seconds',
+  'errors.wait.oneMinute': 'about 1 minute',
   'errors.wait.minutes': 'about {n} minutes',
+  'errors.wait.oneHour': 'about 1 hour',
   'errors.wait.hours': 'about {n} hours',
   'errors.wait.severalHours': 'several hours',
   'errors.artistResolve':
@@ -221,7 +226,7 @@ export const en = {
   'errors.artistResolveNamed':
     'Couldn’t find “{name}” on Spotify. Try searching for it instead.',
   'errors.trackResolveNamed':
-    'Couldn’t find the track “{name}” on Spotify. Try another seed.',
+    'Couldn’t find the song “{name}” on Spotify. Try another one.',
   'genre.searchPlaceholder': 'Search genres…',
   'genre.loadError': 'Couldn’t load genres. Please try again.',
   'genre.empty': 'No matching genres found.',
@@ -298,7 +303,8 @@ export const en = {
   'library.selectAllVisible': 'Select all',
   'library.deselectAll': 'Deselect all',
   'library.selectHint': 'Select the playlists you want to remove.',
-  'library.selectedCount': '{count} selected',
+  'library.selectedCountOne': '1 selected',
+  'library.selectedCountMany': '{count} selected',
   'library.selectItem': 'Select {name}',
   'library.editSelection': 'Select',
   'library.doneSelecting': 'Cancel',
@@ -396,7 +402,7 @@ export const en = {
   'spotifyAccess.whyTitle':
     'Why this happens',
   'spotifyAccess.whyBody':
-    'Blendify currently uses Spotify Development Mode. In that mode, Spotify only lets accounts that have been enabled for this app connect.',
+    'Blendify uses Spotify’s development mode. In that mode, only Spotify accounts enabled for Blendify can connect.',
   'spotifyAccess.retry':
     'Trying again with the same account does not remove that restriction.',
   'spotifyAccess.optionsTitle':
@@ -447,8 +453,9 @@ export const en = {
     'Prepare transfer',
   'transfer.preparing':
     'Preparing transfer…',
-  'transfer.ready':
-    'Transfer prepared for {count} tracks. Available until {expires}.',
+  'transfer.readyOne': 'Transfer prepared for 1 song. Available until {expires}.',
+  'transfer.readyMany':
+    'Transfer prepared for {count} songs. Available until {expires}.',
   'transfer.continue':
     'Continue on Soundiiz',
   'transfer.failed':
@@ -583,7 +590,7 @@ export const en = {
     'These details aren’t supported yet, so they won’t affect this playlist.',
   'ai.editRequest': 'Edit request',
   'ai.startOver': 'Start over',
-  'ai.createPlaylist': 'Create playlist',
+  'ai.createPlaylist': 'Create preview',
   'ai.createHint': 'Blendify will create a preview of your playlist.',
   'ai.cancelEdit': 'Cancel editing',
   'ai.restoring': 'Loading your request…',
@@ -665,10 +672,10 @@ export const en = {
     'Cancel',
   'ai.refine.keepHint':
     'Select songs below to keep them in their current position.',
-  'ai.refine.keepSelected':
-    'Songs selected to keep: {count}',
-  'ai.refine.keptAlready':
-    'Songs already kept in place: {count}',
+  'ai.refine.keepSelectedOne': '1 song selected to keep',
+  'ai.refine.keepSelectedMany': '{count} songs selected to keep',
+  'ai.refine.keptAlreadyOne': '1 song already kept in place',
+  'ai.refine.keptAlreadyMany': '{count} songs already kept in place',
   'ai.refine.keepLabel':
     'Keep',
   'ai.refine.keepTrack':
@@ -856,7 +863,7 @@ export const en = {
   'runStatus.viewDetails':
     'View details',
   'runStatus.dismiss':
-    'Dismiss',
+    'Close',
   'create.uncertainTitle':
     'Lost connection',
   'create.uncertainLibrary':
@@ -867,7 +874,8 @@ export const en = {
     'Open Library',
   'home.eyebrow': 'Home',
   'home.title': 'What do you want to create?',
-  'home.subtitle': 'Choose where to start. Blendify builds the playlist and you decide where it goes.',
+  'home.subtitle':
+    'Choose where to start. Blendify builds the playlist. Saving it to Spotify is optional.',
   'home.actionsLabel': 'Ways to create',
   'home.mixDescription': 'Combine artists or genres into one playlist.',
   'home.discoverDescription': 'Start with one artist or song and explore related music.',
@@ -876,7 +884,8 @@ export const en = {
   'home.libraryDescription': 'Playlists you saved in Blendify.',
   'home.statsDescription': 'Your most-used artists and genres.',
   'home.connectTitle': 'Want to save playlists straight to Spotify?',
-  'home.connectBody': 'Connect Spotify to publish playlists to your account, keep a Library and see your stats. Everything above works without it.',
+  'home.connectBody':
+    'Connect Spotify to save private playlists to your account, keep a Library and see your stats. The options above work without connecting.',
 } as const
 
 export type MessageKey = keyof typeof en

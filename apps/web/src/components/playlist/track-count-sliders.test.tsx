@@ -88,7 +88,7 @@ describe('Mix track-count slider', () => {
     expect(artists).toHaveAttribute('min', '1')
     expect(artists).toHaveAttribute('max', '50')
     expect(artists).toHaveAttribute('step', '1')
-    expect(artists).toHaveAccessibleDescription('Up to 50 with this selection')
+    expect(artists).toHaveAccessibleDescription('Up to 50 songs per artist')
     expect(screen.getByText('10 songs')).toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Generate playlist' }),
@@ -120,7 +120,7 @@ describe('Mix track-count slider', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Add artists' }))
 
-    expect(await screen.findByText('Up to 25 with this selection')).toBeVisible()
+    expect(await screen.findByText('Up to 25 songs per artist')).toBeVisible()
     expect(slider('Songs per artist')).toHaveValue('25')
     expect(screen.getByText('≈ 50 songs · 25 songs per artist')).toBeVisible()
     expect(screen.getByText('Adjusted to 25 songs')).toBeInTheDocument()
@@ -129,7 +129,7 @@ describe('Mix track-count slider', () => {
 
     expect(slider('Songs per artist')).toHaveValue('25')
     expect(slider('Songs per artist')).toHaveAttribute('max', '50')
-    expect(screen.getByText('Up to 50 with this selection')).toBeVisible()
+    expect(screen.getByText('Up to 50 songs per artist')).toBeVisible()
     expect(screen.getByText('≈ 25 songs · 25 songs per artist')).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: 'Generate playlist' }))
@@ -193,7 +193,7 @@ describe('Mix track-count slider', () => {
 
     expect(slider('Songs per genre')).toHaveValue('10')
     expect(slider('Songs per genre')).toHaveAttribute('max', '10')
-    expect(screen.getByText('Up to 10 with this selection')).toBeVisible()
+    expect(screen.getByText('Up to 10 songs per genre')).toBeVisible()
     expect(screen.getByText('≈ 50 songs · 10 songs per genre')).toBeVisible()
 
     await user.click(screen.getByRole('radio', { name: 'Artists' }))
@@ -343,8 +343,8 @@ describe('Mix track-count slider', () => {
   })
 
   it.each([
-    ['es', 'Canciones por artista', '10 canciones', 'Hasta 50 con esta selección'],
-    ['pt', 'Músicas por artista', '10 músicas', 'Até 50 com esta seleção'],
+    ['es', 'Canciones por artista', '10 canciones', 'Hasta 50 canciones por artista'],
+    ['pt', 'Músicas por artista', '10 músicas', 'Até 50 músicas por artista'],
   ] as const)(
     'localizes the artist slider in %s',
     (locale, label, value, hint) => {

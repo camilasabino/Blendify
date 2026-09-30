@@ -113,7 +113,7 @@ describe('Create with AI Guest destination', () => {
     expect(destinationCalls(calls)).toEqual([
       { url: `/api/ai/sessions/${AI_SESSION_ID}/transfer`, method: 'POST', body: { name: 'Rainy run' } },
     ])
-    expect(screen.getByText(/Transfer prepared for 20 tracks/)).toBeVisible()
+    expect(screen.getByText(/Transfer prepared for 20 songs/)).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Edit title' })).toBeNull()
     expect(screen.getByText('This is a preview. It isn’t saved to Spotify.')).toBeVisible()
   })

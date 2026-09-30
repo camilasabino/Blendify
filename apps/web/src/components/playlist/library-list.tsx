@@ -92,9 +92,11 @@ function LibrarySelectionBar({
       <div className="space-y-2">
         {hasSelection ? (
           <p className="text-sm font-medium text-cream-100">
-            {t('library.selectedCount', {
-              count: selectedPlaylists.length,
-            })}
+            {selectedPlaylists.length === 1
+              ? t('library.selectedCountOne')
+              : t('library.selectedCountMany', {
+                  count: selectedPlaylists.length,
+                })}
           </p>
         ) : (
           <p className="text-sm text-cream-300">{t('library.selectHint')}</p>

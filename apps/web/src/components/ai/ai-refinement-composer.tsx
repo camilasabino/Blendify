@@ -112,10 +112,18 @@ export function AiRefinementComposer({
         <div className="space-y-1 text-sm text-cream-300">
           <p>{t('ai.refine.keepHint')}</p>
           {keptCount > 0 ? (
-            <p className="text-cream-400">{t('ai.refine.keptAlready', { count: keptCount })}</p>
+            <p className="text-cream-400">
+              {keptCount === 1
+                ? t('ai.refine.keptAlreadyOne')
+                : t('ai.refine.keptAlreadyMany', { count: keptCount })}
+            </p>
           ) : null}
           {selectedCount > 0 ? (
-            <p className="text-cream-400">{t('ai.refine.keepSelected', { count: selectedCount })}</p>
+            <p className="text-cream-400">
+              {selectedCount === 1
+                ? t('ai.refine.keepSelectedOne')
+                : t('ai.refine.keepSelectedMany', { count: selectedCount })}
+            </p>
           ) : null}
         </div>
 

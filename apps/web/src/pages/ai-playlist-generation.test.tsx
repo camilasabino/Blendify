@@ -55,7 +55,7 @@ function promptField() {
 }
 
 function createButton() {
-  return screen.getByRole('button', { name: 'Create playlist' })
+  return screen.getByRole('button', { name: 'Create preview' })
 }
 
 function interpretCalls(calls: FetchCall[]) {
@@ -114,18 +114,18 @@ afterEach(() => {
 })
 
 describe('Create with AI generation', () => {
-  it('offers Create playlist only once the request is reviewed', async () => {
+  it('offers Create preview only once the request is reviewed', async () => {
     const user = userEvent.setup()
     stubApi({ [CREATE_ROUTE]: () => jsonResponse(createdAiSession(), 201) })
     renderPage()
 
-    expect(screen.queryByRole('button', { name: 'Create playlist' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Create preview' })).toBeNull()
     await reviewRequest(user)
 
     const summary = screen
       .getByRole('heading', { name: 'Here’s what Blendify understood' })
       .closest('section') as HTMLElement
-    expect(within(summary).getByRole('button', { name: 'Create playlist' })).toBeEnabled()
+    expect(within(summary).getByRole('button', { name: 'Create preview' })).toBeEnabled()
     expect(within(summary).getByRole('button', { name: 'Start over' })).toBeEnabled()
     expect(within(summary).getByText('Not used')).toBeVisible()
     expect(within(summary).getByText(/for a long run/)).toBeVisible()
@@ -149,7 +149,7 @@ describe('Create with AI generation', () => {
     const progressHeading = await screen.findByRole('heading', { name: 'Creating your playlist…' })
     await waitFor(() => expect(progressHeading).toHaveFocus())
 
-    expect(screen.queryByRole('button', { name: /Create playlist|Creating playlist/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Create preview|Creating playlist/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Start over' })).toBeNull()
     expect(
       screen.getAllByRole('status').filter((status) => status.textContent?.trim()),
@@ -220,7 +220,7 @@ describe('Create with AI generation', () => {
     expect(within(trackList).getAllByText(/Radiohead/).length).toBeGreaterThan(0)
     expect(result.textContent).not.toContain('30')
     expect(screen.queryByText('Some preferences couldn’t be fully applied')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Create playlist' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Create preview' })).toBeNull()
     expect(screen.queryByRole('button', { name: /save|publish|add to spotify/i })).toBeNull()
     expect(within(result).getByRole('button', { name: 'Prepare transfer' })).toBeEnabled()
     expect(screen.queryByRole('link', { name: /soundiiz/i })).toBeNull()
@@ -564,7 +564,7 @@ describe('Create with AI session restore', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Creating your playlist…' })).toBeVisible()
-    expect(screen.queryByRole('button', { name: 'Create playlist' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Create preview' })).toBeNull()
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3_000)
@@ -729,7 +729,7 @@ describe('Create with AI generation copy', () => {
   it.each([
     {
       locale: 'es',
-      create: 'Crear playlist',
+      create: 'Crear vista previa',
       hint: 'Blendify creará una vista previa de tu playlist.',
       eyebrow: 'Vista previa de la playlist',
       unmetTitle: 'Algunas preferencias no se pudieron aplicar del todo',
@@ -740,7 +740,7 @@ describe('Create with AI generation copy', () => {
     },
     {
       locale: 'pt',
-      create: 'Criar playlist',
+      create: 'Criar prévia',
       hint: 'O Blendify vai criar uma prévia da sua playlist.',
       eyebrow: 'Prévia da playlist',
       unmetTitle: 'Algumas preferências não puderam ser aplicadas por completo',

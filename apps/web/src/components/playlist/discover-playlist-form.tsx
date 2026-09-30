@@ -286,7 +286,7 @@ export function DiscoverPlaylistForm() {
         return
       }
       const seedTrack = track
-      const playlistName = buildDiscoverPlaylistName(seedTrack.name)
+      const playlistName = buildDiscoverPlaylistName(seedTrack.name, t)
       request = {
         kind: 'discover_track',
         trackId: seedTrack.id,
@@ -314,7 +314,7 @@ export function DiscoverPlaylistForm() {
         return
       }
       const seedArtist = artist
-      const playlistName = buildDiscoverPlaylistName(seedArtist.name)
+      const playlistName = buildDiscoverPlaylistName(seedArtist.name, t)
       request = {
         kind: 'discover_artist',
         artistId: seedArtist.id,

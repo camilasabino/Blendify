@@ -189,7 +189,7 @@ describe('English refinement copy', () => {
       type: 'value',
       label: 'Familiarity',
       from: 'Balanced',
-      to: 'Deep cuts',
+      to: 'Lesser-known',
     })
     expect(
       intentChangeView({ field: 'excludeArtists', added: ['Coldplay'], removed: [] }, t),

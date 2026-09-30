@@ -120,7 +120,7 @@ describe('document sync', () => {
 
     expect(document.documentElement.lang).toBe('pt-BR')
     expect(document.title).toBe(DOCUMENT_TITLE.pt)
-    expect(meta.getAttribute('content')).toContain('Crie e descubra')
+    expect(meta.getAttribute('content')).toContain('Conecte o Spotify para salvá-las')
     meta.remove()
   })
 })

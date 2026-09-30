@@ -35,6 +35,22 @@ describe('buildDefaultPlaylistName', () => {
       'Blendify · Mix',
     )
   })
+
+  it('uses the active language when a translator is provided', () => {
+    const translate = (key: string, vars?: Record<string, string | number>) => {
+      if (key === 'playlist.name.mixEmpty') {
+        return 'Blendify · Mezcla'
+      }
+      return `Blendify · Mezcla · ${vars?.seeds ?? ''}`
+    }
+
+    expect(
+      buildDefaultPlaylistName({
+        names: ['Radiohead'],
+        translate,
+      }),
+    ).toBe('Blendify · Mezcla · Radiohead')
+  })
 })
 
 describe('buildDiscoverPlaylistName', () => {

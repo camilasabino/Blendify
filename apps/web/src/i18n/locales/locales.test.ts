@@ -73,6 +73,9 @@ describe('locale contracts', () => {
     expect(es['authError.denied']).not.toMatch(/podés|probá/i)
     expect(es['authError.failed']).not.toMatch(/probá/i)
     expect(es['authError.expired']).not.toMatch(/empezalo/i)
+    for (const [key, value] of Object.entries(es)) {
+      expect(value, key).not.toMatch(/volvé|tenés|podés|hacé|probá|empezalo|semilla/i)
+    }
     expect(en['spotifyAccess.whyBody']).not.toMatch(/\d/)
     expect(es['spotifyAccess.whyBody']).not.toMatch(/\d/)
     expect(pt['spotifyAccess.whyBody']).not.toMatch(/\d/)

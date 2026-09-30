@@ -369,12 +369,14 @@ export function MixPlaylistForm() {
     if (mode === 'artists') {
       return buildDefaultPlaylistName({
         names: artists.map((a) => a.name),
+        translate: t,
       })
     }
     return buildDefaultPlaylistName({
       names: genres.map((g) => g.name),
+      translate: t,
     })
-  }, [mode, artists, genres])
+  }, [mode, artists, genres, t])
 
   useLayoutEffect(() => {
     const next = clampedTrackCount(
@@ -535,6 +537,7 @@ export function MixPlaylistForm() {
         playlistName ||
         buildDefaultPlaylistName({
           names: seedNames,
+          translate: t,
         })
       const description = buildDefaultPlaylistDescription(seedNames, t)
 
@@ -780,7 +783,7 @@ export function MixPlaylistForm() {
                     valueText={formatSongCount(tracksPerArtist, t)}
                     control={form.control}
                     name="tracksPerArtist"
-                    hint={t('create.tracksMaxHint', { max: artistTrackMax })}
+                    hint={t('create.tracksMaxPerArtist', { max: artistTrackMax })}
                     adjustment={artistAdjustment}
                     onAdjust={() => setArtistAdjustment(null)}
                   />
@@ -792,7 +795,7 @@ export function MixPlaylistForm() {
                     valueText={formatSongCount(tracksPerGenre, t)}
                     control={form.control}
                     name="tracksPerGenre"
-                    hint={t('create.tracksMaxHint', { max: genreTrackMax })}
+                    hint={t('create.tracksMaxPerGenre', { max: genreTrackMax })}
                     adjustment={genreAdjustment}
                     onAdjust={() => setGenreAdjustment(null)}
                   />

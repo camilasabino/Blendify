@@ -57,7 +57,7 @@ describe('TransferAction', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     expect(link).toHaveFocus()
     expect(open).not.toHaveBeenCalled()
-    expect(screen.getByText(/Transfer prepared for 12 tracks\. Available until /)).toBeVisible()
+    expect(screen.getByText(/Transfer prepared for 12 songs\. Available until /)).toBeVisible()
     expect(document.body).not.toHaveTextContent('signed-token')
   })
 

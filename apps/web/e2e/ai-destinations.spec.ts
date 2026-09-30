@@ -58,7 +58,7 @@ async function generateLive(page: Page) {
   await page.goto('/app/ai')
   await page.getByRole('textbox', { name: 'Playlist request' }).fill(AI_REVIEW_PROMPT)
   await page.getByRole('button', { name: 'Review request' }).click()
-  await page.getByRole('button', { name: 'Create playlist' }).click()
+  await page.getByRole('button', { name: 'Create preview' }).click()
   stream.release()
   await expect(
     page.getByRole('heading', { name: 'Blendify · Mix · Radiohead + Interpol' }),

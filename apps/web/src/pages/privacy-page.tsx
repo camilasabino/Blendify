@@ -3,6 +3,7 @@ import { BlendifyMark } from '@/components/brand/blendify-mark'
 import { Footer } from '@/components/layout/footer'
 import { LanguageSwitcher } from '@/components/layout/language-switcher'
 import { useLocaleStore } from '@/i18n/use-locale'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { cn, focusRing, shellGutter } from '@/lib/utils'
 import {
   formatPolicyDate,
@@ -23,6 +24,7 @@ function withEmail(text: string): string {
 export function PrivacyPage() {
   const locale = useLocaleStore((state) => state.locale)
   const policy = PRIVACY_POLICY[locale]
+  useDocumentTitle(policy.title)
 
   return (
     <div className="flex min-h-svh flex-col">

@@ -4,8 +4,14 @@ type DescriptionKey =
   | 'playlist.description.two'
   | 'playlist.description.many'
 
-type DescriptionTranslate = (
-  key: DescriptionKey,
+type NameKey =
+  | 'playlist.name.mix'
+  | 'playlist.name.mixEmpty'
+  | 'playlist.name.discover'
+  | 'playlist.name.discoverFallback'
+
+type CatalogTranslate = (
+  key: DescriptionKey | NameKey,
   vars?: Record<string, string | number>,
 ) => string
 
@@ -13,10 +19,13 @@ export const GENERATED_NAME_PREFIX = 'Blendify · '
 
 export function buildDefaultPlaylistName(input: {
   names: string[]
+  translate?: CatalogTranslate
 }): string {
   const names = input.names.map((n) => n.trim()).filter(Boolean)
   if (names.length === 0) {
-    return `${GENERATED_NAME_PREFIX}Mix`
+    return input.translate
+      ? truncate(input.translate('playlist.name.mixEmpty'))
+      : `${GENERATED_NAME_PREFIX}Mix`
   }
 
   let seeds: string
@@ -28,17 +37,31 @@ export function buildDefaultPlaylistName(input: {
     seeds = `${names[0]} + ${names.length - 1}`
   }
 
-  return truncate(`${GENERATED_NAME_PREFIX}Mix · ${seeds}`)
+  return truncate(
+    input.translate
+      ? input.translate('playlist.name.mix', { seeds })
+      : `${GENERATED_NAME_PREFIX}Mix · ${seeds}`,
+  )
 }
 
-export function buildDiscoverPlaylistName(seedName: string): string {
-  const seed = seedName.trim() || 'Discover'
-  return truncate(`${GENERATED_NAME_PREFIX}Discover · ${seed}`)
+export function buildDiscoverPlaylistName(
+  seedName: string,
+  translate?: CatalogTranslate,
+): string {
+  const fallback = translate
+    ? translate('playlist.name.discoverFallback')
+    : 'Discover'
+  const seed = seedName.trim() || fallback
+  return truncate(
+    translate
+      ? translate('playlist.name.discover', { seed })
+      : `${GENERATED_NAME_PREFIX}Discover · ${seed}`,
+  )
 }
 
 export function buildDefaultPlaylistDescription(
   names: string[],
-  translate?: DescriptionTranslate,
+  translate?: CatalogTranslate,
 ): string {
   const clean = names.map((n) => n.trim()).filter(Boolean)
   if (clean.length === 0) {

@@ -110,7 +110,7 @@ test.describe('Track count sliders', () => {
       await page.keyboard.press('ArrowLeft')
     }
     await expect(slider).toHaveValue('40')
-    await expect(page.getByText('Up to 50 with this selection')).toBeVisible()
+    await expect(page.getByText('Up to 50 songs per artist')).toBeVisible()
 
     const search = page.getByRole('combobox', { name: 'Artists' })
     await search.fill('Sade')
@@ -122,7 +122,7 @@ test.describe('Track count sliders', () => {
     await page.getByRole('option', { name: 'Portishead' }).click()
     await expect(slider).toHaveValue('25')
     await expect(slider).toHaveAttribute('max', '25')
-    await expect(page.getByText('Up to 25 with this selection')).toBeVisible()
+    await expect(page.getByText('Up to 25 songs per artist')).toBeVisible()
 
     await page.getByRole('button', { name: 'Remove Portishead' }).click()
     await expect(slider).toHaveValue('25')

@@ -96,16 +96,10 @@ export function OrderModeSection<T extends OrderFields>({
 }
 
 export function CoverErrorNotice({ message }: Readonly<{ message: string | null }>) {
-  const t = useT()
   if (!message) {
     return null
   }
-  return (
-    <div className="space-y-1">
-      <FieldError>{message}</FieldError>
-      <p className="text-xs text-cream-400">{t('create.coverScopeHint')}</p>
-    </div>
-  )
+  return <FieldError>{message}</FieldError>
 }
 
 export function CoverToggle({
