@@ -451,3 +451,59 @@ describe('GenerateDiscoverPlaylistUseCase intermediate targets', () => {
     });
   });
 });
+
+describe('GenerateDiscoverPlaylistUseCase seed snapshot popularity', () => {
+  async function seedPopularity(
+    popularity?: number | null,
+  ): Promise<number | null | undefined> {
+    const context = setup(knownCandidates(20));
+    context.resolveTrack.mockImplementation(
+      (artistName: string, trackName: string) => {
+        if (trackName === SEED.name) {
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(makeTrack(artistName, trackName));
+      },
+    );
+    const catalog = {
+      searchTracks: jest.fn().mockResolvedValue([]),
+      resolveTrack: context.resolveTrack,
+    } as unknown as CatalogProviderPort;
+    const useCase = new GenerateDiscoverPlaylistUseCase(
+      {} as GenerateArtistMixUseCase,
+      {
+        isConfigured: () => true,
+        getSimilarTracks: jest.fn().mockResolvedValue(knownCandidates(20)),
+        getTopTracksForArtist: jest.fn().mockResolvedValue([]),
+        getSimilarArtists: jest.fn().mockResolvedValue([]),
+      } as unknown as DiscoveryCatalogPort,
+      { forMarket: () => catalog },
+      { assertAvailable: jest.fn() },
+    );
+
+    const playlist = await useCase.execute({
+      kind: 'discover_track',
+      trackId: SEED.id.getValue(),
+      track: {
+        id: SEED.id.getValue(),
+        name: SEED.name,
+        artistId: SEED.artistId.getValue(),
+        artistName: SEED.artistName,
+        uri: SEED.uri,
+        ...(popularity === undefined ? {} : { popularity }),
+      },
+      targetTrackCount: 10,
+      popularity: PopularityMode.BALANCED,
+      orderMode: 'random',
+    });
+    const seed = playlist.seeds[0];
+    return seed?.type === 'track' ? seed.popularity : undefined;
+  }
+
+  it('keeps a measured snapshot, a real zero, and an omitted snapshot distinct', async () => {
+    await expect(seedPopularity(73)).resolves.toBe(73);
+    await expect(seedPopularity(0)).resolves.toBe(0);
+    await expect(seedPopularity()).resolves.toBeNull();
+    await expect(seedPopularity(null)).resolves.toBeNull();
+  });
+});

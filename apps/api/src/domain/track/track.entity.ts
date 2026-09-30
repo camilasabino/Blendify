@@ -12,7 +12,7 @@ export interface TrackProps {
   artistId: ArtistId;
   artistName: string;
   durationMs: number;
-  popularity: number;
+  popularity: number | null;
   uri: string;
   albumName?: string;
   albumImageUrl?: string;
@@ -28,7 +28,7 @@ export class Track {
   readonly artistId: ArtistId;
   readonly artistName: string;
   readonly durationMs: number;
-  readonly popularity: number;
+  readonly popularity: number | null;
   readonly uri: string;
   readonly albumName?: string;
   readonly albumImageUrl?: string;

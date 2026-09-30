@@ -19,6 +19,7 @@ import {
   pickStrictArtistMatch,
 } from '@/domain/artist/artist-name-match';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { readTrackPopularity } from '@/domain/track/track-popularity';
 import { Track } from '@/domain/track/track.entity';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
 import {
@@ -412,7 +413,7 @@ export class GenerateDiscoverPlaylistUseCase {
         artistId: ArtistId.create(snapshot.artistId),
         artistName: snapshot.artistName,
         durationMs: snapshot.durationMs ?? 0,
-        popularity: snapshot.popularity ?? 0,
+        popularity: readTrackPopularity(snapshot.popularity),
         uri: snapshot.uri,
         albumImageUrl: snapshot.albumImageUrl ?? undefined,
       });

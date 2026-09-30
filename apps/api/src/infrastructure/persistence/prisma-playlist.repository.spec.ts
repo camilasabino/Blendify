@@ -81,6 +81,58 @@ describe('PrismaPlaylistRepository track metadata', () => {
     expect(track.artists).toEqual([{ id: 'kid-id', name: 'The Kid LAROI' }]);
     expect(track.isrc).toBeUndefined();
     expect(track.externalUrl).toBeUndefined();
+    expect(track.popularity).toBe(0);
+  });
+
+  it('keeps a stored 73, a stored zero, a stored null, and a missing field distinct', async () => {
+    const { prisma, repository } = createRepository();
+    const { popularity: _storedZero, ...withoutPopularity } = legacyTrack;
+    prisma.playlist.findUnique.mockResolvedValue(
+      row([
+        { ...legacyTrack, id: 'high', popularity: 73 },
+        { ...legacyTrack, id: 'zero', popularity: 0 },
+        { ...legacyTrack, id: 'unknown', popularity: null },
+        { ...withoutPopularity, id: 'absent' },
+      ]),
+    );
+
+    const playlist = await repository.findById('playlist-1');
+
+    expect(playlist?.tracks.map((track) => track.popularity)).toEqual([
+      73,
+      0,
+      null,
+      null,
+    ]);
+  });
+
+  it('persists an unknown popularity as null', async () => {
+    const { prisma, repository } = createRepository();
+    const playlist = Playlist.create({
+      id: 'playlist-1',
+      userId: 'user-1',
+      name: 'Evening mix',
+      seeds: [{ type: 'artist', id: 'kid-id', name: 'The Kid LAROI' }],
+      tracks: [
+        Track.create({
+          id: TrackId.create('track-1'),
+          name: 'Stay',
+          artistId: ArtistId.create('kid-id'),
+          artistName: 'The Kid LAROI',
+          durationMs: 141_000,
+          popularity: null,
+          uri: 'spotify:track:track-1',
+        }),
+      ],
+      generation,
+    });
+
+    const saved = await repository.save(playlist);
+    const [stored] = prisma.playlist.upsert.mock.calls[0][0].create
+      .tracks as unknown as Array<Record<string, unknown>>;
+
+    expect(stored.popularity).toBeNull();
+    expect(saved.tracks[0].popularity).toBeNull();
   });
 
   it('persists and restores credited artists, isrc and external url', async () => {

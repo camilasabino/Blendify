@@ -26,6 +26,16 @@ function makeTrack(extra: Partial<Parameters<typeof Track.create>[0]> = {}) {
 }
 
 describe('toTrackResponse', () => {
+  it('serializes 73, a real zero, and an unknown score', () => {
+    expect(toTrackResponse(makeTrack({ popularity: 73 })).popularity).toBe(73);
+    expect(toTrackResponse(makeTrack({ popularity: 0 })).popularity).toBe(0);
+
+    const unknown = toTrackResponse(makeTrack({ popularity: null }));
+
+    expect(unknown.popularity).toBeNull();
+    expect(TrackSchema.parse(unknown)).toEqual(unknown);
+  });
+
   it('exposes portable metadata without changing the attributed artist', () => {
     const response = toTrackResponse(
       makeTrack({

@@ -9,7 +9,7 @@ export interface ResolvedAiTrackSeed extends ResolvedAiSeed {
   artistName: string;
   uri: string;
   durationMs: number;
-  popularity: number;
+  popularity: number | null;
 }
 
 export interface ResolvedAiSeeds {

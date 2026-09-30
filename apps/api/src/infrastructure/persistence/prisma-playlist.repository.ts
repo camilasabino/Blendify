@@ -11,6 +11,7 @@ import {
 } from '@blendify/contracts';
 import { Playlist } from '@/domain/playlist/playlist.entity';
 import { PlaylistName } from '@/domain/value-objects/playlist-name.vo';
+import { readTrackPopularity } from '@/domain/track/track-popularity';
 import { Track, type TrackArtist } from '@/domain/track/track.entity';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
@@ -26,7 +27,7 @@ interface TrackJson {
   artistId: string;
   artistName: string;
   durationMs: number;
-  popularity: number;
+  popularity: number | null;
   uri: string;
   albumName?: string;
   albumImageUrl?: string | null;
@@ -173,7 +174,7 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
           artistId: ArtistId.create(track.artistId),
           artistName: track.artistName,
           durationMs: track.durationMs,
-          popularity: track.popularity,
+          popularity: readTrackPopularity(track.popularity),
           uri: track.uri,
           albumName: track.albumName,
           albumImageUrl: track.albumImageUrl ?? undefined,

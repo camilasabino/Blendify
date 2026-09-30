@@ -7,7 +7,7 @@ function track(overrides: {
   id: string;
   name: string;
   artistId?: string;
-  popularity?: number;
+  popularity?: number | null;
 }): Track {
   return Track.create({
     id: TrackId.create(overrides.id),
@@ -15,7 +15,7 @@ function track(overrides: {
     artistId: ArtistId.create(overrides.artistId ?? 'artist-1'),
     artistName: 'Test Artist',
     durationMs: 200_000,
-    popularity: overrides.popularity ?? 50,
+    popularity: overrides.popularity === undefined ? 50 : overrides.popularity,
     uri: `spotify:track:${overrides.id}`,
   });
 }
@@ -72,6 +72,47 @@ describe('TrackDeduplicationService', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].id.getValue()).toBe('2');
+  });
+
+  it('keeps the known popularity when the other alternate is unknown', () => {
+    const result = service.deduplicate([
+      track({ id: '1', name: 'Hello - Live', popularity: null }),
+      track({ id: '2', name: 'Hello (Acoustic)', popularity: 0 }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id.getValue()).toBe('2');
+    expect(result[0].popularity).toBe(0);
+  });
+
+  it('does not keep an unknown popularity ahead of a lower known one', () => {
+    const result = service.deduplicate([
+      track({ id: '1', name: 'Hello (Acoustic)', popularity: 10 }),
+      track({ id: '2', name: 'Hello - Live', popularity: null }),
+    ]);
+
+    expect(result[0].id.getValue()).toBe('1');
+    expect(result[0].popularity).toBe(10);
+  });
+
+  it('keeps the first track when both popularities are unknown', () => {
+    const result = service.deduplicate([
+      track({ id: '1', name: 'Hello - Live', popularity: null }),
+      track({ id: '2', name: 'Hello (Acoustic)', popularity: null }),
+    ]);
+
+    expect(result[0].id.getValue()).toBe('1');
+    expect(result[0].popularity).toBeNull();
+  });
+
+  it('still prefers a standard version with unknown popularity over a popular alternate', () => {
+    const result = service.deduplicate([
+      track({ id: '1', name: 'Hello - Live', popularity: 90 }),
+      track({ id: '2', name: 'Hello', popularity: null }),
+    ]);
+
+    expect(result[0].id.getValue()).toBe('2');
+    expect(result[0].popularity).toBeNull();
   });
 
   it('breaks a popularity tie between two alternates by keeping the first', () => {

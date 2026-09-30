@@ -198,6 +198,35 @@ describe('selectSimilarTrackCandidates', () => {
     ]);
   });
 
+  it('does not treat a Spotify popularity of zero as a Last.fm rarity', () => {
+    const unknown = Array.from({ length: 30 }, (_, index) => ({
+      name: `unknown${index}`,
+      playcount: undefined,
+      popularity: 0,
+    }));
+    const mixed = [...unknown.slice(0, 15), ...pool, ...unknown.slice(15)];
+
+    for (const mode of [
+      PopularityMode.POPULAR,
+      PopularityMode.BALANCED,
+      PopularityMode.RARITIES,
+    ]) {
+      for (const seed of SEEDS) {
+        const picked = selectSimilarTrackCandidates(
+          mixed,
+          mode,
+          needed,
+          seededRandom(seed),
+        );
+
+        expect(picked).toHaveLength(budget);
+        expect(
+          picked.every((candidate) => candidate.playcount !== undefined),
+        ).toBe(true);
+      }
+    }
+  });
+
   it('treats invalid playcounts as unknown', () => {
     const picked = selectSimilarTrackCandidates(
       [

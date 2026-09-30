@@ -6,6 +6,7 @@ import {
   PlaylistRemoteSnapshot,
   ProviderPlaylist,
 } from '@/domain/repositories/music-provider.port';
+import { readTrackPopularity } from '@/domain/track/track-popularity';
 import { Track } from '@/domain/track/track.entity';
 import { User } from '@/domain/user/user.entity';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
@@ -509,7 +510,7 @@ function mapPlaylistTrack(item?: SpotifyPlaylistTrack | null): Track | null {
     artistId: ArtistId.create(artist?.id ?? 'unknown'),
     artistName: artist?.name?.trim() || 'Unknown Artist',
     durationMs: Math.max(0, item.duration_ms ?? 0),
-    popularity: item.popularity ?? 0,
+    popularity: readTrackPopularity(item.popularity),
     uri: item.uri,
     albumName: item.album?.name,
     albumImageUrl: item.album?.images?.[0]?.url,

@@ -314,6 +314,7 @@ describe('SpotifyCatalogClient.searchTracks portable metadata', () => {
     ]);
     expect(track.isrc).toBe('USUM72105936');
     expect(track.externalUrl).toBe('https://open.spotify.com/track/track-1');
+    expect(track.popularity).toBeNull();
   });
 
   it('maps a track without optional portable metadata', async () => {
@@ -340,7 +341,7 @@ describe('SpotifyCatalogClient.searchTracks portable metadata', () => {
 
   it('round-trips portable metadata through the search cache', async () => {
     const { api, raw } = createApi({ tracks: { items: [spotifyTrack] } });
-    const { cache } = createCache();
+    const { cache, store } = createCache();
     const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
 
     await client.searchTracks('Stay');
@@ -353,6 +354,10 @@ describe('SpotifyCatalogClient.searchTracks portable metadata', () => {
     ]);
     expect(cached.isrc).toBe('USUM72105936');
     expect(cached.externalUrl).toBe('https://open.spotify.com/track/track-1');
+    expect(cached.popularity).toBeNull();
+    expect(store.get('spotify:search-tracks:AR:stay:10:0')).toEqual([
+      expect.objectContaining({ popularity: null }),
+    ]);
   });
 
   it('hydrates cache entries written before portable metadata existed', async () => {
@@ -377,6 +382,80 @@ describe('SpotifyCatalogClient.searchTracks portable metadata', () => {
     expect(track.artists).toEqual([{ id: 'kid-id', name: 'The Kid LAROI' }]);
     expect(track.isrc).toBeUndefined();
     expect(track.externalUrl).toBeUndefined();
+    expect(track.popularity).toBe(0);
+  });
+
+  it('reads a cached null and a cached entry with no popularity as unknown', async () => {
+    const { api, raw } = createApi();
+    const { cache, store } = createCache();
+    store.set('spotify:search-tracks:AR:stay:10:0', [
+      {
+        id: 'known-null',
+        name: 'Stay',
+        artistId: 'kid-id',
+        artistName: 'The Kid LAROI',
+        durationMs: 141_000,
+        popularity: null,
+        uri: 'spotify:track:known-null',
+      },
+      {
+        id: 'absent',
+        name: 'Stay Again',
+        artistId: 'kid-id',
+        artistName: 'The Kid LAROI',
+        durationMs: 141_000,
+        uri: 'spotify:track:absent',
+      },
+    ]);
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    const tracks = await client.searchTracks('Stay');
+
+    expect(raw).not.toHaveBeenCalled();
+    expect(tracks.map((track) => track.popularity)).toEqual([null, null]);
+  });
+
+  it('keeps 73, a real zero, and an omitted score distinct', async () => {
+    const { api } = createApi({
+      tracks: {
+        items: [
+          {
+            ...spotifyTrack,
+            id: 'high',
+            uri: 'spotify:track:high',
+            popularity: 73,
+          },
+          {
+            ...spotifyTrack,
+            id: 'zero',
+            uri: 'spotify:track:zero',
+            popularity: 0,
+          },
+          { ...spotifyTrack, id: 'missing', uri: 'spotify:track:missing' },
+        ],
+      },
+    });
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR');
+
+    const tracks = await client.searchTracks('Stay');
+
+    expect(tracks.map((track) => track.popularity)).toEqual([73, 0, null]);
+  });
+
+  it('round-trips a real zero through the search cache', async () => {
+    const { api, raw } = createApi({
+      tracks: {
+        items: [{ ...spotifyTrack, popularity: 0 }],
+      },
+    });
+    const { cache } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    await client.searchTracks('Stay');
+    const [cached] = await client.searchTracks('Stay');
+
+    expect(raw).toHaveBeenCalledTimes(1);
+    expect(cached.popularity).toBe(0);
   });
 });
 

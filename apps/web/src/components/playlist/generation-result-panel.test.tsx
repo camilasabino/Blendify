@@ -10,6 +10,10 @@ import { guestJazzPlaylist, jazzTrack } from '@/test/playlist-fixtures'
 
 type PanelProps = Parameters<typeof GenerationResultPanel>[0]
 
+function numericTokens(name: string): string[] {
+  return screen.getByText(name).closest('li')?.textContent?.match(/\d+/g) ?? []
+}
+
 function renderPanel(overrides: Partial<PanelProps> = {}) {
   const props: PanelProps = {
     mode: 'spotify',
@@ -207,6 +211,33 @@ describe('GenerationResultPanel in Guest Mode', () => {
         'This playlist is temporary. It will be lost if you leave this page or refresh it.',
       ),
     ).toBeVisible()
+  })
+
+  it('does not present unknown track popularity as a zero score', () => {
+    renderGuest({
+      ...guestJazzPlaylist,
+      tracks: [
+        { ...jazzTrack, popularity: 73 },
+        {
+          ...jazzTrack,
+          id: 'track-2',
+          name: 'Blue in Green',
+          uri: 'spotify:track:track-2',
+          popularity: 0,
+        },
+        {
+          ...jazzTrack,
+          id: 'track-3',
+          name: 'Flamenco Sketches',
+          uri: 'spotify:track:track-3',
+          popularity: null,
+        },
+      ],
+    })
+
+    expect(numericTokens('So What')).toEqual(['1', '9', '05'])
+    expect(numericTokens('Blue in Green')).toEqual(['2', '9', '05'])
+    expect(numericTokens('Flamenco Sketches')).toEqual(['3', '9', '05'])
   })
 
   it('credits Last.fm alongside the Spotify track credit', () => {

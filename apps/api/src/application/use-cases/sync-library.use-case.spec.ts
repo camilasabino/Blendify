@@ -2,7 +2,10 @@ import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
 import { SyncLibraryUseCase } from './sync-library.use-case';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { Playlist } from '@/domain/playlist/playlist.entity';
+import { Track } from '@/domain/track/track.entity';
 import type { PlaylistRepositoryPort } from '@/domain/repositories/playlist.repository.port';
+import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { TrackId } from '@/domain/value-objects/track-id.vo';
 import type { MusicProviderFactoryPort } from '@/domain/repositories/music-provider.factory.port';
 
 function makePlaylist(id: string, spotifyId: string, name: string): Playlist {
@@ -49,6 +52,42 @@ function makeFactory(provider: unknown): MusicProviderFactoryPort {
 }
 
 describe('SyncLibraryUseCase', () => {
+  it('stores synced popularity of 73, zero, and unknown without collapsing them', async () => {
+    const playlist = makePlaylist('playlist-1', 'sp1', 'Mix');
+    const { repository } = makeRepository([playlist]);
+    const tracks = [73, 0, null].map((popularity, index) =>
+      Track.create({
+        id: TrackId.create(`track-${index}`),
+        name: `Song ${index}`,
+        artistId: ArtistId.create('artist-1'),
+        artistName: 'Artist',
+        durationMs: 1_000,
+        popularity,
+        uri: `spotify:track:track-${index}`,
+      }),
+    );
+    const provider = {
+      listLibraryPlaylistIds: jest.fn().mockResolvedValue(new Set(['sp1'])),
+      getPlaylistSnapshot: jest.fn().mockResolvedValue({
+        name: 'Synced',
+        url: 'https://open.spotify.com/playlist/sp1',
+        trackCount: tracks.length,
+        totalDurationMs: 3_000,
+        tracks,
+      }),
+    };
+
+    await new SyncLibraryUseCase(repository, makeFactory(provider)).execute(
+      'user-1',
+    );
+
+    expect(playlist.tracks.map((track) => track.popularity)).toEqual([
+      73,
+      0,
+      null,
+    ]);
+  });
+
   it('checks every library playlist in one pass, independent of any page size', async () => {
     const playlists = Array.from({ length: 12 }, (_, i) =>
       makePlaylist(`playlist-${i}`, `sp${i}`, `Mix ${i}`),

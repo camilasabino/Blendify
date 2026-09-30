@@ -46,10 +46,24 @@ export class TrackDeduplicationService {
       return aAlternate ? b : a;
     }
 
-    if (a.popularity !== b.popularity) {
-      return a.popularity >= b.popularity ? a : b;
-    }
+    return preferByKnownPopularity(a, b);
+  }
+}
 
+function preferByKnownPopularity(a: Track, b: Track): Track {
+  if (a.popularity !== null && b.popularity !== null) {
+    if (a.popularity === b.popularity) {
+      return a;
+    }
+    return a.popularity > b.popularity ? a : b;
+  }
+
+  if (a.popularity !== null) {
     return a;
   }
+  if (b.popularity !== null) {
+    return b;
+  }
+
+  return a;
 }

@@ -73,7 +73,7 @@ export const TrackSchema = z.object({
   artistId: z.string().min(1),
   artistName: z.string().min(1).max(200),
   durationMs: z.number().int().nonnegative(),
-  popularity: z.number().int().min(0).max(100),
+  popularity: z.number().int().min(0).max(100).nullable(),
   uri: z.string().min(1),
   albumName: z.string().optional(),
   albumImageUrl: z.string().nullable().optional(),
@@ -99,7 +99,7 @@ export const TrackSeedSchema = TrackSchema.pick({
 }).extend({
   uri: z.string().optional(),
   durationMs: z.number().int().nonnegative().optional(),
-  popularity: z.number().int().min(0).max(100).optional(),
+  popularity: z.number().int().min(0).max(100).nullable().optional(),
 });
 
 export const GenreSchema = z.object({

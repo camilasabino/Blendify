@@ -215,6 +215,37 @@ describe('track contracts', () => {
     ).toThrow();
   });
 
+  it('keeps 73, a real zero, and an unknown score distinct', () => {
+    expect(TrackSchema.parse({ ...legacyTrack, popularity: 73 }).popularity).toBe(
+      73,
+    );
+    expect(TrackSchema.parse(legacyTrack).popularity).toBe(0);
+    expect(
+      TrackSchema.parse({ ...legacyTrack, popularity: null }).popularity,
+    ).toBeNull();
+    expect(
+      TrackSchema.safeParse({ ...legacyTrack, popularity: undefined }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an omitted, null, zero, or measured popularity on a track seed', () => {
+    const seed = {
+      id: legacyTrack.id,
+      name: legacyTrack.name,
+      artistId: legacyTrack.artistId,
+      artistName: legacyTrack.artistName,
+    };
+
+    expect(TrackSeedSchema.parse(seed)).not.toHaveProperty('popularity');
+    expect(TrackSeedSchema.parse({ ...seed, popularity: null }).popularity).toBe(
+      null,
+    );
+    expect(TrackSeedSchema.parse({ ...seed, popularity: 0 }).popularity).toBe(0);
+    expect(TrackSeedSchema.parse({ ...seed, popularity: 73 }).popularity).toBe(
+      73,
+    );
+  });
+
   it('keeps portable metadata out of track seeds', () => {
     const seed = TrackSeedSchema.parse({
       ...legacyTrack,

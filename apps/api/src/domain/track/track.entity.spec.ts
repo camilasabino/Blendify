@@ -54,6 +54,16 @@ describe('Track', () => {
       );
     });
 
+    it.each([
+      ['a measured score', 73],
+      ['a real zero', 0],
+      ['an unknown score', null],
+    ] as const)('keeps %s', (_label, popularity) => {
+      expect(Track.create({ ...baseProps(), popularity }).popularity).toBe(
+        popularity,
+      );
+    });
+
     it('rejects a negative duration', () => {
       expect(() => Track.create({ ...baseProps(), durationMs: -1 })).toThrow(
         'Track duration cannot be negative',

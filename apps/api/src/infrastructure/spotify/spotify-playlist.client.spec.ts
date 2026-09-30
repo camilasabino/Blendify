@@ -50,6 +50,52 @@ describe('SpotifyPlaylistClient.getPlaylistSnapshot', () => {
     ]);
     expect(track.isrc).toBe('USUM72105936');
     expect(track.externalUrl).toBe('https://open.spotify.com/track/track-1');
+    expect(track.popularity).toBeNull();
+  });
+
+  it('keeps playlist-item popularity of 73, zero, and omitted distinct', async () => {
+    const api = createApi([
+      {
+        item: {
+          id: 'high',
+          name: 'High',
+          uri: 'spotify:track:high',
+          duration_ms: 1_000,
+          popularity: 73,
+          artists: [{ id: 'artist-1', name: 'Artist' }],
+        },
+      },
+      {
+        item: {
+          id: 'zero',
+          name: 'Zero',
+          uri: 'spotify:track:zero',
+          duration_ms: 1_000,
+          popularity: 0,
+          artists: [{ id: 'artist-1', name: 'Artist' }],
+        },
+      },
+      {
+        item: {
+          id: 'missing',
+          name: 'Missing',
+          uri: 'spotify:track:missing',
+          duration_ms: 1_000,
+          artists: [{ id: 'artist-1', name: 'Artist' }],
+        },
+      },
+    ]);
+
+    const snapshot = await new SpotifyPlaylistClient(
+      'user-1',
+      api,
+    ).getPlaylistSnapshot('playlist-1');
+
+    expect(snapshot?.tracks?.map((track) => track.popularity)).toEqual([
+      73,
+      0,
+      null,
+    ]);
   });
 
   it('falls back to the attributed artist when credits are unusable', async () => {

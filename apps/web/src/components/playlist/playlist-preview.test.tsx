@@ -99,4 +99,32 @@ describe('PlaylistPreview track list', () => {
       screen.getByRole('button', { name: 'Show fewer' }),
     ).toHaveAttribute('aria-expanded', 'true')
   })
+
+  it('does not present unknown track popularity as a zero score', () => {
+    renderPreview([
+      { ...tracks[0], popularity: 73, name: 'Measured' },
+      {
+        ...tracks[0],
+        id: 'track-2',
+        name: 'Real zero',
+        uri: 'spotify:track:track-2',
+        popularity: 0,
+      },
+      {
+        ...tracks[0],
+        id: 'track-3',
+        name: 'Unknown',
+        uri: 'spotify:track:track-3',
+        popularity: null,
+      },
+    ])
+
+    expect(numericTokens('Measured')).toEqual(['1', '3', '00'])
+    expect(numericTokens('Real zero')).toEqual(['2', '3', '00'])
+    expect(numericTokens('Unknown')).toEqual(['3', '3', '00'])
+  })
 })
+
+function numericTokens(name: string): string[] {
+  return screen.getByText(name).closest('li')?.textContent?.match(/\d+/g) ?? []
+}
