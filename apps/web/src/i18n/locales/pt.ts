@@ -383,11 +383,11 @@ export const pt: Record<MessageKey, string> = {
   'landing.ctaGuest': 'Continuar sem o Spotify',
   'landing.ctaOpenApp': 'Ir para o Blendify',
   'spotifyRequired.library':
-    'Conecte o Spotify para usar sua Biblioteca.',
+    'Conecte o Spotify para usar sua biblioteca.',
   'spotifyRequired.stats':
     'Conecte o Spotify para ver suas estatísticas.',
   'authError.restricted':
-    'Esta conta do Spotify não está habilitada para se conectar ao Blendify. Por uma limitação do Spotify, só podem se conectar contas habilitadas para a integração. Você pode continuar usando o Blendify sem conectar o Spotify.',
+    'Esta conta do Spotify não está habilitada para se conectar ao Blendify. O Spotify limita quais contas podem se conectar a esta integração. Você pode continuar usando o Blendify sem conectar o Spotify.',
   'authError.denied':
     'Você não concluiu a conexão da sua conta do Spotify. Pode tentar de novo ou continuar usando o Blendify sem o Spotify.',
   'authError.failed':
@@ -419,7 +419,7 @@ export const pt: Record<MessageKey, string> = {
   'spotifyAccess.withTitle':
     'Com o Spotify conectado',
   'spotifyAccess.withBody':
-    'Salvar playlists na sua conta do Spotify, usar a Biblioteca e ver suas estatísticas exige uma conta habilitada para esta integração.',
+    'Salvar playlists na sua conta do Spotify, usar a biblioteca e ver suas estatísticas exige uma conta habilitada para esta integração.',
   'spotifyAccess.otherAccount':
     'Se você tiver outra conta do Spotify já habilitada para o Blendify, entre nela no Spotify e depois conecte-a a partir do Blendify. Conectar de novo enquanto esta conta continua com a sessão aberta no Spotify repete a mesma tentativa.',
   'spotifyAccess.continue':
@@ -513,7 +513,7 @@ export const pt: Record<MessageKey, string> = {
   'ai.submitting': 'Lendo seu pedido…',
   'ai.interpreting': 'Lendo seu pedido…',
   'ai.error.unavailable':
-    'Criar com IA está indisponível no momento. Misturar e Descobrir continuam funcionando.',
+    'Criar com IA está indisponível no momento. Misturar e Descobrir continuam disponíveis.',
   'ai.error.timeout': 'A leitura do seu pedido demorou demais. Tente de novo.',
   'ai.error.rateLimited':
     'Criar com IA está ocupado agora. Tente de novo em instantes.',
@@ -883,7 +883,7 @@ export const pt: Record<MessageKey, string> = {
   'home.eyebrow': 'Início',
   'home.title': 'O que você quer criar?',
   'home.subtitle':
-    'Escolha por onde começar. O Blendify monta a playlist. Salvá-la no Spotify é opcional.',
+    'Escolha por onde começar. Sem conectar o Spotify, o resultado é temporário e você pode preparar uma transferência com o Soundiiz. O Blendify não o guarda.',
   'home.actionsLabel': 'Formas de criar',
   'home.mixDescription': 'Combine artistas ou gêneros em uma playlist.',
   'home.discoverDescription': 'Comece por um artista ou uma música e explore músicas relacionadas.',

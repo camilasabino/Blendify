@@ -875,7 +875,7 @@ export const en = {
   'home.eyebrow': 'Home',
   'home.title': 'What do you want to create?',
   'home.subtitle':
-    'Choose where to start. Blendify builds the playlist. Saving it to Spotify is optional.',
+    'Choose where to start. Without connecting Spotify, the result is temporary and you can prepare a Soundiiz transfer. Blendify doesn’t save it.',
   'home.actionsLabel': 'Ways to create',
   'home.mixDescription': 'Combine artists or genres into one playlist.',
   'home.discoverDescription': 'Start with one artist or song and explore related music.',

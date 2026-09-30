@@ -10,8 +10,13 @@ type NameKey =
   | 'playlist.name.discover'
   | 'playlist.name.discoverFallback'
 
-type CatalogTranslate = (
-  key: DescriptionKey | NameKey,
+type DescriptionTranslate = (
+  key: DescriptionKey,
+  vars?: Record<string, string | number>,
+) => string
+
+type NameTranslate = (
+  key: NameKey,
   vars?: Record<string, string | number>,
 ) => string
 
@@ -19,7 +24,7 @@ export const GENERATED_NAME_PREFIX = 'Blendify · '
 
 export function buildDefaultPlaylistName(input: {
   names: string[]
-  translate?: CatalogTranslate
+  translate?: NameTranslate
 }): string {
   const names = input.names.map((n) => n.trim()).filter(Boolean)
   if (names.length === 0) {
@@ -46,7 +51,7 @@ export function buildDefaultPlaylistName(input: {
 
 export function buildDiscoverPlaylistName(
   seedName: string,
-  translate?: CatalogTranslate,
+  translate?: NameTranslate,
 ): string {
   const fallback = translate
     ? translate('playlist.name.discoverFallback')
@@ -61,7 +66,7 @@ export function buildDiscoverPlaylistName(
 
 export function buildDefaultPlaylistDescription(
   names: string[],
-  translate?: CatalogTranslate,
+  translate?: DescriptionTranslate,
 ): string {
   const clean = names.map((n) => n.trim()).filter(Boolean)
   if (clean.length === 0) {

@@ -16,7 +16,7 @@ export const es: Record<MessageKey, string> = {
   'account.delete.confirm': 'Eliminar mi cuenta',
   'account.delete.working': 'Eliminando tu cuenta…',
   'account.delete.error':
-    'No se borró nada. Vuelve a intentarlo.',
+    'No pudimos eliminar tu cuenta. No se borró nada. Vuelve a intentarlo.',
   'nav.account': 'Menú de cuenta',
   'nav.create': 'Mezclar',
   'nav.discover': 'Descubrir',
@@ -388,11 +388,11 @@ export const es: Record<MessageKey, string> = {
   'landing.ctaGuest': 'Continuar sin Spotify',
   'landing.ctaOpenApp': 'Ir a Blendify',
   'spotifyRequired.library':
-    'Conecta Spotify para usar tu Biblioteca.',
+    'Conecta Spotify para usar tu biblioteca.',
   'spotifyRequired.stats':
     'Conecta Spotify para ver tus estadísticas.',
   'authError.restricted':
-    'Esta cuenta de Spotify no está habilitada para conectarse con Blendify. Por una limitación de Spotify, solo pueden conectarse las cuentas habilitadas para la integración. Puedes seguir usando Blendify sin conectar Spotify.',
+    'Esta cuenta de Spotify no está habilitada para conectarse con Blendify. Spotify limita qué cuentas pueden conectarse a esta integración. Puedes seguir usando Blendify sin conectar Spotify.',
   'authError.denied':
     'No terminaste de conectar tu cuenta de Spotify. Puedes intentarlo de nuevo o seguir usando Blendify sin Spotify.',
   'authError.failed':
@@ -424,7 +424,7 @@ export const es: Record<MessageKey, string> = {
   'spotifyAccess.withTitle':
     'Con Spotify conectado',
   'spotifyAccess.withBody':
-    'Guardar playlists en tu cuenta de Spotify, usar la Biblioteca y ver tus estadísticas requiere una cuenta habilitada para esta integración.',
+    'Guardar playlists en tu cuenta de Spotify, usar la biblioteca y ver tus estadísticas requiere una cuenta habilitada para esta integración.',
   'spotifyAccess.otherAccount':
     'Si tienes otra cuenta de Spotify ya habilitada para Blendify, inicia sesión con ella en Spotify y luego conéctala desde Blendify. Conectar de nuevo mientras esta cuenta sigue con la sesión abierta en Spotify repite el mismo intento.',
   'spotifyAccess.continue':
@@ -517,7 +517,7 @@ export const es: Record<MessageKey, string> = {
   'ai.submitting': 'Leyendo tu pedido…',
   'ai.interpreting': 'Leyendo tu pedido…',
   'ai.error.unavailable':
-    'Crear con IA no está disponible en este momento. Mezclar y Descubrir siguen funcionando.',
+    'Crear con IA no está disponible en este momento. Mezclar y Descubrir siguen disponibles.',
   'ai.error.timeout': 'Leer tu pedido tardó demasiado. Vuelve a intentarlo.',
   'ai.error.rateLimited':
     'Crear con IA está ocupado en este momento. Vuelve a intentarlo en un rato.',
@@ -888,7 +888,7 @@ export const es: Record<MessageKey, string> = {
   'home.eyebrow': 'Inicio',
   'home.title': '¿Qué quieres crear?',
   'home.subtitle':
-    'Elige por dónde empezar. Blendify arma la playlist. Guardarla en Spotify es opcional.',
+    'Elige por dónde empezar. Sin conectar Spotify, el resultado es temporal y puedes preparar una transferencia con Soundiiz. Blendify no lo guarda.',
   'home.actionsLabel': 'Formas de crear',
   'home.mixDescription': 'Combina artistas o géneros en una playlist.',
   'home.discoverDescription': 'Empieza con un artista o una canción y explora música relacionada.',

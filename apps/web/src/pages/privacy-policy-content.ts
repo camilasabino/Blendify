@@ -345,7 +345,7 @@ export const PRIVACY_POLICY: Record<Locale, PrivacyPolicy> = {
             'Excluir conta, no menu de conta, pede confirmação e então apaga seu registro de usuário do Blendify junto com os tokens do Spotify guardados, suas playlists salvas e seus dados de uso, e encerra sua sessão. Você não precisa escrever para ninguém para fazer isso.',
           ],
           'Excluir sua conta do Blendify não exclui sua conta do Spotify nem remove as playlists já salvas no Spotify. O Blendify apaga os tokens do Spotify que tinha guardado. Ele não pede ao Spotify para desconectar o Blendify; você remove essa conexão nas configurações da sua conta do Spotify. Se você conectar a mesma conta do Spotify de novo, a biblioteca e as estatísticas anteriores não estão mais lá.',
-          'As cópias de backup do banco de dados feitas antes de mudanças anteriores são mantidas fora do serviço em funcionamento para que ele possa ser restaurado após uma falha. Elas não são reescritas, então uma cópia feita antes de você excluir sua conta ainda pode conter dados daquele momento.',
+          'As cópias de segurança do banco de dados feitas antes de mudanças anteriores são mantidas fora do serviço em funcionamento para que ele possa ser restaurado após uma falha. Elas não são reescritas, então uma cópia feita antes de você excluir sua conta ainda pode conter dados daquele momento.',
         ],
       },
       {
