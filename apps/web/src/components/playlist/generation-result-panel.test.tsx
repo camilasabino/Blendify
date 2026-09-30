@@ -20,7 +20,7 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
     isGenerating: false,
     result: null,
     progress: null,
-    error: null,
+    failure: null,
     coverError: null,
     requestedTrackCount: 0,
     workingTitleKey: 'create.working',
@@ -28,6 +28,7 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
     copied: false,
     onCopy: vi.fn(),
     onRetry: vi.fn(),
+    onCreateNew: vi.fn(),
     onAdjust: vi.fn(),
     onCreateAnother: vi.fn(),
     ...overrides,
@@ -96,9 +97,13 @@ describe('GenerationResultPanel', () => {
 
   it('does not offer a retry when the outcome of a Spotify creation is uncertain', () => {
     renderPanel({
-      error: 'Blendify lost the connection before it could confirm the result.',
-      isErrorOutcomeUncertain: true,
-      libraryAvailable: false,
+      failure: {
+        kind: 'connection_lost',
+        message: 'Blendify lost the connection before it could confirm the result.',
+        recovery: 'none',
+        playlistUrl: null,
+        offersNewCreation: true,
+      },
     })
 
     expect(screen.getByRole('heading', { name: 'Lost connection' })).toBeVisible()
@@ -109,15 +114,83 @@ describe('GenerationResultPanel', () => {
 
   it('points to the Library when an uncertain outcome may already be saved there', () => {
     renderPanel({
-      error: 'Blendify lost the connection before it could confirm the result.',
-      isErrorOutcomeUncertain: true,
-      libraryAvailable: true,
+      failure: {
+        kind: 'connection_lost',
+        message: 'Blendify lost the connection before it could confirm the result.',
+        recovery: 'open_library',
+        playlistUrl: null,
+        offersNewCreation: true,
+      },
     })
 
     expect(screen.getByRole('link', { name: 'Open Library' })).toHaveAttribute(
       'href',
       '/app/library',
     )
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Create a new playlist anyway' }),
+    ).toBeVisible()
+  })
+
+  it('offers an unconfirmed Spotify creation only an explicit new creation, never a retry', async () => {
+    const { props } = renderPanel({
+      failure: {
+        kind: 'unconfirmed',
+        message: 'Spotify didn’t confirm whether the playlist was created.',
+        recovery: 'none',
+        playlistUrl: null,
+        offersNewCreation: true,
+      },
+    })
+
+    expect(
+      screen.getByRole('heading', { name: 'Couldn’t confirm the playlist' }),
+    ).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+    expect(screen.queryByRole('link')).toBeNull()
+    const createNew = screen.getByRole('button', { name: 'Create a new playlist anyway' })
+    expect(createNew).toHaveAccessibleDescription(
+      'This sends the same request again as a separate playlist. If the previous one was created, you’ll have both in Spotify.',
+    )
+    await userEvent.setup().click(createNew)
+    expect(props.onCreateNew).toHaveBeenCalledOnce()
+    expect(props.onRetry).not.toHaveBeenCalled()
+  })
+
+  it('links to the created playlist when Spotify could not finish it', () => {
+    renderPanel({
+      failure: {
+        kind: 'incomplete',
+        message: 'Blendify created the playlist on Spotify, but couldn’t confirm whether its songs were added.',
+        recovery: 'open_playlist',
+        playlistUrl: 'https://open.spotify.com/playlist/created-1',
+        offersNewCreation: false,
+      },
+    })
+
+    expect(
+      screen.getByRole('heading', { name: 'Couldn’t finish the playlist' }),
+    ).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Open in Spotify' })).toHaveAttribute(
+      'href',
+      'https://open.spotify.com/playlist/created-1',
+    )
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
+
+  it('offers to connect Spotify again instead of a retry when authorization expired', () => {
+    renderPanel({
+      failure: {
+        kind: 'failed',
+        message: 'Your Spotify connection is no longer valid.',
+        recovery: 'reconnect',
+        playlistUrl: null,
+        offersNewCreation: false,
+      },
+    })
+
+    expect(screen.getByRole('button', { name: 'Connect Spotify' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
 
@@ -154,7 +227,13 @@ describe('GenerationResultPanel', () => {
   it('shows generation errors in place of the progress with a retry', async () => {
     const user = userEvent.setup()
     const { props } = renderPanel({
-      error: 'Spotify is busy right now. Try again in about 2 minutes.',
+      failure: {
+        kind: 'failed',
+        message: 'Spotify is busy right now. Try again in about 2 minutes.',
+        recovery: 'retry',
+        playlistUrl: null,
+        offersNewCreation: false,
+      },
     })
 
     expect(
@@ -360,7 +439,16 @@ describe('GenerationResultPanel in Guest Mode', () => {
   })
 
   it('titles a failed Guest generation without creation wording', () => {
-    renderPanel({ mode: 'guest', error: 'Something went wrong.' })
+    renderPanel({
+      mode: 'guest',
+      failure: {
+        kind: 'failed',
+        message: 'Something went wrong.',
+        recovery: 'retry',
+        playlistUrl: null,
+        offersNewCreation: false,
+      },
+    })
 
     expect(
       screen.getByRole('heading', { name: 'Couldn’t generate the playlist' }),

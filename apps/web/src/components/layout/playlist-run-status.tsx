@@ -8,6 +8,7 @@ import { PLAYLIST_RUN_COPY } from '@/components/playlist/playlist-run-copy'
 import { buttonVariants } from '@/components/ui/button'
 import { useT } from '@/i18n/use-t'
 import type { MessageKey } from '@/i18n/messages'
+import { classifyGenerationFailure } from '@/lib/generation-failure'
 import { cn, focusRing } from '@/lib/utils'
 import {
   usePlaylistRunStore,
@@ -48,10 +49,27 @@ function describeRun(
     }
   }
   return {
-    title: status.phase === 'failed' ? copy.failed : copy.uncertain,
+    title: failedRunTitle(copy, status.error, status.phase === 'uncertain'),
     action: 'runStatus.viewDetails',
     detail: null,
     progress: false,
+  }
+}
+
+function failedRunTitle(
+  copy: (typeof PLAYLIST_RUN_COPY)[keyof typeof PLAYLIST_RUN_COPY],
+  error: unknown,
+  isOutcomeUncertain: boolean,
+): MessageKey {
+  switch (classifyGenerationFailure(error, isOutcomeUncertain).kind) {
+    case 'connection_lost':
+      return copy.uncertain
+    case 'unconfirmed':
+      return copy.unconfirmed
+    case 'incomplete':
+      return copy.incomplete
+    default:
+      return copy.failed
   }
 }
 

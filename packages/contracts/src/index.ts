@@ -300,6 +300,10 @@ export const PlaylistDetailSchema = PlaylistSummarySchema.extend({
   generation: PlaylistGenerationSchema,
 });
 
+export const PublishedPlaylistSchema = PlaylistDetailSchema.extend({
+  coverUploadFailed: z.boolean().optional(),
+});
+
 export const PlaylistTransferOfferSchema = z.object({
   token: z.string().min(1).max(TRANSFER_TOKEN_MAX_LENGTH),
   expiresAt: z.string(),
@@ -374,6 +378,42 @@ export const ApiErrorResponseSchema = z.object({
   details: z.record(z.string(), z.unknown()).optional(),
 });
 
+export const SPOTIFY_FAILURE_CATEGORIES = [
+  'upstream_error',
+  'timeout',
+  'network',
+  'forbidden',
+  'rejected',
+] as const;
+export const SpotifyFailureCategorySchema = z.enum(SPOTIFY_FAILURE_CATEGORIES);
+
+export const SPOTIFY_WAIT_SOURCES = ['spotify', 'blendify'] as const;
+export const SpotifyWaitSourceSchema = z.enum(SPOTIFY_WAIT_SOURCES);
+
+export const SpotifyFailureDetailsSchema = z.object({
+  operation: z.string().min(1),
+  category: SpotifyFailureCategorySchema,
+  status: z.number().int().nullable(),
+  retryAfterSeconds: z.number().int().positive().optional(),
+  retryAfterSource: z.literal('spotify').optional(),
+});
+
+export const SpotifyThrottleDetailsSchema = z.object({
+  retryAfterSeconds: z.number().int().positive().nullable(),
+  retryAfterSource: SpotifyWaitSourceSchema.nullable(),
+  reason: z.string(),
+});
+
+export const PLAYLIST_PUBLISH_STEPS = ['add_tracks', 'save_to_library'] as const;
+export const PLAYLIST_TRACKS_ADDED_STATES = ['none', 'unknown', 'all'] as const;
+
+export const PlaylistPublishIncompleteDetailsSchema = z.object({
+  spotifyId: z.string().min(1),
+  spotifyUrl: z.string().min(1).nullable(),
+  failedStep: z.enum(PLAYLIST_PUBLISH_STEPS),
+  tracksAdded: z.enum(PLAYLIST_TRACKS_ADDED_STATES),
+});
+
 export const GENERATION_PHASES = [
   'resolving_seeds',
   'matching_tracks',
@@ -400,7 +440,7 @@ export const GenerationStreamEventSchema = z.discriminatedUnion('type', [
   GenerationProgressEventSchema,
   z.object({
     type: z.literal('result'),
-    playlist: PlaylistDetailSchema,
+    playlist: PublishedPlaylistSchema,
   }),
   GenerationErrorEventSchema,
 ]);
@@ -892,6 +932,7 @@ export type GenerateDiscoverRequest = z.input<
 >;
 export type PlaylistSummary = z.infer<typeof PlaylistSummarySchema>;
 export type PlaylistDetail = z.infer<typeof PlaylistDetailSchema>;
+export type PublishedPlaylist = z.infer<typeof PublishedPlaylistSchema>;
 export type GeneratedPlaylistDto = z.infer<typeof GeneratedPlaylistSchema>;
 export type PlaylistTransferOfferDto = z.infer<
   typeof PlaylistTransferOfferSchema
@@ -911,6 +952,16 @@ export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 export type RankedSeedUsage = z.infer<typeof RankedSeedUsageSchema>;
 export type UserUsageStats = z.infer<typeof UserUsageStatsSchema>;
 export type ApiErrorResponse = z.infer<typeof ApiErrorResponseSchema>;
+export type SpotifyFailureCategory = z.infer<typeof SpotifyFailureCategorySchema>;
+export type SpotifyFailureDetails = z.infer<typeof SpotifyFailureDetailsSchema>;
+export type SpotifyWaitSource = z.infer<typeof SpotifyWaitSourceSchema>;
+export type SpotifyThrottleDetails = z.infer<typeof SpotifyThrottleDetailsSchema>;
+export type PlaylistPublishStep = (typeof PLAYLIST_PUBLISH_STEPS)[number];
+export type PlaylistTracksAddedState =
+  (typeof PLAYLIST_TRACKS_ADDED_STATES)[number];
+export type PlaylistPublishIncompleteDetails = z.infer<
+  typeof PlaylistPublishIncompleteDetailsSchema
+>;
 export type GenerationPhase = z.infer<typeof GenerationPhaseSchema>;
 export type GenerationProgress = z.infer<typeof GenerationProgressSchema>;
 export type GenerationStreamEvent = z.infer<

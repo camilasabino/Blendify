@@ -1,4 +1,7 @@
 import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
+import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-unknown.error';
+import { SpotifyProviderError } from '@/domain/errors/spotify-provider.error';
+import { createSpotifyQuotaError } from '@/infrastructure/spotify/spotify-quota-error';
 import type { MusicProviderPort } from '@/domain/repositories/music-provider.port';
 import type { PlaylistRepositoryPort } from '@/domain/repositories/playlist.repository.port';
 import { Playlist } from '@/domain/playlist/playlist.entity';
@@ -126,6 +129,8 @@ describe('PublishPlaylistService', () => {
     expect(save).not.toHaveBeenCalled();
     expect(result.status).toBe('COMPLETED');
     expect(result.imageUrl).toBeNull();
+    expect(result.coverUploadFailed).toBe(true);
+    expect(result.trackCount).toBe(1);
   });
 
   it('reports the created Spotify playlist before adding tracks', async () => {
@@ -161,12 +166,159 @@ describe('PublishPlaylistService', () => {
         persistToLibrary: true,
         onRemotePlaylistCreated,
       }),
-    ).rejects.toThrow('add failed');
+    ).rejects.toMatchObject({
+      code: 'SPOTIFY_PLAYLIST_INCOMPLETE',
+      details: {
+        spotifyId: 'spotify-playlist-1',
+        spotifyUrl: 'https://sp/1',
+        failedStep: 'add_tracks',
+        tracksAdded: 'unknown',
+      },
+    });
 
     expect(onRemotePlaylistCreated).toHaveBeenCalledWith({
       id: 'spotify-playlist-1',
       url: 'https://sp/1',
     });
     expect(calls).toEqual(['create', 'created', 'add']);
+  });
+
+  describe('provider failures', () => {
+    const remote = {
+      id: 'spotify-playlist-1',
+      url: 'https://open.spotify.com/playlist/spotify-playlist-1',
+    };
+
+    function world(
+      overrides: Partial<Record<keyof MusicProviderPort, jest.Mock>>,
+    ) {
+      const provider = {
+        createPlaylist: jest.fn().mockResolvedValue(remote),
+        addTracksToPlaylist: jest.fn().mockResolvedValue(undefined),
+        uploadPlaylistCover: jest.fn().mockResolvedValue(undefined),
+        getPlaylistSnapshot: jest.fn().mockResolvedValue(null),
+        ...overrides,
+      };
+      const save = jest.fn((playlist: Playlist) => Promise.resolve(playlist));
+      const service = new PublishPlaylistService({
+        save,
+      } as unknown as PlaylistRepositoryPort);
+      const publish = (persistToLibrary = true) =>
+        service.execute({
+          playlist: makePlaylist(),
+          provider: provider as unknown as MusicProviderPort,
+          spotifyUserId: 'spotify-user-1',
+          persistToLibrary,
+        });
+      return { provider, save, publish };
+    }
+
+    const unknownCreation = new ProviderOutcomeUnknownError('unknown', {
+      operation: 'createPlaylist',
+      category: 'upstream_error',
+      status: 502,
+    });
+
+    it('surfaces an unconfirmed creation without continuing or retrying', async () => {
+      const { provider, save, publish } = world({
+        createPlaylist: jest.fn().mockRejectedValue(unknownCreation),
+      });
+
+      await expect(publish()).rejects.toBe(unknownCreation);
+
+      expect(provider.createPlaylist).toHaveBeenCalledTimes(1);
+      expect(provider.addTracksToPlaylist).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('surfaces a confirmed creation rejection unchanged', async () => {
+      const rejected = new SpotifyProviderError('SPOTIFY_UNAVAILABLE', {
+        operation: 'createPlaylist',
+        category: 'network',
+        status: null,
+      });
+      const { provider, publish } = world({
+        createPlaylist: jest.fn().mockRejectedValue(rejected),
+      });
+
+      await expect(publish()).rejects.toBe(rejected);
+      expect(provider.createPlaylist).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [
+        'an unknown outcome',
+        new ProviderOutcomeUnknownError('unknown', {
+          operation: 'addTracksToPlaylist',
+          category: 'timeout',
+          status: null,
+        }),
+        'unknown',
+      ],
+      [
+        'a rate limit',
+        createSpotifyQuotaError({
+          retryAfterSeconds: 30,
+          retryAfterSource: 'spotify',
+          reason: 'rate_limit',
+        }),
+        'none',
+      ],
+      [
+        'a permission rejection',
+        new SpotifyProviderError('SPOTIFY_PERMISSION_DENIED', {
+          operation: 'addTracksToPlaylist',
+          category: 'forbidden',
+          status: 403,
+        }),
+        'none',
+      ],
+    ])(
+      'keeps the created playlist when adding songs fails with %s',
+      async (_label, failure, tracksAdded) => {
+        const { provider, save, publish } = world({
+          addTracksToPlaylist: jest.fn().mockRejectedValue(failure),
+        });
+
+        await expect(publish()).rejects.toMatchObject({
+          code: 'SPOTIFY_PLAYLIST_INCOMPLETE',
+          details: {
+            spotifyId: remote.id,
+            spotifyUrl: remote.url,
+            failedStep: 'add_tracks',
+            tracksAdded,
+          },
+        });
+        expect(provider.createPlaylist).toHaveBeenCalledTimes(1);
+        expect(provider.addTracksToPlaylist).toHaveBeenCalledTimes(1);
+        expect(provider.uploadPlaylistCover).not.toHaveBeenCalled();
+        expect(save).not.toHaveBeenCalled();
+      },
+    );
+
+    it('reports a Library save failure after a complete Spotify playlist', async () => {
+      const { provider, save, publish } = world({});
+      save.mockRejectedValueOnce(new Error('database down'));
+
+      await expect(publish()).rejects.toMatchObject({
+        code: 'SPOTIFY_PLAYLIST_INCOMPLETE',
+        details: {
+          spotifyId: remote.id,
+          failedStep: 'save_to_library',
+          tracksAdded: 'all',
+        },
+      });
+      expect(provider.createPlaylist).toHaveBeenCalledTimes(1);
+      expect(provider.addTracksToPlaylist).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not report a cover failure when no cover was requested', async () => {
+      const { provider, publish } = world({});
+
+      const result = await publish(false);
+
+      expect(provider.uploadPlaylistCover).not.toHaveBeenCalled();
+      expect(result.coverUploadFailed).toBeUndefined();
+    });
   });
 });

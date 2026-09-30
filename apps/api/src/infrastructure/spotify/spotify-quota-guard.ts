@@ -2,6 +2,7 @@ import { createSpotifyQuotaError } from './spotify-quota-error';
 import {
   getSpotifyQuotaReason,
   getSpotifyQuotaRetryAfterSeconds,
+  getSpotifyQuotaWaitSource,
   isSpotifyQuotaBlocked,
 } from './spotify-rate-limit';
 
@@ -15,6 +16,7 @@ export function throwIfSpotifyQuotaBlocked(): void {
   }
   throw createSpotifyQuotaError({
     retryAfterSeconds: getSpotifyQuotaRetryAfterSeconds(),
+    retryAfterSource: getSpotifyQuotaWaitSource(),
     reason: getSpotifyQuotaReason() ?? 'QUOTA_EXCEEDED',
   });
 }

@@ -181,6 +181,59 @@ describe('getApiErrorMessage', () => {
   })
 
   it.each([
+    ['SPOTIFY_UNAVAILABLE', 503, 'errors.spotifyUnavailable'],
+    ['SPOTIFY_PERMISSION_DENIED', 403, 'errors.spotifyPermissionDenied'],
+    ['SPOTIFY_REQUEST_REJECTED', 502, 'errors.spotifyRequestRejected'],
+    ['SPOTIFY_OUTCOME_UNKNOWN', 502, 'errors.spotifyOutcomeUnknown'],
+    ['SPOTIFY_PLAYLIST_INCOMPLETE', 502, 'errors.spotifyPlaylistIncomplete'],
+  ])('localizes Spotify provider failure %s without blaming the chosen song', (code, status, expected) => {
+    const message = getApiErrorMessage(
+      new ApiError('raw server message', status, {
+        statusCode: status,
+        code,
+        message: 'raw server message',
+      }),
+      t,
+      'discover.failed',
+    )
+    expect(message).toBe(expected)
+    expect(message).not.toBe('discover.resolveFailed')
+  })
+
+  it.each([
+    ['SPOTIFY_UNAVAILABLE', { retryAfterSeconds: 30, retryAfterSource: 'spotify' }, 'errors.spotifyUnavailableWait'],
+    ['CATALOG_UNAVAILABLE', { retryAfterSeconds: 30, retryAfterSource: 'spotify' }, 'errors.spotifyUnavailableWait'],
+    ['SPOTIFY_UNAVAILABLE', { operation: 'searchArtists' }, 'errors.spotifyUnavailable'],
+  ])('states the wait only when Spotify itself asked for it on %s', (code, details, expected) => {
+    const message = getApiErrorMessage(
+      new ApiError('raw server message', 503, {
+        statusCode: 503,
+        code,
+        message: 'raw server message',
+        details,
+      }),
+      t,
+      'discover.failed',
+    )
+    expect(message.split(':')[0]).toBe(expected)
+  })
+
+  it('keeps a missing seed song an input problem', () => {
+    expect(
+      getApiErrorMessage(
+        new ApiError('Seed track could not be resolved', 422, {
+          statusCode: 422,
+          code: 'TRACK_RESOLVE_FAILED',
+          message: 'Seed track could not be resolved',
+          details: { name: 'Un Beso en la Nariz' },
+        }),
+        t,
+        'discover.failed',
+      ),
+    ).toBe('errors.trackResolveNamed:name=Un Beso en la Nariz')
+  })
+
+  it.each([
     ['PREMIUM_REQUIRED', 'preview.premiumRequired'],
     ['PLAYBACK_UNAUTHORIZED', 'preview.sessionExpired'],
     ['PLAYBACK_INVALID', 'preview.invalidPlayback'],

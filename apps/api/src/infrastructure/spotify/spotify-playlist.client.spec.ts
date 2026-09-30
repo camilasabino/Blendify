@@ -225,3 +225,41 @@ describe('SpotifyPlaylistClient.listLibraryPlaylistIds', () => {
     await expect(client.listLibraryPlaylistIds()).rejects.toThrow();
   });
 });
+
+describe('SpotifyPlaylistClient.createPlaylist', () => {
+  function clientReturning(data: unknown) {
+    const request = jest.fn(() => Promise.resolve(data));
+    const api = {
+      request,
+      accessToken: jest.fn(() => Promise.resolve('user-token')),
+    } as unknown as SpotifyApiClient;
+    return { client: new SpotifyPlaylistClient('user-1', api), request };
+  }
+
+  it('returns the created playlist id and link', async () => {
+    const { client, request } = clientReturning({
+      id: 'created-1',
+      external_urls: { spotify: 'https://open.spotify.com/playlist/created-1' },
+    });
+
+    await expect(
+      client.createPlaylist({ userId: 'u', name: 'Mix', description: '' }),
+    ).resolves.toEqual({
+      id: 'created-1',
+      url: 'https://open.spotify.com/playlist/created-1',
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a success response without a playlist id as an unknown outcome', async () => {
+    const { client, request } = clientReturning({});
+
+    await expect(
+      client.createPlaylist({ userId: 'u', name: 'Mix', description: '' }),
+    ).rejects.toMatchObject({
+      code: 'SPOTIFY_OUTCOME_UNKNOWN',
+      failure: { operation: 'createPlaylist' },
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+});

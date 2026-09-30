@@ -2,9 +2,13 @@ import { AiGenerationError } from '@/domain/errors/ai-generation.error';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { SpotifyProviderError } from '@/domain/errors/spotify-provider.error';
 import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import { TransferError } from '@/domain/errors/transfer.error';
-import { toApiErrorResponse } from './api-error-response';
+import {
+  retryAfterHeaderValue,
+  toApiErrorResponse,
+} from './api-error-response';
 
 describe('toApiErrorResponse', () => {
   it('maps an unavailable catalog to a 503 without exposing the cause', () => {
@@ -20,6 +24,33 @@ describe('toApiErrorResponse', () => {
       message:
         'The music catalog is temporarily unavailable. Try again shortly.',
     });
+  });
+
+  it('passes the wait Spotify asked for on an unavailable read without Blendify estimates', () => {
+    const failure = {
+      operation: 'searchArtists',
+      category: 'upstream_error' as const,
+      status: 503,
+      retryAfterSeconds: 30,
+      retryAfterSource: 'spotify' as const,
+    };
+
+    const direct = toApiErrorResponse(
+      new SpotifyProviderError('SPOTIFY_UNAVAILABLE', failure),
+    );
+    const catalog = toApiErrorResponse(
+      new CatalogUnavailableError({
+        cause: new SpotifyProviderError('SPOTIFY_UNAVAILABLE', failure),
+      }),
+    );
+
+    expect(direct).toMatchObject({ statusCode: 503, details: failure });
+    expect(catalog).toMatchObject({
+      code: 'CATALOG_UNAVAILABLE',
+      details: { retryAfterSeconds: 30, retryAfterSource: 'spotify' },
+    });
+    expect(retryAfterHeaderValue(direct)).toBe('30');
+    expect(retryAfterHeaderValue(catalog)).toBe('30');
   });
 
   it('maps a revoked Spotify authorization to a typed 401 without the provider cause', () => {

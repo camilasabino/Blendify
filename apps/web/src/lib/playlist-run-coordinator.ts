@@ -1,6 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { isGenerationOutcomeUncertain } from '@/lib/api-error'
 import {
+  canRetryGeneration,
+  isWriteOutcomeUnknown,
+} from '@/lib/generation-failure'
+import {
   runDiscoverGeneration,
   runMixGeneration,
   type GenerationOutcome,
@@ -76,6 +80,20 @@ export function startPlaylistRun(
 export function rerunPlaylistRun(queryClient: QueryClient): boolean {
   const { run } = usePlaylistRunStore.getState()
   if (!run || run.status.phase === 'active' || run.status.phase === 'uncertain') {
+    return false
+  }
+  if (run.status.phase === 'failed' && !canRetryGeneration(run.status.error, false)) {
+    return false
+  }
+  return startPlaylistRun(run.spec, queryClient)
+}
+
+export function recreateUncertainPlaylistRun(queryClient: QueryClient): boolean {
+  const { run } = usePlaylistRunStore.getState()
+  if (
+    run?.status.phase !== 'uncertain' ||
+    !isWriteOutcomeUnknown(run.status.error, true)
+  ) {
     return false
   }
   return startPlaylistRun(run.spec, queryClient)

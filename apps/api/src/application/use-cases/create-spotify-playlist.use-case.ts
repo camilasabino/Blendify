@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import {
   CreateDiscoverRequestSchema,
   CreateMixRequestSchema,
-  type PlaylistDetail,
+  type PublishedPlaylist,
 } from '@blendify/contracts';
 import type { z } from 'zod';
 import {
@@ -46,7 +46,7 @@ export class CreateSpotifyPlaylistUseCase {
   async execute(
     input: { userId: string; request: SpotifyPlaylistRequest },
     options?: { onProgress?: ProgressReporter },
-  ): Promise<PlaylistDetail> {
+  ): Promise<PublishedPlaylist> {
     const user = await this.users.findById(input.userId);
     if (!user) {
       throw new BusinessRuleError('User not found', 'USER_NOT_FOUND');

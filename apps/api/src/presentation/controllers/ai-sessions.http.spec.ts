@@ -130,6 +130,7 @@ function unavailableProvider() {
   return jest.fn<unknown, unknown[]>(() => {
     throw createSpotifyQuotaError({
       retryAfterSeconds: 3_600,
+      retryAfterSource: 'spotify',
       reason: 'QUOTA_EXCEEDED',
     });
   });
@@ -1712,6 +1713,7 @@ describe('Create with AI sessions over HTTP', () => {
       world.spotify.createPlaylist.mockRejectedValueOnce(
         createSpotifyQuotaError({
           retryAfterSeconds: 120,
+          retryAfterSource: 'spotify',
           reason: 'rate_limit',
         }),
       );
@@ -2119,6 +2121,7 @@ describe('Create with AI sessions over HTTP', () => {
       world.generator.execute.mockRejectedValueOnce(
         createSpotifyQuotaError({
           retryAfterSeconds: 3_600,
+          retryAfterSource: 'spotify',
           reason: 'QUOTA_EXCEEDED',
         }),
       );
@@ -2623,6 +2626,7 @@ describe('Create with AI sessions over HTTP', () => {
             world.generator.execute.mockRejectedValueOnce(
               createSpotifyQuotaError({
                 retryAfterSeconds: 60,
+                retryAfterSource: 'spotify',
                 reason: 'QUOTA_EXCEEDED',
               }),
             );
@@ -3403,7 +3407,7 @@ describe('Create with AI sessions over HTTP', () => {
         }),
         expect.objectContaining({
           result: 'publish_incomplete',
-          errorCode: 'INTERNAL_ERROR',
+          errorCode: 'SPOTIFY_PLAYLIST_INCOMPLETE',
           spotifyPlaylistCreated: true,
         }),
       ]);

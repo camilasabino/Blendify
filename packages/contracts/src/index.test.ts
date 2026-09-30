@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PlaylistPublishIncompleteDetailsSchema,
+  SpotifyFailureDetailsSchema,
+  SpotifyThrottleDetailsSchema,
   ApiErrorResponseSchema,
   ArtistSchema,
   CreateDiscoverRequestSchema,
@@ -602,5 +605,100 @@ describe('discover track targets', () => {
         }).generation,
       ).toEqual(artistRecipe);
     }
+  });
+});
+
+describe('Spotify provider failure contracts', () => {
+  it('describes an incomplete publication with its created playlist', () => {
+    expect(
+      PlaylistPublishIncompleteDetailsSchema.parse({
+        spotifyId: 'created-1',
+        spotifyUrl: 'https://open.spotify.com/playlist/created-1',
+        failedStep: 'add_tracks',
+        tracksAdded: 'unknown',
+      }),
+    ).toMatchObject({ failedStep: 'add_tracks', tracksAdded: 'unknown' });
+    expect(
+      PlaylistPublishIncompleteDetailsSchema.safeParse({
+        spotifyId: '',
+        spotifyUrl: null,
+        failedStep: 'upload_cover',
+        tracksAdded: 'none',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('keeps the provider wait source separate from the wait itself', () => {
+    expect(
+      SpotifyThrottleDetailsSchema.parse({
+        retryAfterSeconds: 20,
+        retryAfterSource: 'blendify',
+        reason: 'rate_limit',
+      }).retryAfterSource,
+    ).toBe('blendify');
+    expect(
+      SpotifyThrottleDetailsSchema.safeParse({
+        retryAfterSeconds: 0,
+        retryAfterSource: 'spotify',
+        reason: 'rate_limit',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts operation, category and status without provider payloads', () => {
+    expect(
+      SpotifyFailureDetailsSchema.parse({
+        operation: 'createPlaylist',
+        category: 'upstream_error',
+        status: 502,
+        body: { secret: 'dropped' },
+      }),
+    ).toEqual({ operation: 'createPlaylist', category: 'upstream_error', status: 502 });
+  });
+
+  it('keeps a transient Spotify failure wait attributed to Spotify only', () => {
+    const base = { operation: 'searchArtists', category: 'upstream_error', status: 503 };
+
+    expect(
+      SpotifyFailureDetailsSchema.parse({ ...base, retryAfterSeconds: 30, retryAfterSource: 'spotify' }),
+    ).toEqual({ ...base, retryAfterSeconds: 30, retryAfterSource: 'spotify' });
+    expect(
+      SpotifyFailureDetailsSchema.safeParse({ ...base, retryAfterSeconds: 30, retryAfterSource: 'blendify' })
+        .success,
+    ).toBe(false);
+    expect(SpotifyFailureDetailsSchema.safeParse({ ...base, retryAfterSeconds: 0 }).success).toBe(false);
+  });
+
+  it('carries a cover upload failure on a published playlist stream result', () => {
+    const parsed = GenerationStreamEventSchema.parse({
+      type: 'result',
+      playlist: {
+        id: 'playlist-1',
+        name: 'Mix',
+        description: '',
+        kind: 'artist_mix',
+        seeds: [{ type: 'artist', id: 'artist-1', name: 'Sade' }],
+        seedCount: 1,
+        trackCount: 0,
+        totalDurationMs: 0,
+        spotifyUrl: 'https://open.spotify.com/playlist/spotify-1',
+        spotifyId: 'spotify-1',
+        status: 'COMPLETED',
+        imageUrl: null,
+        createdAt: '2026-09-30T12:00:00.000Z',
+        updatedAt: '2026-09-30T12:00:00.000Z',
+        tracks: [],
+        generation: {
+          version: 1,
+          kind: 'artist_mix',
+          tracksPerSeed: 1,
+          seeds: [{ id: 'artist-1', name: 'Sade' }],
+          popularity: 'balanced',
+          orderMode: 'random',
+        },
+        coverUploadFailed: true,
+      },
+    });
+    expect(parsed.type === 'result' && parsed.playlist.coverUploadFailed).toBe(true);
   });
 });

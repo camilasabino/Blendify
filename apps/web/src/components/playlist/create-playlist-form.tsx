@@ -29,7 +29,11 @@ import {
   OrderModeSection,
   PopularityModeSection,
 } from '@/components/playlist/generation-form-shared'
-import { runFailureMessage } from '@/components/playlist/generation-result-helpers'
+import {
+  blocksImplicitResubmit,
+  runCoverError,
+  runFailureView,
+} from '@/components/playlist/generation-result-helpers'
 import { PLAYLIST_RUN_COPY } from '@/components/playlist/playlist-run-copy'
 import {
   buildGenerationSummary,
@@ -511,6 +515,9 @@ export function MixPlaylistForm() {
     ) {
       return
     }
+    if (blocksImplicitResubmit(playlistRun.failure)) {
+      return
+    }
     const generationMode = capabilities.mode
 
     const seedNames =
@@ -655,18 +662,21 @@ export function MixPlaylistForm() {
   const requestedTrackCount = result ? outcomeRequestedTrackCount(result) : 0
   const spec = playlistRun.run?.spec
   const libraryAvailable = spec?.publication.persistToLibrary ?? false
-  const failureMessage = runFailureMessage(
+  const failureView = runFailureView(
     failure,
     libraryAvailable,
     t,
     'create.failed',
   )
-  const coverError = spec?.coverFailed ? t('create.coverFailed') : null
+  const coverError = runCoverError(spec?.coverFailed, result, t)
   let disabledReason: string | null = t('common.loading')
   if (capabilities.isResolved) {
     disabledReason = playlistRun.busyFeature
       ? t(PLAYLIST_RUN_COPY[playlistRun.busyFeature].busy)
       : mixDisabledReason(mode, artists.length, genres.length, t)
+    if (!disabledReason && blocksImplicitResubmit(failure)) {
+      disabledReason = t('create.resubmitBlockedUncertain')
+    }
   }
 
   return (
@@ -687,9 +697,7 @@ export function MixPlaylistForm() {
           isGenerating={isGenerating}
           result={result}
           progress={progress}
-          error={failureMessage}
-          isErrorOutcomeUncertain={failure?.isOutcomeUncertain}
-          libraryAvailable={libraryAvailable}
+          failure={failureView}
           coverError={coverError}
           requestedTrackCount={requestedTrackCount}
           workingTitleKey={workingCopy.workingTitle}
@@ -698,6 +706,7 @@ export function MixPlaylistForm() {
           copied={copiedLink.copied}
           onCopy={(url) => void copiedLink.copy(url)}
           onRetry={() => void playlistRun.rerun()}
+          onCreateNew={() => void playlistRun.recreateUncertain()}
           onAdjust={adjustAndRecreate}
           onCreateAnother={createAnother}
         />

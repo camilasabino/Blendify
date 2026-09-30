@@ -1,5 +1,8 @@
 import { HttpStatus } from '@nestjs/common';
-import type { ApiErrorResponse } from '@blendify/contracts';
+import type {
+  ApiErrorResponse,
+  SpotifyFailureDetails,
+} from '@blendify/contracts';
 import { ZodError } from 'zod';
 import { DomainError } from '@/domain/errors/domain.error';
 import {
@@ -13,6 +16,12 @@ import {
 } from '@/domain/errors/ai-session.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import { PlaylistPublishIncompleteError } from '@/domain/errors/playlist-publish-incomplete.error';
+import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-unknown.error';
+import {
+  SpotifyProviderError,
+  type SpotifyProviderErrorCode,
+} from '@/domain/errors/spotify-provider.error';
 import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import {
   TransferError,
@@ -26,6 +35,13 @@ const TRANSFER_ERROR_STATUS: Record<TransferErrorCode, number> = {
   TRANSFER_PLAYLIST_REJECTED: HttpStatus.UNPROCESSABLE_ENTITY,
   TRANSFER_PROVIDER_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
 };
+
+const SPOTIFY_PROVIDER_ERROR_STATUS: Record<SpotifyProviderErrorCode, number> =
+  {
+    SPOTIFY_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+    SPOTIFY_PERMISSION_DENIED: HttpStatus.FORBIDDEN,
+    SPOTIFY_REQUEST_REJECTED: HttpStatus.BAD_GATEWAY,
+  };
 
 const AI_INTERPRETATION_ERROR_STATUS: Record<
   AiInterpretationErrorCode,
@@ -112,10 +128,40 @@ export function toApiErrorResponse(exception: unknown): ApiErrorResponse {
   }
 
   if (exception instanceof CatalogUnavailableError) {
+    const providerWait = providerWaitOf(exception.cause);
     return {
       statusCode: HttpStatus.SERVICE_UNAVAILABLE,
       code: exception.code,
       message: exception.message,
+      ...(providerWait ? { details: providerWait } : {}),
+    };
+  }
+
+  if (exception instanceof SpotifyProviderError) {
+    return {
+      statusCode: SPOTIFY_PROVIDER_ERROR_STATUS[exception.code],
+      code: exception.code,
+      message: exception.message,
+      details: { ...exception.failure },
+    };
+  }
+
+  if (exception instanceof ProviderOutcomeUnknownError) {
+    return {
+      statusCode: HttpStatus.BAD_GATEWAY,
+      code: exception.code,
+      message:
+        'Spotify did not confirm the result of this change. Check Spotify before trying again.',
+      ...(exception.failure ? { details: { ...exception.failure } } : {}),
+    };
+  }
+
+  if (exception instanceof PlaylistPublishIncompleteError) {
+    return {
+      statusCode: HttpStatus.BAD_GATEWAY,
+      code: exception.code,
+      message: exception.message,
+      details: { ...exception.details },
     };
   }
 
@@ -189,6 +235,24 @@ function httpCode(status: number): string {
     default:
       return status >= 500 ? 'INTERNAL_ERROR' : 'HTTP_ERROR';
   }
+}
+
+function providerWaitOf(
+  cause: unknown,
+): Pick<
+  SpotifyFailureDetails,
+  'retryAfterSeconds' | 'retryAfterSource'
+> | null {
+  if (
+    !(cause instanceof SpotifyProviderError) ||
+    cause.failure.retryAfterSeconds === undefined
+  ) {
+    return null;
+  }
+  return {
+    retryAfterSeconds: cause.failure.retryAfterSeconds,
+    retryAfterSource: cause.failure.retryAfterSource,
+  };
 }
 
 export function retryAfterHeaderValue(body: ApiErrorResponse): string | null {

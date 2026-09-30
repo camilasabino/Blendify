@@ -23,6 +23,9 @@ import { RenamePlaylistUseCase } from '@/application/use-cases/rename-playlist.u
 import { Artist } from '@/domain/artist/artist.entity';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-unknown.error';
+import { SpotifyProviderError } from '@/domain/errors/spotify-provider.error';
+import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import type { Playlist } from '@/domain/playlist/playlist.entity';
 import { DISCOVERY_CATALOG } from '@/domain/repositories/discovery-catalog.port';
 import { MUSIC_PROVIDER_FACTORY } from '@/domain/repositories/music-provider.factory.port';
@@ -789,6 +792,192 @@ describe('Spotify Mode generation characterization', () => {
           },
         ],
       });
+    });
+  });
+
+  describe('Spotify provider failures while publishing', () => {
+    const discoverArtistBody = {
+      kind: 'discover_artist',
+      artistId: 'sade',
+      artist: { id: 'sade', name: 'Sade', imageUrl: null },
+      targetTrackCount: 15,
+      popularity: 'balanced',
+    };
+
+    async function streamDiscover(body: object = discoverArtistBody) {
+      const response = await request(httpServer())
+        .post('/api/playlists/discover')
+        .set('Accept', 'application/x-ndjson')
+        .buffer(true)
+        .parse(readNdjson)
+        .send(body)
+        .expect(200);
+      return parseEvents(response.body as string);
+    }
+
+    function expectNoPublishSideEffects() {
+      expect(world.provider.addTracksToPlaylist).not.toHaveBeenCalled();
+      expect(world.playlists.save).not.toHaveBeenCalled();
+      expect(world.usageStats.recordMix).not.toHaveBeenCalled();
+    }
+
+    it('reports a 502 on playlist creation as unconfirmed and creates nothing more', async () => {
+      world.provider.createPlaylist.mockRejectedValueOnce(
+        new ProviderOutcomeUnknownError(
+          'Spotify createPlaylist outcome unknown',
+          {
+            operation: 'createPlaylist',
+            category: 'upstream_error',
+            status: 502,
+          },
+        ),
+      );
+
+      const events = await streamDiscover();
+
+      expect(events.at(-1)).toEqual({
+        type: 'error',
+        statusCode: 502,
+        code: 'SPOTIFY_OUTCOME_UNKNOWN',
+        message: expect.any(String) as string,
+        details: {
+          operation: 'createPlaylist',
+          category: 'upstream_error',
+          status: 502,
+        },
+      });
+      expect(world.provider.createPlaylist).toHaveBeenCalledTimes(1);
+      expectNoPublishSideEffects();
+    });
+
+    it('reports a creation that never reached Spotify as a retryable provider failure', async () => {
+      world.provider.createPlaylist.mockRejectedValueOnce(
+        new SpotifyProviderError('SPOTIFY_UNAVAILABLE', {
+          operation: 'createPlaylist',
+          category: 'network',
+          status: null,
+        }),
+      );
+
+      const events = await streamDiscover();
+
+      expect(events.at(-1)).toMatchObject({
+        type: 'error',
+        statusCode: 503,
+        code: 'SPOTIFY_UNAVAILABLE',
+        details: { operation: 'createPlaylist', category: 'network' },
+      });
+      expect(world.provider.createPlaylist).toHaveBeenCalledTimes(1);
+      expectNoPublishSideEffects();
+    });
+
+    it('keeps the created playlist link when adding songs fails', async () => {
+      world.provider.addTracksToPlaylist.mockRejectedValueOnce(
+        new ProviderOutcomeUnknownError('timeout', {
+          operation: 'addTracksToPlaylist',
+          category: 'timeout',
+          status: null,
+        }),
+      );
+
+      const events = await streamDiscover();
+
+      expect(events.at(-1)).toMatchObject({
+        type: 'error',
+        statusCode: 502,
+        code: 'SPOTIFY_PLAYLIST_INCOMPLETE',
+        details: {
+          spotifyId: SPOTIFY_PLAYLIST.id,
+          spotifyUrl: SPOTIFY_PLAYLIST.url,
+          failedStep: 'add_tracks',
+          tracksAdded: 'unknown',
+        },
+      });
+      expect(world.provider.createPlaylist).toHaveBeenCalledTimes(1);
+      expect(world.provider.addTracksToPlaylist).toHaveBeenCalledTimes(1);
+      expect(world.playlists.save).not.toHaveBeenCalled();
+    });
+
+    it('completes the playlist and flags only the cover when the cover upload fails', async () => {
+      world.provider.uploadPlaylistCover.mockRejectedValueOnce(
+        new Error('cover rejected'),
+      );
+
+      const events = await streamDiscover({
+        ...discoverArtistBody,
+        coverImageBase64: 'jpeg-data',
+      });
+
+      const last = events.at(-1);
+      expect(last).toMatchObject({
+        type: 'result',
+        playlist: {
+          status: 'COMPLETED',
+          spotifyId: SPOTIFY_PLAYLIST.id,
+          coverUploadFailed: true,
+        },
+      });
+      expect(world.provider.createPlaylist).toHaveBeenCalledTimes(1);
+      expect(world.playlists.save).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [
+        'a revoked authorization',
+        new SpotifyReauthRequiredError(),
+        401,
+        'SPOTIFY_REAUTH_REQUIRED',
+      ],
+      [
+        'a forbidden action',
+        new SpotifyProviderError('SPOTIFY_PERMISSION_DENIED', {
+          operation: 'createPlaylist',
+          category: 'forbidden',
+          status: 403,
+        }),
+        403,
+        'SPOTIFY_PERMISSION_DENIED',
+      ],
+    ])(
+      'keeps %s distinct from input problems',
+      async (_label, failure, statusCode, code) => {
+        world.provider.createPlaylist.mockRejectedValueOnce(failure);
+
+        const events = await streamDiscover();
+
+        expect(events.at(-1)).toMatchObject({
+          type: 'error',
+          statusCode,
+          code,
+        });
+        expectNoPublishSideEffects();
+      },
+    );
+
+    it('reports a seed song Spotify cannot find as an input problem, not a provider failure', async () => {
+      world.provider.searchTracks.mockResolvedValue([]);
+      world.provider.resolveTrack.mockResolvedValue(null);
+
+      const events = await streamDiscover({
+        kind: 'discover_track',
+        trackId: 'missing-song',
+        track: {
+          id: 'missing-song',
+          name: 'Un Beso en la Nariz',
+          artistId: 'artist-x',
+          artistName: 'Artist X',
+        },
+        targetTrackCount: 15,
+        popularity: 'balanced',
+      });
+
+      expect(events.at(-1)).toMatchObject({
+        type: 'error',
+        statusCode: 422,
+        code: 'TRACK_RESOLVE_FAILED',
+        details: { name: 'Un Beso en la Nariz' },
+      });
+      expect(world.provider.createPlaylist).not.toHaveBeenCalled();
     });
   });
 });

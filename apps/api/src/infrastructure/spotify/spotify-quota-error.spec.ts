@@ -20,6 +20,7 @@ describe('createSpotifyQuotaError', () => {
   it('builds a quota-exceeded business error', () => {
     const error = createSpotifyQuotaError({
       retryAfterSeconds: 30,
+      retryAfterSource: 'spotify',
       reason: 'QUOTA_EXCEEDED',
     });
     expect(error.code).toBe('SPOTIFY_QUOTA_EXCEEDED');
@@ -29,6 +30,7 @@ describe('createSpotifyQuotaError', () => {
   it('builds a rate-limit business error', () => {
     const error = createSpotifyQuotaError({
       retryAfterSeconds: 20,
+      retryAfterSource: 'spotify',
       reason: null,
     });
     expect(error.code).toBe('SPOTIFY_RATE_LIMITED');

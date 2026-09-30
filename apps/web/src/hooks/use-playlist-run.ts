@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { GenerationProgress } from '@/lib/api'
 import type { GenerationOutcome } from '@/lib/playlist-generation'
 import {
+  recreateUncertainPlaylistRun,
   rerunPlaylistRun,
   startPlaylistRun,
 } from '@/lib/playlist-run-coordinator'
@@ -24,6 +25,7 @@ export type PlaylistRunView = {
   failure: PlaylistRunFailure | null
   start: (spec: PlaylistRunSpec) => boolean
   rerun: () => boolean
+  recreateUncertain: () => boolean
   dismiss: () => void
 }
 
@@ -63,6 +65,7 @@ export function usePlaylistRun(feature: PlaylistRunFeature): PlaylistRunView {
         : null,
     start: (spec) => startPlaylistRun(spec, queryClient),
     rerun: () => rerunPlaylistRun(queryClient),
+    recreateUncertain: () => recreateUncertainPlaylistRun(queryClient),
     dismiss: () => {
       const { run: latest, discard } = usePlaylistRunStore.getState()
       if (latest?.spec.feature === feature && latest.status.phase !== 'active') {

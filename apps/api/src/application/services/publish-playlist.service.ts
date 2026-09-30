@@ -1,5 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { PlaylistDetail } from '@blendify/contracts';
+import type {
+  PlaylistPublishStep,
+  PlaylistTracksAddedState,
+  PublishedPlaylist,
+} from '@blendify/contracts';
+import { PlaylistPublishIncompleteError } from '@/domain/errors/playlist-publish-incomplete.error';
+import { SpotifyProviderError } from '@/domain/errors/spotify-provider.error';
+import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
+import { isSpotifyQuotaError } from '@/domain/genre/catalog-resolve';
 import {
   PLAYLIST_REPOSITORY,
   type PlaylistRepositoryPort,
@@ -30,7 +38,7 @@ export class PublishPlaylistService {
     persistToLibrary: boolean;
     onProgress?: ProgressReporter;
     onRemotePlaylistCreated?: (remote: ProviderPlaylist) => Promise<void>;
-  }): Promise<PlaylistDetail> {
+  }): Promise<PublishedPlaylist> {
     const { playlist, provider } = input;
     const tracker = new GenerationProgressTracker(input.onProgress);
     const steps = input.coverImageBase64 ? 4 : 3;
@@ -47,17 +55,21 @@ export class PublishPlaylistService {
     step += 1;
     tracker.report('publishing', step, steps);
 
-    await provider.addTracksToPlaylist(
-      remote.id,
-      playlist.tracks.map((track) => track.uri),
+    await this.completeStep(remote, 'add_tracks', () =>
+      provider.addTracksToPlaylist(
+        remote.id,
+        playlist.tracks.map((track) => track.uri),
+      ),
     );
     step += 1;
     tracker.report('publishing', step, steps);
 
+    let coverUploadFailed = false;
     if (input.coverImageBase64) {
       try {
         await provider.uploadPlaylistCover(remote.id, input.coverImageBase64);
       } catch (error) {
+        coverUploadFailed = true;
         this.logger.warn(
           `Playlist cover upload failed: ${errorMessage(error)}`,
         );
@@ -76,11 +88,63 @@ export class PublishPlaylistService {
     playlist.markCompleted();
 
     const result = input.persistToLibrary
-      ? await this.playlists.save(playlist)
+      ? await this.completeStep(remote, 'save_to_library', () =>
+          this.playlists.save(playlist),
+        )
       : playlist;
     tracker.report('publishing', steps, steps);
-    return toPlaylistDetail(result);
+    return {
+      ...toPlaylistDetail(result),
+      ...(coverUploadFailed ? { coverUploadFailed } : {}),
+    };
   }
+
+  private async completeStep<T>(
+    remote: ProviderPlaylist,
+    failedStep: PlaylistPublishStep,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      const tracksAdded = tracksAddedAfter(failedStep, error);
+      this.logger.warn(
+        JSON.stringify({
+          event: 'playlist_publish_incomplete',
+          failedStep,
+          tracksAdded,
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        }),
+      );
+      throw new PlaylistPublishIncompleteError(
+        {
+          spotifyId: remote.id,
+          spotifyUrl: remote.url,
+          failedStep,
+          tracksAdded,
+        },
+        { cause: error },
+      );
+    }
+  }
+}
+
+function tracksAddedAfter(
+  failedStep: PlaylistPublishStep,
+  error: unknown,
+): PlaylistTracksAddedState {
+  if (failedStep === 'save_to_library') {
+    return 'all';
+  }
+  return isConfirmedRejection(error) ? 'none' : 'unknown';
+}
+
+function isConfirmedRejection(error: unknown): boolean {
+  return (
+    error instanceof SpotifyProviderError ||
+    error instanceof SpotifyReauthRequiredError ||
+    isSpotifyQuotaError(error)
+  );
 }
 
 function errorMessage(error: unknown): string {

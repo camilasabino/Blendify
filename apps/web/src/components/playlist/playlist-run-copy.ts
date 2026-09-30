@@ -7,6 +7,8 @@ type PlaylistRunCopy = {
   succeeded: MessageKey
   failed: MessageKey
   uncertain: MessageKey
+  unconfirmed: MessageKey
+  incomplete: MessageKey
   busy: MessageKey
 }
 
@@ -17,6 +19,8 @@ export const PLAYLIST_RUN_COPY: Record<PlaylistRunFeature, PlaylistRunCopy> = {
     succeeded: 'runStatus.succeeded.mix',
     failed: 'runStatus.failed.mix',
     uncertain: 'runStatus.uncertain.mix',
+    unconfirmed: 'runStatus.unconfirmed.mix',
+    incomplete: 'runStatus.incomplete.mix',
     busy: 'runStatus.busy.mix',
   },
   discover: {
@@ -25,6 +29,8 @@ export const PLAYLIST_RUN_COPY: Record<PlaylistRunFeature, PlaylistRunCopy> = {
     succeeded: 'runStatus.succeeded.discover',
     failed: 'runStatus.failed.discover',
     uncertain: 'runStatus.uncertain.discover',
+    unconfirmed: 'runStatus.unconfirmed.discover',
+    incomplete: 'runStatus.incomplete.discover',
     busy: 'runStatus.busy.discover',
   },
 }

@@ -44,11 +44,33 @@ export function interruptedGenerationError(): ApiError {
   })
 }
 
+export const SPOTIFY_OUTCOME_UNKNOWN = 'SPOTIFY_OUTCOME_UNKNOWN'
+export const SPOTIFY_PLAYLIST_INCOMPLETE = 'SPOTIFY_PLAYLIST_INCOMPLETE'
+
+const SERVER_RETRIED_PROVIDER_CODES = new Set([
+  'SPOTIFY_UNAVAILABLE',
+  'SPOTIFY_REQUEST_REJECTED',
+  'SPOTIFY_PERMISSION_DENIED',
+  'SPOTIFY_REAUTH_REQUIRED',
+  'CATALOG_UNAVAILABLE',
+])
+
 export function isGenerationOutcomeUncertain(error: unknown): boolean {
   if (error instanceof ApiError) {
-    return error.code === GENERATION_STREAM_INTERRUPTED
+    return (
+      error.code === GENERATION_STREAM_INTERRUPTED ||
+      error.code === SPOTIFY_OUTCOME_UNKNOWN
+    )
   }
   return error instanceof TypeError
+}
+
+export function isSpotifyProviderFailure(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.code !== undefined &&
+    SERVER_RETRIED_PROVIDER_CODES.has(error.code)
+  )
 }
 
 const REQUEST_LIMIT_MESSAGES: Record<string, MessageKey> = {
@@ -154,6 +176,17 @@ function mapSpotifyThrottleMessage(
   return null
 }
 
+function mapProviderWaitMessage(error: ApiError, t: Translate): string | null {
+  if (error.code !== 'SPOTIFY_UNAVAILABLE' && error.code !== 'CATALOG_UNAVAILABLE') {
+    return null
+  }
+  if (error.details?.retryAfterSource !== 'spotify') {
+    return null
+  }
+  const wait = formatWaitLabel(t, readRetryAfterSeconds(error.details))
+  return wait ? t('errors.spotifyUnavailableWait', { wait }) : null
+}
+
 function mapRequestLimitMessage(
   error: ApiError,
   t: Translate,
@@ -224,6 +257,11 @@ const STATIC_ERROR_MESSAGES: Record<string, MessageKey> = {
   PLAYBACK_FAILED: 'preview.playError',
   CATALOG_UNAVAILABLE: 'errors.catalogUnavailable',
   SPOTIFY_REAUTH_REQUIRED: 'errors.spotifyReauthRequired',
+  SPOTIFY_UNAVAILABLE: 'errors.spotifyUnavailable',
+  SPOTIFY_PERMISSION_DENIED: 'errors.spotifyPermissionDenied',
+  SPOTIFY_REQUEST_REJECTED: 'errors.spotifyRequestRejected',
+  [SPOTIFY_OUTCOME_UNKNOWN]: 'errors.spotifyOutcomeUnknown',
+  [SPOTIFY_PLAYLIST_INCOMPLETE]: 'errors.spotifyPlaylistIncomplete',
   [INVALID_GENERATION_RESPONSE]: 'errors.invalidGenerationResponse',
   TRANSFER_TOKEN_INVALID: 'transfer.errorInvalid',
   TRANSFER_TOKEN_EXPIRED: 'transfer.errorExpired',
@@ -267,6 +305,7 @@ export function getApiErrorMessage(
     mapRequestLimitMessage(error, t) ??
     mapTransferUnavailableMessage(error, t) ??
     mapSpotifyThrottleMessage(error, t) ??
+    mapProviderWaitMessage(error, t) ??
     mapMaxSelectionMessage(error, t, fallbackKey) ??
     mapNamedResolveMessage(error, t) ??
     mapStaticCodeMessage(error.code, t) ??

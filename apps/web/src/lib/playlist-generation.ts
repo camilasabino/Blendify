@@ -3,13 +3,13 @@ import {
   type GenerateDiscoverRequest,
   type GenerateMixRequest,
   type GeneratedPlaylistDto,
-  type PlaylistDetail,
+  type PublishedPlaylist,
 } from '@/lib/api'
 import type { AppMode } from '@/lib/capabilities'
 import type { GenerationProgressHandler } from '@/lib/generation-stream'
 
 export type GenerationOutcome =
-  | { mode: 'spotify'; playlist: PlaylistDetail }
+  | { mode: 'spotify'; playlist: PublishedPlaylist }
   | { mode: 'guest'; playlist: GeneratedPlaylistDto }
 
 export type SpotifyPublication = {

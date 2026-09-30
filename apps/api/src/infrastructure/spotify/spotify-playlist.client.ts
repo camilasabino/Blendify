@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { MAX_TRACKS } from '@/domain/constants';
+import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-unknown.error';
 import {
   CreateProviderPlaylistInput,
   PlaylistRemoteSnapshot,
@@ -54,9 +55,9 @@ export class SpotifyPlaylistClient {
   ): Promise<ProviderPlaylist> {
     const token = await this.api.accessToken(this.userId);
     const data = await this.api.request<{
-      id: string;
-      external_urls: { spotify: string };
-    }>('createPlaylist', token, {
+      id?: string;
+      external_urls?: { spotify?: string };
+    } | null>('createPlaylist', token, {
       method: 'POST',
       url: '/me/playlists',
       data: {
@@ -65,7 +66,22 @@ export class SpotifyPlaylistClient {
         public: input.isPublic ?? false,
       },
     });
-    return { id: data.id, url: data.external_urls.spotify };
+    if (!data?.id) {
+      throw new ProviderOutcomeUnknownError(
+        'Spotify createPlaylist returned no playlist id',
+        {
+          operation: 'createPlaylist',
+          category: 'upstream_error',
+          status: null,
+        },
+      );
+    }
+    return {
+      id: data.id,
+      url:
+        data.external_urls?.spotify ??
+        `https://open.spotify.com/playlist/${data.id}`,
+    };
   }
 
   async addTracksToPlaylist(
@@ -160,10 +176,7 @@ export class SpotifyPlaylistClient {
       if (this.api.isStatus(error, 404)) {
         return null;
       }
-      throw this.api.toSpotifyError(
-        `getPlaylistSnapshot(${playlistId})`,
-        error,
-      );
+      throw this.api.toSpotifyError('getPlaylistSnapshot', error);
     }
   }
 
@@ -226,7 +239,7 @@ export class SpotifyPlaylistClient {
         );
         return { fetched: false, tracks: [], totalDurationMs: 0 };
       }
-      throw this.api.toSpotifyError(`fetchPlaylistItems(${playlistId})`, error);
+      throw this.api.toSpotifyError('fetchPlaylistItems', error);
     }
   }
 
@@ -287,15 +300,11 @@ export class SpotifyPlaylistClient {
       return;
     }
 
-    await this.api.request<unknown>(
-      `updatePlaylistDetails(${playlistId})`,
-      token,
-      {
-        method: 'PUT',
-        url: `/playlists/${playlistId}`,
-        data: body,
-      },
-    );
+    await this.api.request<unknown>('updatePlaylistDetails', token, {
+      method: 'PUT',
+      url: `/playlists/${playlistId}`,
+      data: body,
+    });
   }
 
   async deletePlaylist(playlistId: string): Promise<void> {
@@ -331,7 +340,7 @@ export class SpotifyPlaylistClient {
         return true;
       } catch (error) {
         if (this.api.isStatus(error, 429)) {
-          throw this.api.toSpotifyError(`deletePlaylist(${playlistId})`, error);
+          throw this.api.toSpotifyError('deletePlaylist', error);
         }
         this.logger.warn(
           `Could not clear playlist ${playlistId} via ${endpoint}: ${errorMessage(error)}`,
@@ -358,7 +367,7 @@ export class SpotifyPlaylistClient {
       });
     } catch (error) {
       if (this.api.isStatus(error, 429)) {
-        throw this.api.toSpotifyError(`deletePlaylist(${playlistId})`, error);
+        throw this.api.toSpotifyError('deletePlaylist', error);
       }
       this.logger.warn(
         `Could not privatize playlist ${playlistId}: ${errorMessage(error)}`,
@@ -379,7 +388,7 @@ export class SpotifyPlaylistClient {
       });
     } catch (error) {
       if (this.api.isStatus(error, 429)) {
-        throw this.api.toSpotifyError(`deletePlaylist(${playlistId})`, error);
+        throw this.api.toSpotifyError('deletePlaylist', error);
       }
       await this.unfollowPlaylistFollowers(token, playlistId);
     }
@@ -396,10 +405,7 @@ export class SpotifyPlaylistClient {
       });
     } catch (followError) {
       if (this.api.isStatus(followError, 429)) {
-        throw this.api.toSpotifyError(
-          `deletePlaylist(${playlistId})`,
-          followError,
-        );
+        throw this.api.toSpotifyError('deletePlaylist', followError);
       }
       this.logger.warn(
         `Playlist ${playlistId} unfollow failed: ${errorMessage(followError)}`,

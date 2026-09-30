@@ -25,10 +25,14 @@ import {
   guestArtwork,
   phaseMessageKey,
   type GuestArtwork,
+  type RunFailureKind,
+  type RunFailureRecovery,
+  type RunFailureView,
 } from '@/components/playlist/generation-result-helpers'
 import { PlaylistPreview } from '@/components/playlist/playlist-preview'
 import { TransferAction } from '@/components/playlist/transfer-action'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { useConnectSpotify } from '@/hooks/use-connect-spotify'
 import { useGenerationFill } from '@/hooks/use-generation-feedback'
 import { useT } from '@/i18n/use-t'
 import type { MessageKey } from '@/i18n/messages'
@@ -103,8 +107,17 @@ function readyKey(mode: AppMode): MessageKey {
   return mode === 'guest' ? 'create.readyGuest' : 'create.ready'
 }
 
-function failedTitleKey(mode: AppMode): MessageKey {
-  return mode === 'guest' ? 'create.failedTitleGuest' : 'create.failedTitle'
+function failedTitleKey(mode: AppMode, kind: RunFailureKind): MessageKey {
+  switch (kind) {
+    case 'connection_lost':
+      return 'create.uncertainTitle'
+    case 'unconfirmed':
+      return 'create.unconfirmedTitle'
+    case 'incomplete':
+      return 'create.incompleteTitle'
+    case 'failed':
+      return mode === 'guest' ? 'create.failedTitleGuest' : 'create.failedTitle'
+  }
 }
 
 function leaveNoteKey(mode: AppMode): MessageKey {
@@ -238,56 +251,101 @@ function ResultActions({
   )
 }
 
-function GenerationErrorActions({
-  isOutcomeUncertain,
-  libraryAvailable,
-  onRetry,
-}: Readonly<{
-  isOutcomeUncertain: boolean
-  libraryAvailable: boolean
-  onRetry: () => void
-}>) {
+function ReconnectAction() {
   const t = useT()
-  if (!isOutcomeUncertain) {
-    return (
-      <Button type="button" variant="secondary" onClick={onRetry}>
-        <RotateCcw aria-hidden className="size-4" />
-        {t('common.retry')}
-      </Button>
-    )
-  }
-  if (!libraryAvailable) {
-    return null
-  }
+  const connectSpotify = useConnectSpotify()
   return (
-    <Link to="/app/library" className={buttonVariants({ variant: 'secondary' })}>
-      <Library aria-hidden className="size-4" />
-      {t('create.openLibrary')}
-    </Link>
+    <Button type="button" variant="secondary" onClick={connectSpotify}>
+      {t('nav.connectSpotify')}
+    </Button>
   )
 }
 
-function GenerationErrorState({
-  message,
-  isOutcomeUncertain,
-  libraryAvailable,
+function CreateNewAnywayAction({ onCreateNew }: Readonly<{ onCreateNew: () => void }>) {
+  const t = useT()
+  const hintId = useId()
+  return (
+    <div className="space-y-2">
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={onCreateNew}
+        aria-describedby={hintId}
+      >
+        <Plus aria-hidden className="size-4" />
+        {t('create.createNewAnyway')}
+      </Button>
+      <p id={hintId} className="text-sm text-cream-400">
+        {t('create.createNewAnywayHint')}
+      </p>
+    </div>
+  )
+}
+
+function GenerationErrorActions({
+  recovery,
+  playlistUrl,
   onRetry,
 }: Readonly<{
-  message: string
-  isOutcomeUncertain: boolean
-  libraryAvailable: boolean
+  recovery: RunFailureRecovery
+  playlistUrl: string | null
   onRetry: () => void
+}>) {
+  const t = useT()
+  switch (recovery) {
+    case 'retry':
+      return (
+        <Button type="button" variant="secondary" onClick={onRetry}>
+          <RotateCcw aria-hidden className="size-4" />
+          {t('common.retry')}
+        </Button>
+      )
+    case 'open_library':
+      return (
+        <Link to="/app/library" className={buttonVariants({ variant: 'secondary' })}>
+          <Library aria-hidden className="size-4" />
+          {t('create.openLibrary')}
+        </Link>
+      )
+    case 'open_playlist':
+      return playlistUrl ? (
+        <a
+          href={playlistUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={buttonVariants({ variant: 'secondary' })}
+        >
+          <ExternalLink aria-hidden className="size-4" />
+          {t('create.openSpotify')}
+        </a>
+      ) : null
+    case 'reconnect':
+      return <ReconnectAction />
+    case 'none':
+      return null
+  }
+}
+
+function GenerationErrorState({
+  failure,
+  onRetry,
+  onCreateNew,
+}: Readonly<{
+  failure: RunFailureView
+  onRetry: () => void
+  onCreateNew: () => void
 }>) {
   return (
     <div className="space-y-4">
       <p role="alert" className="text-sm leading-relaxed text-danger">
-        {message}
+        {failure.message}
       </p>
       <GenerationErrorActions
-        isOutcomeUncertain={isOutcomeUncertain}
-        libraryAvailable={libraryAvailable}
+        recovery={failure.recovery}
+        playlistUrl={failure.playlistUrl}
         onRetry={onRetry}
       />
+      {failure.offersNewCreation ? <CreateNewAnywayAction onCreateNew={onCreateNew} /> : null}
     </div>
   )
 }
@@ -532,9 +590,7 @@ export function GenerationResultPanel({
   isGenerating,
   result,
   progress,
-  error,
-  isErrorOutcomeUncertain = false,
-  libraryAvailable = false,
+  failure,
   coverError,
   requestedTrackCount,
   workingTitleKey,
@@ -543,6 +599,7 @@ export function GenerationResultPanel({
   copied,
   onCopy,
   onRetry,
+  onCreateNew,
   onAdjust,
   onCreateAnother,
 }: Readonly<{
@@ -550,9 +607,7 @@ export function GenerationResultPanel({
   isGenerating: boolean
   result: GenerationOutcome | null
   progress: GenerationProgress | null
-  error: string | null
-  isErrorOutcomeUncertain?: boolean
-  libraryAvailable?: boolean
+  failure: RunFailureView | null
   coverError: string | null
   requestedTrackCount: number
   workingTitleKey: MessageKey
@@ -561,17 +616,18 @@ export function GenerationResultPanel({
   copied: boolean
   onCopy: (url: string) => void
   onRetry: () => void
+  onCreateNew: () => void
   onAdjust: () => void
   onCreateAnother: () => void
 }>) {
   const t = useT()
   const titleId = useId()
 
-  if (!isGenerating && !result && !error) {
+  if (!isGenerating && !result && !failure) {
     return null
   }
 
-  const showError = !isGenerating && error != null
+  const showError = !isGenerating && failure != null
   const showResult = !isGenerating && !showError && result != null
   const readyLabel = t(readyKey(result?.mode ?? mode))
   let title = result?.playlist.name ?? readyLabel
@@ -579,9 +635,7 @@ export function GenerationResultPanel({
     title = t(workingTitleKey)
   }
   else if (showError) {
-    title = t(
-      isErrorOutcomeUncertain ? 'create.uncertainTitle' : failedTitleKey(mode),
-    )
+    title = t(failedTitleKey(mode, failure.kind))
   }
 
   let announcement = ''
@@ -628,12 +682,7 @@ export function GenerationResultPanel({
         />
       ) : null}
       {showError ? (
-        <GenerationErrorState
-          message={error}
-          isOutcomeUncertain={isErrorOutcomeUncertain}
-          libraryAvailable={libraryAvailable}
-          onRetry={onRetry}
-        />
+        <GenerationErrorState failure={failure} onRetry={onRetry} onCreateNew={onCreateNew} />
       ) : null}
       <CoverErrorNotice message={coverError} />
       {showResult ? (

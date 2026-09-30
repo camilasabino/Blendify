@@ -5,6 +5,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from 'axios';
 import { Logger } from '@nestjs/common';
+import type { SpotifyWaitSource } from '@blendify/contracts';
 
 type RateLimitedConfig = InternalAxiosRequestConfig & {
   __releaseRateGate?: () => void;
@@ -16,15 +17,28 @@ const LOCAL_COOLDOWN_MS = 20_000;
 const MAX_QUEUE_WAIT_MS = 1_500;
 const MAX_PLAUSIBLE_RETRY_AFTER_SECONDS = 48 * 3600;
 const DEFAULT_RETRY_AFTER_SECONDS = 20;
+const HTTP_DATE_PATTERN =
+  /^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/;
 
 let quotaBlockedUntil = 0;
 let lastQuotaReason: string | undefined;
+let quotaWaitSource: SpotifyWaitSource = 'blendify';
+
+export type SpotifyWait = {
+  seconds: number | null;
+  source: SpotifyWaitSource | null;
+};
+
+const localWaits = new WeakMap<AxiosError, SpotifyWait>();
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function readRetryAfterSeconds(error: AxiosError): number | null {
+export function readSpotifyRetryAfterSeconds(
+  error: AxiosError,
+  nowMs: number = Date.now(),
+): number | null {
   const headers = error.response?.headers;
   const raw: unknown =
     headers && typeof headers === 'object' && 'retry-after' in headers
@@ -33,16 +47,23 @@ function readRetryAfterSeconds(error: AxiosError): number | null {
   const headerCandidate: unknown = Array.isArray(raw) ? raw[0] : raw;
   const header =
     typeof headerCandidate === 'string' || typeof headerCandidate === 'number'
-      ? String(headerCandidate)
-      : null;
-  if (!header?.trim()) {
-    return null;
-  }
-  const seconds = Number(header.trim());
-  if (!Number.isFinite(seconds) || seconds < 0) {
+      ? String(headerCandidate).trim()
+      : '';
+  const seconds = /^\d+(?:\.\d+)?$/.test(header)
+    ? Math.ceil(Number(header))
+    : secondsUntilHttpDate(header, nowMs);
+  if (seconds === null || !Number.isFinite(seconds) || seconds <= 0) {
     return null;
   }
   return Math.min(seconds, MAX_PLAUSIBLE_RETRY_AFTER_SECONDS);
+}
+
+function secondsUntilHttpDate(header: string, nowMs: number): number | null {
+  if (!HTTP_DATE_PATTERN.test(header)) {
+    return null;
+  }
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? null : Math.ceil((at - nowMs) / 1000);
 }
 
 function readQuotaReason(error: AxiosError): string | undefined {
@@ -51,12 +72,11 @@ function readQuotaReason(error: AxiosError): string | undefined {
   return data?.error?.reason ?? data?.error?.message;
 }
 
-function synthetic429(config: InternalAxiosRequestConfig): AxiosError {
-  const remainingSec = Math.max(
-    0,
-    Math.ceil((quotaBlockedUntil - Date.now()) / 1000),
-  );
-  return new AxiosError(
+function synthetic429(
+  config: InternalAxiosRequestConfig,
+  wait: { seconds: number; source: SpotifyWaitSource },
+): AxiosError {
+  const error = new AxiosError(
     'Too many requests',
     'ERR_SPOTIFY_COOLDOWN',
     config,
@@ -71,12 +91,16 @@ function synthetic429(config: InternalAxiosRequestConfig): AxiosError {
           reason: lastQuotaReason ?? 'QUOTA_EXCEEDED',
         },
       },
-      headers: AxiosHeaders.from({
-        'retry-after': String(remainingSec || DEFAULT_RETRY_AFTER_SECONDS),
-      }),
+      headers: AxiosHeaders.from({ 'retry-after': String(wait.seconds) }),
       config,
     },
   );
+  localWaits.set(error, wait);
+  return error;
+}
+
+function remainingSeconds(until: number): number {
+  return Math.max(1, Math.ceil((until - Date.now()) / 1000));
 }
 
 /** True while Spotify has told us to wait (Retry-After window). */
@@ -95,10 +119,33 @@ export function getSpotifyQuotaReason(): string | undefined {
   return lastQuotaReason;
 }
 
+export function getSpotifyQuotaWaitSource(): SpotifyWaitSource {
+  return quotaWaitSource;
+}
+
+export function readSpotifyWait(error: AxiosError): SpotifyWait {
+  const local = localWaits.get(error);
+  if (local) {
+    return local;
+  }
+  if (error.response?.status !== 429) {
+    return { seconds: null, source: null };
+  }
+  const provided = readSpotifyRetryAfterSeconds(error);
+  if (provided !== null) {
+    return { seconds: provided, source: 'spotify' };
+  }
+  return {
+    seconds: getSpotifyQuotaRetryAfterSeconds(),
+    source: isSpotifyQuotaBlocked() ? 'blendify' : null,
+  };
+}
+
 /** For tests only. */
 export function __resetSpotifyRateLimitForTests(): void {
   quotaBlockedUntil = 0;
   lastQuotaReason = undefined;
+  quotaWaitSource = 'blendify';
 }
 
 export function attachSpotifyRateLimit(
@@ -116,7 +163,10 @@ export function attachSpotifyRateLimit(
       logger?.warn(
         `Spotify blocked ${getSpotifyQuotaRetryAfterSeconds()}s — failing fast`,
       );
-      throw synthetic429(cfg);
+      throw synthetic429(cfg, {
+        seconds: remainingSeconds(quotaBlockedUntil),
+        source: quotaWaitSource,
+      });
     }
 
     let release!: () => void;
@@ -134,7 +184,10 @@ export function attachSpotifyRateLimit(
       logger?.warn(
         `Spotify short cooldown ${Math.ceil(wait / 1000)}s — failing fast`,
       );
-      throw synthetic429(cfg);
+      throw synthetic429(cfg, {
+        seconds: remainingSeconds(nextSlot),
+        source: 'blendify',
+      });
     }
 
     if (wait > 0) {
@@ -164,16 +217,15 @@ export function attachSpotifyRateLimit(
       const status = error.response?.status;
 
       if (status === 429) {
-        const retrySec =
-          readRetryAfterSeconds(error) ?? DEFAULT_RETRY_AFTER_SECONDS;
+        const provided = readSpotifyRetryAfterSeconds(error);
+        const retrySec = provided ?? DEFAULT_RETRY_AFTER_SECONDS;
         const reason = readQuotaReason(error) ?? 'rate_limit';
         lastQuotaReason = reason;
+        quotaWaitSource = provided === null ? 'blendify' : 'spotify';
         quotaBlockedUntil = Date.now() + retrySec * 1000;
         nextSlot = Date.now() + Math.max(LOCAL_COOLDOWN_MS, retrySec * 1000);
         logger?.warn(
-          `Spotify 429 (${reason}) Retry-After=${retrySec}s (~${(
-            retrySec / 3600
-          ).toFixed(1)}h) — no auto-retry`,
+          `Spotify 429 (${reason}) wait=${retrySec}s source=${quotaWaitSource} — no auto-retry`,
         );
       } else if (error.code !== 'ERR_SPOTIFY_COOLDOWN') {
         nextSlot = Date.now() + MIN_GAP_MS;

@@ -486,6 +486,44 @@ export const es: Record<MessageKey, string> = {
     'El catálogo de música no está disponible temporalmente. Intenta de nuevo en unos minutos.',
   'errors.spotifyReauthRequired':
     'Tu conexión con Spotify ya no es válida. Vuelve a conectar Spotify para continuar.',
+  'errors.spotifyUnavailable':
+    'No pudimos comunicarnos correctamente con Spotify. Vuelve a intentarlo.',
+  'errors.spotifyUnavailableWait':
+    'Spotify no está respondiendo en este momento y pidió esperar {wait} antes de volver a intentarlo.',
+  'errors.spotifyPermissionDenied':
+    'Spotify no permitió esta acción para tu cuenta.',
+  'errors.spotifyRequestRejected':
+    'Spotify no pudo procesar esta solicitud. Intenta de nuevo más tarde.',
+  'errors.spotifyOutcomeUnknown':
+    'Spotify no confirmó si se hizo el cambio. Revisa Spotify antes de volver a intentarlo.',
+  'errors.spotifyPlaylistIncomplete':
+    'Blendify creó la playlist en Spotify, pero no pudo terminarla. Ábrela en Spotify para revisarla.',
+  'create.unconfirmedTitle':
+    'No pudimos confirmar la playlist',
+  'create.unconfirmed':
+    'Spotify no confirmó si se creó la playlist. Es posible que ya esté en tu cuenta, así que revisa tus playlists en Spotify antes de crearla de nuevo.',
+  'create.createNewAnyway':
+    'Crear otra playlist igualmente',
+  'create.createNewAnywayHint':
+    'Esto envía la misma solicitud otra vez como una playlist aparte. Si la anterior se creó, tendrás las dos en Spotify.',
+  'create.resubmitBlockedUncertain':
+    'Primero revisa Spotify. Para crear otra playlist, usa “Crear otra playlist igualmente”, arriba.',
+  'create.incompleteTitle':
+    'No pudimos terminar la playlist',
+  'create.incompleteNoTracks':
+    'Blendify creó la playlist en Spotify, pero Spotify no aceptó sus canciones. Ábrela en Spotify para revisarla.',
+  'create.incompleteUnknownTracks':
+    'Blendify creó la playlist en Spotify, pero no pudo confirmar si se agregaron sus canciones. Ábrela en Spotify para revisarla.',
+  'create.incompleteLibrary':
+    'Tu playlist ya está en Spotify con todas sus canciones, pero Blendify no pudo guardarla en tu biblioteca.',
+  'runStatus.unconfirmed.mix':
+    'No pudimos confirmar tu mezcla',
+  'runStatus.unconfirmed.discover':
+    'No pudimos confirmar tu playlist de Descubrir',
+  'runStatus.incomplete.mix':
+    'Tu mezcla quedó sin terminar',
+  'runStatus.incomplete.discover':
+    'Tu playlist de Descubrir quedó sin terminar',
   'errors.invalidGenerationResponse':
     'Blendify recibió una respuesta inesperada. Intenta de nuevo.',
   'create.stepSize': 'Tamaño',

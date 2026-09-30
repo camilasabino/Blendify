@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import {
+  recreateUncertainPlaylistRun,
   rerunPlaylistRun,
   startPlaylistRun,
 } from '@/lib/playlist-run-coordinator'
@@ -9,6 +10,7 @@ import {
 } from '@/stores/playlist-run-store'
 import {
   jsonResponse,
+  ndjsonResponse,
   pendingNdjsonResponse,
   stubApi,
   type PendingNdjsonStream,
@@ -172,6 +174,33 @@ describe('playlist run coordinator', () => {
     expect(rerunPlaylistRun(queryClient)).toBe(false)
   })
 
+  it('creates again after a write whose response never arrived only through the explicit recreate', async () => {
+    const providerWrites: unknown[] = []
+    stubApi({
+      'POST /api/playlists/mix': (call) => {
+        providerWrites.push(call.body)
+        return providerWrites.length === 1
+          ? ndjsonResponse({ type: 'progress', phase: 'publishing', current: 1, total: 1, percent: 95 })
+          : ndjsonResponse({ type: 'result', playlist: spotifyJazzPlaylist })
+      },
+    })
+    const queryClient = new QueryClient()
+
+    startPlaylistRun(spotifySpec, queryClient)
+    await settle()
+    expect(phase()).toBe('uncertain')
+    expect(rerunPlaylistRun(queryClient)).toBe(false)
+    await settle()
+    expect(providerWrites).toHaveLength(1)
+
+    expect(recreateUncertainPlaylistRun(queryClient)).toBe(true)
+    await settle()
+
+    expect(providerWrites).toHaveLength(2)
+    expect(providerWrites[1]).toEqual(providerWrites[0])
+    expect(phase()).toBe('succeeded')
+  })
+
   it('treats the same interruption as an ordinary failure for a Guest run', async () => {
     stubApi({
       'POST /api/generate/mix': () => Promise.reject(new TypeError('network error')),
@@ -193,5 +222,141 @@ describe('playlist run coordinator', () => {
     await settle()
 
     expect(phase()).toBe('failed')
+  })
+
+  async function failWith(event: Record<string, unknown>) {
+    const streams: PendingNdjsonStream[] = []
+    const api = stubApi({ 'POST /api/playlists/mix': pendingRoute(streams) })
+    const queryClient = new QueryClient()
+    startPlaylistRun(spotifySpec, queryClient)
+    streams[0].push({ type: 'error', ...event })
+    streams[0].close()
+    await settle()
+    return {
+      queryClient,
+      posts: () => api.calls.filter((call) => call.method === 'POST'),
+    }
+  }
+
+  it('keeps an unconfirmed Spotify creation uncertain and never sends it again', async () => {
+    const { queryClient, posts } = await failWith({
+      statusCode: 502,
+      code: 'SPOTIFY_OUTCOME_UNKNOWN',
+      message: 'unknown',
+      details: { operation: 'createPlaylist', category: 'upstream_error', status: 502 },
+    })
+
+    expect(phase()).toBe('uncertain')
+    expect(rerunPlaylistRun(queryClient)).toBe(false)
+    await settle()
+    expect(posts()).toHaveLength(1)
+  })
+
+  it('sends an unconfirmed creation again only through the explicit recreate, with the stored request', async () => {
+    const { queryClient, posts } = await failWith({
+      statusCode: 502,
+      code: 'SPOTIFY_OUTCOME_UNKNOWN',
+      message: 'unknown',
+      details: { operation: 'createPlaylist', category: 'timeout', status: null },
+    })
+
+    expect(recreateUncertainPlaylistRun(queryClient)).toBe(true)
+    await settle()
+
+    expect(posts()).toHaveLength(2)
+    expect(posts()[1].body).toEqual(posts()[0].body)
+    expect(phase()).toBe('active')
+  })
+
+  it.each([
+    [
+      'an incomplete playlist',
+      {
+        statusCode: 502,
+        code: 'SPOTIFY_PLAYLIST_INCOMPLETE',
+        message: 'incomplete',
+        details: {
+          spotifyId: 'created-1',
+          spotifyUrl: 'https://open.spotify.com/playlist/created-1',
+          failedStep: 'add_tracks',
+          tracksAdded: 'unknown',
+        },
+      },
+    ],
+    [
+      'a safe provider failure',
+      {
+        statusCode: 503,
+        code: 'SPOTIFY_UNAVAILABLE',
+        message: 'unavailable',
+        details: { operation: 'searchTracks', category: 'upstream_error', status: 502 },
+      },
+    ],
+  ])('refuses the explicit recreate after %s', async (_label, event) => {
+    const { queryClient, posts } = await failWith(event)
+
+    expect(recreateUncertainPlaylistRun(queryClient)).toBe(false)
+    await settle()
+    expect(posts()).toHaveLength(1)
+  })
+
+  it('never recreates a playlist that Spotify already created but did not finish', async () => {
+    const { queryClient, posts } = await failWith({
+      statusCode: 502,
+      code: 'SPOTIFY_PLAYLIST_INCOMPLETE',
+      message: 'incomplete',
+      details: {
+        spotifyId: 'created-1',
+        spotifyUrl: 'https://open.spotify.com/playlist/created-1',
+        failedStep: 'add_tracks',
+        tracksAdded: 'unknown',
+      },
+    })
+
+    expect(phase()).toBe('failed')
+    expect(rerunPlaylistRun(queryClient)).toBe(false)
+    await settle()
+    expect(posts()).toHaveLength(1)
+  })
+
+  it.each([
+    ['SPOTIFY_REAUTH_REQUIRED', 401],
+    ['SPOTIFY_PERMISSION_DENIED', 403],
+  ])('does not rerun after %s', async (code, statusCode) => {
+    const { queryClient, posts } = await failWith({ statusCode, code, message: code })
+
+    expect(phase()).toBe('failed')
+    expect(rerunPlaylistRun(queryClient)).toBe(false)
+    expect(posts()).toHaveLength(1)
+  })
+
+  it.each([
+    [
+      'a creation that never reached Spotify',
+      {
+        statusCode: 503,
+        code: 'SPOTIFY_UNAVAILABLE',
+        message: 'unavailable',
+        details: { operation: 'createPlaylist', category: 'network', status: null },
+      },
+    ],
+    [
+      'a Spotify rate limit',
+      {
+        statusCode: 429,
+        code: 'SPOTIFY_RATE_LIMITED',
+        message: 'rate limited',
+        details: { retryAfterSeconds: 7, retryAfterSource: 'spotify', reason: 'rate_limit' },
+      },
+    ],
+  ])('reruns the same request once after %s', async (_label, event) => {
+    const { queryClient, posts } = await failWith(event)
+
+    expect(phase()).toBe('failed')
+    expect(rerunPlaylistRun(queryClient)).toBe(true)
+    await settle()
+
+    expect(posts()).toHaveLength(2)
+    expect(posts()[1].body).toEqual(posts()[0].body)
   })
 })

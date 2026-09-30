@@ -1,7 +1,8 @@
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DiscoverPlaylistForm } from '@/components/playlist/discover-playlist-form'
 import { renderPlaylistCoverBase64 } from '@/lib/playlist-cover'
+import { usePlaylistRunStore } from '@/stores/playlist-run-store'
 import {
   jsonResponse,
   ndjsonResponse,
@@ -58,5 +59,67 @@ describe('DiscoverPlaylistForm cover', () => {
       kind: 'discover_artist',
       coverImageBase64: 'cover-data',
     })
+  })
+})
+
+describe('DiscoverPlaylistForm after an unconfirmed Spotify creation', () => {
+  beforeEach(() => {
+    usePlaylistRunStore.getState().discard()
+  })
+
+  it('keeps the seed, blocks the usual submit and Enter, and creates again only on the explicit action', async () => {
+    setAuthState(testUser)
+    let creations = 0
+    const { calls } = stubApi({
+      'GET /api/artists/search': () =>
+        jsonResponse({
+          artists: [
+            {
+              id: 'artist-1',
+              name: 'Sade',
+              imageUrl: 'https://i.scdn.co/image/sade',
+              externalUrl: 'https://open.spotify.com/artist/artist-1',
+            },
+          ],
+        }),
+      'POST /api/playlists/discover': () => {
+        creations += 1
+        return creations === 1
+          ? ndjsonResponse({
+              type: 'error',
+              statusCode: 502,
+              code: 'SPOTIFY_OUTCOME_UNKNOWN',
+              message: 'Spotify did not confirm the result of this change.',
+              details: { operation: 'createPlaylist', category: 'timeout', status: null },
+            })
+          : ndjsonResponse({ type: 'result', playlist: spotifyJazzPlaylist })
+      },
+      'GET /api/player/devices': () => jsonResponse({ devices: [] }),
+    })
+    const user = userEvent.setup()
+    renderWithProviders(<DiscoverPlaylistForm />, { route: '/app/discover' })
+
+    await user.type(screen.getByRole('combobox'), 'sade')
+    await user.click(
+      (await screen.findByRole('option', { name: 'Sade' })).firstElementChild!,
+    )
+    await user.click(screen.getByRole('button', { name: 'Create playlist' }))
+    await screen.findByRole('heading', { name: 'Couldn’t confirm the playlist' })
+
+    const submit = screen.getByRole('button', { name: 'Create playlist' })
+    expect(submit).toBeDisabled()
+    expect(screen.getByText('Sade')).toBeVisible()
+    await user.click(screen.getByRole('radio', { name: 'Artist' }))
+    await user.keyboard('{Enter}')
+    fireEvent.submit(submit.closest('form')!)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    const posts = () => calls.filter((call) => call.method === 'POST')
+    expect(posts()).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Create a new playlist anyway' }))
+    await screen.findByText('Playlist ready')
+
+    expect(posts()).toHaveLength(2)
+    expect(posts()[1].body).toEqual(posts()[0].body)
   })
 })

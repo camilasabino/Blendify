@@ -475,6 +475,44 @@ export const en = {
     'The music catalog is temporarily unavailable. Try again in a few minutes.',
   'errors.spotifyReauthRequired':
     'Your Spotify connection is no longer valid. Connect Spotify again to continue.',
+  'errors.spotifyUnavailable':
+    'Blendify couldn’t communicate properly with Spotify. Try again.',
+  'errors.spotifyUnavailableWait':
+    'Spotify isn’t responding right now and asked to wait {wait} before trying again.',
+  'errors.spotifyPermissionDenied':
+    'Spotify didn’t allow this action for your account.',
+  'errors.spotifyRequestRejected':
+    'Spotify couldn’t process this request. Try again later.',
+  'errors.spotifyOutcomeUnknown':
+    'Spotify didn’t confirm whether the change was made. Check Spotify before trying again.',
+  'errors.spotifyPlaylistIncomplete':
+    'Blendify created the playlist on Spotify but couldn’t finish it. Open it in Spotify to check it.',
+  'create.unconfirmedTitle':
+    'Couldn’t confirm the playlist',
+  'create.unconfirmed':
+    'Spotify didn’t confirm whether the playlist was created. It may already be in your Spotify account, so check your playlists there before creating it again.',
+  'create.createNewAnyway':
+    'Create a new playlist anyway',
+  'create.createNewAnywayHint':
+    'This sends the same request again as a separate playlist. If the previous one was created, you’ll have both in Spotify.',
+  'create.resubmitBlockedUncertain':
+    'Check Spotify first. To create another playlist, use “Create a new playlist anyway” above.',
+  'create.incompleteTitle':
+    'Couldn’t finish the playlist',
+  'create.incompleteNoTracks':
+    'Blendify created the playlist on Spotify, but Spotify didn’t accept its songs. Open it in Spotify to check it.',
+  'create.incompleteUnknownTracks':
+    'Blendify created the playlist on Spotify, but couldn’t confirm whether its songs were added. Open it in Spotify to check it.',
+  'create.incompleteLibrary':
+    'Your playlist is on Spotify with all its songs, but Blendify couldn’t save it to your Library.',
+  'runStatus.unconfirmed.mix':
+    'Couldn’t confirm your Mix',
+  'runStatus.unconfirmed.discover':
+    'Couldn’t confirm your Discover playlist',
+  'runStatus.incomplete.mix':
+    'Your Mix wasn’t finished',
+  'runStatus.incomplete.discover':
+    'Your Discover playlist wasn’t finished',
   'errors.invalidGenerationResponse':
     'Blendify received an unexpected response. Please try again.',
   'create.stepSize': 'Size',

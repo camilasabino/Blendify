@@ -252,7 +252,7 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
     }
 
     for (const id of missing) {
-      const data = await this.request<SpotifyArtist>(`getArtist(${id})`, {
+      const data = await this.request<SpotifyArtist>('getArtist', {
         method: 'GET',
         url: `/artists/${id}`,
       });

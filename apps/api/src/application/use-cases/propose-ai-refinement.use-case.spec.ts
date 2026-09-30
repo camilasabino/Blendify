@@ -1104,6 +1104,7 @@ describe('ProposeAiRefinementUseCase', () => {
       world.generator.execute.mockRejectedValue(
         createSpotifyQuotaError({
           retryAfterSeconds: 120,
+          retryAfterSource: 'spotify',
           reason: 'RATE_LIMITED',
         }),
       );
@@ -1222,7 +1223,11 @@ describe('ProposeAiRefinementUseCase', () => {
         const { running, generation } = await loseLeaseDuringGeneration(world);
 
         generation.reject(
-          createSpotifyQuotaError({ retryAfterSeconds: 1, reason: 'X' }),
+          createSpotifyQuotaError({
+            retryAfterSeconds: 1,
+            retryAfterSource: 'spotify',
+            reason: 'X',
+          }),
         );
 
         expect(await errorCode(running)).toBe('AI_REFINEMENT_SUPERSEDED');

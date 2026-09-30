@@ -465,6 +465,7 @@ describe('GenerateAiPlaylistUseCase', () => {
     const world = createWorld();
     const quota = createSpotifyQuotaError({
       retryAfterSeconds: 3_600,
+      retryAfterSource: 'spotify',
       reason: 'QUOTA_EXCEEDED',
     });
     world.catalog.searchArtists.mockRejectedValue(quota);

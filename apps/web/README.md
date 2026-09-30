@@ -114,6 +114,7 @@ npm run test:web                # Vitest (jsdom)
 npm run lint -w @blendify/web   # oxlint
 npm run test:e2e                # Playwright (Chromium)
 npm run visual:ai -w @blendify/web   # Create with AI screenshots for manual review
+npm run visual:spotify-errors -w @blendify/web   # Spotify error states (EN/ES/PT, desktop and 390 px) for manual review
 ```
 
 ## Tests

@@ -102,6 +102,7 @@ export class SpotifyAppTokenProvider {
     if (status === 429) {
       return createSpotifyQuotaError({
         retryAfterSeconds: readRetryAfterSeconds(error),
+        retryAfterSource: 'spotify',
         reason: 'rate_limit',
       });
     }

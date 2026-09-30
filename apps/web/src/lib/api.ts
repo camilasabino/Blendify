@@ -8,7 +8,7 @@ import {
   GeneratedPlaylistSchema,
   GeneratedPlaylistStreamEventSchema,
   GenerationStreamEventSchema,
-  PlaylistDetailSchema,
+  PublishedPlaylistSchema,
   PlaylistTransferSchema,
   type AiGenerationDto,
   type AiRefinementResultDto,
@@ -33,6 +33,7 @@ import {
   type PlaybackDeviceDto,
   type PlaylistDetail,
   type PlaylistLibraryPage,
+  type PublishedPlaylist,
   type PlaylistTransferDto,
   type StartPlaybackRequest,
   type TrackDto,
@@ -48,6 +49,7 @@ export {
   getTransferErrorMessage,
   getTransferErrorRecovery,
   isRequestLimited,
+  isSpotifyProviderFailure,
   isSpotifyRateLimited,
 } from '@/lib/api-error'
 import { ApiError, invalidGenerationResponseError } from '@/lib/api-error'
@@ -74,6 +76,7 @@ export type {
   GeneratedPlaylistDto,
   GenerationProgress,
   PlaylistDetail,
+  PublishedPlaylist,
   PlaylistLibraryPage,
   PlaylistTransferDto,
   UserUsageStats,
@@ -212,9 +215,9 @@ const AI_GENERATION: GenerationContract<AiGeneration> = {
   result: AiGenerationSchema,
 }
 
-const SPOTIFY_GENERATION: GenerationContract<PlaylistDetail> = {
+const SPOTIFY_GENERATION: GenerationContract<PublishedPlaylist> = {
   events: GenerationStreamEventSchema,
-  result: PlaylistDetailSchema,
+  result: PublishedPlaylistSchema,
 }
 
 const GUEST_GENERATION: GenerationContract<GeneratedPlaylistDto> = {
