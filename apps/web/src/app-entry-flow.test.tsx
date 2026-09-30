@@ -2,6 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import App from '@/App'
+import { useLocaleStore } from '@/i18n/use-locale'
+import type { Locale } from '@/i18n/messages'
 import { api } from '@/lib/api'
 import {
   generatedAiSessionState,
@@ -57,6 +59,7 @@ function stubBrowserLocation(href: string) {
 }
 
 afterEach(() => {
+  useLocaleStore.getState().setLocale('en')
   sessionStorage.clear()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
@@ -86,6 +89,72 @@ describe('Landing entry', () => {
     expect(location()).toHaveTextContent(/^\/app$/)
   })
 
+  it('explains how to start and links the access limit without starting login', async () => {
+    const user = userEvent.setup()
+    const loginUrl = vi.spyOn(api, 'loginUrl')
+    setAuthState(null)
+    stubApi({})
+    renderApp('/')
+
+    expect(
+      await screen.findByText(
+        'Choose artists, genres, or a song, or describe what you want to hear.',
+      ),
+    ).toBeVisible()
+    expect(
+      screen.getByText('Only enabled Spotify accounts can connect to Blendify.'),
+    ).toBeVisible()
+    expect(screen.queryByText(/Connecting Spotify is optional/i)).toBeNull()
+    expect(screen.queryByText(/created as private/i)).toBeNull()
+
+    const details = screen.getByRole('link', { name: 'Learn more' })
+    expect(details).toHaveAttribute('href', '/spotify-access')
+    screen.getByRole('link', { name: 'Continue without Spotify' }).focus()
+    await user.tab()
+    await user.tab()
+    expect(details).toHaveFocus()
+
+    await user.click(details)
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Spotify access' }),
+    ).toBeVisible()
+    expect(location()).toHaveTextContent(/^\/spotify-access$/)
+    expect(loginUrl).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      'es',
+      'Elige artistas, géneros o una canción, o describe lo que quieres escuchar.',
+      'La conexión con Spotify está limitada a cuentas habilitadas.',
+      'Más información',
+    ],
+    [
+      'pt',
+      'Escolha artistas, gêneros ou uma música, ou descreva o que quer ouvir.',
+      'A conexão com o Spotify está limitada a contas habilitadas.',
+      'Saiba mais',
+    ],
+  ] as const)(
+    'shows the short landing copy in %s',
+    async (locale: Locale, description, note, more) => {
+      setAuthState(null)
+      stubApi({})
+      renderApp('/')
+      useLocaleStore.getState().setLocale(locale)
+
+      expect(await screen.findByText(description)).toBeVisible()
+      expect(screen.getByRole('link', { name: more })).toHaveAttribute(
+        'href',
+        '/spotify-access',
+      )
+      expect(
+        screen.getByRole('link', { name: more }).closest('p'),
+      ).toHaveTextContent(note)
+    },
+  )
+
   it('never offers the Guest entry while the session is still unknown', async () => {
     setAuthState(null, false)
     let resolveSession: (() => void) | undefined
@@ -104,6 +173,7 @@ describe('Landing entry', () => {
     expect(
       screen.queryByRole('link', { name: 'Continue without Spotify' }),
     ).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Learn more' })).toBeNull()
     expect(location()).toHaveTextContent(/^\/$/)
 
     resolveSession?.()
@@ -131,6 +201,7 @@ describe('OAuth feedback on the landing page', () => {
     expect(
       screen.getByRole('link', { name: 'Go to Blendify' }),
     ).toHaveAttribute('href', '/app')
+    expect(screen.queryByRole('link', { name: 'Learn more' })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Dismiss' }))
 

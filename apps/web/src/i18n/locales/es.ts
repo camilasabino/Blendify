@@ -3,9 +3,9 @@ import type { MessageKey } from './en'
 export const es: Record<MessageKey, string> = {
   'brand.tagline': 'Mezcla la música que te gusta en nuevas playlists.',
   'brand.description':
-    'Mezcla artistas o géneros, o empieza desde un artista o una canción. Guarda la playlist en Spotify o sigue sin conectar Spotify.',
+    'Elige artistas, géneros o una canción para crear tu playlist.',
   'brand.descriptionWithAi':
-    'Mezcla artistas o géneros, empieza desde un artista o una canción, o describe lo que quieres. Guarda la playlist en Spotify o sigue sin conectar Spotify.',
+    'Elige artistas, géneros o una canción, o describe lo que quieres escuchar.',
   'nav.logOut': 'Cerrar sesión',
   'nav.deleteAccount': 'Eliminar cuenta',
   'account.delete.title': '¿Eliminar tu cuenta de Blendify?',
@@ -378,8 +378,9 @@ export const es: Record<MessageKey, string> = {
   'library.kindMix': 'Mezcla',
   'library.kindDiscover': 'Descubrir',
   'library.titleMany': '{first}, {second} y {count} más',
-  'landing.trust':
-    'Conectar Spotify es opcional. Las playlists que guardes se crean como privadas en tu cuenta de Spotify.',
+  'landing.accessNote':
+    'La conexión con Spotify está limitada a cuentas habilitadas.',
+  'landing.accessMore': 'Más información',
   'stats.useCountOne': '1 playlist',
   'stats.useCountMany': '{count} playlists',
   'stats.overview': 'Resumen',
@@ -403,8 +404,6 @@ export const es: Record<MessageKey, string> = {
     'Cerrar',
   'authError.moreInfo':
     'Más información',
-  'landing.spotifyAccess':
-    'Conectar tu cuenta de Spotify y guardar playlists en Spotify está disponible para las cuentas habilitadas para la integración. Puedes usar Blendify sin conectar Spotify.',
   'spotifyAccess.title':
     'Acceso a Spotify',
   'spotifyAccess.intro':
@@ -425,6 +424,8 @@ export const es: Record<MessageKey, string> = {
     'Con Spotify conectado',
   'spotifyAccess.withBody':
     'Guardar playlists en tu cuenta de Spotify, usar la biblioteca y ver tus estadísticas requiere una cuenta habilitada para esta integración.',
+  'spotifyAccess.privatePlaylists':
+    'Las playlists nuevas que Blendify guarda en Spotify se crean como privadas.',
   'spotifyAccess.otherAccount':
     'Si tienes otra cuenta de Spotify ya habilitada para Blendify, inicia sesión con ella en Spotify y luego conéctala desde Blendify. Conectar de nuevo mientras esta cuenta sigue con la sesión abierta en Spotify repite el mismo intento.',
   'spotifyAccess.continue':

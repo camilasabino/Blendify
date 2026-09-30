@@ -37,6 +37,14 @@ describe('Create with AI disabled', () => {
     expect(
       await screen.findByRole('link', { name: 'Continue without Spotify' }),
     ).toBeVisible()
+    expect(
+      screen.getByText(
+        'Choose artists, genres, or a song to build your playlist.',
+      ),
+    ).toBeVisible()
+    expect(
+      screen.queryByText(/describe what you want to hear/i),
+    ).not.toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
     expect(calls.filter((call) => call.url.startsWith('/api/ai/'))).toEqual([])
   })

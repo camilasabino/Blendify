@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { ArrowDown, ArrowRight, Blend, Lock } from 'lucide-react'
+import { ArrowDown, ArrowRight, Blend } from 'lucide-react'
 import { useAuthError } from '@/hooks/use-auth-error'
 import { useCapabilities } from '@/hooks/use-capabilities'
 import { buttonVariants } from '@/components/ui/button'
@@ -12,7 +12,7 @@ import { Footer } from '@/components/layout/footer'
 import { useT } from '@/i18n/use-t'
 import { isAiCreationEnabled } from '@/lib/ai-creation'
 import { clearAppReturnTarget } from '@/lib/app-return-target'
-import { APP_HOME_PATH } from '@/lib/app-routes'
+import { APP_HOME_PATH, SPOTIFY_ACCESS_PATH } from '@/lib/app-routes'
 import type { AppCapabilities } from '@/lib/capabilities'
 import { buildDefaultPlaylistName } from '@/lib/playlist-name'
 import { formatSongCount } from '@/lib/song-count'
@@ -99,7 +99,7 @@ export function LandingPage() {
             )}
           </p>
           <div
-            className="animate-fade-up flex flex-wrap items-center gap-3 pt-2"
+            className="animate-fade-up pt-2"
             style={{ animationDelay: '200ms' }}
           >
             <LandingActions capabilities={capabilities} />
@@ -139,7 +139,7 @@ function LandingActions({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <Link
           to={APP_HOME_PATH}
@@ -150,12 +150,17 @@ function LandingActions({
         </Link>
         <ConnectSpotifyButton size="lg" variant="outline" />
       </div>
-      <p className="flex items-start gap-1.5 text-sm text-cream-400">
-        <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-        {t('landing.trust')}
-      </p>
-      <p className="max-w-md text-sm text-cream-500">
-        {t('landing.spotifyAccess')}
+      <p className="text-sm leading-relaxed text-cream-400">
+        {t('landing.accessNote')}{' '}
+        <Link
+          to={SPOTIFY_ACCESS_PATH}
+          className={cn(
+            'whitespace-nowrap rounded-control font-medium text-accent-fg underline decoration-accent-fg/60 underline-offset-4 hover:text-amber-300',
+            focusRing,
+          )}
+        >
+          {t('landing.accessMore')}
+        </Link>
       </p>
     </div>
   )

@@ -1,9 +1,9 @@
 export const en = {
   'brand.tagline': 'Blend the music you love into new playlists.',
   'brand.description':
-    'Mix artists or genres, or start from a single artist or song. Save the playlist to Spotify, or continue without connecting Spotify.',
+    'Choose artists, genres, or a song to build your playlist.',
   'brand.descriptionWithAi':
-    'Mix artists or genres, start from one artist or song, or describe what you want. Save the playlist to Spotify, or continue without connecting Spotify.',
+    'Choose artists, genres, or a song, or describe what you want to hear.',
   'nav.logOut': 'Log out',
   'nav.deleteAccount': 'Delete account',
   'account.delete.title': 'Delete your Blendify account?',
@@ -368,8 +368,9 @@ export const en = {
   'library.kindMix': 'Mix',
   'library.kindDiscover': 'Discover',
   'library.titleMany': '{first}, {second} + {count} more',
-  'landing.trust':
-    'Connecting Spotify is optional. Playlists you save are created as private in your Spotify account.',
+  'landing.accessNote':
+    'Only enabled Spotify accounts can connect to Blendify.',
+  'landing.accessMore': 'Learn more',
   'stats.useCountOne': '1 playlist',
   'stats.useCountMany': '{count} playlists',
   'stats.overview': 'Overview',
@@ -393,8 +394,6 @@ export const en = {
     'Dismiss',
   'authError.moreInfo':
     'More information',
-  'landing.spotifyAccess':
-    'Connecting your Spotify account and saving playlists to Spotify is available to accounts enabled for this integration. You can use Blendify without connecting Spotify.',
   'spotifyAccess.title':
     'Spotify access',
   'spotifyAccess.intro':
@@ -415,6 +414,8 @@ export const en = {
     'With Spotify connected',
   'spotifyAccess.withBody':
     'Saving playlists to your Spotify account, using your Library and seeing your stats require an account enabled for this integration.',
+  'spotifyAccess.privatePlaylists':
+    'New playlists Blendify saves to Spotify are created as private.',
   'spotifyAccess.otherAccount':
     'If you have another Spotify account that is already enabled for Blendify, sign in to that account on Spotify and then connect it from Blendify. Connecting again while this account stays signed in on Spotify repeats the same attempt.',
   'spotifyAccess.continue':

@@ -15,7 +15,8 @@ const SPOTIFY_ACCESS_KEYS = [
   'authError.failed',
   'authError.expired',
   'authError.moreInfo',
-  'landing.spotifyAccess',
+  'landing.accessNote',
+  'landing.accessMore',
   'spotifyAccess.title',
   'spotifyAccess.intro',
   'spotifyAccess.whyTitle',
@@ -26,6 +27,7 @@ const SPOTIFY_ACCESS_KEYS = [
   'spotifyAccess.withoutBody',
   'spotifyAccess.withTitle',
   'spotifyAccess.withBody',
+  'spotifyAccess.privatePlaylists',
   'spotifyAccess.otherAccount',
   'spotifyAccess.continue',
 ] as const satisfies ReadonlyArray<keyof typeof en>

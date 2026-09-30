@@ -59,6 +59,9 @@ export function SpotifyAccessPage() {
             </h3>
             <p className="leading-relaxed text-cream-200">{t('spotifyAccess.withBody')}</p>
             <p className="leading-relaxed text-cream-200">
+              {t('spotifyAccess.privatePlaylists')}
+            </p>
+            <p className="leading-relaxed text-cream-200">
               {t('spotifyAccess.otherAccount')}
             </p>
           </section>

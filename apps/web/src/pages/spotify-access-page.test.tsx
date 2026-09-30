@@ -54,6 +54,7 @@ describe('Spotify access page', () => {
     expect(screen.getByText(/development mode/i)).toBeVisible()
     expect(screen.getByText(/same account does not remove/i)).toBeVisible()
     expect(screen.getByText(/Song details still come from Spotify/)).toBeVisible()
+    expect(screen.getByText(/created as private/)).toBeVisible()
     expect(screen.getByText(/Soundiiz/)).toBeVisible()
     expect(screen.getByText(/Library/)).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Connect Spotify' })).toBeNull()
@@ -100,6 +101,7 @@ describe('Spotify access page', () => {
     expect(
       screen.getByRole('link', { name: 'Continuar en Blendify' }),
     ).toHaveAttribute('href', '/app')
+    expect(screen.getByText(/se crean como privadas/)).toBeVisible()
     expect(document.body).not.toHaveTextContent(/podés|probá|tenés|empezalo/i)
     await waitFor(() =>
       expect(document.title).toBe('Acceso a Spotify · Blendify'),
@@ -121,6 +123,7 @@ describe('Spotify access page', () => {
     expect(
       screen.getByRole('link', { name: 'Continuar no Blendify' }),
     ).toHaveAttribute('href', '/app')
+    expect(screen.getByText(/criadas como privadas/)).toBeVisible()
     await waitFor(() =>
       expect(document.title).toBe('Acesso ao Spotify · Blendify'),
     )
