@@ -1,7 +1,8 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import App from '@/App'
+import { api } from '@/lib/api'
 import {
   jsonResponse,
   renderWithProviders,
@@ -42,48 +43,80 @@ afterEach(() => {
 })
 
 describe('Spotify connection failures on the landing page', () => {
-  it('explains an account that is not authorized and keeps Guest Mode', async () => {
+  it('explains a restricted account without inviting the same attempt again', async () => {
     renderApp('/?auth_error=access_restricted')
     await landing()
 
     const notice = await screen.findByRole('status')
-    expect(notice).toHaveTextContent(
-      /isn’t authorized for Spotify-connected features/i,
-    )
-    expect(notice).toHaveTextContent(/Guest Mode/i)
+    expect(notice).toHaveTextContent(/isn’t enabled to connect with Blendify/i)
+    expect(notice).toHaveTextContent(/without connecting Spotify/i)
+    expect(within(notice).queryByRole('button', { name: 'Connect Spotify' })).toBeNull()
     expect(
-      screen.getByRole('link', { name: /Continue without Spotify/i }),
-    ).toBeVisible()
+      within(notice).getByRole('link', { name: 'More information' }),
+    ).toHaveAttribute('href', '/spotify-access')
     expect(
-      screen.getAllByRole('button', { name: 'Connect Spotify' }).length,
-    ).toBeGreaterThan(0)
+      screen.getByRole('link', { name: 'Continue without Spotify' }),
+    ).toHaveAttribute('href', '/app')
   })
 
-  it('uses lighter copy when the user cancelled the authorization', async () => {
-    renderApp('/?auth_error=access_denied')
+  it.each([
+    ['access_denied', /didn’t finish connecting your Spotify account/i],
+    ['connection_failed', /couldn’t connect to Spotify/i],
+    ['invalid_state', /no longer valid/i],
+  ] as const)('offers a new connection attempt for %s', async (error, message) => {
+    renderApp(`/?auth_error=${error}`)
     await landing()
 
     const notice = await screen.findByRole('status')
-    expect(notice).toHaveTextContent(/didn’t finish/i)
-    expect(notice).not.toHaveTextContent(/authorized for Spotify-connected/i)
+    expect(notice).toHaveTextContent(message)
+    expect(
+      within(notice).getByRole('button', { name: 'Connect Spotify' }),
+    ).toBeVisible()
+    expect(within(notice).queryByRole('link', { name: 'More information' })).toBeNull()
   })
 
-  it('offers a retry for a provider failure', async () => {
-    renderApp('/?auth_error=connection_failed')
+  it('opens the explanation without starting Spotify login', async () => {
+    const user = userEvent.setup()
+    const loginUrl = vi.spyOn(api, 'loginUrl')
+    renderApp('/?auth_error=access_restricted')
     await landing()
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      /couldn’t connect to Spotify/i,
+    await user.click(
+      within(await screen.findByRole('status')).getByRole('link', {
+        name: 'More information',
+      }),
     )
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Spotify access' }),
+    ).toBeVisible()
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/spotify-access$/)
+    expect(loginUrl).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Connect Spotify' })).toBeNull()
   })
 
   it('falls back to the generic message for an unknown outcome', async () => {
     renderApp('/?auth_error=something-else')
     await landing()
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      /couldn’t connect to Spotify/i,
-    )
+    const notice = await screen.findByRole('status')
+    expect(notice).toHaveTextContent(/couldn’t connect to Spotify/i)
+    expect(
+      within(notice).getByRole('button', { name: 'Connect Spotify' }),
+    ).toBeVisible()
+  })
+
+  it('moves from the explanation to dismiss with the keyboard', async () => {
+    const user = userEvent.setup()
+    renderApp('/?auth_error=access_restricted')
+    await landing()
+
+    const notice = await screen.findByRole('status')
+    const details = within(notice).getByRole('link', { name: 'More information' })
+    details.focus()
+    await user.tab()
+
+    expect(within(notice).getByRole('button', { name: 'Dismiss' })).toHaveFocus()
   })
 
   it('removes the outcome from the URL so a reload is clean', async () => {
@@ -122,7 +155,7 @@ describe('Spotify connection failures on the landing page', () => {
     renderApp('/?auth_error=access_restricted')
     await landing()
     expect(await screen.findByRole('status')).toHaveTextContent(
-      /isn’t authorized for Spotify-connected features/i,
+      /isn’t enabled to connect with Blendify/i,
     )
   })
 })

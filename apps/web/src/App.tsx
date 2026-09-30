@@ -6,7 +6,7 @@ import { AppShell } from '@/components/layout/app-shell'
 import { SpotifyOnlyRoute } from '@/components/layout/spotify-only-route'
 import { Spinner } from '@/components/ui/spinner'
 import { isAiCreationEnabled } from '@/lib/ai-creation'
-import { APP_HOME_PATH } from '@/lib/app-routes'
+import { APP_HOME_PATH, SPOTIFY_ACCESS_PATH } from '@/lib/app-routes'
 
 const AppHomePage = lazy(() =>
   import('@/pages/app-home-page').then((module) => ({
@@ -43,6 +43,11 @@ const PrivacyPage = lazy(() =>
     default: module.PrivacyPage,
   })),
 )
+const SpotifyAccessPage = lazy(() =>
+  import('@/pages/spotify-access-page').then((module) => ({
+    default: module.SpotifyAccessPage,
+  })),
+)
 const StatsPage = lazy(() =>
   import('@/pages/stats-page').then((module) => ({
     default: module.StatsPage,
@@ -57,6 +62,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path={SPOTIFY_ACCESS_PATH} element={<SpotifyAccessPage />} />
         <Route path={APP_HOME_PATH} element={<AppShell />}>
           <Route index element={<AppHomePage />} />
           <Route path="mix" element={<MixPlaylistPage />} />

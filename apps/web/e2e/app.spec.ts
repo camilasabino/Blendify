@@ -74,20 +74,74 @@ test.describe('Spotify connection failure feedback', () => {
     await mockGuestSession(page)
   })
 
-  test('explains an unauthorized account and keeps Guest Mode', async ({
+  test('explains a restricted account and continues without Spotify', async ({
     page,
   }) => {
+    const spotifyLogin: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/api/auth/spotify')) {
+        spotifyLogin.push(request.url())
+      }
+    })
     await page.goto('/?auth_error=access_restricted')
 
     const notice = page.getByRole('status')
-    await expect(notice).toContainText(
-      "isn’t authorized for Spotify-connected features",
+    await expect(notice).toContainText('isn’t enabled to connect with Blendify')
+    await expect(notice.getByRole('button', { name: 'Connect Spotify' })).toHaveCount(
+      0,
     )
     await expect(
-      page.getByRole('link', { name: 'Continue without Spotify' }),
+      notice.getByRole('link', { name: 'More information' }),
     ).toBeVisible()
-
-    // The outcome is consumed once so a reload of the landing page stays clean.
+    await expect(
+      page.getByRole('link', { name: 'Continue without Spotify' }),
+    ).toHaveAttribute('href', '/app')
     await expect(page).toHaveURL(/\/$/)
+
+    await notice.getByRole('link', { name: 'More information' }).click()
+
+    await expect(page).toHaveURL(/\/spotify-access$/)
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Spotify access' }),
+    ).toBeVisible()
+    await expect(page).toHaveTitle('Spotify access · Blendify')
+    await expect(page.getByRole('button', { name: 'Connect Spotify' })).toHaveCount(
+      0,
+    )
+    expect(spotifyLogin).toEqual([])
+
+    await page.getByRole('link', { name: 'Continue in Blendify' }).click()
+
+    await expect(page).toHaveURL(/\/app$/)
+    await expect(
+      page.getByRole('heading', { name: 'What do you want to create?' }),
+    ).toBeVisible()
+  })
+
+  test('keeps the restricted explanation usable on a phone', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/?auth_error=access_restricted')
+
+    const notice = page.getByRole('status')
+    const details = notice.getByRole('link', { name: 'More information' })
+    await expect(details).toBeVisible()
+    await expect(details).toBeInViewport()
+    await expect(page).toHaveURL(/\/$/)
+    await notice.getByRole('button', { name: 'Dismiss' }).click()
+    await expect(notice).toHaveCount(0)
+
+    await page.reload()
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByRole('status')).toHaveCount(0)
+
+    await page.goto('/spotify-access')
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Spotify access' }),
+    ).toBeInViewport()
+    const continueInBlendify = page.getByRole('link', {
+      name: 'Continue in Blendify',
+    })
+    await continueInBlendify.scrollIntoViewIfNeeded()
+    await expect(continueInBlendify).toBeInViewport()
   })
 })

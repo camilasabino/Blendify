@@ -376,17 +376,43 @@ export const en = {
   'spotifyRequired.stats':
     'Connect Spotify to see your stats.',
   'authError.restricted':
-    'This Spotify account isn’t authorized for Spotify-connected features in Blendify. Spotify-connected access is limited to authorized accounts, and you can keep using Blendify in Guest Mode.',
+    'This Spotify account isn’t enabled to connect with Blendify. Spotify currently limits which accounts can connect to this integration. You can keep using Blendify without connecting Spotify.',
   'authError.denied':
-    'You didn’t finish connecting Spotify. You can try again or keep using Blendify in Guest Mode.',
+    'You didn’t finish connecting your Spotify account. You can try again or keep using Blendify without Spotify.',
   'authError.failed':
-    'We couldn’t connect to Spotify. Try again in a moment — Guest Mode keeps working in the meantime.',
+    'We couldn’t connect to Spotify. Try again in a moment. You can keep using Blendify without Spotify in the meantime.',
   'authError.expired':
-    'That connection attempt is no longer valid. Start it again from Connect Spotify.',
+    'That connection attempt is no longer valid. Start a new one from Connect Spotify.',
   'authError.dismiss':
     'Dismiss',
+  'authError.moreInfo':
+    'More information',
   'landing.spotifyAccess':
-    'Spotify-connected features are available to authorized accounts. Guest Mode is available to everyone.',
+    'Connecting your Spotify account and saving playlists to Spotify is available to accounts enabled for this integration. You can use Blendify without connecting Spotify.',
+  'spotifyAccess.title':
+    'Spotify access',
+  'spotifyAccess.intro':
+    'This Spotify account isn’t enabled to connect with Blendify. The limit comes from Spotify and applies to this account.',
+  'spotifyAccess.whyTitle':
+    'Why this happens',
+  'spotifyAccess.whyBody':
+    'Blendify currently uses Spotify Development Mode. In that mode, Spotify only lets accounts that have been enabled for this app connect.',
+  'spotifyAccess.retry':
+    'Trying again with the same account does not remove that restriction.',
+  'spotifyAccess.optionsTitle':
+    'What you can do',
+  'spotifyAccess.withoutTitle':
+    'Without connecting Spotify',
+  'spotifyAccess.withoutBody':
+    'You can create playlists in Blendify. They stay in this browser until you leave the page or refresh it, and you can prepare a transfer with Soundiiz. Song details still come from Spotify.',
+  'spotifyAccess.withTitle':
+    'With Spotify connected',
+  'spotifyAccess.withBody':
+    'Saving playlists to your Spotify account, using your Library and seeing your stats require an account enabled for this integration.',
+  'spotifyAccess.otherAccount':
+    'If you have another Spotify account that is already enabled for Blendify, sign in to that account on Spotify and then connect it from Blendify. Connecting again while this account stays signed in on Spotify repeats the same attempt.',
+  'spotifyAccess.continue':
+    'Continue in Blendify',
   'spotifyRequired.dismiss':
     'Dismiss',
   'common.opensNewTab':

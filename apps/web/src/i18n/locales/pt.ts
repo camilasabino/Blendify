@@ -383,17 +383,43 @@ export const pt: Record<MessageKey, string> = {
   'spotifyRequired.stats':
     'Conecte o Spotify para ver suas estatísticas.',
   'authError.restricted':
-    'Esta conta do Spotify não está autorizada a usar os recursos conectados do Blendify. O acesso conectado é limitado a contas autorizadas, e você pode continuar usando o Blendify no modo convidado.',
+    'Esta conta do Spotify não está habilitada para se conectar ao Blendify. Por uma limitação do Spotify, nesta etapa só podem se conectar contas habilitadas para a integração. Você pode continuar usando o Blendify sem conectar o Spotify.',
   'authError.denied':
-    'Você não concluiu a conexão com o Spotify. Pode tentar de novo ou continuar usando o Blendify no modo convidado.',
+    'Você não concluiu a conexão da sua conta do Spotify. Pode tentar de novo ou continuar usando o Blendify sem o Spotify.',
   'authError.failed':
-    'Não conseguimos conectar ao Spotify. Tente de novo em instantes; enquanto isso, o modo convidado continua funcionando.',
+    'Não foi possível conectar ao Spotify. Tente de novo em instantes. Enquanto isso, você pode continuar usando o Blendify sem o Spotify.',
   'authError.expired':
-    'Essa tentativa de conexão não é mais válida. Comece de novo em Conectar Spotify.',
+    'Essa tentativa de conexão não é mais válida. Inicie uma nova em Conectar Spotify.',
   'authError.dismiss':
     'Fechar',
+  'authError.moreInfo':
+    'Mais informações',
   'landing.spotifyAccess':
-    'Os recursos conectados ao Spotify estão disponíveis para contas autorizadas. O modo convidado está disponível para todos.',
+    'Conectar sua conta do Spotify e salvar playlists no Spotify está disponível para contas habilitadas para a integração. Você pode usar o Blendify sem conectar o Spotify.',
+  'spotifyAccess.title':
+    'Acesso ao Spotify',
+  'spotifyAccess.intro':
+    'Esta conta do Spotify não está habilitada para se conectar ao Blendify. Esse limite vem do Spotify e vale para esta conta.',
+  'spotifyAccess.whyTitle':
+    'Por que isso acontece',
+  'spotifyAccess.whyBody':
+    'O Blendify usa atualmente o Development Mode do Spotify. Nesse modo, o Spotify só permite que contas habilitadas para este app se conectem.',
+  'spotifyAccess.retry':
+    'Tentar de novo com a mesma conta não remove essa restrição.',
+  'spotifyAccess.optionsTitle':
+    'O que você pode fazer',
+  'spotifyAccess.withoutTitle':
+    'Sem conectar o Spotify',
+  'spotifyAccess.withoutBody':
+    'Você pode criar playlists no Blendify. Elas ficam neste navegador até você sair da página ou atualizá-la, e você pode preparar uma transferência com o Soundiiz. Os dados das músicas ainda vêm do Spotify.',
+  'spotifyAccess.withTitle':
+    'Com o Spotify conectado',
+  'spotifyAccess.withBody':
+    'Salvar playlists na sua conta do Spotify, usar a Biblioteca e ver suas estatísticas exige uma conta habilitada para esta integração.',
+  'spotifyAccess.otherAccount':
+    'Se você tiver outra conta do Spotify já habilitada para o Blendify, entre nela no Spotify e depois conecte-a a partir do Blendify. Conectar de novo enquanto esta conta continua com a sessão aberta no Spotify repete a mesma tentativa.',
+  'spotifyAccess.continue':
+    'Continuar no Blendify',
   'spotifyRequired.dismiss':
     'Fechar aviso',
   'common.opensNewTab':

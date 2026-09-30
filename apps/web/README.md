@@ -18,6 +18,7 @@ Spotify Mode.
 |---|---|---|
 | `/` | Landing | Everyone; a valid Spotify session is sent to `/app` |
 | `/privacy` | Privacy policy | Everyone |
+| `/spotify-access` | Why a Spotify account cannot connect | Everyone; opening it does not start Spotify login |
 | `/app` | App Home (Mix, Discover, Create with AI) | Guest and Spotify |
 | `/app/mix`, `/app/discover` | Mix and Discover | Guest and Spotify |
 | `/app/ai` | Create with AI | Guest and Spotify, behind the feature flag below |

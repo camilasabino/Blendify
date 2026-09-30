@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import App from '@/App'
@@ -119,9 +119,14 @@ describe('OAuth feedback on the landing page', () => {
     stubApi({})
     renderApp('/?auth_error=access_restricted')
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      /isn’t authorized for Spotify-connected features/i,
-    )
+    const notice = await screen.findByRole('status')
+    expect(notice).toHaveTextContent(/isn’t enabled to connect with Blendify/i)
+    expect(
+      within(notice).queryByRole('button', { name: 'Connect Spotify' }),
+    ).toBeNull()
+    expect(
+      within(notice).getByRole('link', { name: 'More information' }),
+    ).toHaveAttribute('href', '/spotify-access')
     await waitFor(() => expect(location()).toHaveTextContent(/^\/$/))
     expect(
       screen.getByRole('link', { name: 'Go to Blendify' }),
