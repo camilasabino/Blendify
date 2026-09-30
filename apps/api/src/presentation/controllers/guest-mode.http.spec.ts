@@ -699,6 +699,74 @@ describe('Guest Mode HTTP boundary', () => {
     });
 
     it.each([
+      { ...discoverArtistBody, targetTrackCount: 23 },
+      { ...discoverTrackBody, targetTrackCount: 23 },
+    ])(
+      'keeps an intermediate $kind target through the real request pipe',
+      async (body) => {
+        const response = await request(httpServer())
+          .post('/api/generate/discover')
+          .set('Origin', FRONTEND)
+          .send(body)
+          .expect(201);
+
+        const playlist = GeneratedPlaylistSchema.parse(response.body);
+        expect(playlist.generation).toMatchObject({
+          kind: body.kind,
+          targetTrackCount: 23,
+        });
+        expect(playlist.tracks.length).toBeGreaterThan(0);
+        expect(playlist.tracks.length).toBeLessThanOrEqual(23);
+        expectNoSpotifySideEffects();
+      },
+    );
+
+    it.each([
+      { ...discoverArtistBody, targetTrackCount: 1 },
+      { ...discoverTrackBody, targetTrackCount: 1 },
+    ])(
+      'keeps a one-track $kind target through the real request pipe',
+      async (body) => {
+        const response = await request(httpServer())
+          .post('/api/generate/discover')
+          .set('Origin', FRONTEND)
+          .send(body)
+          .expect(201);
+
+        const playlist = GeneratedPlaylistSchema.parse(response.body);
+        expect(playlist.generation).toMatchObject({
+          kind: body.kind,
+          targetTrackCount: 1,
+        });
+        expect(playlist.tracks).toHaveLength(1);
+        expectNoSpotifySideEffects();
+      },
+    );
+
+    it('rejects a discover target of 0', async () => {
+      const response = await request(httpServer())
+        .post('/api/generate/discover')
+        .set('Origin', FRONTEND)
+        .send({ ...discoverArtistBody, targetTrackCount: 0 })
+        .expect(400);
+
+      expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+      expect(world.quota.assertAvailable).not.toHaveBeenCalled();
+    });
+
+    it('rejects a string discover target instead of coercing it', async () => {
+      const response = await request(httpServer())
+        .post('/api/generate/discover')
+        .set('Origin', FRONTEND)
+        .send({ ...discoverArtistBody, targetTrackCount: '23' })
+        .expect(400);
+
+      expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+      expect(world.quota.assertAvailable).not.toHaveBeenCalled();
+      expect(world.discovery.getSimilarArtists).not.toHaveBeenCalled();
+    });
+
+    it.each([
       { path: '/api/generate/mix', body: artistMixBody, monotonic: false },
       {
         path: '/api/generate/discover',

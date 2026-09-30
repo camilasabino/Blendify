@@ -34,6 +34,7 @@ import {
   DISCOVER_FALLBACK_TOP_TRACKS_MIN,
   DISCOVER_MIN_SIMILAR,
   DISCOVER_MIN_SIMILAR_TRACKS,
+  minimumResolvedDiscoverTracks,
   DISCOVER_SIMILAR_FETCH,
   DISCOVER_SIMILAR_TRACK_FETCH,
   buildDiscoverPlaylistDescription,
@@ -241,7 +242,9 @@ export class GenerateDiscoverPlaylistUseCase {
       );
     }
 
-    if (similarRaw.length < DISCOVER_MIN_SIMILAR_TRACKS) {
+    if (
+      similarRaw.length < minimumResolvedDiscoverTracks(input.targetTrackCount)
+    ) {
       throw new BusinessRuleError(
         'Not enough related tracks to build a Discover mix. Try another song.',
         'DISCOVER_NOT_ENOUGH_SIMILAR',
@@ -265,7 +268,10 @@ export class GenerateDiscoverPlaylistUseCase {
       },
     );
 
-    if (resolvedSimilar.length < DISCOVER_MIN_SIMILAR_TRACKS) {
+    if (
+      resolvedSimilar.length <
+      minimumResolvedDiscoverTracks(input.targetTrackCount)
+    ) {
       throw new BusinessRuleError(
         'Could not match enough related tracks on Spotify. Try another song.',
         'DISCOVER_RESOLVE_FAILED',

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useForm, Controller, type Control } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
@@ -39,8 +39,8 @@ import {
 } from '@/components/playlist/generation-options'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/feedback'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RangeSlider } from '@/components/ui/range-slider'
 import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
 import { FormSection } from '@/components/ui/form-section'
@@ -72,9 +72,41 @@ import {
 } from '@/lib/playlist-generation'
 import { useGenerationSettingsCollapse } from '@/hooks/use-generation-settings-collapse'
 import { usePlaylistRun } from '@/hooks/use-playlist-run'
+import { formatSongCount } from '@/lib/song-count'
 
 const DEFAULT_TRACKS_PER_ARTIST = 10
 const DEFAULT_TRACKS_PER_GENRE = 25
+
+function clampedTrackCount(
+  current: number,
+  max: number,
+  fallback: number,
+): number | null {
+  if (Number.isFinite(current) && current >= 1 && current <= max) {
+    return null
+  }
+  const base = Number.isFinite(current) ? current : fallback
+  return Math.min(max, Math.max(1, Math.round(base)))
+}
+
+function perSourceLabel(
+  mode: MixSeedMode,
+  count: number,
+  t: ReturnType<typeof useT>,
+): string {
+  if (count === 1) {
+    return t(mode === 'artists' ? 'create.perArtistOne' : 'create.perGenreOne')
+  }
+  return t(mode === 'artists' ? 'create.perArtist' : 'create.perGenre', {
+    songs: count,
+  })
+}
+
+function estimateLabel(count: number, t: ReturnType<typeof useT>): string {
+  return count === 1
+    ? t('create.estimateSongsOne')
+    : t('create.estimateSongs', { count })
+}
 
 const DEFAULT_VALUES: FormValues = {
   tracksPerArtist: DEFAULT_TRACKS_PER_ARTIST,
@@ -299,6 +331,8 @@ export function MixPlaylistForm() {
   const [resolveError, setResolveError] = useState<string | null>(null)
   const [preparingMode, setPreparingMode] = useState<AppMode>(capabilities.mode)
   const [isPreparing, setIsPreparing] = useState(false)
+  const [artistAdjustment, setArtistAdjustment] = useState<string | null>(null)
+  const [genreAdjustment, setGenreAdjustment] = useState<string | null>(null)
   const copiedLink = useCopiedLink()
   const formRef = useRef<HTMLFormElement>(null)
   const artistSearchId = useId()
@@ -342,27 +376,41 @@ export function MixPlaylistForm() {
     })
   }, [mode, artists, genres])
 
-  useEffect(() => {
-    const current = form.getValues('tracksPerArtist')
-    if (!Number.isFinite(current) || current > artistTrackMax || current < 1) {
-      form.setValue(
-        'tracksPerArtist',
-        Math.min(artistTrackMax, Math.max(1, Number.isFinite(current) ? current : DEFAULT_TRACKS_PER_ARTIST)),
-        { shouldValidate: true, shouldDirty: true },
-      )
+  useLayoutEffect(() => {
+    const next = clampedTrackCount(
+      form.getValues('tracksPerArtist'),
+      artistTrackMax,
+      DEFAULT_TRACKS_PER_ARTIST,
+    )
+    if (next === null) {
+      return
     }
-  }, [artistTrackMax, form])
+    form.setValue('tracksPerArtist', next, {
+      shouldValidate: true,
+      shouldDirty: true,
+    })
+    setArtistAdjustment(
+      t('create.tracksAdjusted', { count: formatSongCount(next, t) }),
+    )
+  }, [artistTrackMax, form, t])
 
-  useEffect(() => {
-    const current = form.getValues('tracksPerGenre')
-    if (!Number.isFinite(current) || current > genreTrackMax || current < 1) {
-      form.setValue(
-        'tracksPerGenre',
-        Math.min(genreTrackMax, Math.max(1, Number.isFinite(current) ? current : DEFAULT_TRACKS_PER_GENRE)),
-        { shouldValidate: true, shouldDirty: true },
-      )
+  useLayoutEffect(() => {
+    const next = clampedTrackCount(
+      form.getValues('tracksPerGenre'),
+      genreTrackMax,
+      DEFAULT_TRACKS_PER_GENRE,
+    )
+    if (next === null) {
+      return
     }
-  }, [genreTrackMax, form])
+    form.setValue('tracksPerGenre', next, {
+      shouldValidate: true,
+      shouldDirty: true,
+    })
+    setGenreAdjustment(
+      t('create.tracksAdjusted', { count: formatSongCount(next, t) }),
+    )
+  }, [genreTrackMax, form, t])
 
   const sourceCount = mode === 'artists' ? artists.length : genres.length
   const tracksPerSource = mode === 'artists' ? tracksPerArtist : tracksPerGenre
@@ -565,6 +613,8 @@ export function MixPlaylistForm() {
     playlistRun.dismiss()
     copiedLink.reset()
     form.reset(DEFAULT_VALUES)
+    setArtistAdjustment(null)
+    setGenreAdjustment(null)
     resolveMutation.reset()
     focusSettings()
   }
@@ -595,10 +645,8 @@ export function MixPlaylistForm() {
   const estimateSummary =
     sourceCount > 0
       ? [
-          t('create.estimateSongs', { count: estimate.total }),
-          mode === 'artists'
-            ? t('create.perArtist', { songs: tracksPerArtist })
-            : t('create.perGenre', { songs: tracksPerGenre }),
+          estimateLabel(estimate.total, t),
+          perSourceLabel(mode, tracksPerSource, t),
         ].join(' · ')
       : null
   const requestedTrackCount = result ? outcomeRequestedTrackCount(result) : 0
@@ -729,20 +777,24 @@ export function MixPlaylistForm() {
                     id="tracksPerArtist"
                     label={t('create.tracksPerArtist')}
                     max={artistTrackMax}
-                    fallback={DEFAULT_TRACKS_PER_ARTIST}
+                    valueText={formatSongCount(tracksPerArtist, t)}
                     control={form.control}
                     name="tracksPerArtist"
                     hint={t('create.tracksMaxHint', { max: artistTrackMax })}
+                    adjustment={artistAdjustment}
+                    onAdjust={() => setArtistAdjustment(null)}
                   />
                 ) : (
                   <TracksPerSeedField
                     id="tracksPerGenre"
                     label={t('create.tracksPerGenre')}
                     max={genreTrackMax}
-                    fallback={DEFAULT_TRACKS_PER_GENRE}
+                    valueText={formatSongCount(tracksPerGenre, t)}
                     control={form.control}
                     name="tracksPerGenre"
                     hint={t('create.tracksMaxHint', { max: genreTrackMax })}
+                    adjustment={genreAdjustment}
+                    onAdjust={() => setGenreAdjustment(null)}
                   />
                 )}
                 {capabilities.canPublishToSpotify ? (
@@ -827,54 +879,43 @@ function TracksPerSeedField({
   label,
   hint,
   max,
-  fallback,
+  valueText,
   control,
   name,
+  adjustment,
+  onAdjust,
 }: Readonly<{
   id: string
   label: string
   hint: string
   max: number
-  fallback: number
+  valueText: string
   control: Control<FormValues>
   name: 'tracksPerArtist' | 'tracksPerGenre'
+  adjustment: string | null
+  onAdjust: () => void
 }>) {
-  const hintId = `${id}-hint`
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-4">
-      <div className="min-w-0">
-        <Label htmlFor={id}>{label}</Label>
-        <p id={hintId} className="mt-1 text-xs text-cream-400">
-          {hint}
-        </p>
-      </div>
-      <Controller
-        control={control}
-        name={name}
-        render={({ field }) => (
-          <Input
-            id={id}
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={max}
-            aria-describedby={hintId}
-            className="w-24 text-center tabular-nums"
-            value={Number.isFinite(field.value) ? field.value : ''}
-            onChange={(e) => {
-              const raw = e.target.valueAsNumber
-              field.onChange(Number.isFinite(raw) ? raw : Number.NaN)
-            }}
-            onBlur={() => {
-              const raw = field.value
-              const next = Number.isFinite(raw)
-                ? Math.min(max, Math.max(1, Math.round(raw)))
-                : Math.min(fallback, max)
-              field.onChange(next)
-            }}
-          />
-        )}
-      />
-    </div>
+    <Controller
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <RangeSlider
+          id={id}
+          label={label}
+          hint={hint}
+          min={1}
+          max={max}
+          value={field.value}
+          valueText={valueText}
+          adjustment={adjustment}
+          onChange={(next) => {
+            onAdjust()
+            field.onChange(next)
+          }}
+          onBlur={field.onBlur}
+        />
+      )}
+    />
   )
 }

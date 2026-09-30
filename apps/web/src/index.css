@@ -181,8 +181,78 @@
   label[for],
   input[type='checkbox']:not(:disabled),
   input[type='radio']:not(:disabled),
+  input[type='range']:not(:disabled),
   select:not(:disabled) {
     cursor: pointer;
+  }
+
+  input.track-count-slider {
+    --track-fill: 0%;
+    --slider-thumb: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'><rect x='8.5' y='5.5' width='11' height='17' rx='3.5' fill='%23100e0c' stroke='%23e8a838' stroke-opacity='0.6' stroke-width='1'/></svg>");
+    appearance: none;
+    height: 1.75rem;
+    margin: 0;
+    overflow: visible;
+    background: transparent;
+    border-radius: 9999px;
+  }
+
+  input.track-count-slider:hover:not(:disabled) {
+    --slider-thumb: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'><rect x='8.5' y='5.5' width='11' height='17' rx='3.5' fill='%23181512' stroke='%23e8a838' stroke-width='1'/></svg>");
+  }
+
+  input.track-count-slider:active:not(:disabled) {
+    --slider-thumb: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'><rect x='8.5' y='5.5' width='11' height='17' rx='3.5' fill='%23181512' stroke='%23f0b84a' stroke-width='1'/></svg>");
+  }
+
+  input.track-count-slider:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  input.track-count-slider::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--color-accent-line) var(--track-fill),
+      var(--color-charcoal-600) var(--track-fill)
+    );
+  }
+
+  input.track-count-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-top: -12.5px;
+    border: 0;
+    border-radius: 0;
+    background: transparent var(--slider-thumb) center / 1.75rem 1.75rem no-repeat;
+    box-shadow: none;
+  }
+
+  input.track-count-slider::-moz-range-track {
+    height: 3px;
+    border: none;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--color-accent-line) var(--track-fill),
+      var(--color-charcoal-600) var(--track-fill)
+    );
+  }
+
+  input.track-count-slider::-moz-range-progress {
+    background: transparent;
+  }
+
+  input.track-count-slider::-moz-range-thumb {
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent var(--slider-thumb) center / 1.75rem 1.75rem no-repeat;
+    box-shadow: none;
   }
 
   progress.generation-progress {

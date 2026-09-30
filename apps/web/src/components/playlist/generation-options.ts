@@ -16,6 +16,7 @@ import type { MessageKey } from '@/i18n/messages'
 import type { useT } from '@/i18n/use-t'
 import type { AppMode } from '@/lib/capabilities'
 import type { GenerationOutcome } from '@/lib/playlist-generation'
+import { formatSongCount } from '@/lib/song-count'
 
 export type GenerationOption<T extends string> = {
   value: T
@@ -97,7 +98,7 @@ export function buildGenerationSummary(
     seeds,
     popularityOption ? t(popularityOption.labelKey) : null,
     orderOption ? t(orderOption.labelKey) : null,
-    trackCount > 0 ? t('create.summarySongs', { count: trackCount }) : null,
+    trackCount > 0 ? formatSongCount(trackCount, t) : null,
   ].filter((item): item is string => Boolean(item))
 }
 

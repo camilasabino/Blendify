@@ -17,6 +17,12 @@ export function discoverSimilarTargetForTracks(trackTarget: number): number {
   return Math.min(MAX_ARTISTS, Math.max(DISCOVER_MIN_SIMILAR, trackTarget));
 }
 
+export function minimumResolvedDiscoverTracks(
+  targetTrackCount: number,
+): number {
+  return Math.min(DISCOVER_MIN_SIMILAR_TRACKS, targetTrackCount);
+}
+
 /**
  * Per-artist fetch size. May slightly overshoot the total target;
  * callers trim with maxTracks so the playlist hits the chosen size.

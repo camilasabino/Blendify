@@ -1,4 +1,5 @@
 import { PopularityMode } from '@blendify/contracts';
+import { Artist } from '@/domain/artist/artist.entity';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { catalogCandidateBudget } from '@/domain/genre/catalog-window';
 import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
@@ -200,5 +201,253 @@ describe('GenerateDiscoverPlaylistUseCase discover_track familiarity', () => {
       execute(context.useCase, PopularityMode.POPULAR),
     ).rejects.toBeInstanceOf(BusinessRuleError);
     expect(context.resolveTrack).toHaveBeenCalledTimes(BUDGET);
+  });
+});
+
+describe('GenerateDiscoverPlaylistUseCase intermediate targets', () => {
+  const intermediate = {
+    targetTrackCount: 23,
+    popularity: PopularityMode.BALANCED,
+    orderMode: 'random' as const,
+  };
+
+  it('returns exactly the requested track count when the pool can fill it', async () => {
+    const context = setup(knownCandidates(80));
+
+    const playlist = await context.useCase.execute({
+      kind: 'discover_track',
+      trackId: SEED.id.getValue(),
+      track: {
+        id: SEED.id.getValue(),
+        name: SEED.name,
+        artistId: SEED.artistId.getValue(),
+        artistName: SEED.artistName,
+      },
+      ...intermediate,
+    });
+
+    expect(playlist.tracks).toHaveLength(23);
+    expect(playlist.generation).toMatchObject({
+      kind: 'discover_track',
+      targetTrackCount: 23,
+    });
+  });
+
+  it('keeps the requested count when fewer similar tracks resolve', async () => {
+    const context = setup(
+      knownCandidates(8),
+      (name) => Number(name.at(-1)) < 6,
+    );
+
+    const playlist = await context.useCase.execute({
+      kind: 'discover_track',
+      trackId: SEED.id.getValue(),
+      track: {
+        id: SEED.id.getValue(),
+        name: SEED.name,
+        artistId: SEED.artistId.getValue(),
+        artistName: SEED.artistName,
+      },
+      ...intermediate,
+    });
+
+    expect(playlist.tracks).toHaveLength(6);
+    expect(playlist.tracks.length).toBeLessThan(23);
+    expect(playlist.generation).toMatchObject({
+      kind: 'discover_track',
+      targetTrackCount: 23,
+    });
+  });
+
+  it('passes an intermediate artist target through without snapping to a preset', async () => {
+    const artistMix = { execute: jest.fn().mockResolvedValue({ kept: true }) };
+    const catalog = {
+      getArtistsByIds: jest
+        .fn()
+        .mockResolvedValue([
+          Artist.create({ id: ArtistId.create('sade'), name: 'Sade' }),
+        ]),
+      searchArtists: jest.fn((name: string) =>
+        Promise.resolve([
+          Artist.create({
+            id: ArtistId.create(name.toLowerCase().replaceAll(' ', '-')),
+            name,
+          }),
+        ]),
+      ),
+    };
+    const discovery = {
+      isConfigured: () => true,
+      getSimilarArtists: jest
+        .fn()
+        .mockResolvedValue([
+          { name: 'Tracey Thorn' },
+          { name: 'Everything But The Girl' },
+          { name: 'Maxwell' },
+        ]),
+    };
+    const useCase = new GenerateDiscoverPlaylistUseCase(
+      artistMix as unknown as GenerateArtistMixUseCase,
+      discovery as unknown as DiscoveryCatalogPort,
+      { forMarket: () => catalog as unknown as CatalogProviderPort },
+      { assertAvailable: jest.fn() },
+    );
+
+    const result = await useCase.execute({
+      kind: 'discover_artist',
+      artistId: 'sade',
+      artist: { id: 'sade', name: 'Sade' },
+      ...intermediate,
+    });
+
+    expect(result).toEqual({ kept: true });
+    const [mixInput] = artistMix.execute.mock.calls[0] as [
+      {
+        kind: string;
+        maxTracks: number;
+        tracksPerSeed: number;
+        generation: { kind: string; targetTrackCount: number };
+      },
+    ];
+    expect(mixInput).toMatchObject({
+      kind: 'artist_mix',
+      maxTracks: 23,
+      tracksPerSeed: 8,
+      generation: {
+        kind: 'discover_artist',
+        targetTrackCount: 23,
+      },
+    });
+  });
+
+  it.each([1, 10])(
+    'returns exactly %s tracks when the pool can fill that target',
+    async (targetTrackCount) => {
+      const context = setup(knownCandidates(80));
+
+      const playlist = await context.useCase.execute({
+        kind: 'discover_track',
+        trackId: SEED.id.getValue(),
+        track: {
+          id: SEED.id.getValue(),
+          name: SEED.name,
+          artistId: SEED.artistId.getValue(),
+          artistName: SEED.artistName,
+        },
+        targetTrackCount,
+        popularity: PopularityMode.BALANCED,
+        orderMode: 'random',
+      });
+
+      expect(playlist.tracks).toHaveLength(targetTrackCount);
+      expect(playlist.tracks.length).toBeLessThanOrEqual(targetTrackCount);
+      expect(playlist.generation).toMatchObject({
+        kind: 'discover_track',
+        targetTrackCount,
+      });
+    },
+  );
+
+  it('accepts a single resolved neighbor when the target is 1', async () => {
+    const context = setup(knownCandidates(1));
+
+    const playlist = await context.useCase.execute({
+      kind: 'discover_track',
+      trackId: SEED.id.getValue(),
+      track: {
+        id: SEED.id.getValue(),
+        name: SEED.name,
+        artistId: SEED.artistId.getValue(),
+        artistName: SEED.artistName,
+      },
+      targetTrackCount: 1,
+      popularity: PopularityMode.BALANCED,
+      orderMode: 'random',
+    });
+
+    expect(playlist.tracks).toHaveLength(1);
+    expect(playlist.generation).toMatchObject({ targetTrackCount: 1 });
+  });
+
+  it('still rejects a short track pool when the target is above the resolution floor', async () => {
+    const context = setup(knownCandidates(8), () => false);
+
+    await expect(
+      context.useCase.execute({
+        kind: 'discover_track',
+        trackId: SEED.id.getValue(),
+        track: {
+          id: SEED.id.getValue(),
+          name: SEED.name,
+          artistId: SEED.artistId.getValue(),
+          artistName: SEED.artistName,
+        },
+        targetTrackCount: 10,
+        popularity: PopularityMode.BALANCED,
+        orderMode: 'random',
+      }),
+    ).rejects.toBeInstanceOf(BusinessRuleError);
+  });
+
+  it('asks the artist mix for exactly one track when the target is 1', async () => {
+    const artistMix = { execute: jest.fn().mockResolvedValue({ kept: true }) };
+    const catalog = {
+      getArtistsByIds: jest
+        .fn()
+        .mockResolvedValue([
+          Artist.create({ id: ArtistId.create('sade'), name: 'Sade' }),
+        ]),
+      searchArtists: jest.fn((name: string) =>
+        Promise.resolve([
+          Artist.create({
+            id: ArtistId.create(name.toLowerCase().replaceAll(' ', '-')),
+            name,
+          }),
+        ]),
+      ),
+    };
+    const discovery = {
+      isConfigured: () => true,
+      getSimilarArtists: jest
+        .fn()
+        .mockResolvedValue([
+          { name: 'Tracey Thorn' },
+          { name: 'Everything But The Girl' },
+          { name: 'Maxwell' },
+        ]),
+    };
+    const useCase = new GenerateDiscoverPlaylistUseCase(
+      artistMix as unknown as GenerateArtistMixUseCase,
+      discovery as unknown as DiscoveryCatalogPort,
+      { forMarket: () => catalog as unknown as CatalogProviderPort },
+      { assertAvailable: jest.fn() },
+    );
+
+    await useCase.execute({
+      kind: 'discover_artist',
+      artistId: 'sade',
+      artist: { id: 'sade', name: 'Sade' },
+      targetTrackCount: 1,
+      popularity: PopularityMode.BALANCED,
+      orderMode: 'random',
+    });
+
+    const [mixInput] = artistMix.execute.mock.calls[0] as [
+      {
+        artistIds: string[];
+        maxTracks: number;
+        tracksPerSeed: number;
+        generation: { kind: string; targetTrackCount: number };
+      },
+    ];
+    expect(mixInput.artistIds).toHaveLength(2);
+    expect(mixInput).toMatchObject({
+      maxTracks: 1,
+      tracksPerSeed: 1,
+      generation: {
+        kind: 'discover_artist',
+        targetTrackCount: 1,
+      },
+    });
   });
 });

@@ -9,7 +9,10 @@ const t = ((key: string, vars?: Record<string, string | number>) => {
   if (key === 'create.summaryMore') {
     return `+${vars?.count} more`
   }
-  if (key === 'create.summarySongs') {
+  if (key === 'common.songsOne') {
+    return '1 song'
+  }
+  if (key === 'common.songsMany') {
     return `${vars?.count} songs`
   }
   return key
@@ -107,6 +110,20 @@ describe('buildGenerationSummary', () => {
       'create.order.random',
       '30 songs',
     ])
+  })
+
+  it('uses the singular song label when the count is 1', () => {
+    expect(
+      buildGenerationSummary(
+        {
+          seedNames: ['Jazz'],
+          popularity: 'balanced',
+          orderMode: 'random',
+          trackCount: 1,
+        },
+        t,
+      ),
+    ).toContain('1 song')
   })
 
   it('skips empty seeds and zero track counts', () => {

@@ -7,12 +7,17 @@ import {
   CreateMixRequestSchema,
   GenerateDiscoverRequestSchema,
   GenerateMixRequestSchema,
+  DiscoverArtistRequestSchema,
+  DiscoverTrackRequestSchema,
+  DiscoverTrackTargetSchema,
   GeneratedPlaylistSchema,
   GeneratedPlaylistStreamEventSchema,
   GenerationStreamEventSchema,
   DeletePlaylistQuerySchema,
   LibrarySyncResultSchema,
   MAX_ARTISTS,
+  MAX_TRACKS,
+  MIN_DISCOVER_TRACKS,
   PlaylistDetailSchema,
   PlaylistLibraryQuerySchema,
   PlaylistGenerationSchema,
@@ -457,5 +462,114 @@ describe('transfer contracts', () => {
     expect(
       LibrarySyncResultSchema.parse({ checkedCount: 5, removedCount: 2 }),
     ).toEqual({ checkedCount: 5, removedCount: 2 });
+  });
+});
+
+describe('discover track targets', () => {
+  const targets = Array.from(
+    { length: MAX_TRACKS - MIN_DISCOVER_TRACKS + 1 },
+    (_, index) => MIN_DISCOVER_TRACKS + index,
+  );
+  const discoverTrack = {
+    id: 'track-1',
+    name: 'Stay',
+    artistId: 'artist-1',
+    artistName: 'Sade',
+  };
+
+  it.each(targets)('accepts discover target %s for both request kinds', (target) => {
+    expect(DiscoverTrackTargetSchema.parse(target)).toBe(target);
+    expect(
+      DiscoverArtistRequestSchema.parse({
+        kind: 'discover_artist',
+        artistId: 'artist-1',
+        targetTrackCount: target,
+        popularity: 'balanced',
+      }).targetTrackCount,
+    ).toBe(target);
+    expect(
+      DiscoverTrackRequestSchema.parse({
+        kind: 'discover_track',
+        trackId: 'track-1',
+        track: discoverTrack,
+        targetTrackCount: target,
+        popularity: 'balanced',
+      }).targetTrackCount,
+    ).toBe(target);
+  });
+
+  it.each([0, -1, 51, 1.5, '1', null])(
+    'rejects discover target %j',
+    (target) => {
+      expect(DiscoverTrackTargetSchema.safeParse(target).success).toBe(false);
+      expect(
+        DiscoverArtistRequestSchema.safeParse({
+          kind: 'discover_artist',
+          artistId: 'artist-1',
+          targetTrackCount: target,
+          popularity: 'balanced',
+        }).success,
+      ).toBe(false);
+      expect(
+        DiscoverTrackRequestSchema.safeParse({
+          kind: 'discover_track',
+          trackId: 'track-1',
+          track: discoverTrack,
+          targetTrackCount: target,
+          popularity: 'balanced',
+        }).success,
+      ).toBe(false);
+    },
+  );
+
+  it('rejects a discover request that omits the target', () => {
+    expect(
+      DiscoverArtistRequestSchema.safeParse({
+        kind: 'discover_artist',
+        artistId: 'artist-1',
+        popularity: 'balanced',
+      }).success,
+    ).toBe(false);
+    expect(
+      DiscoverTrackRequestSchema.safeParse({
+        kind: 'discover_track',
+        trackId: 'track-1',
+        track: discoverTrack,
+        popularity: 'balanced',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('round-trips preset and intermediate discover recipes', () => {
+    for (const targetTrackCount of [1, 15, 23, 30, 31, 50]) {
+      const artistRecipe = {
+        version: 1 as const,
+        kind: 'discover_artist' as const,
+        targetTrackCount,
+        seed: { id: 'artist-1', name: 'Sade' },
+        popularity: 'balanced' as const,
+        orderMode: 'random' as const,
+      };
+      const trackRecipe = {
+        version: 1 as const,
+        kind: 'discover_track' as const,
+        targetTrackCount,
+        seed: discoverTrack,
+        popularity: 'balanced' as const,
+        orderMode: 'random' as const,
+      };
+      expect(PlaylistGenerationSchema.parse(artistRecipe)).toEqual(artistRecipe);
+      expect(PlaylistGenerationSchema.parse(trackRecipe)).toEqual(trackRecipe);
+      expect(
+        GeneratedPlaylistSchema.parse({
+          name: 'Blendify · Discover · Sade',
+          description: 'In the orbit of Sade.',
+          generation: artistRecipe,
+          seeds: [{ type: 'artist', id: 'artist-1', name: 'Sade' }],
+          tracks: [],
+          transfer: null,
+        }).generation,
+      ).toEqual(artistRecipe);
+    }
   });
 });

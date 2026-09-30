@@ -4,6 +4,7 @@ export const MAX_ARTISTS = 12;
 export const MAX_GENRES = 5;
 export const PLAYLIST_NAME_MAX_LENGTH = 100;
 export const MAX_TRACKS = 50;
+export const MIN_DISCOVER_TRACKS = 1;
 export const TRANSFER_TOKEN_MAX_LENGTH = 48_000;
 
 export const POPULARITY_MODES = ['popular', 'balanced', 'rarities'] as const;
@@ -30,18 +31,17 @@ export const PLAYLIST_KINDS = [
   'discover_track',
 ] as const;
 export const PLAYLIST_STATUSES = ['PENDING', 'COMPLETED', 'FAILED'] as const;
-export const DISCOVER_TRACK_TARGETS = [15, 30, 50] as const;
 export const BULK_LIBRARY_ACTIONS = ['purge_active', 'clear_library'] as const;
 
 export const PopularityModeSchema = z.enum(POPULARITY_MODES);
 export const TrackOrderModeSchema = z.enum(TRACK_ORDER_MODES);
 export const PlaylistKindSchema = z.enum(PLAYLIST_KINDS);
 export const PlaylistStatusSchema = z.enum(PLAYLIST_STATUSES);
-export const DiscoverTrackTargetSchema = z.union([
-  z.literal(15),
-  z.literal(30),
-  z.literal(50),
-]);
+export const DiscoverTrackTargetSchema = z
+  .number()
+  .int()
+  .min(MIN_DISCOVER_TRACKS)
+  .max(MAX_TRACKS);
 export const BulkLibraryActionSchema = z.enum(BULK_LIBRARY_ACTIONS);
 
 export type PopularityMode = z.infer<typeof PopularityModeSchema>;

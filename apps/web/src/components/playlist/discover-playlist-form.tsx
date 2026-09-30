@@ -5,10 +5,14 @@ import { z } from 'zod'
 import { Compass, X } from 'lucide-react'
 import {
   type Artist,
-  type DiscoverTrackTarget,
   type GenerateDiscoverRequest,
 } from '@/lib/api'
-import type { TrackDto } from '@blendify/contracts'
+import {
+  MAX_TRACKS,
+  MIN_DISCOVER_TRACKS,
+  DiscoverTrackTargetSchema,
+  type TrackDto,
+} from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
 import { SpotifyLink } from '@/components/brand/spotify-link'
 import { TrackSearch } from '@/components/tracks/track-search'
@@ -33,8 +37,8 @@ import { Label } from '@/components/ui/label'
 import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
 import { FormSection } from '@/components/ui/form-section'
+import { RangeSlider } from '@/components/ui/range-slider'
 import { SegmentedControl } from '@/components/ui/segmented-control'
-import { RadioCardGroup } from '@/components/ui/radio-card-group'
 import { useT } from '@/i18n/use-t'
 import { readPersistToLibraryPreference } from '@/lib/persist-to-library-preference'
 import { cn, focusRing, formatCreditedArtists } from '@/lib/utils'
@@ -49,14 +53,15 @@ import {
 } from '@/lib/playlist-generation'
 import { useGenerationSettingsCollapse } from '@/hooks/use-generation-settings-collapse'
 import { usePlaylistRun } from '@/hooks/use-playlist-run'
+import { formatSongCount } from '@/lib/song-count'
 
 type SeedMode = 'artist' | 'track'
 
-const TRACK_TARGETS: DiscoverTrackTarget[] = [15, 30, 50]
+const DEFAULT_DISCOVER_TRACK_COUNT = 10
 
 const formSchema = z.object({
   popularity: z.enum(['popular', 'balanced', 'rarities']),
-  targetTrackCount: z.literal(TRACK_TARGETS),
+  targetTrackCount: DiscoverTrackTargetSchema,
   orderMode: z.enum(GENERATION_ORDER_MODES),
   generateCover: z.boolean(),
 })
@@ -65,7 +70,7 @@ type FormValues = z.infer<typeof formSchema>
 
 const DEFAULT_VALUES: FormValues = {
   popularity: 'balanced',
-  targetTrackCount: 30,
+  targetTrackCount: DEFAULT_DISCOVER_TRACK_COUNT,
   orderMode: 'random',
   generateCover: true,
 }
@@ -391,7 +396,9 @@ export function DiscoverPlaylistForm() {
       )
   const estimateSummary = seedName
     ? [
-        t('create.estimateSongs', { count: targetTrackCount }),
+        targetTrackCount === 1
+          ? t('create.estimateSongsOne')
+          : t('create.estimateSongs', { count: targetTrackCount }),
         t('discover.summarySeed', { seed: seedName }),
       ].join(' · ')
     : null
@@ -506,28 +513,22 @@ export function DiscoverPlaylistForm() {
 
             <FormSection step={3} title={t(formCopy.detailsTitle)}>
               <div className="divide-y divide-divider">
-                <div className="space-y-3 pb-4">
-                  <p className="text-sm font-medium leading-none text-cream-200">
-                    {t('discover.stepDetails')}
-                  </p>
-                  <Controller
-                    control={form.control}
-                    name="targetTrackCount"
-                    render={({ field }) => (
-                      <RadioCardGroup
-                        label={t('discover.stepDetails')}
-                        value={field.value}
-                        onChange={field.onChange}
-                        mobileLayout="inline"
-                        options={TRACK_TARGETS.map((count) => ({
-                          value: count,
-                          label: count,
-                          hint: t('discover.songsLabel'),
-                        }))}
-                      />
-                    )}
-                  />
-                </div>
+                <Controller
+                  control={form.control}
+                  name="targetTrackCount"
+                  render={({ field }) => (
+                    <RangeSlider
+                      id="discoverTargetTrackCount"
+                      label={t('discover.stepDetails')}
+                      min={MIN_DISCOVER_TRACKS}
+                      max={MAX_TRACKS}
+                      value={field.value}
+                      valueText={formatSongCount(field.value, t)}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
                 {capabilities.canPublishToSpotify ? (
                   <div className="pt-4">
                     <Controller

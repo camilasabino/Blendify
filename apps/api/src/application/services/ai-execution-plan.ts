@@ -1,8 +1,4 @@
 import {
-  DISCOVER_TRACK_TARGETS,
-  type DiscoverTrackTarget,
-} from '@blendify/contracts';
-import {
   AI_DEFAULT_ORDER_MODE,
   AI_DEFAULT_POPULARITY,
   type AiIntent,
@@ -20,7 +16,8 @@ import type { PlaylistGenerationRequest } from '@/application/use-cases/generate
 
 const DEFAULT_ARTIST_MIX_TRACKS_PER_SEED = 10;
 const DEFAULT_GENRE_MIX_TRACKS_PER_SEED = 25;
-const DEFAULT_DISCOVER_TRACK_TARGET: DiscoverTrackTarget = 30;
+const DEFAULT_DISCOVER_TRACK_TARGET = 30;
+const AI_DISCOVER_TRACK_PRESETS = [15, 30, 50] as const;
 
 export interface AiExecutionPlan {
   request: PlaylistGenerationRequest;
@@ -161,13 +158,13 @@ function tracksPerSeed(
   return Math.min(maxPerSeed, Math.ceil(candidateCount / seedCount));
 }
 
-function discoverTarget(candidateCount: number | null): DiscoverTrackTarget {
+function discoverTarget(candidateCount: number | null): number {
   if (candidateCount === null) {
     return DEFAULT_DISCOVER_TRACK_TARGET;
   }
   return (
-    DISCOVER_TRACK_TARGETS.find((target) => target >= candidateCount) ??
-    DISCOVER_TRACK_TARGETS[DISCOVER_TRACK_TARGETS.length - 1]
+    AI_DISCOVER_TRACK_PRESETS.find((target) => target >= candidateCount) ??
+    AI_DISCOVER_TRACK_PRESETS[AI_DISCOVER_TRACK_PRESETS.length - 1]
   );
 }
 
