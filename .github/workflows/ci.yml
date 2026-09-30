@@ -118,6 +118,9 @@ jobs:
         working-directory: apps/web
         run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      # Traces, screenshots, and the HTML report can still contain headers,
+      # cookies, storage, and unsanitized URLs. Upload them only after a
+      # failure. Copy the qa-diagnostic attachment, not the trace.
       - name: Upload Playwright artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v7

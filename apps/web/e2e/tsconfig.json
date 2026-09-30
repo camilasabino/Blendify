@@ -15,5 +15,6 @@
       "@blendify/contracts": ["../../packages/contracts/src/index.ts"]
     }
   },
-  "include": ["."]
+  "include": ["."],
+  "exclude": ["**/*.unit.ts"]
 }

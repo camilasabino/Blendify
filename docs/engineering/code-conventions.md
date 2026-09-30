@@ -314,8 +314,10 @@ abstraction for control flow that's local to one file.
   at the browser boundary via Playwright routing (`apps/web/e2e/fixtures`) —
   never real Spotify, Last.fm, Soundiiz, or an AI provider — and runs against
   Chromium only. CI runs it as the `e2e` job. Failure artifacts (trace,
-  screenshot) land in `apps/web/test-results/` and `apps/web/playwright-report/`,
-  both gitignored.
+  screenshot, HTML report) land in `apps/web/test-results/` and
+  `apps/web/playwright-report/`, both gitignored. Traces still contain raw
+  request headers, cookies, storage, and URLs; the copy-safe text is the
+  `qa-diagnostic` attachment. See the web README Tests section.
 
 ### Validation environment: functional fixes are local-first
 

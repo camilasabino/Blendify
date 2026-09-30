@@ -1,3 +1,4 @@
+import { redactQaUrl } from './fixtures/qa-redaction'
 import { expect, test } from './fixtures/test'
 import {
   mockAuthenticatedSession,
@@ -69,7 +70,7 @@ test.describe('Logout', () => {
     const abortedRequests: string[] = []
     page.on('requestfailed', (request) => {
       if (request.url().includes('/api/playlists/mix')) {
-        abortedRequests.push(request.url())
+        abortedRequests.push(redactQaUrl(request.url()))
       }
     })
 

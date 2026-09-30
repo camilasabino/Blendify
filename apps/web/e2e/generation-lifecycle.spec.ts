@@ -1,3 +1,4 @@
+import { redactQaUrl } from './fixtures/qa-redaction'
 import { expect, test } from './fixtures/test'
 import {
   mockAuthenticatedSession,
@@ -24,7 +25,7 @@ test.describe('Spotify generation across navigation', () => {
     const generationRequests: string[] = []
     page.on('request', (request) => {
       if (request.url().includes('/api/playlists/mix')) {
-        generationRequests.push(request.url())
+        generationRequests.push(redactQaUrl(request.url()))
       }
     })
 

@@ -123,6 +123,46 @@ Playwright suite in `e2e/` drives a real browser against the dev server and
 mocks Blendify's own API with `page.route` (`e2e/fixtures/`). It never reaches
 Spotify, Last.fm, Soundiiz, or an AI provider, and it must stay that way.
 
+### Credential hygiene
+
+When a Playwright test fails, the `qa-diagnostic` attachment and the terminal
+line that starts with `QA diagnostic (credential values redacted)` are the
+notes to copy. They keep method, sanitized URL, status, duration, and request
+id. Sensitive header values are replaced with `redacted`.
+
+```text
+GET https://127.0.0.1:5173/api/auth/spotify/callback?code=redacted&state=redacted status=302
+  X-Ai-Session-Key: redacted
+  Cookie: redacted
+```
+
+The examples above use the marker `redacted`, not a real credential. Do not
+replace it with a live key to try the formatter.
+
+Do not copy these into a transcript, handoff, ticket, or chat, even when the
+value looks expired or like a fixture:
+
+- Playwright traces and the HTML report's network panel
+- `apps/web/test-results/` and `apps/web/playwright-report/` (gitignored; CI
+  uploads both only after the `e2e` job fails, and keeps them for 7 days)
+- Screenshots and `error-context.md` snapshots when the page is showing a
+  token, a callback URL, or an account identifier
+- `.playwright-mcp/` console logs, page snapshots, and screenshots
+- Browser DevTools Network, Application (cookies / storage), or a copied
+  cURL command
+- `curl -i` / `curl -si` output that includes `Set-Cookie` or `Authorization`
+
+Traces are not sanitized. A trace records headers (`Authorization`, `Cookie`,
+`Set-Cookie`, `X-Ai-Session-Key`), storage (including a Guest AI access key),
+and full URLs. Video and HAR are off, and tests do not write a Playwright
+`storageState` file. Being gitignored does not make a trace safe to paste.
+
+Playwright MCP and Chrome DevTools are outside this repo. Their network and
+storage panes can show a live secret. Record method, host, path, status, and
+request id from the sanitized diagnostic instead of copying that pane. When
+checking the `blendify_session` cookie flags, write down `HttpOnly`, `Secure`,
+`SameSite`, `Path`, and `Domain` only.
+
 ## Layout
 
 ```text

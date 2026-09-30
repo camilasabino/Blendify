@@ -29,8 +29,9 @@ export default defineConfig(({ command, mode }) => {
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./src/test/setup.ts'],
-      // Playwright owns e2e/**: it runs in a real browser, not jsdom.
-      exclude: [...configDefaults.exclude, 'e2e/**'],
+      // Playwright owns browser specs. Vitest owns the QA redaction unit file.
+      include: [...configDefaults.include, 'e2e/fixtures/**/*.unit.ts'],
+      exclude: [...configDefaults.exclude, 'e2e/**/*.spec.ts', 'e2e/**/*.visual.ts'],
     },
   }
 })

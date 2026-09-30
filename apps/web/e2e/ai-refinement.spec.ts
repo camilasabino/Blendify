@@ -114,8 +114,14 @@ test.describe('Create with AI refinement', () => {
       ),
     ).toBeVisible()
     expect(refinements).toHaveLength(1)
-    expect(refinements[0].url()).not.toContain(AI_REVIEW_ACCESS_KEY)
-    expect(await refinements[0].headerValue('x-ai-session-key')).toBe(AI_REVIEW_ACCESS_KEY)
+    expect(
+      refinements[0].url().includes(AI_REVIEW_ACCESS_KEY),
+      'session key must not appear in the request URL',
+    ).toBe(false)
+    expect(
+      (await refinements[0].headerValue('x-ai-session-key')) === AI_REVIEW_ACCESS_KEY,
+      'Expected the X-Ai-Session-Key header to match the fixture key',
+    ).toBe(true)
     expect(server.state.refinement).toBe(pendingFromOtherTab)
 
     await page.getByRole('button', { name: 'Apply changes' }).click()

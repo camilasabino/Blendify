@@ -1,3 +1,4 @@
+import { redactQaUrl } from './fixtures/qa-redaction'
 import { expect, test } from './fixtures/test'
 import { mockGuestSession } from './fixtures/api-mocks'
 
@@ -80,7 +81,7 @@ test.describe('Spotify connection failure feedback', () => {
     const spotifyLogin: string[] = []
     page.on('request', (request) => {
       if (request.url().includes('/api/auth/spotify')) {
-        spotifyLogin.push(request.url())
+        spotifyLogin.push(redactQaUrl(request.url()))
       }
     })
     await page.goto('/?auth_error=access_restricted')
