@@ -4,6 +4,7 @@ import type {
   AiGenerationUnmetConstraint,
   AiSeedNotFound,
   PlaylistGeneration,
+  SpotifyWaitSource,
 } from '@blendify/contracts';
 import type {
   AiIntent,
@@ -23,6 +24,7 @@ export interface AiGenerationFailure {
   code: string;
   category: AiGenerationFailureCategory;
   retryAfterSeconds: number | null;
+  retryAfterSource?: SpotifyWaitSource | null;
   seedNotFound: AiSeedNotFound | null;
 }
 

@@ -5,14 +5,15 @@ import {
 
 describe('formatSpotifyWaitLabel', () => {
   it('formats seconds, minutes, and hours', () => {
-    expect(formatSpotifyWaitLabel(45, false)).toBe('45s');
-    expect(formatSpotifyWaitLabel(120, false)).toBe('2 min');
-    expect(formatSpotifyWaitLabel(7200, true)).toBe('2 h');
+    expect(formatSpotifyWaitLabel(45)).toBe('45s');
+    expect(formatSpotifyWaitLabel(120)).toBe('2 min');
+    expect(formatSpotifyWaitLabel(7200)).toBe('2 h');
   });
 
-  it('falls back when retry-after is missing', () => {
-    expect(formatSpotifyWaitLabel(null, true)).toBe('several hours');
-    expect(formatSpotifyWaitLabel(undefined, false)).toBe('20s');
+  it('does not invent a wait when retry-after is missing or invalid', () => {
+    expect(formatSpotifyWaitLabel(null)).toBeNull();
+    expect(formatSpotifyWaitLabel(undefined)).toBeNull();
+    expect(formatSpotifyWaitLabel(0)).toBeNull();
   });
 });
 
@@ -25,6 +26,33 @@ describe('createSpotifyQuotaError', () => {
     });
     expect(error.code).toBe('SPOTIFY_QUOTA_EXCEEDED');
     expect(error.message).toContain('30s');
+  });
+
+  it('does not put a Blendify estimate in the public message', () => {
+    const error = createSpotifyQuotaError({
+      retryAfterSeconds: 20,
+      retryAfterSource: 'blendify',
+      reason: null,
+    });
+    expect(error.message).not.toMatch(/\d/);
+    expect(error.message).toContain('Try again later');
+    expect(error.details).toMatchObject({
+      retryAfterSeconds: 20,
+      retryAfterSource: 'blendify',
+    });
+  });
+
+  it('reports no wait when none is known', () => {
+    const error = createSpotifyQuotaError({
+      retryAfterSeconds: null,
+      retryAfterSource: null,
+      reason: 'QUOTA_EXCEEDED',
+    });
+    expect(error.message).not.toMatch(/\d|several hours/);
+    expect(error.details).toMatchObject({
+      retryAfterSeconds: null,
+      retryAfterSource: null,
+    });
   });
 
   it('builds a rate-limit business error', () => {

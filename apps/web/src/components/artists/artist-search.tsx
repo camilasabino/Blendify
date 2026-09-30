@@ -27,7 +27,7 @@ export function ArtistSearch(props: ArtistSearchProps) {
       emptyLabel={t('search.empty')}
       errorLabel={(error) =>
         isSpotifyRateLimited(error) || isRequestLimited(error)
-          ? getApiErrorMessage(error, t, 'search.rateLimited')
+          ? getApiErrorMessage(error, t, 'search.error')
           : t('search.error')
       }
       disabled={props.disabled}

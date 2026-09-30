@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 import { Pencil, RotateCcw } from 'lucide-react'
 import type { AiGenerationFailureDto } from '@blendify/contracts'
+import { SpotifyLimitExplanation } from '@/components/brand/spotify-limit-explanation'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/i18n/use-t'
 import { generationFailureView } from './ai-generation-copy'
@@ -44,6 +45,7 @@ export function AiGenerationFailure({
         <p className="text-sm leading-relaxed text-danger">{view.message}</p>
         {view.hint ? <p className="text-sm text-cream-300">{view.hint}</p> : null}
       </div>
+      {view.explainsSpotifyLimit ? <SpotifyLimitExplanation /> : null}
       <div className="flex flex-wrap gap-2">
         {editFirst ? (
           <Button type="button" onClick={onEdit}>

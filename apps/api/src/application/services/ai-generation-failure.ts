@@ -1,4 +1,8 @@
-import { MAX_ARTISTS } from '@blendify/contracts';
+import {
+  MAX_ARTISTS,
+  SpotifyWaitSourceSchema,
+  type SpotifyWaitSource,
+} from '@blendify/contracts';
 import type { AiGenerationFailure } from '@/domain/ai/ai-session';
 import { AiGenerationError } from '@/domain/errors/ai-generation.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
@@ -37,6 +41,7 @@ export function describeAiGenerationFailure(
         error.code,
         'provider_rate_limited',
         retryAfterSeconds(error.details),
+        retryAfterSource(error.details),
       );
     }
     if (INSUFFICIENT_RESULT_CODES.has(error.code)) {
@@ -54,8 +59,24 @@ function failure(
   code: string,
   category: AiGenerationFailure['category'],
   retryAfter: number | null = null,
+  source: SpotifyWaitSource | null = null,
 ): AiGenerationFailure {
-  return { code, category, retryAfterSeconds: retryAfter, seedNotFound: null };
+  return {
+    code,
+    category,
+    retryAfterSeconds: retryAfter,
+    ...(retryAfter !== null && source !== null
+      ? { retryAfterSource: source }
+      : {}),
+    seedNotFound: null,
+  };
+}
+
+function retryAfterSource(
+  details: Record<string, unknown> | undefined,
+): SpotifyWaitSource | null {
+  const parsed = SpotifyWaitSourceSchema.safeParse(details?.retryAfterSource);
+  return parsed.success ? parsed.data : null;
 }
 
 function retryAfterSeconds(

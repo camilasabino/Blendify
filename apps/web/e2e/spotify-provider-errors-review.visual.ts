@@ -169,7 +169,7 @@ for (const locale of LOCALES) {
           const alert = page.getByRole('alert').first()
           await expect(alert).toBeVisible()
           const action = alert
-            .locator('xpath=following-sibling::*/descendant-or-self::button')
+            .locator('xpath=following-sibling::*/descendant-or-self::button[not(@aria-controls)]')
             .first()
           await expect(action).toBeVisible()
           await action.evaluate((element) => element.setAttribute('data-review-action', ''))
@@ -177,6 +177,14 @@ for (const locale of LOCALES) {
         }
 
         await capture(page, `${locale}/${viewport.name}/${state}`)
+
+        if (state.startsWith('rate-limit')) {
+          const explanationToggle = page.locator('button[aria-controls][aria-expanded]')
+          await expect(explanationToggle).toHaveAttribute('aria-expanded', 'false')
+          await explanationToggle.click()
+          await expect(explanationToggle).toHaveAttribute('aria-expanded', 'true')
+          await capture(page, `${locale}/${viewport.name}/${state}-explained`)
+        }
       })
     }
   }

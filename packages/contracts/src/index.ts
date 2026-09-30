@@ -676,6 +676,7 @@ export const AiGenerationFailureSchema = z
     code: z.string().min(1),
     category: z.enum(AI_GENERATION_FAILURE_CATEGORIES),
     retryAfterSeconds: z.number().nonnegative().nullable(),
+    retryAfterSource: SpotifyWaitSourceSchema.nullable().optional(),
     seedNotFound: AiSeedNotFoundSchema.nullable(),
   })
   .refine(

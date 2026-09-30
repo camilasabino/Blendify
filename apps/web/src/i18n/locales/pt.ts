@@ -201,27 +201,38 @@ export const pt: Record<MessageKey, string> = {
   'search.empty': 'Nenhum artista encontrado.',
   'search.trackEmpty': 'Nenhuma música encontrada.',
   'search.added': 'Adicionado',
-  'search.rateLimited':
-    'O Spotify está limitando as solicitações. Aguarde alguns minutos e tente novamente.',
-  'errors.spotifyQuota':
-    'O Spotify está ocupado no momento. Tente novamente em {wait}.',
-  'errors.spotifyRateLimit':
-    'Há solicitações demais. Tente novamente em {wait}.',
   'errors.rateLimited':
     'Há solicitações demais. Tente novamente em {wait}.',
+  'errors.rateLimitedLater':
+    'Há solicitações demais. Tente novamente mais tarde.',
   'errors.concurrencyLimited':
     'Outra playlist ainda está sendo criada. Aguarde terminar e tente novamente.',
   'errors.capacityExceeded':
     'O Blendify está ocupado no momento. Tente novamente em {wait}.',
+  'errors.capacityExceededLater':
+    'O Blendify está ocupado no momento. Tente novamente mais tarde.',
   'errors.serviceUnavailable':
     'O Blendify está temporariamente indisponível. Tente novamente em {wait}.',
+  'errors.serviceUnavailableLater':
+    'O Blendify está temporariamente indisponível. Tente novamente mais tarde.',
   'errors.wait.oneSecond': 'cerca de 1 segundo',
   'errors.wait.seconds': 'cerca de {n} segundos',
   'errors.wait.oneMinute': 'cerca de 1 minuto',
   'errors.wait.minutes': 'cerca de {n} minutos',
   'errors.wait.oneHour': 'cerca de 1 hora',
   'errors.wait.hours': 'cerca de {n} horas',
-  'errors.wait.severalHours': 'várias horas',
+  'errors.spotifyLimit.spotifyWait':
+    'O Spotify está limitando temporariamente as solicitações do Blendify e pediu para esperar {wait} antes de tentar de novo.',
+  'errors.spotifyLimit.estimate':
+    'O Spotify está limitando temporariamente as solicitações do Blendify. O Blendify estima {wait}, mas pode levar mais tempo.',
+  'errors.spotifyLimit.unknown':
+    'O Spotify está limitando temporariamente as solicitações do Blendify. Tente de novo mais tarde.',
+  'errors.spotifyLimit.why':
+    'Por que estou vendo isso?',
+  'errors.spotifyLimit.hide':
+    'Ocultar detalhes',
+  'errors.spotifyLimit.explanation':
+    'O Spotify limita quantas solicitações os aplicativos podem fazer em determinado período. O Blendify atingiu esse limite temporariamente. Isso afeta a integração do Blendify com o Spotify, não a sua conta. Você não precisa reconectá-la; tente de novo mais tarde.',
   'errors.lastfmMissing':
     'As recomendações de músicas relacionadas não estão disponíveis. Tente mais tarde.',
   'errors.lastfmSimilar':
@@ -477,6 +488,8 @@ export const pt: Record<MessageKey, string> = {
     'O Soundiiz não conseguiu aceitar esta playlist. Tente gerar outra.',
   'transfer.errorUnavailable':
     'O Soundiiz não está respondendo agora. Tente novamente em {wait}.',
+  'transfer.errorUnavailableLater':
+    'O Soundiiz não está respondendo agora. Tente novamente mais tarde.',
   'errors.catalogUnavailable':
     'O catálogo de músicas está temporariamente indisponível. Tente novamente em alguns minutos.',
   'errors.spotifyReauthRequired':
@@ -660,8 +673,6 @@ export const pt: Record<MessageKey, string> = {
   'ai.generationError.seedNotFound': 'O Blendify não encontrou {names} no Spotify.',
   'ai.generationError.seedNotFoundGeneric': 'O Blendify não encontrou no Spotify um dos artistas ou músicas que você citou.',
   'ai.generationError.seedNotFoundHint': 'Confira a grafia no seu pedido e envie de novo.',
-  'ai.generationError.rateLimited': 'O Spotify está limitando temporariamente as solicitações do Blendify. Tente de novo em {wait}.',
-  'ai.generationError.rateLimitedLater': 'O Spotify está limitando temporariamente as solicitações do Blendify. Tente de novo mais tarde.',
   'ai.generationError.spotifyUnavailable': 'O Spotify não está respondendo agora. Tente de novo em alguns minutos.',
   'ai.generationError.discoveryUnavailable': 'Os dados de músicas relacionadas não estão disponíveis agora. Tente de novo em alguns minutos.',
   'ai.generationError.insufficient': 'O Blendify não encontrou músicas suficientes para este pedido. Tente outros artistas, gêneros ou outra música.',

@@ -3,7 +3,7 @@ import type { MessageKey } from '@/i18n/messages'
 import type { useT } from '@/i18n/use-t'
 import type { PlaylistRunFailure } from '@/hooks/use-playlist-run'
 import type { GenerationOutcome } from '@/lib/playlist-generation'
-import { getApiErrorMessage } from '@/lib/api'
+import { getApiErrorMessage, isSpotifyRateLimited } from '@/lib/api'
 import {
   classifyGenerationFailure,
   isWriteOutcomeUnknown,
@@ -57,6 +57,7 @@ export type RunFailureView = Readonly<{
   recovery: RunFailureRecovery
   playlistUrl: string | null
   offersNewCreation: boolean
+  explainsSpotifyLimit: boolean
 }>
 
 function incompleteMessageKey(
@@ -93,6 +94,7 @@ export function runFailureView(
         recovery: playlistUrl ? 'open_playlist' : 'none',
         playlistUrl,
         offersNewCreation: false,
+        explainsSpotifyLimit: false,
       }
     }
     case 'unconfirmed':
@@ -102,6 +104,7 @@ export function runFailureView(
         recovery: 'none',
         playlistUrl: null,
         offersNewCreation: true,
+        explainsSpotifyLimit: false,
       }
     case 'connection_lost':
       return {
@@ -110,6 +113,7 @@ export function runFailureView(
         recovery: libraryAvailable ? 'open_library' : 'none',
         playlistUrl: null,
         offersNewCreation: true,
+        explainsSpotifyLimit: false,
       }
     case 'reauth':
     case 'blocked':
@@ -120,6 +124,8 @@ export function runFailureView(
         recovery: RECOVERY_BY_KIND[classified.kind],
         playlistUrl: null,
         offersNewCreation: false,
+        explainsSpotifyLimit:
+          classified.kind === 'retryable' && isSpotifyRateLimited(failure.error),
       }
   }
 }

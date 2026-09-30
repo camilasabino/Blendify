@@ -1,6 +1,7 @@
 import { useId, type ReactNode, type RefObject } from 'react'
 import { ArrowUpDown, Check, Pin, Plus, RotateCcw } from 'lucide-react'
 import type { AiRefinementDto, TrackDto } from '@blendify/contracts'
+import { SpotifyLimitExplanation } from '@/components/brand/spotify-limit-explanation'
 import { GeneratedTrackList } from '@/components/playlist/generated-track-list'
 import { Button } from '@/components/ui/button'
 import type { AiRefinementActivity } from '@/hooks/use-ai-session'
@@ -228,6 +229,7 @@ function CandidateFailure({
         <p className="text-sm leading-relaxed text-danger">{view.message}</p>
         <p className="text-sm text-cream-300">{t('ai.refine.failed.hint')}</p>
       </div>
+      {view.explainsSpotifyLimit ? <SpotifyLimitExplanation /> : null}
       <ActionError error={error} />
       <Actions>
         <Button

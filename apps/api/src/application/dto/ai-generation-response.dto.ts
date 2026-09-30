@@ -109,6 +109,9 @@ function toExecution(
           code: execution.failure.code,
           category: execution.failure.category,
           retryAfterSeconds: execution.failure.retryAfterSeconds,
+          ...(execution.failure.retryAfterSource
+            ? { retryAfterSource: execution.failure.retryAfterSource }
+            : {}),
           seedNotFound: execution.failure.seedNotFound,
         },
       };

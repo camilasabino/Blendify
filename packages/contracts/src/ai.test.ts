@@ -6,6 +6,7 @@ import {
   AI_REFINEMENT_ID_MAX_LENGTH,
   AI_REFINEMENT_MAX_LENGTH,
   AiCurrentPreservationSchema,
+  AiGenerationFailureSchema,
   AiGenerationSchema,
   AiGenerationStreamEventSchema,
   AiRefinementIdSchema,
@@ -379,6 +380,7 @@ describe('AI session state contract', () => {
             code: 'SPOTIFY_RATE_LIMITED',
             category: 'provider_rate_limited',
             retryAfterSeconds: 30,
+            retryAfterSource: 'spotify',
             seedNotFound: null,
           },
         },
@@ -842,6 +844,30 @@ describe('AI refinement contracts', () => {
     expect(request({ add: [], remove: [], trackIds: ['spotify:track:1'] })).toBe(false);
     expect(
       request({ add: Array.from({ length: MAX_TRACKS + 1 }, () => 1), remove: [] }),
+    ).toBe(false);
+  });
+});
+
+describe('AiGenerationFailureSchema wait origin', () => {
+  const failure = {
+    code: 'SPOTIFY_RATE_LIMITED',
+    category: 'provider_rate_limited',
+    retryAfterSeconds: 30,
+    seedNotFound: null,
+  };
+
+  it.each(['spotify', 'blendify', null, undefined])(
+    'accepts a wait origin of %s',
+    (retryAfterSource) => {
+      expect(
+        AiGenerationFailureSchema.safeParse({ ...failure, retryAfterSource }).success,
+      ).toBe(true);
+    },
+  );
+
+  it('rejects an unknown wait origin', () => {
+    expect(
+      AiGenerationFailureSchema.safeParse({ ...failure, retryAfterSource: 'proxy' }).success,
     ).toBe(false);
   });
 });

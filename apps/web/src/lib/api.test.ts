@@ -80,8 +80,13 @@ function sentBody(fetchMock: ReturnType<typeof vi.fn>): unknown {
 }
 
 describe('isSpotifyRateLimited', () => {
-  it('detects HTTP 429', () => {
-    expect(isSpotifyRateLimited(new ApiError('wait', 429))).toBe(true)
+  it('does not classify a bare HTTP 429 as a Spotify limit', () => {
+    expect(isSpotifyRateLimited(new ApiError('wait', 429))).toBe(false)
+    expect(
+      isSpotifyRateLimited(
+        new ApiError('wait', 429, { statusCode: 429, code: 'SOMETHING_ELSE', message: 'wait' }),
+      ),
+    ).toBe(false)
   })
 
   it('detects SPOTIFY_RATE_LIMITED code', () => {
@@ -144,34 +149,61 @@ describe('request limit errors', () => {
   ])('localizes %s', (code, status, expected) => {
     expect(getApiErrorMessage(requestLimitError(code, status), t)).toBe(expected)
   })
+
+  it.each([
+    ['RATE_LIMITED', 429, 'errors.rateLimitedLater'],
+    ['CAPACITY_EXCEEDED', 503, 'errors.capacityExceededLater'],
+    ['SERVICE_UNAVAILABLE', 503, 'errors.serviceUnavailableLater'],
+  ])('does not invent a wait for %s without one', (code, status, expected) => {
+    const error = new ApiError('limited', status, { statusCode: status, code, message: 'limited' })
+    expect(getApiErrorMessage(error, t)).toBe(expected)
+  })
 })
 
 describe('getApiErrorMessage', () => {
-  it('localizes quota exceeded with wait label', () => {
-    const message = getApiErrorMessage(
-      new ApiError('en message', 429, {
-        statusCode: 429,
-        code: 'SPOTIFY_QUOTA_EXCEEDED',
-        message: 'en message',
-        details: { retryAfterSeconds: 10800 },
-      }),
-      t,
+  function spotifyLimitError(code: string, details?: object) {
+    return new ApiError('provider text', 429, {
+      statusCode: 429,
+      code,
+      message: 'provider text',
+      ...(details ? { details } : {}),
+    })
+  }
+
+  it.each(['SPOTIFY_RATE_LIMITED', 'SPOTIFY_QUOTA_EXCEEDED'])(
+    'attributes the wait to Spotify for %s when Spotify provided it',
+    (code) => {
+      const error = spotifyLimitError(code, { retryAfterSeconds: 10800, retryAfterSource: 'spotify' })
+      expect(getApiErrorMessage(error, t, 'create.failed')).toBe(
+        'errors.spotifyLimit.spotifyWait:wait=errors.wait.hours:n=3',
+      )
+    },
+  )
+
+  it('labels a Blendify cooldown as an estimate, not a Spotify wait', () => {
+    const error = spotifyLimitError('SPOTIFY_RATE_LIMITED', {
+      retryAfterSeconds: 20,
+      retryAfterSource: 'blendify',
+    })
+    expect(getApiErrorMessage(error, t, 'create.failed')).toBe(
+      'errors.spotifyLimit.estimate:wait=errors.wait.seconds:n=20',
     )
-    expect(message).toBe('errors.spotifyQuota:wait=errors.wait.hours:n=3')
   })
 
-  it('localizes rate limit without relying on API message', () => {
-    const message = getApiErrorMessage(
-      new ApiError('Spotify rate limit. Wait about 20 seconds…', 429, {
-        statusCode: 429,
-        code: 'SPOTIFY_RATE_LIMITED',
-        message: 'Spotify rate limit.',
-        details: { retryAfterSeconds: 20 },
-      }),
-      t,
-      'create.failed',
-    )
-    expect(message).toBe('errors.spotifyRateLimit:wait=errors.wait.seconds:n=20')
+  it.each([
+    ['no details', undefined],
+    ['null wait', { retryAfterSeconds: null, retryAfterSource: null }],
+    ['zero wait', { retryAfterSeconds: 0, retryAfterSource: 'spotify' }],
+    ['a wait without a source', { retryAfterSeconds: 45 }],
+    ['an unknown source', { retryAfterSeconds: 45, retryAfterSource: 'proxy' }],
+  ])('does not show a wait for %s', (_label, details) => {
+    const error = spotifyLimitError('SPOTIFY_QUOTA_EXCEEDED', details)
+    expect(getApiErrorMessage(error, t, 'create.failed')).toBe('errors.spotifyLimit.unknown')
+  })
+
+  it('does not treat a bare 429 as a Spotify limit', () => {
+    const error = new ApiError('x', 429, { statusCode: 429, code: 'UPSTREAM', message: 'x' })
+    expect(getApiErrorMessage(error, t, 'create.failed')).toBe('create.failed')
   })
 
   it('falls back for unknown errors', () => {

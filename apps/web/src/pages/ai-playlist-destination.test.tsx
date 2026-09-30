@@ -291,13 +291,19 @@ describe('Create with AI Spotify destination', () => {
   it('shows the typed Spotify limit and lets the user try again', async () => {
     const user = userEvent.setup()
     await renderGenerated({
-      [PUBLISH_ROUTE]: () => apiError(429, 'SPOTIFY_RATE_LIMITED', { retryAfterSeconds: 45 }),
+      [PUBLISH_ROUTE]: () => apiError(429, 'SPOTIFY_RATE_LIMITED', { retryAfterSeconds: 45, retryAfterSource: 'spotify' }),
     })
 
     await user.click(publishButton())
 
-    const message = await screen.findByText(/Too many requests\. Try again in/)
+    const message = await screen.findByText(
+      'Spotify is temporarily limiting requests from Blendify and asked to wait about 45 seconds before trying again.',
+    )
     expect(message).toHaveAttribute('role', 'alert')
+    expect(screen.getByRole('button', { name: 'Why am I seeing this?' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
     expect(document.body.textContent).not.toMatch(/SPOTIFY_RATE_LIMITED|provider detail/)
     expect(publishButton()).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Connect Spotify' })).not.toBeInTheDocument()

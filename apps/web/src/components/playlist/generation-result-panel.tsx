@@ -18,6 +18,7 @@ import type {
   PlaylistDetail,
 } from '@blendify/contracts'
 import { LastFmAttribution } from '@/components/brand/lastfm-attribution'
+import { SpotifyLimitExplanation } from '@/components/brand/spotify-limit-explanation'
 import { SpotifyLogo } from '@/components/brand/spotify-mark'
 import { CoverErrorNotice } from '@/components/playlist/generation-form-shared'
 import { GeneratedTrackList } from '@/components/playlist/generated-track-list'
@@ -340,6 +341,7 @@ function GenerationErrorState({
       <p role="alert" className="text-sm leading-relaxed text-danger">
         {failure.message}
       </p>
+      {failure.explainsSpotifyLimit ? <SpotifyLimitExplanation /> : null}
       <GenerationErrorActions
         recovery={failure.recovery}
         playlistUrl={failure.playlistUrl}

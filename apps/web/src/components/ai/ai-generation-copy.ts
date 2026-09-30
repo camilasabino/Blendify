@@ -4,7 +4,7 @@ import type {
   AiMoodUnmetReason,
 } from '@blendify/contracts'
 import type { MessageKey } from '@/i18n/messages'
-import { formatWaitLabel, getApiErrorMessage, isRequestLimited } from '@/lib/api-error'
+import { formatSpotifyLimitMessage, getApiErrorMessage, isRequestLimited } from '@/lib/api-error'
 import { formatListeningTime } from '@/lib/utils'
 import { MOOD_LABEL_KEYS } from './ai-copy'
 
@@ -16,6 +16,7 @@ export type AiFailureView = Readonly<{
   message: string
   hint: string | null
   recovery: AiFailureRecovery
+  explainsSpotifyLimit?: boolean
 }>
 
 const PROVIDER_CATALOG_UNAVAILABLE_CODE = 'CATALOG_UNAVAILABLE'
@@ -38,11 +39,11 @@ function seedNotFoundView(failure: AiGenerationFailureDto, t: Translate): AiFail
 }
 
 function rateLimitedView(failure: AiGenerationFailureDto, t: Translate): AiFailureView {
-  const wait = formatWaitLabel(t, failure.retryAfterSeconds)
-  const message = wait
-    ? t('ai.generationError.rateLimited', { wait })
-    : t('ai.generationError.rateLimitedLater')
-  return { message, hint: null, recovery: 'retry' }
+  const message = formatSpotifyLimitMessage(t, {
+    seconds: failure.retryAfterSeconds,
+    source: failure.retryAfterSource,
+  })
+  return { message, hint: null, recovery: 'retry', explainsSpotifyLimit: true }
 }
 
 function providerUnavailableView(failure: AiGenerationFailureDto, t: Translate): AiFailureView {

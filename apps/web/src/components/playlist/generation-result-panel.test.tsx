@@ -103,6 +103,7 @@ describe('GenerationResultPanel', () => {
         recovery: 'none',
         playlistUrl: null,
         offersNewCreation: true,
+        explainsSpotifyLimit: false,
       },
     })
 
@@ -120,6 +121,7 @@ describe('GenerationResultPanel', () => {
         recovery: 'open_library',
         playlistUrl: null,
         offersNewCreation: true,
+        explainsSpotifyLimit: false,
       },
     })
 
@@ -141,6 +143,7 @@ describe('GenerationResultPanel', () => {
         recovery: 'none',
         playlistUrl: null,
         offersNewCreation: true,
+        explainsSpotifyLimit: false,
       },
     })
 
@@ -166,6 +169,7 @@ describe('GenerationResultPanel', () => {
         recovery: 'open_playlist',
         playlistUrl: 'https://open.spotify.com/playlist/created-1',
         offersNewCreation: false,
+        explainsSpotifyLimit: false,
       },
     })
 
@@ -179,6 +183,31 @@ describe('GenerationResultPanel', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
 
+  it('keeps Try again visible and adds a collapsed explanation for a Spotify limit', async () => {
+    const { props } = renderPanel({
+      failure: {
+        kind: 'failed',
+        message: 'Spotify is temporarily limiting requests from Blendify. Try again later.',
+        recovery: 'retry',
+        playlistUrl: null,
+        offersNewCreation: false,
+        explainsSpotifyLimit: true,
+      },
+    })
+
+    const toggle = screen.getByRole('button', { name: 'Why am I seeing this?' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible()
+
+    await userEvent.setup().click(toggle)
+    expect(screen.getByRole('button', { name: 'Hide details' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible()
+    expect(props.onRetry).not.toHaveBeenCalled()
+  })
+
   it('offers to connect Spotify again instead of a retry when authorization expired', () => {
     renderPanel({
       failure: {
@@ -187,6 +216,7 @@ describe('GenerationResultPanel', () => {
         recovery: 'reconnect',
         playlistUrl: null,
         offersNewCreation: false,
+        explainsSpotifyLimit: false,
       },
     })
 
@@ -233,6 +263,7 @@ describe('GenerationResultPanel', () => {
         recovery: 'retry',
         playlistUrl: null,
         offersNewCreation: false,
+        explainsSpotifyLimit: false,
       },
     })
 
@@ -447,6 +478,7 @@ describe('GenerationResultPanel in Guest Mode', () => {
         recovery: 'retry',
         playlistUrl: null,
         offersNewCreation: false,
+        explainsSpotifyLimit: false,
       },
     })
 

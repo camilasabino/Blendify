@@ -6,12 +6,13 @@ import type {
   PlaylistTransferDto,
   PublishAiPlaylistRequest,
 } from '@blendify/contracts'
+import { SpotifyLimitExplanation } from '@/components/brand/spotify-limit-explanation'
 import { SoundiizTransfer } from '@/components/playlist/transfer-action'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { useConnectSpotify } from '@/hooks/use-connect-spotify'
 import { useT } from '@/i18n/use-t'
 import { isSpotifyDestination, type AiSpotifyDestination } from './ai-destination-state'
-import { ApiError, getApiErrorMessage } from '@/lib/api'
+import { ApiError, getApiErrorMessage, isSpotifyRateLimited } from '@/lib/api'
 import type { AppMode } from '@/lib/capabilities'
 import { readPersistToLibraryPreference } from '@/lib/persist-to-library-preference'
 import { renderPlaylistCoverBase64, type PlaylistCoverKind } from '@/lib/playlist-cover'
@@ -155,6 +156,7 @@ function AiSpotifyPublish({
             : getApiErrorMessage(error, t, 'ai.destination.failed')}
         </p>
       ) : null}
+      {error && !isBusy && isSpotifyRateLimited(error) ? <SpotifyLimitExplanation /> : null}
       {showsReconnect ? (
         <Button ref={reconnectRef} type="button" className="w-full sm:w-auto" onClick={connectSpotify}>
           {t('nav.connectSpotify')}

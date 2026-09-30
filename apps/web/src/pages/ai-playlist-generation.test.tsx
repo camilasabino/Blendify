@@ -371,12 +371,12 @@ describe('Create with AI generation failures', () => {
   it('shows the Spotify limit with the normalized wait and offers a retry', async () => {
     const { user, calls, heading } = await failGeneration(
       failureError('SPOTIFY_QUOTA_EXCEEDED', 'Quota exceeded', 429, { retryAfterSeconds: 14_400 }),
-      { code: 'SPOTIFY_QUOTA_EXCEEDED', category: 'provider_rate_limited', retryAfterSeconds: 14_400, seedNotFound: null },
+      { code: 'SPOTIFY_QUOTA_EXCEEDED', category: 'provider_rate_limited', retryAfterSeconds: 14_400, retryAfterSource: 'spotify', seedNotFound: null },
     )
 
     const panel = heading.closest('section') as HTMLElement
     expect(within(panel).getByRole('alert')).toHaveTextContent(
-      'Spotify is temporarily limiting requests from Blendify. Try again in about 4 hours.',
+      'Spotify is temporarily limiting requests from Blendify and asked to wait about 4 hours before trying again.',
     )
     expectNoRawIdentifiers()
 
@@ -393,6 +393,55 @@ describe('Create with AI generation failures', () => {
     expect(within(heading.closest('section') as HTMLElement).getByRole('alert')).toHaveTextContent(
       'Spotify is temporarily limiting requests from Blendify. Try again later.',
     )
+  })
+
+  it('labels a Blendify cooldown as an estimate', async () => {
+    const { heading } = await failGeneration(
+      failureError('SPOTIFY_RATE_LIMITED', 'Rate limited', 429, { retryAfterSeconds: 20, retryAfterSource: 'blendify' }),
+      { code: 'SPOTIFY_RATE_LIMITED', category: 'provider_rate_limited', retryAfterSeconds: 20, retryAfterSource: 'blendify', seedNotFound: null },
+    )
+
+    expect(within(heading.closest('section') as HTMLElement).getByRole('alert')).toHaveTextContent(
+      'Spotify is temporarily limiting requests from Blendify. Blendify estimates about 20 seconds, but it could take longer.',
+    )
+  })
+
+  it('explains the Spotify limit in a collapsed disclosure that does not move focus', async () => {
+    const { user, heading } = await failGeneration(
+      failureError('SPOTIFY_RATE_LIMITED', 'Rate limited', 429),
+      { code: 'SPOTIFY_RATE_LIMITED', category: 'provider_rate_limited', retryAfterSeconds: null, seedNotFound: null },
+    )
+    const panel = heading.closest('section') as HTMLElement
+
+    const toggle = within(panel).getByRole('button', { name: 'Why am I seeing this?' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(within(panel).getByRole('button', { name: 'Try again' })).toBeVisible()
+
+    await user.click(toggle)
+    const hide = within(panel).getByRole('button', { name: 'Hide details' })
+    expect(hide).toHaveAttribute('aria-expanded', 'true')
+    expect(hide).toHaveFocus()
+    expect(document.getElementById(hide.getAttribute('aria-controls') ?? '')).toHaveTextContent(
+      'This affects Blendify’s Spotify integration, not your account.',
+    )
+
+    await user.click(hide)
+    expect(within(panel).getByRole('button', { name: 'Why am I seeing this?' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+  })
+
+  it('does not explain a Spotify limit for an unavailable provider', async () => {
+    const { heading } = await failGeneration(
+      failureError('CATALOG_UNAVAILABLE', 'Catalog unavailable', 503),
+      { code: 'CATALOG_UNAVAILABLE', category: 'provider_unavailable', retryAfterSeconds: null, seedNotFound: null },
+    )
+    expect(
+      within(heading.closest('section') as HTMLElement).queryByRole('button', {
+        name: /Why am I seeing this/,
+      }),
+    ).toBeNull()
   })
 
   it('distinguishes an unavailable provider from a rate limit', async () => {

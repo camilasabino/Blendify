@@ -1425,6 +1425,7 @@ describe('Create with AI sessions over HTTP', () => {
         code: 'SPOTIFY_QUOTA_EXCEEDED',
         category: 'provider_rate_limited',
         retryAfterSeconds: 3_600,
+        retryAfterSource: 'spotify',
         seedNotFound: null,
       },
     });
@@ -2137,6 +2138,7 @@ describe('Create with AI sessions over HTTP', () => {
             code: 'SPOTIFY_QUOTA_EXCEEDED',
             category: 'provider_rate_limited',
             retryAfterSeconds: 3_600,
+            retryAfterSource: 'spotify',
             seedNotFound: null,
           },
         }),

@@ -29,7 +29,7 @@ export function TrackSearch(props: TrackSearchProps) {
       emptyLabel={t('search.trackEmpty')}
       errorLabel={(error) =>
         isSpotifyRateLimited(error) || isRequestLimited(error)
-          ? getApiErrorMessage(error, t, 'search.rateLimited')
+          ? getApiErrorMessage(error, t, 'search.trackError')
           : t('search.trackError')
       }
       disabled={props.disabled}

@@ -202,27 +202,38 @@ export const es: Record<MessageKey, string> = {
   'search.empty': 'No se encontraron artistas.',
   'search.trackEmpty': 'No se encontraron canciones.',
   'search.added': 'Agregado',
-  'search.rateLimited':
-    'Spotify está limitando las solicitudes. Espera unos minutos e intenta de nuevo.',
-  'errors.spotifyQuota':
-    'Spotify está ocupado en este momento. Intenta de nuevo en {wait}.',
-  'errors.spotifyRateLimit':
-    'Hay demasiadas solicitudes. Intenta de nuevo en {wait}.',
   'errors.rateLimited':
     'Hay demasiadas solicitudes. Intenta de nuevo en {wait}.',
+  'errors.rateLimitedLater':
+    'Hay demasiadas solicitudes. Intenta de nuevo más tarde.',
   'errors.concurrencyLimited':
     'Todavía se está creando otra playlist. Espera a que termine e intenta de nuevo.',
   'errors.capacityExceeded':
     'Blendify está ocupado en este momento. Intenta de nuevo en {wait}.',
+  'errors.capacityExceededLater':
+    'Blendify está ocupado en este momento. Intenta de nuevo más tarde.',
   'errors.serviceUnavailable':
     'Blendify no está disponible temporalmente. Intenta de nuevo en {wait}.',
+  'errors.serviceUnavailableLater':
+    'Blendify no está disponible temporalmente. Intenta de nuevo más tarde.',
   'errors.wait.oneSecond': 'cerca de 1 segundo',
   'errors.wait.seconds': 'cerca de {n} segundos',
   'errors.wait.oneMinute': 'cerca de 1 minuto',
   'errors.wait.minutes': 'cerca de {n} minutos',
   'errors.wait.oneHour': 'cerca de 1 hora',
   'errors.wait.hours': 'cerca de {n} horas',
-  'errors.wait.severalHours': 'varias horas',
+  'errors.spotifyLimit.spotifyWait':
+    'Spotify está limitando temporalmente las solicitudes de Blendify y pidió esperar {wait} antes de volver a intentarlo.',
+  'errors.spotifyLimit.estimate':
+    'Spotify está limitando temporalmente las solicitudes de Blendify. Blendify estima {wait}, pero podría tardar más.',
+  'errors.spotifyLimit.unknown':
+    'Spotify está limitando temporalmente las solicitudes de Blendify. Vuelve a intentarlo más tarde.',
+  'errors.spotifyLimit.why':
+    '¿Por qué veo esto?',
+  'errors.spotifyLimit.hide':
+    'Ocultar detalles',
+  'errors.spotifyLimit.explanation':
+    'Spotify limita cuántas solicitudes pueden hacer las aplicaciones durante un periodo de tiempo. Blendify alcanzó ese límite de forma temporal. Esto afecta la integración de Blendify con Spotify, no tu cuenta. No necesitas volver a conectarla; vuelve a intentarlo más tarde.',
   'errors.lastfmMissing':
     'Las recomendaciones de música relacionada no están disponibles. Intenta más tarde.',
   'errors.lastfmSimilar':
@@ -482,6 +493,8 @@ export const es: Record<MessageKey, string> = {
     'Soundiiz no pudo aceptar esta playlist. Prueba generar otra.',
   'transfer.errorUnavailable':
     'Soundiiz no responde en este momento. Intenta de nuevo en {wait}.',
+  'transfer.errorUnavailableLater':
+    'Soundiiz no responde en este momento. Intenta de nuevo más tarde.',
   'errors.catalogUnavailable':
     'El catálogo de música no está disponible temporalmente. Intenta de nuevo en unos minutos.',
   'errors.spotifyReauthRequired':
@@ -665,8 +678,6 @@ export const es: Record<MessageKey, string> = {
   'ai.generationError.seedNotFound': 'Blendify no encontró {names} en Spotify.',
   'ai.generationError.seedNotFoundGeneric': 'Blendify no encontró en Spotify uno de los artistas o canciones que nombraste.',
   'ai.generationError.seedNotFoundHint': 'Revisa cómo lo escribiste en tu pedido y vuelve a enviarlo.',
-  'ai.generationError.rateLimited': 'Spotify está limitando temporalmente las solicitudes de Blendify. Vuelve a intentarlo en {wait}.',
-  'ai.generationError.rateLimitedLater': 'Spotify está limitando temporalmente las solicitudes de Blendify. Vuelve a intentarlo más tarde.',
   'ai.generationError.spotifyUnavailable': 'Spotify no está respondiendo en este momento. Vuelve a intentarlo en unos minutos.',
   'ai.generationError.discoveryUnavailable': 'Los datos de música relacionada no están disponibles en este momento. Vuelve a intentarlo en unos minutos.',
   'ai.generationError.insufficient': 'Blendify no encontró suficiente música para este pedido. Prueba con otros artistas, géneros u otra canción.',

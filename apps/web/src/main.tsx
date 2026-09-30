@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
+  ApiError,
   isRequestLimited,
   isSpotifyProviderFailure,
   isSpotifyRateLimited,
@@ -17,6 +18,7 @@ const queryClient = new QueryClient({
       retry: (failureCount, error) => {
         if (
           isSpotifyRateLimited(error) ||
+          (error instanceof ApiError && error.status === 429) ||
           isRequestLimited(error) ||
           isSpotifyProviderFailure(error)
         ) {

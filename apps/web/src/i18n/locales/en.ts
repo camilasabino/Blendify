@@ -194,33 +194,44 @@ export const en = {
   'search.empty': 'No artists found.',
   'search.trackEmpty': 'No songs found.',
   'search.added': 'Added',
-  'search.rateLimited':
-    'Spotify is limiting requests right now. Wait a few minutes and try again.',
   'errors.lastfmMissing':
     'Related-music suggestions aren’t available right now. Try again later.',
   'errors.lastfmSimilar':
     'Couldn’t load related music right now. Please try again.',
   'errors.genreLookupUnavailable':
     'Couldn’t find enough artists for this genre. Try another genre or try again later.',
-  'errors.spotifyQuota':
-    'Spotify is busy right now. Try again in {wait}.',
-  'errors.spotifyRateLimit':
-    'Too many requests. Try again in {wait}.',
   'errors.rateLimited':
     'Too many requests. Try again in {wait}.',
+  'errors.rateLimitedLater':
+    'Too many requests. Try again later.',
   'errors.concurrencyLimited':
     'Another playlist is still being created. Wait for it to finish and try again.',
   'errors.capacityExceeded':
     'Blendify is busy right now. Try again in {wait}.',
+  'errors.capacityExceededLater':
+    'Blendify is busy right now. Try again later.',
   'errors.serviceUnavailable':
     'Blendify is temporarily unavailable. Try again in {wait}.',
+  'errors.serviceUnavailableLater':
+    'Blendify is temporarily unavailable. Try again later.',
   'errors.wait.oneSecond': 'about 1 second',
   'errors.wait.seconds': 'about {n} seconds',
   'errors.wait.oneMinute': 'about 1 minute',
   'errors.wait.minutes': 'about {n} minutes',
   'errors.wait.oneHour': 'about 1 hour',
   'errors.wait.hours': 'about {n} hours',
-  'errors.wait.severalHours': 'several hours',
+  'errors.spotifyLimit.spotifyWait':
+    'Spotify is temporarily limiting requests from Blendify and asked to wait {wait} before trying again.',
+  'errors.spotifyLimit.estimate':
+    'Spotify is temporarily limiting requests from Blendify. Blendify estimates {wait}, but it could take longer.',
+  'errors.spotifyLimit.unknown':
+    'Spotify is temporarily limiting requests from Blendify. Try again later.',
+  'errors.spotifyLimit.why':
+    'Why am I seeing this?',
+  'errors.spotifyLimit.hide':
+    'Hide details',
+  'errors.spotifyLimit.explanation':
+    'Spotify limits how many requests apps can make within a period of time. Blendify has temporarily reached that limit. This affects Blendify’s Spotify integration, not your account. You don’t need to reconnect; try again later.',
   'errors.artistResolve':
     'Couldn’t match one of the selected artists on Spotify. Try searching for it instead.',
   'errors.artistResolveNamed':
@@ -471,6 +482,8 @@ export const en = {
     'Soundiiz couldn’t accept this playlist. Try generating a different one.',
   'transfer.errorUnavailable':
     'Soundiiz isn’t responding right now. Try again in {wait}.',
+  'transfer.errorUnavailableLater':
+    'Soundiiz isn’t responding right now. Try again later.',
   'errors.catalogUnavailable':
     'The music catalog is temporarily unavailable. Try again in a few minutes.',
   'errors.spotifyReauthRequired':
@@ -653,8 +666,6 @@ export const en = {
   'ai.generationError.seedNotFound': 'Blendify couldn’t find {names} on Spotify.',
   'ai.generationError.seedNotFoundGeneric': 'Blendify couldn’t find one of the artists or songs you named on Spotify.',
   'ai.generationError.seedNotFoundHint': 'Check the spelling in your request and review it again.',
-  'ai.generationError.rateLimited': 'Spotify is temporarily limiting requests from Blendify. Try again in {wait}.',
-  'ai.generationError.rateLimitedLater': 'Spotify is temporarily limiting requests from Blendify. Try again later.',
   'ai.generationError.spotifyUnavailable': 'Spotify isn’t responding right now. Try again in a few minutes.',
   'ai.generationError.discoveryUnavailable': 'Related-music data isn’t available right now. Try again in a few minutes.',
   'ai.generationError.insufficient': 'Blendify couldn’t find enough music for this request. Try different artists, genres or another song.',

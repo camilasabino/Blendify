@@ -1,5 +1,9 @@
 import type { MessageKey } from '@/i18n/messages'
-import { ApiErrorResponseSchema } from '@blendify/contracts'
+import {
+  ApiErrorResponseSchema,
+  SpotifyWaitSourceSchema,
+  type SpotifyWaitSource,
+} from '@blendify/contracts'
 
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string
 
@@ -73,14 +77,25 @@ export function isSpotifyProviderFailure(error: unknown): boolean {
   )
 }
 
-const REQUEST_LIMIT_MESSAGES: Record<string, MessageKey> = {
-  RATE_LIMITED: 'errors.rateLimited',
-  CONCURRENCY_LIMITED: 'errors.concurrencyLimited',
-  CAPACITY_EXCEEDED: 'errors.capacityExceeded',
-  SERVICE_UNAVAILABLE: 'errors.serviceUnavailable',
+type RequestLimitMessageKeys = Readonly<{ wait: MessageKey; later: MessageKey }>
+
+const REQUEST_LIMIT_MESSAGES: Record<string, RequestLimitMessageKeys> = {
+  RATE_LIMITED: { wait: 'errors.rateLimited', later: 'errors.rateLimitedLater' },
+  CONCURRENCY_LIMITED: {
+    wait: 'errors.concurrencyLimited',
+    later: 'errors.concurrencyLimited',
+  },
+  CAPACITY_EXCEEDED: {
+    wait: 'errors.capacityExceeded',
+    later: 'errors.capacityExceededLater',
+  },
+  SERVICE_UNAVAILABLE: {
+    wait: 'errors.serviceUnavailable',
+    later: 'errors.serviceUnavailableLater',
+  },
 }
 
-function requestLimitMessageKey(error: unknown): MessageKey | null {
+function requestLimitMessageKeys(error: unknown): RequestLimitMessageKeys | null {
   if (!(error instanceof ApiError) || !error.code) {
     return null
   }
@@ -90,16 +105,16 @@ function requestLimitMessageKey(error: unknown): MessageKey | null {
 }
 
 export function isRequestLimited(error: unknown): boolean {
-  return requestLimitMessageKey(error) !== null
+  return requestLimitMessageKeys(error) !== null
 }
+
+const SPOTIFY_THROTTLE_CODES = new Set(['SPOTIFY_RATE_LIMITED', 'SPOTIFY_QUOTA_EXCEEDED'])
 
 export function isSpotifyRateLimited(error: unknown): boolean {
   return (
     error instanceof ApiError &&
-    !isRequestLimited(error) &&
-    (error.status === 429 ||
-      error.code === 'SPOTIFY_RATE_LIMITED' ||
-      error.code === 'SPOTIFY_QUOTA_EXCEEDED')
+    error.code !== undefined &&
+    SPOTIFY_THROTTLE_CODES.has(error.code)
   )
 }
 
@@ -136,44 +151,43 @@ function waitCountLabel(
   return t(many, { n })
 }
 
-function formatRetryWaitLabel(
-  t: Translate,
-  seconds: number | null | undefined,
-  quotaExceeded: boolean,
-): string {
-  const wait = formatWaitLabel(t, seconds)
-  if (wait) {
-    return wait
-  }
-  return quotaExceeded
-    ? t('errors.wait.severalHours')
-    : t('errors.wait.seconds', { n: 20 })
-}
-
 function readRetryAfterSeconds(details?: Record<string, unknown>): number | null {
   const retryRaw = details?.retryAfterSeconds
-  if (typeof retryRaw === 'number' && Number.isFinite(retryRaw)) {
+  if (typeof retryRaw === 'number' && Number.isFinite(retryRaw) && retryRaw > 0) {
     return retryRaw
   }
   return null
 }
 
-function mapSpotifyThrottleMessage(
-  error: ApiError,
-  t: Translate,
-): string | null {
-  const retryAfterSeconds = readRetryAfterSeconds(error.details)
-  if (error.code === 'SPOTIFY_QUOTA_EXCEEDED') {
-    return t('errors.spotifyQuota', {
-      wait: formatRetryWaitLabel(t, retryAfterSeconds, true),
-    })
+function readRetryAfterSource(details?: Record<string, unknown>): SpotifyWaitSource | null {
+  const parsed = SpotifyWaitSourceSchema.safeParse(details?.retryAfterSource)
+  return parsed.success ? parsed.data : null
+}
+
+export type SpotifyLimitWait = Readonly<{
+  seconds: number | null | undefined
+  source: SpotifyWaitSource | null | undefined
+}>
+
+export function formatSpotifyLimitMessage(t: Translate, wait: SpotifyLimitWait): string {
+  const label = formatWaitLabel(t, wait.seconds)
+  if (label && wait.source === 'spotify') {
+    return t('errors.spotifyLimit.spotifyWait', { wait: label })
   }
-  if (error.code === 'SPOTIFY_RATE_LIMITED' || error.status === 429) {
-    return t('errors.spotifyRateLimit', {
-      wait: formatRetryWaitLabel(t, retryAfterSeconds, false),
-    })
+  if (label && wait.source === 'blendify') {
+    return t('errors.spotifyLimit.estimate', { wait: label })
   }
-  return null
+  return t('errors.spotifyLimit.unknown')
+}
+
+function mapSpotifyThrottleMessage(error: ApiError, t: Translate): string | null {
+  if (!isSpotifyRateLimited(error)) {
+    return null
+  }
+  return formatSpotifyLimitMessage(t, {
+    seconds: readRetryAfterSeconds(error.details),
+    source: readRetryAfterSource(error.details),
+  })
 }
 
 function mapProviderWaitMessage(error: ApiError, t: Translate): string | null {
@@ -191,16 +205,15 @@ function mapRequestLimitMessage(
   error: ApiError,
   t: Translate,
 ): string | null {
-  const key = requestLimitMessageKey(error)
-  if (!key) {
+  const keys = requestLimitMessageKeys(error)
+  if (!keys) {
     return null
   }
   if (error.code === 'CONCURRENCY_LIMITED') {
-    return t(key)
+    return t(keys.later)
   }
-  return t(key, {
-    wait: formatRetryWaitLabel(t, readRetryAfterSeconds(error.details), false),
-  })
+  const wait = formatWaitLabel(t, readRetryAfterSeconds(error.details))
+  return wait ? t(keys.wait, { wait }) : t(keys.later)
 }
 
 function mapMaxSelectionMessage(
@@ -276,9 +289,8 @@ function mapTransferUnavailableMessage(
   if (error.code !== 'TRANSFER_PROVIDER_UNAVAILABLE') {
     return null
   }
-  return t('transfer.errorUnavailable', {
-    wait: formatRetryWaitLabel(t, readRetryAfterSeconds(error.details), false),
-  })
+  const wait = formatWaitLabel(t, readRetryAfterSeconds(error.details))
+  return wait ? t('transfer.errorUnavailable', { wait }) : t('transfer.errorUnavailableLater')
 }
 
 function mapStaticCodeMessage(
