@@ -21,9 +21,14 @@ versions), never what the user wrote or which music was involved.
    prompt only (`/v1/intent/interpret`), or the AI-safe refinement request
    `{intent, preservation, refinement}` (`/v1/refinement/plan`). Both request
    schemas are strict; anything else is rejected before any network call.
-3. AI service → OpenAI: versioned system instructions plus that request, with
-   `store=false`, no tools, SDK retries off.
-4. OpenAI → AI service → API: a validated structured interpretation.
+3. AI service → configured model provider: versioned system instructions plus
+   that request, through the provider-neutral `IntentModelProvider` interface.
+   OpenAI is currently the supported real model provider; the OpenAI adapter
+   sends requests with `store=false`, no tools, and SDK retries off. These are
+   OpenAI-adapter properties: another provider is not assumed to have the same
+   retention, training, or logging semantics, and its data handling must be
+   reviewed in this document before it is enabled.
+4. Model provider → AI service → API: a validated structured interpretation.
 5. API → Redis: the AI session record (below). No PostgreSQL write.
 6. After the explicit Create playlist action, the API resolves seeds and
    generates tracks against Spotify/Last.fm exactly like Mix/Discover.
@@ -41,7 +46,7 @@ versions), never what the user wrote or which music was involved.
 | | edited playlist title | no | no | yes (`sessionStorage`) | no | no | only if saved to Library |
 | AI-safe structured state | `PlaylistIntent`, `IntentPatch`, preservation, unsupported constraints (may quote user text), clarification | yes (refinement context) | yes | no | no | derived only: `intentKind`, `clarificationReason`, counts | no |
 | Provider-backed content | resolved artists/tracks, IDs, ISRC, URLs, artwork, durations, generated playlist, diff, Spotify playlist link, Soundiiz link | never | yes (execution result, pending candidate, destination) | rendered in the tab; not stored | no | derived only: `trackCount`, `candidateTrackCount`, `addedCount`, `removedCount`, `movedCount` | only if published and saved to Library |
-| Credentials and secrets | `OPENAI_API_KEY`, `AI_SERVICE_TOKEN`, Spotify access/refresh tokens, `blendify_session` cookie, JWT, AI session access key | never | the access key is hashed into the Redis key, never stored as a value | the access key (`sessionStorage`, `accessKey`); sent only in the `X-Ai-Session-Key` header | no | no | Spotify tokens only (existing auth) |
+| Credentials and secrets | `AI_PROVIDER_API_KEY`, `AI_SERVICE_TOKEN`, Spotify access/refresh tokens, `blendify_session` cookie, JWT, AI session access key | never | the access key is hashed into the Redis key, never stored as a value | the access key (`sessionStorage`, `accessKey`); sent only in the `X-Ai-Session-Key` header | no | no | Spotify tokens only (existing auth) |
 | Public session identifier | `sessionId` in `/api/ai/sessions/:sessionId` | never | not stored (derived from the access key on each request) | yes (`sessionStorage`, `sessionId`) | no | no | no |
 | Safe operational metadata | operation, result, typed error code, durations, prompt version, model, provider, request/token counts, booleans | n/a | n/a | n/a | yes | yes | no |
 

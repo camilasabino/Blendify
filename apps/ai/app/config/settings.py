@@ -1,13 +1,12 @@
 import os
 from collections.abc import Mapping
-from typing import Literal, get_args
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, model_validator
 
 MIN_SERVICE_TOKEN_LENGTH = 32
 
 Environment = Literal["development", "production"]
-ModelProviderName = Literal["disabled", "openai"]
 
 
 class Settings(BaseModel):
@@ -15,9 +14,9 @@ class Settings(BaseModel):
 
     environment: Environment
     service_token: SecretStr | None
-    model_provider: ModelProviderName
+    model_provider: str = Field(min_length=1)
     model: str | None = None
-    openai_api_key: SecretStr | None = None
+    provider_api_key: SecretStr | None = None
 
     @property
     def is_production(self) -> bool:
@@ -36,17 +35,6 @@ class Settings(BaseModel):
             )
         return self
 
-    @model_validator(mode="after")
-    def require_model_provider_configuration(self) -> "Settings":
-        if self.model_provider != "openai":
-            return self
-
-        if not self.model or not self.model.strip():
-            raise ValueError("AI_MODEL is required when AI_PROVIDER=openai")
-        if self.openai_api_key is None:
-            raise ValueError("OPENAI_API_KEY is required when AI_PROVIDER=openai")
-        return self
-
 
 class InvalidSettingsError(Exception):
     pass
@@ -56,21 +44,19 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     source = os.environ if environ is None else environ
     environment = source.get("AI_SERVICE_ENV", "development").strip()
     provider = source.get("AI_PROVIDER", "").strip()
-    supported_providers = get_args(ModelProviderName)
 
-    if provider not in supported_providers:
+    if not provider:
         raise InvalidSettingsError(
-            "Invalid AI service environment: AI_PROVIDER must be set explicitly to one of "
-            f"{', '.join(supported_providers)}"
+            "Invalid AI service environment: AI_PROVIDER must be set explicitly"
         )
 
     try:
         return Settings(
             environment=environment,  # type: ignore[arg-type]
             service_token=_secret(source, "AI_SERVICE_TOKEN"),
-            model_provider=provider,  # type: ignore[arg-type]
+            model_provider=provider,
             model=source.get("AI_MODEL", "").strip() or None,
-            openai_api_key=_secret(source, "OPENAI_API_KEY"),
+            provider_api_key=_secret(source, "AI_PROVIDER_API_KEY"),
         )
     except ValidationError as error:
         problems = "; ".join(str(detail["msg"]) for detail in error.errors())

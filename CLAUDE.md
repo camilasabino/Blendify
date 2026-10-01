@@ -82,9 +82,9 @@ Git hooks (Husky + commitlint) enforce Conventional Commits and run lint on pre-
 
 ## Paid AI provider calls
 
-Never execute paid/external AI-provider calls or real-model evals without explicit user approval for that specific run, even if credentials are already configured. This covers OpenAI and any future model provider, real-model evals, paid API smoke tests, manual provider experiments, and submitting prompts to `/app/ai` while `apps/ai/.env` enables a real provider. A configured `OPENAI_API_KEY` is not authorization. Mocked/deterministic tests are unaffected.
+Never execute paid/external AI-provider calls or real-model evals without explicit user approval for that specific run, even if credentials are already configured. This covers OpenAI and any future model provider, real-model evals, paid API smoke tests, manual provider experiments, and submitting prompts to `/app/ai` while `apps/ai/.env` enables a real provider. A configured `AI_PROVIDER_API_KEY` is not authorization. Mocked/deterministic tests are unaffected.
 
-No normal command (dev, start, test, lint, format, build, git/install hooks, CI) may trigger a real model call. `eval:ai` stays manual-only: it refuses to run unless `OPENAI_API_KEY`, `AI_PROVIDER=openai`, `AI_MODEL`, a command-line `ALLOW_PAID_AI_EVALS=true` (never persisted in an env file), and `--confirm` are all present.
+No normal command (dev, start, test, lint, format, build, git/install hooks, CI) may trigger a real model call. `eval:ai` stays manual-only: it refuses to run unless `AI_PROVIDER` names a real (non-`disabled`) provider, `AI_MODEL`, the provider's own requirements (for example `AI_PROVIDER_API_KEY`), a command-line `ALLOW_PAID_AI_EVALS=true` (never persisted in an env file), and `--confirm` are all present.
 
 ## Functional fixes are local-first
 

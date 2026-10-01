@@ -15,7 +15,7 @@ browser ──► Cloudflare (Workers static assets) ─────────
 browser ──► Railway edge (TLS, Let's Encrypt) ─► NestJS ─► https://api.blendify.camilasabino.dev
                                                   │
                                                   └─ Railway private network ─► PostgreSQL, Redis
-                                                                            └─► ai (FastAPI) ─► OpenAI
+                                                                            └─► ai (FastAPI) ─► model provider (OpenAI)
 ```
 
 | Piece | Where | Notes |
@@ -207,7 +207,7 @@ pinned as a root devDependency) declares:
 | `postgres` | Railway PostgreSQL database (`postgres()` helper) |
 | `redis` | Railway Redis database (`redis()` helper) |
 | `api` | Source `github("camilasabino/blendify", { branch: "main" })`, repository root as build context; builder `RAILPACK`; build `npm run build:api`; watch patterns `apps/api/**`, `packages/contracts/**`, `package.json`, `package-lock.json`, `.nvmrc`; pre-deploy `npm run prisma:deploy -w @blendify/api`; start `npm run start:prod -w @blendify/api`; health check `/api/health`, timeout 120 s; 1 replica; restart `ON_FAILURE` (5 retries); `RAILPACK_NODE_NPM_INSTALL=npm ci`; `PORT=8080`; non-secret variables; `DATABASE_URL`/`REDIS_URL` as typed references to the databases; secrets as `preserve()`; AI integration: `AI_SERVICE_URL=http://ai.railway.internal:8000`, `AI_SERVICE_TOKEN` as `preserve()` |
-| `ai` | Source `github("camilasabino/blendify", { branch: "main", rootDirectory: "apps/ai" })`; builder `RAILPACK`; watch pattern `apps/ai/**`; start `python -m app.server`; health check `/health`; region `sfo` with 1 replica; draining 30 s; non-secret variables `AI_SERVICE_ENV`, `PORT`, `AI_PROVIDER`, `AI_MODEL`; `OPENAI_API_KEY` and `AI_SERVICE_TOKEN` as `preserve()` (section 19) |
+| `ai` | Source `github("camilasabino/blendify", { branch: "main", rootDirectory: "apps/ai" })`; builder `RAILPACK`; watch pattern `apps/ai/**`; start `python -m app.server`; health check `/health`; region `sfo` with 1 replica; draining 30 s; non-secret variables `AI_SERVICE_ENV`, `PORT`, `AI_PROVIDER`, `AI_MODEL`; `AI_PROVIDER_API_KEY` and `AI_SERVICE_TOKEN` as `preserve()` (section 19) |
 
 `PORT=8080` is set explicitly; when adding the custom domain in the
 dashboard, target port 8080 so the domain and the port Nest listens on match.
@@ -229,7 +229,7 @@ configuration (see the sections referenced):
   through the same API, see
   [PostgreSQL](#7-postgresql-prisma-migrations-and-backups).
 - Secret values (`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `JWT_SECRET`,
-  `LASTFM_API_KEY` and `AI_SERVICE_TOKEN` on `api`; `OPENAI_API_KEY` and
+  `LASTFM_API_KEY` and `AI_SERVICE_TOKEN` on `api`; `AI_PROVIDER_API_KEY` and
   `AI_SERVICE_TOKEN` on `ai`): declared with `preserve()`, so IaC never writes
   or prints them; set them once in the dashboard (sealed).
 - The absence of a public domain and TCP proxy on `ai`. Undeclared
@@ -387,7 +387,7 @@ private key material to the repository or to logs.
 |---|---|
 | `api` | Railpack with `npm ci`, Node 22, 1 replica, `PORT=8080`, private connections to PostgreSQL and Redis, custom domain `api.blendify.camilasabino.dev` **ACTIVE** on port 8080 (the generated Railway domain was removed), `/api/health` 200, `AI_SERVICE_URL=http://ai.railway.internal:8000`, `AI_SERVICE_TOKEN` sealed, `CLIENT_IP_SOURCE=railway-x-forwarded-for`, `GUEST_TRANSFER_ENABLED=true`, `CLIENT_IP_DIAGNOSTICS` not set |
 | `postgres` | PostgreSQL 18.6, 5 GB volume, private networking only (no public domain, no public TCP proxy), no Railway backups or PITR on Hobby; backups by manual `pg_dump` (section 7) |
-| `ai` | Railpack (Python 3.13, `uv`), root `apps/ai`, 1 replica in `sfo`, draining 30 s, `python -m app.server` on `PORT=8000`, `/health` 200, `AI_SERVICE_ENV=production`, `AI_PROVIDER=openai`, `AI_MODEL=gpt-5.6-luna`, `OPENAI_API_KEY` and `AI_SERVICE_TOKEN` sealed, private networking only (no public domain, no TCP proxy) |
+| `ai` | Railpack (Python 3.13, `uv`), root `apps/ai`, 1 replica in `sfo`, draining 30 s, `python -m app.server` on `PORT=8000`, `/health` 200, `AI_SERVICE_ENV=production`, `AI_PROVIDER=openai`, `AI_MODEL=gpt-5.6-luna`, `AI_PROVIDER_API_KEY` and `AI_SERVICE_TOKEN` sealed, private networking only (no public domain, no TCP proxy) |
 | `redis` | 512 MiB container memory limit, `maxmemory` 256 MiB, `noeviction`, RDB and AOF disabled, authenticated, private networking only (no public domain, no public TCP proxy) |
 
 ### 4.9 Automatic deploys (GitHub trigger)
@@ -1195,7 +1195,7 @@ by a build-time flag (section 19.6).
 
 ```
 browser ──► Cloudflare (SPA) ── no AI URL, no AI credential
-browser ──► api (NestJS, public) ──► ai (FastAPI, private) ──► OpenAI
+browser ──► api (NestJS, public) ──► ai (FastAPI, private) ──► model provider (OpenAI)
                   └──► PostgreSQL, Redis, Spotify, Last.fm, Soundiiz
 ```
 
@@ -1205,7 +1205,7 @@ browser ──► api (NestJS, public) ──► ai (FastAPI, private) ──►
   ownership checks and the provider-content firewall; AI sessions live in
   Redis (30-minute TTL, no PostgreSQL history). `ai` is stateless: restarts
   or replacement lose nothing but the requests in flight.
-- `OPENAI_API_KEY` exists only on `ai`. `AI_SERVICE_TOKEN` exists only on
+- `AI_PROVIDER_API_KEY` (the model-provider credential; an OpenAI key today) exists only on `ai`. `AI_SERVICE_TOKEN` exists only on
   `api` and `ai`.
 - Mix, Discover, Library, publishing and transfer never call `ai`.
 
@@ -1225,9 +1225,10 @@ browser ──► api (NestJS, public) ──► ai (FastAPI, private) ──►
 | Draining | `drainingSeconds: 30` (Railway defaults to 0 s, which cuts a model call in flight on every redeploy; a call takes at most two 12 s model requests) |
 
 Startup fails closed with `AI_SERVICE_ENV=production`: the process exits when
-`AI_SERVICE_TOKEN` is shorter than 32 characters, `AI_PROVIDER` is not
-`openai` or `disabled`, or `AI_PROVIDER=openai` lacks `AI_MODEL` or
-`OPENAI_API_KEY`. Production also hides `/docs` and `/openapi.json`.
+`AI_SERVICE_TOKEN` is shorter than 32 characters, `AI_PROVIDER` is unset or
+not registered (currently `openai` or `disabled`), or the selected provider's
+own requirements fail (`AI_PROVIDER=openai` lacks `AI_MODEL` or
+`AI_PROVIDER_API_KEY`). Production also hides `/docs` and `/openapi.json`.
 
 ### 19.3 Variables
 
@@ -1237,7 +1238,7 @@ Startup fails closed with `AI_SERVICE_ENV=production`: the process exits when
 | `ai` | `PORT` | No | `8000` |
 | `ai` | `AI_PROVIDER` | No | `openai` (`disabled` keeps the service up with interpretation unavailable) |
 | `ai` | `AI_MODEL` | No | `gpt-5.6-luna` |
-| `ai` | `OPENAI_API_KEY` | Yes, `preserve()`, sealed | Production key, never copied from a local `.env` |
+| `ai` | `AI_PROVIDER_API_KEY` | Yes, `preserve()`, sealed | Production key for the configured provider (an OpenAI key today), never copied from a local `.env` |
 | `ai` | `AI_SERVICE_TOKEN` | Yes, `preserve()`, sealed | ≥ 32 random characters, for example `openssl rand -base64 48` |
 | `api` | `AI_SERVICE_URL` | No | `http://ai.railway.internal:8000` (`http`: the private network is already encrypted) |
 | `api` | `AI_SERVICE_TOKEN` | Yes, `preserve()`, sealed | Same value as on `ai` |
@@ -1245,15 +1246,15 @@ Startup fails closed with `AI_SERVICE_ENV=production`: the process exits when
 
 Every route except `/health` requires `Authorization: Bearer <AI_SERVICE_TOKEN>`
 (constant-time comparison; with no token configured those routes reject every
-request). The token is never logged and is not an OpenAI credential. Rotating
+request). The token is never logged and is not a model-provider credential. Rotating
 it needs both services updated: set the new value on `ai` and `api`, then
 redeploy both; requests between the two deploys fail as AI unavailable (Mix
 and Discover are unaffected).
 
-The service sends OpenAI the versioned system prompt and the user's request
-text only (`store=false`, SDK retries off, 12 s per model request, at most two
-requests when the first output is invalid); it never logs prompts or model
-output. `api` waits up to 30 s for `ai`.
+The service sends the configured provider the versioned system prompt and the
+user's request text only (12 s per model request, at most two requests when the
+first output is invalid); it never logs prompts or model output. With the
+current OpenAI adapter requests also use `store=false` and SDK retries off. `api` waits up to 30 s for `ai`.
 
 Known benign log line: the OpenAI SDK's HTTP client logs one INFO line per
 model request, for example
@@ -1261,11 +1262,19 @@ model request, for example
 It contains the method, URL and status only (no prompt, output, headers or
 credentials) and is left as is.
 
+Migrating from `OPENAI_API_KEY`: the service no longer reads `OPENAI_API_KEY`;
+`AI_PROVIDER_API_KEY` replaces it with the same value. With `AI_PROVIDER=openai`
+the new code refuses to start without `AI_PROVIDER_API_KEY`, so before
+deploying a release that includes this change, add the sealed
+`AI_PROVIDER_API_KEY` on `ai` (the previous release ignores it), deploy, check
+the health check, then delete `OPENAI_API_KEY`. Apply `.railway/railway.ts`
+only after the variable exists, because `preserve()` declares a value but never creates it.
+
 ### 19.4 Health
 
 `GET /health` returns `200 {"status":"ok","intentInterpretation":"available"}`
 (`"unavailable"` with `AI_PROVIDER=disabled`). It proves the process is up and
-the configuration was accepted at startup; it never calls OpenAI, so it says
+the configuration was accepted at startup; it never calls the model provider, so it says
 nothing about the key, billing or model access. Railway runs it only during a
 deploy. `GET /api/health` on `api` does not check `ai`, so an `ai` outage never
 blocks an `api` deploy.
@@ -1280,7 +1289,7 @@ AI service only the session's AI-safe intent, the positions or user-authored
 artist names to keep, and the user's refinement text; never tracks, provider IDs
 or destination state. There is no global cap across clients, so the OpenAI
 project budget is the spending backstop and a **prerequisite** for keeping
-`AI_PROVIDER=openai` in production: the production OpenAI project has an
+`AI_PROVIDER=openai` in production: the production OpenAI project (the current provider) has an
 enforced monthly hard limit of USD 5 (requests fail once it is reached; not
 alert-only) with notifications at 50 %, 80 % and 100 %. When the limit is hit,
 `ai` reports the provider as unavailable and `api` answers `AI_UNAVAILABLE`;
@@ -1311,9 +1320,9 @@ smoke (Guest and Spotify Mode) and the VoiceOver check had passed.
 | Hide the feature durably | Remove `VITE_AI_CREATION_ENABLED` from `deploy-web.yml` and push | Next web deploy has no `/app/ai` |
 | Too much AI traffic | `RATE_LIMIT_OVERRIDES=interpret=1/3600` on `api` | `api` redeploys; interpretations nearly stop |
 | `api` ↔ `ai` integration | Unset `AI_SERVICE_URL` on `api` | `api` redeploys and reports AI unavailable without any network call |
-| `ai` or OpenAI problem | `AI_PROVIDER=disabled` on `ai`, or stop the `ai` deployment | Interpretation unavailable; `api` answers `AI_UNAVAILABLE`, Mix/Discover unaffected |
+| `ai` or model-provider problem | `AI_PROVIDER=disabled` on `ai`, or stop the `ai` deployment | Interpretation unavailable; `api` answers `AI_UNAVAILABLE`, Mix/Discover unaffected |
 | Bad `ai` release | Railway → `ai` → Deployments → roll back to the previous successful deployment | Previous image serves again; nothing to migrate |
-| Leaked or suspect OpenAI key | Revoke the key in the OpenAI dashboard, then set a new sealed `OPENAI_API_KEY` on `ai` | Calls fail as unavailable until `ai` redeploys with the new key |
+| Leaked or suspect provider key | Revoke the key in the provider dashboard (OpenAI today), then set a new sealed `AI_PROVIDER_API_KEY` on `ai` | Calls fail as unavailable until `ai` redeploys with the new key |
 
 None of these touches PostgreSQL; AI sessions in Redis expire on their own
 within 30 minutes. Removing the `ai` service is never required for a rollback.
@@ -1355,17 +1364,17 @@ plan stays at the known drift.
 ### Real-model evals (manual, paid)
 
 Real-model evals are never part of CI. The `test-ai` job uses fakes only and
-needs no `OPENAI_API_KEY`. Locally, the eval runs only as
-`ALLOW_PAID_AI_EVALS=true npm run eval:ai -- --confirm` with `AI_PROVIDER=openai`,
-`AI_MODEL` and `OPENAI_API_KEY` configured; the runner refuses before any request
-if any of them is missing, or if `ALLOW_PAID_AI_EVALS` is persisted in `apps/ai/.env`
+needs no `AI_PROVIDER_API_KEY`. Locally, the eval runs only as
+`ALLOW_PAID_AI_EVALS=true npm run eval:ai -- --confirm` with a real (non-`disabled`)
+`AI_PROVIDER`, `AI_MODEL` and the provider's credential (`AI_PROVIDER_API_KEY`)
+configured; the provider is built through the same registry as the service. The runner
+refuses before any request if any of them is missing, or if `ALLOW_PAID_AI_EVALS` is persisted in `apps/ai/.env`
 (flags are never abbreviated: `--confirm` must be written in full). `--suite intent` (default) or
 `--suite refinement` selects the dataset. A run uses the production prompt, output schema,
-validation and attempt bound, is capped at `cases × 2` model requests and 4,000 output tokens per
-request, and stops on the first rate-limit or unavailable-provider error.
+validation and attempt bound, is capped at `cases × 2` model requests, and stops on the first rate-limit or unavailable-provider error.
 
 Each run writes one JSON report to `apps/ai/evals/results/` (gitignored, local only): suite,
-configured and returned model, prompt and dataset versions with their SHA-256, model settings,
+configured provider, configured and returned model, prompt and dataset versions with their SHA-256, provider-neutral run settings (attempt bound, call timeout),
 pass/fail per case, failed and errored case ids, model requests (every request, including invalid
 outputs and retries), retries, input/output/total tokens as reported by the provider and whether
 usage was complete (never estimated). It never contains secrets or raw provider responses; the
@@ -1382,6 +1391,6 @@ No GitHub eval workflow exists yet. If one is added, it must be a separate
    self-review** off while you are the only reviewer, or the run cannot be
    approved.
 3. **Deployment branches and tags** → Selected branches → `main` only.
-4. Add `OPENAI_API_KEY` as an **environment secret** of `ai-evals`, never as a
+4. Add `AI_PROVIDER_API_KEY` as an **environment secret** of `ai-evals`, never as a
    repository secret, so only approved jobs in that environment can read it.
-5. Optionally set a spending limit for the project in the OpenAI dashboard.
+5. Optionally set a spending limit for the project in the model provider's dashboard.

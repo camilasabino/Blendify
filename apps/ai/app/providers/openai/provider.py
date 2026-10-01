@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Mapping
 
 import httpx2
@@ -13,18 +14,21 @@ from app.providers.model_provider import (
     ModelIntentResult,
     ModelInvalidOutputError,
     ModelOutputSpec,
+    ModelProviderConfig,
+    ModelProviderSetupError,
     ModelRateLimitedError,
     ModelTimeoutError,
     ModelTokenUsage,
     ModelUnavailableError,
 )
-from app.providers.openai_output_schema import (
+from app.providers.openai.output_schema import (
     MODEL_OUTPUT_RESULT_FIELD,
     JsonSchema,
     build_model_output_schema,
 )
 
 OPENAI_PROVIDER_NAME = "openai"
+OPENAI_SDK_LOGGER_NAME = "openai"
 MODEL_MAX_OUTPUT_TOKENS = 4_000
 MODEL_SDK_MAX_RETRIES = 0
 MODEL_STORES_RESPONSES = False
@@ -48,6 +52,9 @@ class OpenAIIntentModelProvider:
         timeout_seconds: float,
         http_client: httpx2.AsyncClient | None = None,
     ) -> None:
+        # SDK debug logs include request bodies, which carry the user's prompt.
+        logging.getLogger(OPENAI_SDK_LOGGER_NAME).setLevel(logging.WARNING)
+
         self._model = model
         self._output_schemas: dict[str, JsonSchema] = {}
         self._client = AsyncOpenAI(
@@ -96,6 +103,19 @@ class OpenAIIntentModelProvider:
         if output.name not in self._output_schemas:
             self._output_schemas[output.name] = build_model_output_schema(output.result_type)
         return self._output_schemas[output.name]
+
+
+def build_openai_provider(config: ModelProviderConfig) -> OpenAIIntentModelProvider:
+    if config.model is None:
+        raise ModelProviderSetupError("AI_MODEL is required when AI_PROVIDER=openai")
+    if config.api_key is None:
+        raise ModelProviderSetupError("AI_PROVIDER_API_KEY is required when AI_PROVIDER=openai")
+
+    return OpenAIIntentModelProvider(
+        api_key=config.api_key.get_secret_value(),
+        model=config.model,
+        timeout_seconds=config.timeout_seconds,
+    )
 
 
 def _to_provider_error(error: openai.APIError) -> Exception:

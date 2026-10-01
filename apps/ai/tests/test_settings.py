@@ -1,16 +1,13 @@
 import pytest
 
 from app.config.settings import InvalidSettingsError, load_settings
-from app.interpretation.structured_model_call import MODEL_CALL_TIMEOUT_SECONDS
 from app.main import create_app
-from app.providers.disabled import DisabledModelProvider
-from app.providers.openai_provider import OpenAIIntentModelProvider
-from app.providers.selection import select_model_provider
+from tests.fakes import ScriptedModelProvider
 
 PRODUCTION_TOKEN = "p" * 32
-OPENAI_KEY = "sk-test-openai-key-never-rendered"
-OPENAI_MODEL = "gpt-test-model"
-OPENAI_ENV = {"AI_PROVIDER": "openai", "AI_MODEL": OPENAI_MODEL, "OPENAI_API_KEY": OPENAI_KEY}
+PROVIDER_KEY = "sk-test-provider-key-never-rendered"
+MODEL = "test-model"
+PROVIDER_ENV = {"AI_PROVIDER": "fake", "AI_MODEL": MODEL, "AI_PROVIDER_API_KEY": PROVIDER_KEY}
 PRODUCTION_ENV = {
     "AI_SERVICE_ENV": "production",
     "AI_SERVICE_TOKEN": PRODUCTION_TOKEN,
@@ -25,7 +22,7 @@ def test_disabled_development_starts_without_a_service_token_model_or_key() -> N
     assert settings.service_token is None
     assert settings.model_provider == "disabled"
     assert settings.model is None
-    assert settings.openai_api_key is None
+    assert settings.provider_api_key is None
 
 
 def test_production_requires_a_long_service_token() -> None:
@@ -49,34 +46,24 @@ def test_model_provider_must_be_explicit(environment: str) -> None:
         load_settings(environ)
 
 
-@pytest.mark.parametrize("provider", ["somevendor", "OpenAI", " "])
-def test_unsupported_model_provider_is_rejected(provider: str) -> None:
-    with pytest.raises(InvalidSettingsError, match="one of disabled, openai"):
-        load_settings({"AI_PROVIDER": provider})
+def test_blank_model_provider_is_rejected() -> None:
+    with pytest.raises(InvalidSettingsError, match="AI_PROVIDER must be set explicitly"):
+        load_settings({"AI_PROVIDER": " "})
 
 
-@pytest.mark.parametrize("environment", ["development", "production"])
-def test_openai_provider_requires_a_model(environment: str) -> None:
-    environ = {**PRODUCTION_ENV, **OPENAI_ENV, "AI_SERVICE_ENV": environment, "AI_MODEL": " "}
+def test_settings_carry_any_provider_name_and_leave_validation_to_the_registry() -> None:
+    settings = load_settings({**PROVIDER_ENV, "AI_PROVIDER": "somevendor"})
 
-    with pytest.raises(InvalidSettingsError, match="AI_MODEL is required"):
-        load_settings(environ)
-
-
-@pytest.mark.parametrize("environment", ["development", "production"])
-def test_openai_provider_requires_an_api_key(environment: str) -> None:
-    environ = {**PRODUCTION_ENV, **OPENAI_ENV, "AI_SERVICE_ENV": environment}
-    del environ["OPENAI_API_KEY"]
-
-    with pytest.raises(InvalidSettingsError, match="OPENAI_API_KEY is required"):
-        load_settings(environ)
+    assert settings.model_provider == "somevendor"
+    assert settings.model == MODEL
+    assert settings.provider_api_key is not None
+    assert settings.provider_api_key.get_secret_value() == PROVIDER_KEY
 
 
-def test_openai_provider_uses_exactly_the_configured_model() -> None:
-    settings = load_settings({**PRODUCTION_ENV, **OPENAI_ENV})
+def test_model_is_an_opaque_string() -> None:
+    settings = load_settings({**PROVIDER_ENV, "AI_MODEL": "  Any/Model:Name-1  "})
 
-    assert settings.model_provider == "openai"
-    assert settings.model == OPENAI_MODEL
+    assert settings.model == "Any/Model:Name-1"
 
 
 def test_unknown_environment_is_rejected() -> None:
@@ -85,25 +72,21 @@ def test_unknown_environment_is_rejected() -> None:
 
 
 def test_secrets_are_never_rendered() -> None:
-    settings = load_settings({**PRODUCTION_ENV, **OPENAI_ENV})
+    settings = load_settings({**PRODUCTION_ENV, **PROVIDER_ENV})
 
     assert PRODUCTION_TOKEN not in repr(settings)
-    assert OPENAI_KEY not in repr(settings)
+    assert PROVIDER_KEY not in repr(settings)
+    assert PROVIDER_KEY not in str(settings.model_dump())
 
 
-def test_selects_the_openai_provider_only_when_configured() -> None:
-    openai_settings = load_settings(OPENAI_ENV)
+def test_the_provider_key_is_not_kept_on_application_state() -> None:
+    settings = load_settings({**PRODUCTION_ENV, **PROVIDER_ENV})
+    provider = ScriptedModelProvider([])
 
-    assert isinstance(
-        select_model_provider(openai_settings, MODEL_CALL_TIMEOUT_SECONDS),
-        OpenAIIntentModelProvider,
-    )
-    assert isinstance(
-        select_model_provider(
-            load_settings({"AI_PROVIDER": "disabled"}), MODEL_CALL_TIMEOUT_SECONDS
-        ),
-        DisabledModelProvider,
-    )
+    app = create_app(settings, provider)
+
+    assert app.state.settings.provider_api_key is None
+    assert PROVIDER_KEY not in repr(app.state.settings)
 
 
 def test_production_app_hides_interactive_docs() -> None:

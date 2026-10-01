@@ -21,13 +21,9 @@ from app.interpretation.structured_model_call import (
 from app.models.interpretation import InterpretIntentRequest
 from app.prompts.intent import INTENT_PROMPT_VERSION, INTENT_SYSTEM_PROMPT
 from app.prompts.refinement import REFINEMENT_PROMPT_VERSION, REFINEMENT_SYSTEM_PROMPT
-from app.providers.model_provider import IntentModelProvider
-from app.providers.openai_provider import (
-    MODEL_MAX_OUTPUT_TOKENS,
-    MODEL_SDK_MAX_RETRIES,
-    MODEL_STORES_RESPONSES,
-    OpenAIIntentModelProvider,
-)
+from app.providers.disabled import DISABLED_PROVIDER_NAME
+from app.providers.model_provider import IntentModelProvider, ModelProviderSetupError
+from app.providers.registry import build_model_provider
 from evals import intent_eval, refinement_eval
 from evals.intent_eval import (
     EvalCase,
@@ -47,7 +43,6 @@ APP_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = APP_ROOT / "evals" / "results"
 ENV_FILE = APP_ROOT / ".env"
 
-EVAL_PROVIDER = "openai"
 PAID_EVAL_OPT_IN_VARIABLE = "ALLOW_PAID_AI_EVALS"
 PAID_EVAL_OPT_IN_VALUE = "true"
 PAID_EVAL_COMMAND = f"{PAID_EVAL_OPT_IN_VARIABLE}=true npm run eval:ai -- --confirm"
@@ -150,10 +145,8 @@ class EvalPlan:
 
 def missing_paid_eval_requirements(environ: Mapping[str, str], *, confirmed: bool) -> list[str]:
     missing: list[str] = []
-    if not environ.get("OPENAI_API_KEY", "").strip():
-        missing.append("OPENAI_API_KEY")
-    if environ.get("AI_PROVIDER", "").strip() != EVAL_PROVIDER:
-        missing.append(f"AI_PROVIDER={EVAL_PROVIDER}")
+    if environ.get("AI_PROVIDER", "").strip() in ("", DISABLED_PROVIDER_NAME):
+        missing.append("AI_PROVIDER (a model provider, not disabled)")
     if not environ.get("AI_MODEL", "").strip():
         missing.append("AI_MODEL")
     if environ.get(PAID_EVAL_OPT_IN_VARIABLE, "").strip() != PAID_EVAL_OPT_IN_VALUE:
@@ -182,14 +175,11 @@ def authorize_paid_eval(environ: Mapping[str, str], *, confirmed: bool) -> Setti
         raise EvalPreflightError(str(error)) from None
 
 
-def build_eval_provider(settings: Settings) -> OpenAIIntentModelProvider:
-    if settings.model is None or settings.openai_api_key is None:
-        raise EvalPreflightError("AI_MODEL and OPENAI_API_KEY are required to run the eval.")
-    return OpenAIIntentModelProvider(
-        api_key=settings.openai_api_key.get_secret_value(),
-        model=settings.model,
-        timeout_seconds=MODEL_CALL_TIMEOUT_SECONDS,
-    )
+def build_eval_provider(settings: Settings) -> IntentModelProvider:
+    try:
+        return build_model_provider(settings, MODEL_CALL_TIMEOUT_SECONDS)
+    except ModelProviderSetupError as error:
+        raise EvalPreflightError(f"Invalid AI service environment: {error}") from None
 
 
 def _opt_in_is_persisted(env_file: Path) -> bool:
@@ -219,10 +209,10 @@ def plan_eval(
     )
 
 
-def preflight_lines(plan: EvalPlan) -> list[str]:
+def preflight_lines(plan: EvalPlan, provider_name: str) -> list[str]:
     return [
         f"Paid real-model {plan.suite.name} eval",
-        f"  provider:                 {EVAL_PROVIDER}",
+        f"  provider:                 {provider_name}",
         f"  model:                    {plan.model}",
         f"  prompt version:           {plan.suite.prompt_version}",
         f"  dataset:                  {plan.dataset_version}"
@@ -230,8 +220,6 @@ def preflight_lines(plan: EvalPlan) -> list[str]:
         f"  cases:                    {len(plan.cases)}",
         f"  max model requests:       {plan.request_budget}"
         f" ({MAX_PROVIDER_REQUESTS_PER_CASE} per case)",
-        f"  max output tokens/request: {MODEL_MAX_OUTPUT_TOKENS}",
-        f"  max output tokens/run:    {plan.request_budget * MODEL_MAX_OUTPUT_TOKENS}",
         f"  paid execution:           explicitly enabled ({PAID_EVAL_OPT_IN_VARIABLE}, --confirm)",
     ]
 
@@ -314,7 +302,7 @@ def _report(
     return {
         "ranAt": datetime.now(UTC).isoformat(),
         "suite": plan.suite.name,
-        "provider": EVAL_PROVIDER,
+        "provider": metered.name,
         "model": plan.model,
         "responseModels": sorted({record.model for record in metered.records if record.model}),
         "promptVersion": plan.suite.prompt_version,
@@ -323,13 +311,8 @@ def _report(
         "datasetSha256": _sha256(plan.suite.dataset_path.read_bytes()),
         "caseFilter": list(plan.case_filter) or None,
         "modelSettings": {
-            "maxOutputTokensPerRequest": MODEL_MAX_OUTPUT_TOKENS,
             "maxModelRequestsPerCase": MAX_PROVIDER_REQUESTS_PER_CASE,
             "modelCallTimeoutSeconds": MODEL_CALL_TIMEOUT_SECONDS,
-            "sdkMaxRetries": MODEL_SDK_MAX_RETRIES,
-            "storesResponses": MODEL_STORES_RESPONSES,
-            "temperature": None,
-            "reasoningEffort": None,
         },
         "plannedCases": len(plan.cases),
         "cases": len(results),
@@ -393,7 +376,7 @@ def main(argv: Sequence[str] | None = None, environ: Mapping[str, str] | None = 
     except EvalPreflightError as error:
         raise SystemExit(str(error)) from None
 
-    print("\n".join(preflight_lines(plan)), flush=True)
+    print("\n".join(preflight_lines(plan, provider.name)), flush=True)
     report = asyncio.run(run_eval(plan, provider))
 
     RESULTS_DIR.mkdir(exist_ok=True)

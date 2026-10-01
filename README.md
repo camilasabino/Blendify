@@ -94,11 +94,11 @@ flowchart TD
     API --> PG[("PostgreSQL<br/>accounts, Library, Stats")]
     API --> Redis[("Redis<br/>cache, rate limits, AI sessions")]
     API -->|"private network, bearer token"| AI["FastAPI AI service<br/>private, stateless"]
-    AI --> OpenAI["OpenAI"]
+    AI --> Model["Configured model provider<br/>(OpenAI today)"]
 ```
 
 - The browser talks only to the NestJS API. The AI service has no public
-  domain, and its bearer token and the OpenAI key never reach the browser.
+  domain, and its bearer token and the model-provider key never reach the browser.
 - The AI service receives only user-authored text and AI-safe structured
   state. It never receives provider data, IDs, URLs, or tokens, and it never
   calls Spotify, Last.fm, or Soundiiz.
@@ -186,9 +186,9 @@ npm run dev:ai                         # http://127.0.0.1:8000/health
 
 Set `AI_SERVICE_URL` and `AI_SERVICE_TOKEN` in `apps/api/.env` so the API can
 reach it. `AI_PROVIDER` has no default: use `disabled` to keep interpretation
-unavailable, or `openai` with `AI_MODEL` and `OPENAI_API_KEY` (read only by the
-AI service). With `openai`, every interpretation or refinement request is a
-paid model call. `npm run start` also starts the service when `uv` and
+unavailable, or a real provider (currently `openai`) with `AI_MODEL` and
+`AI_PROVIDER_API_KEY` (read only by the AI service). With a real provider,
+every interpretation or refinement request is a paid model call. `npm run start` also starts the service when `uv` and
 `apps/ai/.env` are present.
 
 Automated tests, lint, and CI use fakes and never call a real model.

@@ -19,6 +19,7 @@ from evals.refinement_eval import (
 )
 from evals.run_intent_eval import REFINEMENT_SUITE, EvalPlan, main, preflight_lines, run_eval
 from tests.fakes import (
+    FAKE_PROVIDER,
     ScriptedModelProvider,
     refinement_clarification,
     refinement_output,
@@ -808,10 +809,10 @@ def test_rejects_an_interpreted_prompt_injection() -> None:
 
 def test_preflight_states_the_refinement_run_bounds() -> None:
     plan = EvalPlan(
-        model="gpt-5.6-luna", dataset_version=DATASET_VERSION, cases=CASES, suite=REFINEMENT_SUITE
+        model="test-model", dataset_version=DATASET_VERSION, cases=CASES, suite=REFINEMENT_SUITE
     )
 
-    preflight = "\n".join(preflight_lines(plan))
+    preflight = "\n".join(preflight_lines(plan, FAKE_PROVIDER))
 
     assert plan.request_budget == len(CASES) * MAX_OUTPUT_VALIDATION_ATTEMPTS
     assert "Paid real-model refinement eval" in preflight
@@ -847,12 +848,12 @@ def test_the_refinement_suite_is_refused_without_explicit_paid_authorization(
 ) -> None:
     constructed: list[object] = []
     monkeypatch.setattr(
-        run_intent_eval, "OpenAIIntentModelProvider", lambda **kwargs: constructed.append(kwargs)
+        run_intent_eval, "build_model_provider", lambda *args: constructed.append(args)
     )
     monkeypatch.setattr(run_intent_eval, "ENV_FILE", Path("/nonexistent/.env"))
 
     with pytest.raises(SystemExit, match="paid operation"):
-        main(["--suite", "refinement"], {"AI_PROVIDER": "openai", "AI_MODEL": "gpt-test"})
+        main(["--suite", "refinement"], {"AI_PROVIDER": FAKE_PROVIDER, "AI_MODEL": "test-model"})
 
     assert constructed == []
 

@@ -10,9 +10,7 @@ from app.interpretation.refinement_planner import RefinementPlanner
 from app.interpretation.structured_model_call import MODEL_CALL_TIMEOUT_SECONDS
 from app.observability.request_correlation import RequestCorrelationMiddleware
 from app.providers.model_provider import IntentModelProvider
-from app.providers.selection import select_model_provider
-
-SDK_LOGGER_NAMES = ("openai",)
+from app.providers.registry import build_model_provider
 
 
 def create_app(
@@ -21,9 +19,6 @@ def create_app(
 ) -> FastAPI:
     resolved_settings = settings or load_settings()
     logging.basicConfig(level=logging.INFO)
-    # SDK debug logs include request bodies, which carry the user's prompt.
-    for logger_name in SDK_LOGGER_NAMES:
-        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
     app = FastAPI(
         title="Blendify AI service",
@@ -31,10 +26,8 @@ def create_app(
         redoc_url=None,
         openapi_url=None if resolved_settings.is_production else "/openapi.json",
     )
-    app.state.settings = resolved_settings
-    model_provider = provider or select_model_provider(
-        resolved_settings, MODEL_CALL_TIMEOUT_SECONDS
-    )
+    model_provider = provider or build_model_provider(resolved_settings, MODEL_CALL_TIMEOUT_SECONDS)
+    app.state.settings = resolved_settings.model_copy(update={"provider_api_key": None})
     app.state.intent_interpreter = IntentInterpreter(model_provider)
     app.state.refinement_planner = RefinementPlanner(model_provider)
 

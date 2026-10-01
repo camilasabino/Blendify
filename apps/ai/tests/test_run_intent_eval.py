@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from app.config.settings import Settings
 from app.interpretation.structured_model_call import MAX_OUTPUT_VALIDATION_ATTEMPTS
 from app.providers.model_provider import (
     ModelConfigurationError,
@@ -18,15 +19,22 @@ from evals.run_intent_eval import (
     preflight_lines,
     run_eval,
 )
-from tests.fakes import FAKE_MODEL, FAKE_USAGE, ScriptedModelProvider, interpreted_output
+from tests.fakes import (
+    FAKE_MODEL,
+    FAKE_PROVIDER,
+    FAKE_USAGE,
+    ScriptedModelProvider,
+    interpreted_output,
+)
 
 API_KEY = "sk-test-key-that-must-never-be-printed"
 AUTHORIZED_ENV = {
-    "AI_PROVIDER": "openai",
-    "AI_MODEL": "gpt-test-model",
-    "OPENAI_API_KEY": API_KEY,
+    "AI_PROVIDER": FAKE_PROVIDER,
+    "AI_MODEL": "test-model",
+    "AI_PROVIDER_API_KEY": API_KEY,
     "ALLOW_PAID_AI_EVALS": "true",
 }
+PROVIDER_REQUIREMENT = "AI_PROVIDER (a model provider, not disabled)"
 MATCHING_CASE = EvalCase(
     id="matching",
     language="en",
@@ -53,7 +61,7 @@ def forbid_provider(monkeypatch: pytest.MonkeyPatch) -> list[object]:
         constructed.append((args, kwargs))
         raise AssertionError("the eval built a real provider before authorization")
 
-    monkeypatch.setattr(run_intent_eval, "OpenAIIntentModelProvider", refuse)
+    monkeypatch.setattr(run_intent_eval, "build_model_provider", refuse)
     monkeypatch.setattr(run_intent_eval, "ENV_FILE", Path("/nonexistent/.env"))
     return constructed
 
@@ -61,11 +69,6 @@ def forbid_provider(monkeypatch: pytest.MonkeyPatch) -> list[object]:
 @pytest.mark.parametrize(
     ("environ", "argv", "missing"),
     [
-        (
-            {key: value for key, value in AUTHORIZED_ENV.items() if key != "OPENAI_API_KEY"},
-            ["--confirm"],
-            "OPENAI_API_KEY",
-        ),
         (
             {key: value for key, value in AUTHORIZED_ENV.items() if key != "ALLOW_PAID_AI_EVALS"},
             ["--confirm"],
@@ -76,9 +79,9 @@ def forbid_provider(monkeypatch: pytest.MonkeyPatch) -> list[object]:
         (
             {key: value for key, value in AUTHORIZED_ENV.items() if key != "AI_PROVIDER"},
             ["--confirm"],
-            "AI_PROVIDER=openai",
+            PROVIDER_REQUIREMENT,
         ),
-        ({**AUTHORIZED_ENV, "AI_PROVIDER": "disabled"}, ["--confirm"], "AI_PROVIDER=openai"),
+        ({**AUTHORIZED_ENV, "AI_PROVIDER": "disabled"}, ["--confirm"], PROVIDER_REQUIREMENT),
         ({**AUTHORIZED_ENV, "AI_MODEL": " "}, ["--confirm"], "AI_MODEL"),
     ],
 )
@@ -104,9 +107,8 @@ def test_lists_every_missing_requirement(forbid_provider: list[object]) -> None:
     with pytest.raises(SystemExit) as exit_info:
         main([], {})
 
-    assert (
-        "Missing: OPENAI_API_KEY, AI_PROVIDER=openai, AI_MODEL, ALLOW_PAID_AI_EVALS=true, --confirm"
-        in str(exit_info.value)
+    assert f"Missing: {PROVIDER_REQUIREMENT}, AI_MODEL, ALLOW_PAID_AI_EVALS=true, --confirm" in str(
+        exit_info.value
     )
     assert forbid_provider == []
 
@@ -115,7 +117,7 @@ def test_refuses_an_opt_in_persisted_in_the_env_file(
     forbid_provider: list[object], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     env_file = tmp_path / ".env"
-    env_file.write_text("AI_PROVIDER=openai\nexport ALLOW_PAID_AI_EVALS=true\n")
+    env_file.write_text(f"AI_PROVIDER={FAKE_PROVIDER}\nexport ALLOW_PAID_AI_EVALS=true\n")
     monkeypatch.setattr(run_intent_eval, "ENV_FILE", env_file)
 
     with pytest.raises(SystemExit, match="only on the command line"):
@@ -127,20 +129,23 @@ def test_refuses_an_opt_in_persisted_in_the_env_file(
 def test_preflight_uses_exactly_the_configured_model(
     forbid_provider: list[object], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    built: list[dict[str, object]] = []
-    monkeypatch.setattr(
-        run_intent_eval, "OpenAIIntentModelProvider", lambda **kwargs: built.append(kwargs)
-    )
+    built: list[Settings] = []
+
+    def record(settings: Settings, timeout_seconds: float) -> ScriptedModelProvider:
+        built.append(settings)
+        return ScriptedModelProvider([])
+
+    monkeypatch.setattr(run_intent_eval, "build_model_provider", record)
 
     async def skip_run(plan: EvalPlan, provider: object) -> None:
         raise SystemExit(f"planned {plan.model}")
 
     monkeypatch.setattr(run_intent_eval, "run_eval", skip_run)
 
-    with pytest.raises(SystemExit, match="planned gpt-test-model"):
+    with pytest.raises(SystemExit, match="planned test-model"):
         main(["--confirm"], AUTHORIZED_ENV)
 
-    assert [call["model"] for call in built] == ["gpt-test-model"]
+    assert [(call.model_provider, call.model) for call in built] == [(FAKE_PROVIDER, "test-model")]
 
 
 def test_refuses_unknown_case_ids(forbid_provider: list[object]) -> None:
@@ -152,13 +157,14 @@ def test_refuses_unknown_case_ids(forbid_provider: list[object]) -> None:
 
 def test_preflight_states_the_run_bounds_without_secrets_or_prompts() -> None:
     dataset_version, cases = load_dataset()
-    plan = EvalPlan(model="gpt-5.6-luna", dataset_version=dataset_version, cases=cases)
+    plan = EvalPlan(model="test-model", dataset_version=dataset_version, cases=cases)
 
-    preflight = "\n".join(preflight_lines(plan))
+    preflight = "\n".join(preflight_lines(plan, FAKE_PROVIDER))
 
     assert plan.request_budget == len(cases) * MAX_OUTPUT_VALIDATION_ATTEMPTS
     assert f"max model requests:       {plan.request_budget}" in preflight
-    assert "gpt-5.6-luna" in preflight
+    assert f"provider:                 {FAKE_PROVIDER}" in preflight
+    assert "model:                    test-model" in preflight
     assert "intent-eval-v6" in preflight
     assert "intent-v6" in preflight
     assert "explicitly enabled" in preflight
@@ -409,7 +415,7 @@ def test_expectation_statuses_distinguish_failed_and_unchecked_keys() -> None:
 
 @pytest.mark.anyio
 async def test_report_records_reproducibility_metadata_without_secrets() -> None:
-    plan = EvalPlan(model="gpt-test-model", dataset_version="test", cases=[MATCHING_CASE])
+    plan = EvalPlan(model="test-model", dataset_version="test", cases=[MATCHING_CASE])
 
     report = await run_eval(plan, ScriptedModelProvider([interpreted_output()]))
 
@@ -417,14 +423,12 @@ async def test_report_records_reproducibility_metadata_without_secrets() -> None
     assert len(report["promptSha256"]) == 64  # type: ignore[arg-type]
     assert len(report["datasetSha256"]) == 64  # type: ignore[arg-type]
     assert report["caseFilter"] is None
+    assert report["provider"] == FAKE_PROVIDER
+    assert report["model"] == "test-model"
+    assert report["responseModels"] == [FAKE_MODEL]
     assert report["modelSettings"] == {
-        "maxOutputTokensPerRequest": 4_000,
         "maxModelRequestsPerCase": MAX_OUTPUT_VALIDATION_ATTEMPTS,
         "modelCallTimeoutSeconds": 12.0,
-        "sdkMaxRetries": 0,
-        "storesResponses": False,
-        "temperature": None,
-        "reasoningEffort": None,
     }
     assert API_KEY not in str(report)
 

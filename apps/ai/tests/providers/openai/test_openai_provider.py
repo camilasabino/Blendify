@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx2
 import pytest
+from pydantic import SecretStr
 
 from app.config.settings import Settings
 from app.prompts.intent import (
@@ -15,12 +16,18 @@ from app.prompts.intent import (
 from app.providers.model_provider import (
     ModelConfigurationError,
     ModelInvalidOutputError,
+    ModelProviderConfig,
+    ModelProviderSetupError,
     ModelRateLimitedError,
     ModelTimeoutError,
     ModelTokenUsage,
     ModelUnavailableError,
 )
-from app.providers.openai_provider import MODEL_MAX_OUTPUT_TOKENS, OpenAIIntentModelProvider
+from app.providers.openai.provider import (
+    MODEL_MAX_OUTPUT_TOKENS,
+    OpenAIIntentModelProvider,
+    build_openai_provider,
+)
 from tests.conftest import AUTH_HEADERS, ClientFactory
 from tests.fakes import interpreted_output
 
@@ -259,3 +266,53 @@ def test_service_normalizes_provider_failures(
 
     assert response.status_code == service_status
     assert response.json()["code"] == service_code
+
+
+async def test_does_not_retry_transient_failures_inside_the_sdk() -> None:
+    calls: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls.append(request)
+        return httpx2.Response(500, json=error_body("server_error"))
+
+    with pytest.raises(ModelUnavailableError):
+        await generate(handler)
+
+    assert len(calls) == 1
+
+
+def test_keeps_the_sdk_logger_from_emitting_request_bodies() -> None:
+    sdk_logger = logging.getLogger("openai")
+    sdk_logger.setLevel(logging.DEBUG)
+
+    build_provider(json_handler(200, responses_body()))
+
+    assert sdk_logger.level == logging.WARNING
+
+
+def test_the_factory_builds_the_adapter_from_the_generic_configuration() -> None:
+    provider = build_openai_provider(
+        ModelProviderConfig(model=MODEL, api_key=SecretStr(API_KEY), timeout_seconds=5.0)
+    )
+
+    assert isinstance(provider, OpenAIIntentModelProvider)
+    assert provider.name == "openai"
+    assert provider.is_available is True
+
+
+@pytest.mark.parametrize(
+    ("model", "api_key", "missing"),
+    [
+        (None, SecretStr(API_KEY), "AI_MODEL"),
+        (MODEL, None, "AI_PROVIDER_API_KEY"),
+    ],
+)
+def test_the_factory_requires_a_model_and_a_credential(
+    model: str | None, api_key: SecretStr | None, missing: str
+) -> None:
+    with pytest.raises(ModelProviderSetupError, match=f"{missing} is required") as raised:
+        build_openai_provider(
+            ModelProviderConfig(model=model, api_key=api_key, timeout_seconds=5.0)
+        )
+
+    assert API_KEY not in str(raised.value)

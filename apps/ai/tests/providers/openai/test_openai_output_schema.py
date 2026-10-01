@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from app.models.intent import IntentInterpretation, intent_interpretation_adapter
 from app.models.refinement import RefinementInterpretation, refinement_interpretation_adapter
-from app.providers.openai_output_schema import (
+from app.providers.openai.output_schema import (
     STRICT_MODE_KEYWORDS,
     build_model_output_schema,
 )

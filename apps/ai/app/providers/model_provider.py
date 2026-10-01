@@ -2,6 +2,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from pydantic import SecretStr
+
 ModelConfigurationReason = Literal[
     "authentication",
     "permission_denied",
@@ -40,6 +42,13 @@ class ModelIntentResult:
     usage: ModelTokenUsage | None
 
 
+@dataclass(frozen=True, slots=True)
+class ModelProviderConfig:
+    model: str | None
+    api_key: SecretStr | None
+    timeout_seconds: float
+
+
 class IntentModelProvider(Protocol):
     @property
     def name(self) -> str: ...
@@ -48,6 +57,10 @@ class IntentModelProvider(Protocol):
     def is_available(self) -> bool: ...
 
     async def generate_intent(self, request: ModelIntentRequest) -> ModelIntentResult: ...
+
+
+class ModelProviderSetupError(Exception):
+    pass
 
 
 class ModelProviderError(Exception):

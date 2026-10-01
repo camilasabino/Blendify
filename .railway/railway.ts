@@ -82,7 +82,7 @@ export default defineRailway(() => {
       PORT: '8000',
       AI_PROVIDER: 'openai',
       AI_MODEL: 'gpt-5.6-luna',
-      OPENAI_API_KEY: preserve(),
+      AI_PROVIDER_API_KEY: preserve(),
       AI_SERVICE_TOKEN: preserve(),
     },
   })
