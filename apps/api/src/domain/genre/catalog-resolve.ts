@@ -124,15 +124,26 @@ export async function resolveChartIntoPool<T extends CatalogTrackRef>(
   provider: CatalogProviderPort,
   cursor: CatalogChartCursor<T>,
   pool: AcceptedTrackPool,
-  options: CatalogResolveOptions & { maxAttempts?: number } = {},
+  options: CatalogResolveOptions & {
+    maxAttempts?: number;
+    admit?: (refs: T[]) => Promise<T[]>;
+  } = {},
 ): Promise<number> {
   const maxAttempts = options.maxAttempts ?? Number.POSITIVE_INFINITY;
   let attempted = 0;
 
   while (!pool.isFull && attempted < maxAttempts) {
-    const batch = cursor.next(pool.missing).slice(0, maxAttempts - attempted);
-    if (batch.length === 0) {
+    const candidates = cursor.next(pool.missing);
+    if (candidates.length === 0) {
       break;
+    }
+
+    const admitted = options.admit
+      ? await admitRefs(cursor, candidates, options.admit)
+      : candidates;
+    const batch = admitted.slice(0, maxAttempts - attempted);
+    if (batch.length === 0) {
+      continue;
     }
 
     attempted += await resolveRefsIntoPool(provider, batch, pool, {
@@ -143,4 +154,18 @@ export async function resolveChartIntoPool<T extends CatalogTrackRef>(
   }
 
   return attempted;
+}
+
+async function admitRefs<T extends CatalogTrackRef>(
+  cursor: CatalogChartCursor<T>,
+  refs: T[],
+  admit: (refs: T[]) => Promise<T[]>,
+): Promise<T[]> {
+  const admitted = new Set(await admit(refs));
+  for (const ref of refs) {
+    if (!admitted.has(ref)) {
+      cursor.markAttempted(ref);
+    }
+  }
+  return refs.filter((ref) => admitted.has(ref));
 }

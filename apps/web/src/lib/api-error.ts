@@ -262,6 +262,7 @@ const STATIC_ERROR_MESSAGES: Record<string, MessageKey> = {
   DISCOVER_RESOLVE_FAILED: 'discover.resolveFailed',
   GENRE_LOOKUP_UNAVAILABLE: 'errors.genreLookupUnavailable',
   REGION_LOOKUP_UNAVAILABLE: 'errors.regionLookupUnavailable',
+  ARTIST_FILTER_LOOKUP_UNAVAILABLE: 'errors.artistFilterLookupUnavailable',
   EMPTY_ARTIST_SELECTION: 'create.addArtist',
   EMPTY_GENRE_SELECTION: 'create.addGenre',
   NO_TRACKS_FOUND: 'create.noTracksFound',

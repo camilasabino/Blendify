@@ -1,7 +1,9 @@
 import type {
   AiIntentChangeDto,
   AiRefinementTrackDiffDto,
+  SelectionFilters,
 } from '@blendify/contracts';
+import { sameReleaseRange } from '@/domain/selection-filters/track-selection-filters';
 import { resolveAiGenreSeeds } from './ai-genre-seeds';
 import type { AiIntent, AiTrackReference } from './ai-intent';
 import { aiNameKey, aiTrackKey } from './ai-intent-rules';
@@ -77,11 +79,9 @@ export function diffIntents(
   if (genres) {
     changes.push({ field: 'genres', ...genres });
   }
-  const currentRegion = aiSelectionFilters(current).region;
-  const proposedRegion = aiSelectionFilters(proposed).region;
-  if (currentRegion !== proposedRegion) {
-    changes.push({ field: 'region', from: currentRegion, to: proposedRegion });
-  }
+  changes.push(
+    ...filterChanges(aiSelectionFilters(current), aiSelectionFilters(proposed)),
+  );
   const seedTracks = trackChanges(current.seedTracks, proposed.seedTracks);
   if (seedTracks) {
     changes.push({ field: 'seedTracks', ...seedTracks });
@@ -201,4 +201,40 @@ function longestIncreasingRun(values: readonly number[]): Set<number> {
     kept.add(index);
   }
   return kept;
+}
+
+function filterChanges(
+  current: SelectionFilters,
+  proposed: SelectionFilters,
+): AiIntentChange[] {
+  const changes: AiIntentChange[] = [];
+  if (current.region !== proposed.region) {
+    changes.push({
+      field: 'region',
+      from: current.region,
+      to: proposed.region,
+    });
+  }
+  if (current.femaleVocals !== proposed.femaleVocals) {
+    changes.push({
+      field: 'femaleVocals',
+      from: current.femaleVocals,
+      to: proposed.femaleVocals,
+    });
+  }
+  if (!sameReleaseRange(current.releaseRange, proposed.releaseRange)) {
+    changes.push({
+      field: 'releaseRange',
+      from: current.releaseRange,
+      to: proposed.releaseRange,
+    });
+  }
+  if (current.excludeLive !== proposed.excludeLive) {
+    changes.push({
+      field: 'excludeLive',
+      from: current.excludeLive,
+      to: proposed.excludeLive,
+    });
+  }
+  return changes;
 }

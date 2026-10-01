@@ -13,6 +13,7 @@ export function resolvePreservation(input: {
   tracks: readonly Track[];
   preservation: AiPreservation;
   intent: AiIntent;
+  isEligible?: (track: Track) => boolean;
 }): AiPreservationResolution {
   const { tracks, preservation, intent } = input;
   const explicit = [
@@ -41,6 +42,14 @@ export function resolvePreservation(input: {
       ...byArtist.flatMap((artist) => artist.positions),
     ]),
   ].sort((left, right) => left - right);
+
+  const ineligible = positions
+    .map((position) => tracks[position - 1])
+    .filter((track) => input.isEligible && !input.isEligible(track))
+    .map((track) => track.name);
+  if (ineligible.length > 0) {
+    return clarify('conflicting_changes', { names: [...new Set(ineligible)] });
+  }
 
   const excludedBy = matchingExclusions({
     artists: intent.excludeArtists,

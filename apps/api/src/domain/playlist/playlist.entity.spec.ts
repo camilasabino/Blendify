@@ -30,6 +30,12 @@ function makePlaylist(tracks: Track[] = []): Playlist {
     tracks,
     generation: {
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       version: 1,
       popularity: PopularityMode.BALANCED,
       orderMode: TrackOrderMode.ARTIST,
@@ -59,6 +65,12 @@ describe('Playlist entity', () => {
         tracks: [],
         generation: {
           kind: 'artist_mix',
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           version: 1,
           popularity: PopularityMode.BALANCED,
           orderMode: TrackOrderMode.ARTIST,
@@ -80,6 +92,12 @@ describe('Playlist entity', () => {
         tracks: tooMany,
         generation: {
           kind: 'artist_mix',
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           version: 1,
           popularity: PopularityMode.BALANCED,
           orderMode: TrackOrderMode.ARTIST,
@@ -180,6 +198,12 @@ describe('Playlist entity', () => {
       tracks,
       generation: {
         kind: 'artist_mix',
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         version: 1,
         popularity: PopularityMode.BALANCED,
         orderMode: TrackOrderMode.ARTIST,

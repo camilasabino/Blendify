@@ -682,6 +682,27 @@ describe('Guest Mode HTTP boundary', () => {
       },
     );
 
+    it.each([
+      { region: 'argentina' },
+      { femaleVocals: true },
+      { releaseRange: { fromYear: 1999, toYear: 1990 } },
+      { releaseRange: { decade: 1990 } },
+      { decade: 1990 },
+    ])(
+      'rejects the unsupported or malformed artist mix filters %j',
+      async (filters) => {
+        const response = await request(httpServer())
+          .post('/api/generate/mix')
+          .set('Origin', FRONTEND)
+          .send({ ...artistMixBody, filters })
+          .expect(400);
+
+        expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+        expect(world.discovery.getTopTracksForArtist).not.toHaveBeenCalled();
+        expectNoSpotifySideEffects();
+      },
+    );
+
     it('rejects a legacy top-level region on a Genre Mix request', async () => {
       const response = await request(httpServer())
         .post('/api/generate/mix')
@@ -1095,6 +1116,12 @@ describe('Guest Mode HTTP boundary', () => {
           generation: {
             version: 1,
             kind: 'artist_mix',
+            filters: {
+              region: null,
+              femaleVocals: false,
+              releaseRange: null,
+              excludeLive: false,
+            },
             tracksPerSeed: 1,
             seeds: [{ id: 'sade', name: 'Sade' }],
             popularity: 'balanced',

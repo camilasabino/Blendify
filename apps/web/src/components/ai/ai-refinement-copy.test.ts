@@ -48,6 +48,10 @@ const EVERY_FIELD: AiIntentChangeDto[] = [
   { field: 'orderMode', from: 'random', to: null },
   { field: 'excludeArtists', added: ['Coldplay'], removed: [] },
   { field: 'excludeTracks', added: [{ title: 'Yellow', artist: null }], removed: [] },
+  { field: 'region', from: null, to: 'argentina' },
+  { field: 'femaleVocals', from: false, to: true },
+  { field: 'releaseRange', from: { fromYear: 1980, toYear: 1989 }, to: null },
+  { field: 'excludeLive', from: true, to: false },
 ]
 
 describe.each(LOCALES)('Create with AI refinement copy (%s)', (locale) => {
@@ -184,6 +188,41 @@ describe('English refinement copy', () => {
     ).toBe(
       'Discover starts from one artist. Try a refinement that names just one, or ask for a mix instead.',
     )
+  })
+
+  it('renders selection filter changes without internal field names', () => {
+    expect(intentChangeView({ field: 'femaleVocals', from: false, to: true }, t, identityLabel)).toEqual({
+      key: 'femaleVocals',
+      type: 'list',
+      label: 'Vocals',
+      added: ['Female vocals'],
+      removed: [],
+    })
+    expect(
+      intentChangeView(
+        {
+          field: 'releaseRange',
+          from: { fromYear: 1980, toYear: 1989 },
+          to: { fromYear: 1990, toYear: 1999 },
+        },
+        t,
+        identityLabel,
+      ),
+    ).toEqual({ key: 'releaseRange', type: 'value', label: 'Era', from: '1980–1989', to: '1990–1999' })
+    expect(
+      intentChangeView({ field: 'releaseRange', from: { fromYear: 2015 }, to: null }, t, identityLabel),
+    ).toMatchObject({ from: 'From 2015', to: 'Any era' })
+    expect(intentChangeView({ field: 'excludeLive', from: false, to: true }, t, identityLabel)).toEqual({
+      key: 'excludeLive',
+      type: 'list',
+      label: 'Versions',
+      added: ['No live versions'],
+      removed: [],
+    })
+    expect(intentChangeView({ field: 'excludeLive', from: true, to: false }, t, identityLabel)).toMatchObject({
+      added: [],
+      removed: ['No live versions'],
+    })
   })
 
   it('renders canonical before and after values', () => {

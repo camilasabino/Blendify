@@ -5,6 +5,7 @@ import type {
   PlaylistKind,
 } from '@blendify/contracts'
 import { REGION_LABEL_KEYS, type GenreLabelSource } from '@/components/genres/genre-labels'
+import { releaseRangeLabel } from '@/components/playlist/release-decades'
 import type { MessageKey } from '@/i18n/messages'
 import { ApiError, getApiErrorMessage, isRequestLimited } from '@/lib/api-error'
 import {
@@ -222,6 +223,30 @@ export function intentChangeView(
         label: t('ai.summary.region'),
         from: change.from ? t(REGION_LABEL_KEYS[change.from]) : t('create.regionAny'),
         to: change.to ? t(REGION_LABEL_KEYS[change.to]) : t('create.regionAny'),
+      }
+    case 'femaleVocals':
+      return {
+        key,
+        type: 'list',
+        label: t('ai.summary.vocals'),
+        added: change.to ? [t('create.femaleVocals')] : [],
+        removed: change.to ? [] : [t('create.femaleVocals')],
+      }
+    case 'releaseRange':
+      return {
+        key,
+        type: 'value',
+        label: t('ai.summary.era'),
+        from: change.from ? releaseRangeLabel(change.from, t) : t('create.eraAny'),
+        to: change.to ? releaseRangeLabel(change.to, t) : t('create.eraAny'),
+      }
+    case 'excludeLive':
+      return {
+        key,
+        type: 'list',
+        label: t('ai.summary.versions'),
+        added: change.to ? [t('create.noLiveVersions')] : [],
+        removed: change.to ? [] : [t('create.noLiveVersions')],
       }
     case 'mood':
       return {

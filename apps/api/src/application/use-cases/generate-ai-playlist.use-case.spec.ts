@@ -43,7 +43,12 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,
@@ -96,6 +101,12 @@ function generated(tracks: Track[]): GeneratedPlaylist {
     generation: {
       version: 1,
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       tracksPerSeed: 10,
       seeds: [{ id: 'radiohead-id', name: 'Radiohead' }],
       popularity: 'balanced',
@@ -376,7 +387,12 @@ describe('GenerateAiPlaylistUseCase', () => {
             kind: 'discover_track',
             artists: [],
             seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
-            filters: { region: null },
+            filters: {
+              region: null,
+              femaleVocals: false,
+              releaseRange: null,
+              excludeLive: false,
+            },
           }),
           preservation: EMPTY_AI_PRESERVATION,
         },
@@ -963,7 +979,12 @@ describe('GenerateAiPlaylistUseCase', () => {
         aiSafe: {
           intent: intent({
             kind: 'discover_artist',
-            filters: { region: null },
+            filters: {
+              region: null,
+              femaleVocals: false,
+              releaseRange: null,
+              excludeLive: false,
+            },
             artists: ['Radiohead'],
             targetTrackCount: 20,
           }),
@@ -980,7 +1001,12 @@ describe('GenerateAiPlaylistUseCase', () => {
         generation: {
           version: 1,
           kind: 'discover_artist',
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           targetTrackCount: 30,
           seed: { id: 'radiohead-id', name: 'Radiohead' },
           popularity: 'balanced',

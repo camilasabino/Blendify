@@ -1,3 +1,4 @@
+import type { ReleaseDatePrecision } from '@blendify/contracts';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
 
@@ -20,6 +21,8 @@ export interface TrackProps {
   artists?: readonly TrackArtist[];
   isrc?: string;
   externalUrl?: string;
+  releaseDate?: string;
+  releaseDatePrecision?: ReleaseDatePrecision;
 }
 
 export class Track {
@@ -36,6 +39,8 @@ export class Track {
   readonly artists: readonly TrackArtist[];
   readonly isrc?: string;
   readonly externalUrl?: string;
+  readonly releaseDate?: string;
+  readonly releaseDatePrecision?: ReleaseDatePrecision;
 
   private constructor(props: TrackProps & { artists: TrackArtist[] }) {
     this.id = props.id;
@@ -51,6 +56,8 @@ export class Track {
     this.artists = props.artists;
     this.isrc = props.isrc;
     this.externalUrl = props.externalUrl;
+    this.releaseDate = props.releaseDate;
+    this.releaseDatePrecision = props.releaseDatePrecision;
   }
 
   static create(props: TrackProps): Track {
@@ -81,6 +88,7 @@ export class Track {
       albumName: props.albumName?.trim() || undefined,
       albumImageUrl: props.albumImageUrl?.trim() || undefined,
       previewUrl: props.previewUrl?.trim() || undefined,
+      releaseDate: props.releaseDate?.trim() || undefined,
       uri: props.uri.trim(),
     });
   }

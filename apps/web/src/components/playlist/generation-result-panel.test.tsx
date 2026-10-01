@@ -61,6 +61,7 @@ const readyPlaylist: PlaylistDetail = {
   generation: {
     version: 1,
     kind: 'artist_mix',
+    filters: { region: null, femaleVocals: false, releaseRange: null, excludeLive: false },
     popularity: 'balanced',
     orderMode: 'random',
     tracksPerSeed: 10,

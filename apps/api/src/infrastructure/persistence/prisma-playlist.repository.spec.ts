@@ -2,6 +2,7 @@ import {
   PlaylistDetailSchema,
   PopularityMode,
   TrackOrderMode,
+  emptySelectionFilters,
 } from '@blendify/contracts';
 import type { Playlist as PlaylistModel } from '@prisma/client';
 import { toPlaylistDetail } from '@/application/dto/playlist-response.dto';
@@ -14,6 +15,7 @@ import type { PrismaService } from './prisma.service';
 
 const generation = {
   kind: 'artist_mix' as const,
+  filters: emptySelectionFilters(),
   version: 1 as const,
   popularity: PopularityMode.BALANCED,
   orderMode: TrackOrderMode.ARTIST,

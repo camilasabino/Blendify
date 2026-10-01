@@ -51,6 +51,12 @@ const artistMixPlaylist = generated(
   {
     version: 1,
     kind: 'artist_mix',
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     tracksPerSeed: 1,
     seeds: [{ id: 'artist-1', name: 'Sade', imageUrl: 'sade.jpg' }],
     popularity: 'balanced',
@@ -61,6 +67,12 @@ const artistMixPlaylist = generated(
 
 const artistMixRequest: SpotifyPlaylistRequest = {
   kind: 'artist_mix',
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   name: '',
   description: '',
   artistIds: ['artist-1'],
@@ -73,7 +85,12 @@ const artistMixRequest: SpotifyPlaylistRequest = {
 
 const discoverTrackRequest: SpotifyPlaylistRequest = {
   kind: 'discover_track',
-  filters: { region: null },
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   name: '',
   description: '',
   trackId: 'track-1',
@@ -223,7 +240,12 @@ describe('CreateSpotifyPlaylistUseCase', () => {
         {
           version: 1,
           kind: 'genre_mix',
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           tracksPerSeed: 1,
           seeds: [{ id: 'jazz', name: 'Jazz' }],
           popularity: 'balanced',
@@ -237,7 +259,12 @@ describe('CreateSpotifyPlaylistUseCase', () => {
       userId: 'user-1',
       request: {
         kind: 'genre_mix',
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         name: '',
         description: '',
         genreIds: ['jazz'],
@@ -264,7 +291,12 @@ describe('CreateSpotifyPlaylistUseCase', () => {
         {
           version: 1,
           kind: 'discover_artist',
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           targetTrackCount: 15,
           seed: { id: 'artist-1', name: 'Sade', imageUrl: null },
           popularity: 'balanced',
@@ -278,7 +310,12 @@ describe('CreateSpotifyPlaylistUseCase', () => {
       userId: 'user-1',
       request: {
         kind: 'discover_artist',
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         name: '',
         description: '',
         artistId: 'artist-1',
@@ -305,7 +342,12 @@ describe('CreateSpotifyPlaylistUseCase', () => {
         {
           version: 1,
           kind: 'discover_track',
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           targetTrackCount: 15,
           seed: {
             id: 'track-1',

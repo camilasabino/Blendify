@@ -151,6 +151,10 @@ export function clarificationMessage(clarification: AiClarificationDetails, t: T
       return t('ai.clarify.regionNotSupported', {
         names: clarification.names.map((name) => regionName(name, t)).join(', '),
       })
+    case 'female_vocals_not_supported':
+      return t('ai.clarify.femaleVocalsNotSupported')
+    case 'invalid_release_range':
+      return t('ai.clarify.invalidReleaseRange', { names })
   }
 }
 
@@ -189,6 +193,9 @@ export function optionLabel(
       }
       if (clarification.reason === 'region_not_supported') {
         return t('ai.option.discoverSimilar')
+      }
+      if (clarification.reason === 'female_vocals_not_supported') {
+        return t('ai.option.discoverSimilarFiltered')
       }
       return t(SEED_KIND_OPTION_KEYS[option.kind])
     case 'keep_seed':

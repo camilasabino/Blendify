@@ -17,7 +17,12 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     targetTrackCount: 30,
     targetDurationMinutes: null,
     mood: 'dark',
@@ -38,7 +43,12 @@ function patch(
     artists: NO_NAMES,
     genres: NO_NAMES,
     seedTracks: NO_NAMES,
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: null,
+      releaseRange: null,
+      excludeLive: null,
+    },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,
@@ -89,6 +99,52 @@ describe('applyIntentPatch', () => {
     expect(next).toEqual(
       intent({ popularity: 'rarities', mood: null, targetTrackCount: 20 }),
     );
+  });
+
+  it('sets, replaces and clears the vocal, release and live filters', () => {
+    const filters = intent().filters;
+    const set = applyIntentPatch(
+      intent(),
+      patch({
+        filters: {
+          region: null,
+          femaleVocals: { operation: 'set', value: true },
+          releaseRange: {
+            operation: 'set',
+            value: { fromYear: 1990, toYear: 1999 },
+          },
+          excludeLive: { operation: 'set', value: true },
+        },
+      }),
+    );
+
+    expect(set.filters).toEqual({
+      ...filters,
+      femaleVocals: true,
+      releaseRange: { fromYear: 1990, toYear: 1999 },
+      excludeLive: true,
+    });
+    expect(
+      applyIntentPatch(
+        set,
+        patch({
+          filters: {
+            region: null,
+            femaleVocals: { operation: 'clear' },
+            releaseRange: {
+              operation: 'set',
+              value: { fromYear: 2000, toYear: null },
+            },
+            excludeLive: { operation: 'clear' },
+          },
+        }),
+      ).filters,
+    ).toEqual({
+      ...filters,
+      femaleVocals: false,
+      releaseRange: { fromYear: 2000, toYear: null },
+      excludeLive: false,
+    });
   });
 
   it('never lets the patch change the unsupported constraints of the intent', () => {
@@ -239,7 +295,12 @@ describe('conflictingPatchLabels', () => {
             add: [{ title: 'Teardrop', artist: null }],
             remove: [{ title: 'Teardrop', artist: null }],
           },
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: null,
+            releaseRange: null,
+            excludeLive: null,
+          },
         }),
         preservationPatch({ positions: { add: [3], remove: [3] } }),
       ),

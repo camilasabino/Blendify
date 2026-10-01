@@ -355,7 +355,7 @@ describe('SpotifyCatalogClient.searchTracks portable metadata', () => {
     expect(cached.isrc).toBe('USUM72105936');
     expect(cached.externalUrl).toBe('https://open.spotify.com/track/track-1');
     expect(cached.popularity).toBeNull();
-    expect(store.get('spotify:search-tracks:AR:stay:10:0')).toEqual([
+    expect(store.get('spotify:search-tracks-v2:AR:stay:10:0')).toEqual([
       expect.objectContaining({ popularity: null }),
     ]);
   });
@@ -363,7 +363,7 @@ describe('SpotifyCatalogClient.searchTracks portable metadata', () => {
   it('hydrates cache entries written before portable metadata existed', async () => {
     const { api, raw } = createApi();
     const { cache, store } = createCache();
-    store.set('spotify:search-tracks:AR:stay:10:0', [
+    store.set('spotify:search-tracks-v2:AR:stay:10:0', [
       {
         id: 'track-1',
         name: 'Stay',
@@ -385,10 +385,181 @@ describe('SpotifyCatalogClient.searchTracks portable metadata', () => {
     expect(track.popularity).toBe(0);
   });
 
+  it('maps the catalog release date and precision of the resolved album', async () => {
+    const { api } = createApi({
+      tracks: {
+        items: [
+          {
+            ...spotifyTrack,
+            album: {
+              name: 'F*CK LOVE 3',
+              release_date: '2021-07-23',
+              release_date_precision: 'day',
+            },
+          },
+          {
+            ...spotifyTrack,
+            id: 'track-2',
+            uri: 'spotify:track:track-2',
+            album: {
+              name: 'Old',
+              release_date: '1981',
+              release_date_precision: 'decade',
+            },
+          },
+        ],
+      },
+    });
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR');
+
+    const [dated, unknownPrecision] = await client.searchTracks('Stay');
+
+    expect(dated.releaseDate).toBe('2021-07-23');
+    expect(dated.releaseDatePrecision).toBe('day');
+    expect(unknownPrecision.releaseDate).toBe('1981');
+    expect(unknownPrecision.releaseDatePrecision).toBeUndefined();
+  });
+
+  it('round-trips release metadata through the resolve cache', async () => {
+    const { api, raw } = createApi({
+      tracks: {
+        items: [
+          {
+            ...spotifyTrack,
+            album: {
+              name: 'Stay',
+              release_date: '2021-07',
+              release_date_precision: 'month',
+            },
+          },
+        ],
+      },
+    });
+    const { cache } = createCache();
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    await client.resolveTrack('The Kid LAROI', 'Stay');
+    const cached = await client.resolveTrack('The Kid LAROI', 'Stay');
+
+    expect(raw).toHaveBeenCalledTimes(1);
+    expect(cached?.releaseDate).toBe('2021-07');
+    expect(cached?.releaseDatePrecision).toBe('month');
+  });
+
+  it('ignores search cache entries written before release metadata and refreshes them', async () => {
+    const { api, raw } = createApi({
+      tracks: {
+        items: [
+          {
+            ...spotifyTrack,
+            album: {
+              name: 'Stay',
+              release_date: '2021-07-09',
+              release_date_precision: 'day',
+            },
+          },
+        ],
+      },
+    });
+    const { cache, store } = createCache();
+    const legacyKey = 'spotify:search-tracks:AR:stay:10:0';
+    store.set(legacyKey, [
+      {
+        id: 'track-1',
+        name: 'Stay',
+        artistId: 'kid-id',
+        artistName: 'The Kid LAROI',
+        durationMs: 141_000,
+        popularity: 40,
+        uri: 'spotify:track:track-1',
+      },
+    ]);
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    const [track] = await client.searchTracks('Stay');
+
+    expect(raw).toHaveBeenCalledTimes(1);
+    expect(track.releaseDate).toBe('2021-07-09');
+    expect(track.releaseDatePrecision).toBe('day');
+    expect(store.get('spotify:search-tracks-v2:AR:stay:10:0')).toEqual([
+      expect.objectContaining({
+        releaseDate: '2021-07-09',
+        releaseDatePrecision: 'day',
+      }),
+    ]);
+    const [legacyTrack] = store.get(legacyKey) as Array<
+      Record<string, unknown>
+    >;
+    expect(legacyTrack).not.toHaveProperty('releaseDate');
+  });
+
+  it('ignores resolve cache entries written before release metadata and refreshes them', async () => {
+    const { api, raw } = createApi({
+      tracks: {
+        items: [
+          {
+            ...spotifyTrack,
+            album: {
+              name: 'Stay',
+              release_date: '2021-07-09',
+              release_date_precision: 'day',
+            },
+          },
+        ],
+      },
+    });
+    const { cache, store } = createCache();
+    const legacyKey = `spotify:resolve-track:AR:${encodeURIComponent(
+      'the kid laroi\u0000stay',
+    )}:`;
+    const legacyEntry = {
+      track: {
+        id: 'track-1',
+        name: 'Stay',
+        artistId: 'kid-id',
+        artistName: 'The Kid LAROI',
+        durationMs: 141_000,
+        popularity: 40,
+        uri: 'spotify:track:track-1',
+      },
+    };
+    store.set(legacyKey, legacyEntry);
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    const resolved = await client.resolveTrack('The Kid LAROI', 'Stay');
+
+    expect(raw).toHaveBeenCalledTimes(1);
+    expect(resolved?.releaseDate).toBe('2021-07-09');
+    expect(store.get(legacyKey)).toBe(legacyEntry);
+    const writtenKeys = (cache.setJson as jest.Mock).mock.calls.map(
+      ([key]) => key as string,
+    );
+    expect(writtenKeys).toEqual([
+      expect.stringContaining('spotify:resolve-track-v2:AR:'),
+    ]);
+  });
+
+  it('does not consume a legacy negative resolve result', async () => {
+    const { api, raw } = createApi({
+      tracks: { items: [{ ...spotifyTrack }] },
+    });
+    const { cache, store } = createCache();
+    store.set(
+      `spotify:resolve-track:AR:${encodeURIComponent('the kid laroi\u0000stay')}:`,
+      { track: null },
+    );
+    const client = new SpotifyCatalogClient(api, createTokens(), 'AR', cache);
+
+    const resolved = await client.resolveTrack('The Kid LAROI', 'Stay');
+
+    expect(raw).toHaveBeenCalledTimes(1);
+    expect(resolved?.id.getValue()).toBe('track-1');
+  });
+
   it('reads a cached null and a cached entry with no popularity as unknown', async () => {
     const { api, raw } = createApi();
     const { cache, store } = createCache();
-    store.set('spotify:search-tracks:AR:stay:10:0', [
+    store.set('spotify:search-tracks-v2:AR:stay:10:0', [
       {
         id: 'known-null',
         name: 'Stay',

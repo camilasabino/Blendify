@@ -96,6 +96,19 @@ export class BusinessRuleError extends DomainError {
     );
   }
 
+  static artistFilterLookupUnavailable(filters: {
+    region: unknown;
+    femaleVocals: boolean;
+  }): BusinessRuleError {
+    if (!filters.femaleVocals) {
+      return BusinessRuleError.regionLookupUnavailable();
+    }
+    return new BusinessRuleError(
+      'Could not check which results match the selected filters right now.',
+      'ARTIST_FILTER_LOOKUP_UNAVAILABLE',
+    );
+  }
+
   static trackBudgetExceeded(
     unit: 'artist' | 'genre',
     max: number,

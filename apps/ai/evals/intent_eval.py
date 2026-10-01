@@ -15,7 +15,7 @@ from app.models.intent import (
     PlaylistIntent,
 )
 
-DATASET_PATH = Path(__file__).resolve().parent / "intent-eval-v5.json"
+DATASET_PATH = Path(__file__).resolve().parent / "intent-eval-v6.json"
 
 EvalLanguage = Literal["en", "es", "pt"]
 ExpectationStatus = Literal["passed", "failed", "unchecked"]
@@ -33,6 +33,7 @@ SCALAR_EXPECTATIONS = (
 )
 TRACK_EXPECTATIONS = ("seedTrackTitles", "seedTrackArtists", "excludeTrackTitles")
 REGION_EXPECTATION = "region"
+FILTER_EXPECTATIONS = ("femaleVocals", "releaseRange", "excludeLive")
 CATEGORY_EXPECTATIONS = ("unsupportedCategories", "unsupportedCategoriesWithin")
 IDENTIFIERS_CHECK = "identifiers"
 IDENTIFIER_PATTERN = re.compile(r"spotify:|open\.spotify|https?://|\b[0-9A-Za-z]{22}\b")
@@ -45,6 +46,7 @@ EXPECTATION_KEYS = frozenset(
         *SCALAR_EXPECTATIONS,
         *TRACK_EXPECTATIONS,
         REGION_EXPECTATION,
+        *FILTER_EXPECTATIONS,
         *CATEGORY_EXPECTATIONS,
     }
 )
@@ -119,6 +121,7 @@ def _check_semantics(expect: dict[str, Any], interpretation: Interpretation) -> 
     failures.extend(_check_scalars(expect, intent))
     failures.extend(_check_tracks(expect, intent))
     failures.extend(_check_region(expect, intent))
+    failures.extend(_check_filters(expect, intent))
     categories = [item.category for item in intent.unsupported_constraints]
     failures.extend(_check_categories(expect, categories))
     return failures
@@ -208,6 +211,15 @@ def _check_region(expect: dict[str, Any], intent: PlaylistIntent) -> list[str]:
     if normalize_name(actual) in {normalize_name(value) for value in accepted}:
         return []
     return [f"region: expected one of {accepted}, got {actual}"]
+
+
+def _check_filters(expect: dict[str, Any], intent: PlaylistIntent) -> list[str]:
+    filters = intent.filters.model_dump(mode="json", by_alias=True)
+    return [
+        f"{key}: expected {expect[key]}, got {filters[key]}"
+        for key in FILTER_EXPECTATIONS
+        if key in expect and expect[key] != filters[key]
+    ]
 
 
 def _check_tracks(expect: dict[str, Any], intent: PlaylistIntent) -> list[str]:

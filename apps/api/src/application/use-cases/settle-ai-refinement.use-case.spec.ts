@@ -18,7 +18,12 @@ const INTENT_A: AiIntent = {
   artists: ['Radiohead', 'Interpol'],
   genres: [],
   seedTracks: [],
-  filters: { region: null },
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   targetTrackCount: null,
   targetDurationMinutes: null,
   mood: null,
@@ -49,6 +54,12 @@ function result(trackIds: string[]): AiGenerationResult {
     recipe: {
       version: 1,
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       tracksPerSeed: 2,
       seeds: [{ id: 'radiohead-id', name: 'Radiohead' }],
       popularity: 'balanced',

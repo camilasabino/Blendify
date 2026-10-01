@@ -11,7 +11,12 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     targetTrackCount: 30,
     targetDurationMinutes: null,
     mood: 'calm',
@@ -184,6 +189,61 @@ describe('diffIntents', () => {
     ).toEqual([{ field: 'region', from: 'argentina', to: 'british' }]);
   });
 
+  it('reports added, changed and removed vocal, release and live filters', () => {
+    const genreMix = (filters: Partial<AiIntent['filters']>) =>
+      intent({
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['rock'],
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+          ...filters,
+        },
+      });
+
+    expect(
+      diffIntents(
+        genreMix({ releaseRange: { fromYear: 1980, toYear: 1989 } }),
+        genreMix({
+          femaleVocals: true,
+          releaseRange: { fromYear: 1990, toYear: 1999 },
+          excludeLive: true,
+        }),
+      ),
+    ).toEqual([
+      { field: 'femaleVocals', from: false, to: true },
+      {
+        field: 'releaseRange',
+        from: { fromYear: 1980, toYear: 1989 },
+        to: { fromYear: 1990, toYear: 1999 },
+      },
+      { field: 'excludeLive', from: false, to: true },
+    ]);
+    expect(
+      diffIntents(
+        genreMix({
+          femaleVocals: true,
+          releaseRange: { fromYear: 2015, toYear: null },
+          excludeLive: true,
+        }),
+        genreMix({}),
+      ),
+    ).toEqual([
+      { field: 'femaleVocals', from: true, to: false },
+      { field: 'releaseRange', from: { fromYear: 2015 }, to: null },
+      { field: 'excludeLive', from: true, to: false },
+    ]);
+    expect(
+      diffIntents(
+        genreMix({ releaseRange: { fromYear: 1990, toYear: 1999 } }),
+        genreMix({ releaseRange: { fromYear: 1990, toYear: 1999 } }),
+      ),
+    ).toEqual([]);
+  });
+
   it('ignores case-only artist rewrites and reports kind and seed changes', () => {
     expect(
       diffIntents(
@@ -192,7 +252,12 @@ describe('diffIntents', () => {
           kind: 'discover_track',
           artists: [],
           seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
         }),
       ),
     ).toEqual([

@@ -4,6 +4,9 @@ import {
   MUSIC_REGION_NAMES,
   SELECTION_FILTER_SUPPORT,
   SelectionFiltersSchema,
+  activeSelectionFilters,
+  emptySelectionFilters,
+  supportedSelectionFilters,
   supportsSelectionFilter,
   supportsAnySelectionFilter,
   PlaylistPublishIncompleteDetailsSchema,
@@ -99,7 +102,12 @@ describe('playlist contracts', () => {
       kind: 'discover_artist',
       targetTrackCount: 30,
       seed: { id: 'artist-1', name: 'Artist' },
-      filters: { region: null },
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       popularity: 'rarities',
       orderMode: 'random',
     };
@@ -322,30 +330,165 @@ describe('selection filter contracts', () => {
     expect(Object.keys(MUSIC_REGION_NAMES)).toEqual([...MUSIC_REGIONS]);
   });
 
-  it('defaults to no active region', () => {
-    expect(SelectionFiltersSchema.parse({})).toEqual({ region: null });
+  it('defaults every filter to inactive', () => {
+    const empty = emptySelectionFilters();
+
+    expect(empty).toEqual({
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    });
+    expect(SelectionFiltersSchema.parse({})).toEqual(empty);
     expect(GenerateMixRequestSchema.parse(genreMix)).toMatchObject({
-      filters: { region: null },
+      filters: empty,
     });
     expect(GenerateDiscoverRequestSchema.parse(discoverArtist)).toMatchObject(
-      { filters: { region: null } },
+      { filters: empty },
     );
     expect(PlaylistGenerationSchema.parse(recipe)).toMatchObject({
-      filters: { region: null },
+      filters: empty,
     });
   });
 
-  it('supports the region filter only where Blendify discovers the artists', () => {
+  it('normalizes region-only recipes to the current filter shape', () => {
+    expect(
+      PlaylistGenerationSchema.parse({
+        ...recipe,
+        filters: { region: 'argentina' },
+      }),
+    ).toMatchObject({
+      filters: {
+        region: 'argentina',
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
+    });
+  });
+
+  it('supports artist-level filters only where Blendify discovers the artists', () => {
     expect(SELECTION_FILTER_SUPPORT).toEqual({
-      artist_mix: { region: false },
-      genre_mix: { region: true },
-      discover_artist: { region: true },
-      discover_track: { region: true },
+      artist_mix: {
+        region: false,
+        femaleVocals: false,
+        releaseRange: true,
+        excludeLive: true,
+      },
+      genre_mix: {
+        region: true,
+        femaleVocals: true,
+        releaseRange: true,
+        excludeLive: true,
+      },
+      discover_artist: {
+        region: true,
+        femaleVocals: true,
+        releaseRange: true,
+        excludeLive: true,
+      },
+      discover_track: {
+        region: true,
+        femaleVocals: true,
+        releaseRange: true,
+        excludeLive: true,
+      },
     });
     expect(supportsSelectionFilter('artist_mix', 'region')).toBe(false);
+    expect(supportsSelectionFilter('artist_mix', 'femaleVocals')).toBe(false);
+    expect(supportsSelectionFilter('artist_mix', 'releaseRange')).toBe(true);
     expect(supportsSelectionFilter('discover_track', 'region')).toBe(true);
-    expect(supportsAnySelectionFilter('artist_mix')).toBe(false);
+    expect(supportsAnySelectionFilter('artist_mix')).toBe(true);
     expect(supportsAnySelectionFilter('genre_mix')).toBe(true);
+  });
+
+  it('lists active filters and drops unsupported ones for a kind', () => {
+    const filters = {
+      region: 'argentina' as const,
+      femaleVocals: true,
+      releaseRange: { fromYear: 1990, toYear: 1999 },
+      excludeLive: true,
+    };
+
+    expect(activeSelectionFilters(emptySelectionFilters())).toEqual([]);
+    expect(activeSelectionFilters(filters)).toEqual([
+      'region',
+      'femaleVocals',
+      'releaseRange',
+      'excludeLive',
+    ]);
+    expect(supportedSelectionFilters('artist_mix', filters)).toEqual({
+      region: null,
+      femaleVocals: false,
+      releaseRange: { fromYear: 1990, toYear: 1999 },
+      excludeLive: true,
+    });
+    expect(supportedSelectionFilters('genre_mix', filters)).toEqual(filters);
+  });
+
+  it('carries every filter in genre mix and discover requests', () => {
+    const filters = {
+      region: 'argentina',
+      femaleVocals: true,
+      releaseRange: { fromYear: 1990, toYear: 1999 },
+      excludeLive: true,
+    };
+
+    expect(
+      GenerateMixRequestSchema.parse({ ...genreMix, filters }),
+    ).toMatchObject({ filters });
+    expect(
+      GenerateDiscoverRequestSchema.parse({ ...discoverArtist, filters }),
+    ).toMatchObject({ filters });
+    expect(
+      GenerateDiscoverRequestSchema.parse({ ...discoverTrack, filters }),
+    ).toMatchObject({ filters });
+  });
+
+  it.each([
+    [{ fromYear: 1990, toYear: 1999 }],
+    [{ fromYear: 2015 }],
+    [{ toYear: 1999 }],
+    [{ fromYear: 1995, toYear: 1995 }],
+  ])('accepts the release range %p', (releaseRange) => {
+    expect(
+      GenerateMixRequestSchema.parse({
+        ...genreMix,
+        filters: { releaseRange },
+      }).filters.releaseRange,
+    ).toEqual(releaseRange);
+  });
+
+  it.each([
+    ['an empty range', {}],
+    ['a reversed range', { fromYear: 1999, toYear: 1990 }],
+    ['a fractional year', { fromYear: 1990.5 }],
+    ['a string year', { fromYear: '1990' }],
+    ['a year before the supported bounds', { fromYear: 1800 }],
+    ['a year after the supported bounds', { toYear: 3000 }],
+    ['a decade field', { decade: 1990 }],
+  ])('rejects %s', (_label, releaseRange) => {
+    expect(
+      GenerateMixRequestSchema.safeParse({
+        ...genreMix,
+        filters: { releaseRange },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects non-boolean vocal and live filters', () => {
+    expect(
+      GenerateMixRequestSchema.safeParse({
+        ...genreMix,
+        filters: { femaleVocals: 'yes' },
+      }).success,
+    ).toBe(false);
+    expect(
+      GenerateMixRequestSchema.safeParse({
+        ...genreMix,
+        filters: { excludeLive: 1 },
+      }).success,
+    ).toBe(false);
   });
 
   it('carries one canonical region in genre mix and discover requests', () => {
@@ -397,7 +540,7 @@ describe('selection filter contracts', () => {
     ).toBe(false);
   });
 
-  it('rejects any filter on artist mixes', () => {
+  it('rejects artist-level filters on artist mixes', () => {
     const artistMix = {
       kind: 'artist_mix',
       artistIds: ['artist-1'],
@@ -412,12 +555,37 @@ describe('selection filter contracts', () => {
       }).success,
     ).toBe(false);
     expect(
+      GenerateMixRequestSchema.safeParse({
+        ...artistMix,
+        filters: { femaleVocals: true },
+      }).success,
+    ).toBe(false);
+    expect(
       GenerateMixRequestSchema.safeParse({ ...artistMix, region: 'latin' })
         .success,
     ).toBe(false);
   });
 
-  it('keeps artist mix recipes free of filters', () => {
+  it('accepts track-level filters on artist mixes', () => {
+    const filters = {
+      region: null,
+      femaleVocals: false,
+      releaseRange: { fromYear: 1980, toYear: 1989 },
+      excludeLive: true,
+    };
+
+    expect(
+      GenerateMixRequestSchema.parse({
+        kind: 'artist_mix',
+        artistIds: ['artist-1'],
+        tracksPerSeed: 10,
+        popularity: 'balanced',
+        filters,
+      }),
+    ).toMatchObject({ filters });
+  });
+
+  it('normalizes legacy artist mix recipes to inactive filters', () => {
     const parsed = PlaylistGenerationSchema.parse({
       version: 1,
       kind: 'artist_mix',
@@ -426,7 +594,13 @@ describe('selection filter contracts', () => {
       popularity: 'balanced',
     });
 
-    expect(parsed).not.toHaveProperty('filters');
+    expect(parsed).toMatchObject({ filters: emptySelectionFilters() });
+    expect(
+      PlaylistGenerationSchema.safeParse({
+        ...parsed,
+        filters: { femaleVocals: true },
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -519,6 +693,12 @@ describe('guest generation contracts', () => {
       kind: 'artist_mix',
       tracksPerSeed: 1,
       seeds: [{ id: 'artist-1', name: 'Sade' }],
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       popularity: 'balanced',
       orderMode: 'random',
     },
@@ -535,6 +715,8 @@ describe('guest generation contracts', () => {
         artists: [{ id: 'artist-1', name: 'Sade' }],
         isrc: 'GBBBM8400012',
         externalUrl: 'https://open.spotify.com/track/track-1',
+        releaseDate: '1984-07-16',
+        releaseDatePrecision: 'day',
       },
     ],
     coverArtwork: {
@@ -748,7 +930,12 @@ describe('discover track targets', () => {
         kind: 'discover_artist' as const,
         targetTrackCount,
         seed: { id: 'artist-1', name: 'Sade' },
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         popularity: 'balanced' as const,
         orderMode: 'random' as const,
       };
@@ -757,7 +944,12 @@ describe('discover track targets', () => {
         kind: 'discover_track' as const,
         targetTrackCount,
         seed: discoverTrack,
-        filters: { region: 'argentina' as const },
+        filters: {
+          region: 'argentina' as const,
+          femaleVocals: true,
+          releaseRange: { toYear: 1999 },
+          excludeLive: true,
+        },
         popularity: 'balanced' as const,
         orderMode: 'random' as const,
       };

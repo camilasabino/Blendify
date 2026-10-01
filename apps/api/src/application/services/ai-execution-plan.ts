@@ -72,6 +72,7 @@ function generationRequest(
           name: artist.name,
           imageUrl: artist.imageUrl ?? null,
         })),
+        filters: aiSelectionFilters(intent),
         tracksPerSeed: tracksPerSeed(
           seeds.artists.length,
           candidateCount,

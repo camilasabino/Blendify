@@ -77,6 +77,12 @@ describe('toGeneratedPlaylistResponse', () => {
   const generation: PlaylistGeneration = {
     version: 1,
     kind: 'artist_mix',
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     tracksPerSeed: 1,
     seeds: [{ id: 'bieber-id', name: 'Justin Bieber' }],
     popularity: 'balanced',

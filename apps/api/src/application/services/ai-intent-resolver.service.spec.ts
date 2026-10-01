@@ -28,7 +28,12 @@ function intent(overrides: Partial<AiIntent>): AiIntent {
     artists: [],
     genres: [],
     seedTracks: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,
@@ -293,7 +298,12 @@ describe('AiIntentResolver', () => {
       intent({
         kind: 'discover_track',
         seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
       }),
     );
 
@@ -325,7 +335,12 @@ describe('AiIntentResolver', () => {
       intent({
         kind: 'discover_track',
         seedTracks: [{ title: 'Enjoy the Silence', artist: null }],
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
       }),
     );
 
@@ -344,7 +359,12 @@ describe('AiIntentResolver', () => {
     const request = intent({
       kind: 'discover_track',
       seedTracks: [{ title: 'Enjoy the Silence', artist: null }],
-      filters: { region: null },
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
     });
 
     await expect(resolver.resolve(request)).resolves.toMatchObject({
@@ -366,7 +386,12 @@ describe('AiIntentResolver', () => {
       intent({
         kind: 'discover_track',
         seedTracks: [{ title: 'Imaginary Song', artist: 'Nobody Known' }],
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
       }),
     );
 

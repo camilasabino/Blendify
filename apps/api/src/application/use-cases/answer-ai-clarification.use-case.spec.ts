@@ -18,7 +18,12 @@ const DISCOVER_INTENT: AiIntent = {
   artists: ['Radiohead', 'Interpol'],
   genres: [],
   seedTracks: [],
-  filters: { region: null },
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   targetTrackCount: null,
   targetDurationMinutes: 45,
   mood: 'dark',

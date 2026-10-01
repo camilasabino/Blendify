@@ -13,6 +13,12 @@ function makePlaylist(userId = 'user-1'): Playlist {
     tracks: [],
     generation: {
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       version: 1,
       popularity: PopularityMode.BALANCED,
       orderMode: TrackOrderMode.ARTIST,

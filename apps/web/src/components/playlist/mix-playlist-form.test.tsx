@@ -102,18 +102,35 @@ describe('MixPlaylistForm genre region', () => {
     })
   })
 
-  it('shows Region under Refine results only for genre mixes', async () => {
+  it('shows only the decade and live controls for an artist mix', async () => {
+    setAuthState(null)
+    stubGeneration()
+    renderWithProviders(<MixPlaylistForm />)
+
+    const section = screen
+      .getByRole('heading', { name: 'Refine results' })
+      .closest('section')
+    expect(section).not.toBeNull()
+    expect(
+      within(section!).getByRole('button', { name: /Decade/ }),
+    ).toHaveAttribute('aria-haspopup', 'listbox')
+    expect(
+      within(section!).getByRole('switch', { name: 'Exclude live versions' }),
+    ).toHaveAttribute('aria-checked', 'false')
+    expect(
+      within(section!).queryByRole('button', { name: /Region/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(section!).queryByRole('button', { name: /Vocals/ }),
+    ).not.toBeInTheDocument()
+    expect(within(section!).queryByText(/female/i)).not.toBeInTheDocument()
+  })
+
+  it('shows every filter in order under Refine results for genre mixes', async () => {
     setAuthState(null)
     stubGeneration()
     renderWithProviders(<MixPlaylistForm />)
     const user = userEvent.setup()
-
-    expect(
-      screen.queryByRole('heading', { name: 'Refine results' }),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: /Region/ }),
-    ).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('radio', { name: 'Genres' }))
 
@@ -121,9 +138,19 @@ describe('MixPlaylistForm genre region', () => {
       .getByRole('heading', { name: 'Refine results' })
       .closest('section')
     expect(section).not.toBeNull()
+    const controls = within(section!)
+      .getAllByRole('button')
+      .map((control) => control.getAttribute('aria-haspopup') === 'listbox' ? control.textContent : null)
+      .filter(Boolean)
+    expect(controls).toEqual(['Any region', 'Any', 'Any'])
     expect(
       within(section!).getByRole('button', { name: /Region/ }),
     ).toHaveAttribute('aria-haspopup', 'listbox')
+    expect(within(section!).getByRole('button', { name: /Vocals/ })).toBeVisible()
+    expect(within(section!).getByRole('button', { name: /Decade/ })).toBeVisible()
+    expect(
+      within(section!).getByRole('switch', { name: 'Exclude live versions' }),
+    ).toBeVisible()
     const source = screen
       .getByRole('heading', { name: 'Artists or genres' })
       .closest('section')
@@ -132,7 +159,46 @@ describe('MixPlaylistForm genre region', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('never sends a region selected for genres with an artist mix', async () => {
+  it('sends every selected genre mix filter canonically', async () => {
+    setAuthState(null)
+    const { calls } = stubApi({
+      'GET /api/genres': () =>
+        jsonResponse({ genres: [{ id: 'rock', name: 'Rock' }] }),
+      'POST /api/generate/mix': () =>
+        ndjsonResponse(progress, { type: 'result', playlist: guestPlaylist }),
+    })
+    renderWithProviders(<MixPlaylistForm />)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('radio', { name: 'Genres' }))
+    await user.click(await screen.findByRole('button', { name: 'Rock' }))
+    await user.click(screen.getByRole('button', { name: /Region/ }))
+    await user.click(await screen.findByRole('option', { name: 'Argentina' }))
+    await user.click(screen.getByRole('button', { name: /Vocals/ }))
+    await user.click(await screen.findByRole('option', { name: 'Female vocals' }))
+    await user.click(screen.getByRole('button', { name: /Decade/ }))
+    await user.click(await screen.findByRole('option', { name: '1990–1999' }))
+    await user.click(screen.getByRole('switch', { name: 'Exclude live versions' }))
+    await user.click(screen.getByRole('button', { name: 'Generate playlist' }))
+
+    await vi.waitFor(() => {
+      expect(generationCalls(calls)).toHaveLength(1)
+    })
+    const [request] = generationCalls(calls)
+    expect(request.body).toMatchObject({
+      kind: 'genre_mix',
+      name: 'Blendify · Mix · Rock · Argentina',
+      filters: {
+        region: 'argentina',
+        femaleVocals: true,
+        releaseRange: { fromYear: 1990, toYear: 1999 },
+        excludeLive: true,
+      },
+    })
+    expect(request.body).not.toHaveProperty('decade')
+  })
+
+  it('never sends artist-level filters chosen for genres with an artist mix', async () => {
     setAuthState(null)
     const { calls } = stubApi({
       'GET /api/genres': () =>
@@ -150,25 +216,40 @@ describe('MixPlaylistForm genre region', () => {
     await user.click(screen.getByRole('radio', { name: 'Genres' }))
     await user.click(screen.getByRole('button', { name: /Region/ }))
     await user.click(await screen.findByRole('option', { name: 'Argentina' }))
+    await user.click(screen.getByRole('button', { name: /Vocals/ }))
+    await user.click(await screen.findByRole('option', { name: 'Female vocals' }))
+    await user.click(screen.getByRole('button', { name: /Decade/ }))
+    await user.click(await screen.findByRole('option', { name: '1980–1989' }))
     await user.click(screen.getByRole('radio', { name: 'Artists' }))
     await user.type(screen.getByRole('combobox'), 'Radiohead')
     await user.click(
       await screen.findByRole('option', { name: /Radiohead/ }, { timeout: 3_000 }),
     )
+    await user.click(screen.getByRole('switch', { name: 'Exclude live versions' }))
     await user.click(screen.getByRole('button', { name: 'Generate playlist' }))
 
     await vi.waitFor(() => {
       expect(generationCalls(calls)).toHaveLength(1)
     })
     const [request] = generationCalls(calls)
-    expect(request.body).toMatchObject({ kind: 'artist_mix' })
-    expect(request.body).not.toHaveProperty('filters')
+    expect(request.body).toMatchObject({
+      kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: { fromYear: 1980, toYear: 1989 },
+        excludeLive: true,
+      },
+    })
     expect(request.body).not.toHaveProperty('region')
 
     await user.click(screen.getByRole('radio', { name: 'Genres', hidden: true }))
     expect(
       screen.getByRole('button', { name: /Region/, hidden: true }),
     ).toHaveTextContent('Argentina')
+    expect(
+      screen.getByRole('button', { name: /Vocals/, hidden: true }),
+    ).toHaveTextContent('Female vocals')
   })
 })
 

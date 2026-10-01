@@ -24,6 +24,12 @@ function makeTrack(index: number): Track {
 const generation: PlaylistGeneration = {
   version: 1,
   kind: 'artist_mix',
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   tracksPerSeed: 2,
   seeds: [{ id: 'artist-1', name: 'Sade', imageUrl: null }],
   popularity: 'balanced',

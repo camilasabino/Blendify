@@ -1,4 +1,4 @@
-import type { MusicRegion } from '@blendify/contracts';
+import { emptySelectionFilters, type MusicRegion } from '@blendify/contracts';
 import { Artist } from '@/domain/artist/artist.entity';
 import { findGenre, type CatalogGenre } from '@/domain/genre/genre-catalog';
 import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
@@ -132,7 +132,7 @@ async function resolve(
     genres(...genreIds),
     'balanced',
     tracksPerSeed,
-    region ? { filters: { region } } : undefined,
+    region ? { filters: { ...emptySelectionFilters(), region } } : undefined,
   );
 }
 

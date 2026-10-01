@@ -159,8 +159,8 @@ def test_preflight_states_the_run_bounds_without_secrets_or_prompts() -> None:
     assert plan.request_budget == len(cases) * MAX_OUTPUT_VALIDATION_ATTEMPTS
     assert f"max model requests:       {plan.request_budget}" in preflight
     assert "gpt-5.6-luna" in preflight
-    assert "intent-eval-v5" in preflight
-    assert "intent-v5" in preflight
+    assert "intent-eval-v6" in preflight
+    assert "intent-v6" in preflight
     assert "explicitly enabled" in preflight
     assert API_KEY not in preflight
     assert all(case.prompt not in preflight for case in cases)
@@ -413,7 +413,7 @@ async def test_report_records_reproducibility_metadata_without_secrets() -> None
 
     report = await run_eval(plan, ScriptedModelProvider([interpreted_output()]))
 
-    assert report["promptVersion"] == "intent-v5"
+    assert report["promptVersion"] == "intent-v6"
     assert len(report["promptSha256"]) == 64  # type: ignore[arg-type]
     assert len(report["datasetSha256"]) == 64  # type: ignore[arg-type]
     assert report["caseFilter"] is None

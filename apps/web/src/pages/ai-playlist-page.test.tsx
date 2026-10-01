@@ -20,7 +20,7 @@ const READY_SESSION: AiSessionDto = {
     kind: 'artist_mix',
     artists: ['Radiohead', 'Interpol'],
     genres: [],
-    filters: { region: null },
+    filters: { region: null, femaleVocals: false, releaseRange: null, excludeLive: false },
     seedTrack: null,
     targetTrackCount: 30,
     targetDurationMinutes: null,
@@ -710,7 +710,7 @@ describe('Create with AI page', () => {
         kind: 'genre_mix',
         artists: [],
         genres: ['Ballad'],
-        filters: { region: 'latin' },
+        filters: { region: 'latin', femaleVocals: false, releaseRange: null, excludeLive: false },
         excludeArtists: [],
       },
     }
@@ -745,7 +745,7 @@ describe('Create with AI page', () => {
           artists: ['Radiohead'],
           kind,
           genres: [],
-          filters: { region: 'argentina' },
+          filters: { region: 'argentina', femaleVocals: false, releaseRange: null, excludeLive: false },
           excludeArtists: [],
         },
       }
@@ -764,6 +764,74 @@ describe('Create with AI page', () => {
       }
     },
   )
+
+  it('summarizes every active result filter in Spanish', async () => {
+    const user = userEvent.setup()
+    const session: AiSessionDto = {
+      ...READY_SESSION,
+      intent: {
+        ...READY_SESSION.intent!,
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['Rock'],
+        filters: {
+          region: 'argentina',
+          femaleVocals: true,
+          releaseRange: { fromYear: 1990, toYear: 1999 },
+          excludeLive: true,
+        },
+        excludeArtists: [],
+      },
+    }
+    stubApi({ 'POST /api/ai/sessions': () => jsonResponse(createdSession(session), 201) })
+    renderPage()
+    act(() => {
+      useLocaleStore.getState().setLocale('es')
+    })
+
+    await user.type(
+      screen.getByRole('textbox'),
+      'rock argentino de los 90 con voces femeninas y sin versiones en vivo',
+    )
+    await user.click(screen.getByRole('button', { name: 'Revisar pedido' }))
+
+    const item = async (label: string) =>
+      (await screen.findByText(label)).parentElement as HTMLElement
+    expect(within(await item('Región')).getByText('Argentina')).toBeVisible()
+    expect(within(await item('Voces')).getByText('Femeninas')).toBeVisible()
+    expect(within(await item('Época')).getByText('1990–1999')).toBeVisible()
+    expect(
+      within(await item('Versiones')).getByText('Sin versiones en vivo'),
+    ).toBeVisible()
+  })
+
+  it('never shows female vocals on an artist mix summary', async () => {
+    const user = userEvent.setup()
+    const session: AiSessionDto = {
+      ...READY_SESSION,
+      intent: {
+        ...READY_SESSION.intent!,
+        kind: 'artist_mix',
+        artists: ['Soda Stereo'],
+        filters: {
+          region: null,
+          femaleVocals: true,
+          releaseRange: { toYear: 1989 },
+          excludeLive: false,
+        },
+      },
+    }
+    stubApi({ 'POST /api/ai/sessions': () => jsonResponse(createdSession(session), 201) })
+    renderPage()
+
+    await user.type(screen.getByRole('textbox'), 'Soda Stereo up to 1989')
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+    const era = (await screen.findByText('Era')).parentElement as HTMLElement
+    expect(within(era).getByText('Up to 1989')).toBeVisible()
+    expect(screen.queryByText('Vocals')).not.toBeInTheDocument()
+    expect(screen.queryByText('Versions')).not.toBeInTheDocument()
+  })
 
   it('keeps the compact request card usable in a translated locale', async () => {
     const user = userEvent.setup()

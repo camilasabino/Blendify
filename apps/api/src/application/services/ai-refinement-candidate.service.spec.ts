@@ -4,6 +4,10 @@ import { EMPTY_AI_PRESERVATION } from '@/domain/ai/ai-intent-patch';
 import type { AiGenerationResult } from '@/domain/ai/ai-session';
 import { unmetGenerationConstraints } from '@/domain/ai/ai-unmet-constraints';
 import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import type {
+  ArtistTagCandidate,
+  DiscoveryCatalogPort,
+} from '@/domain/repositories/discovery-catalog.port';
 import { Track } from '@/domain/track/track.entity';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
@@ -25,7 +29,12 @@ const BASE_INTENT: AiIntent = {
   artists: ['Ed Sheeran'],
   genres: [],
   seedTracks: [],
-  filters: { region: null },
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   targetTrackCount: null,
   targetDurationMinutes: TARGET_MINUTES,
   mood: null,
@@ -63,6 +72,12 @@ function resultOf(
     generation: {
       version: 1,
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       tracksPerSeed: 10,
       seeds: [{ id: 'ed-sheeran-id', name: 'Ed Sheeran' }],
       popularity: 'balanced',
@@ -92,6 +107,12 @@ function freshGeneration(generated: readonly Track[]): GeneratedPlaylist {
     generation: {
       version: 1,
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       tracksPerSeed: 10,
       seeds: [{ id: 'ed-sheeran-id', name: 'Ed Sheeran' }],
       popularity: 'balanced',
@@ -102,7 +123,11 @@ function freshGeneration(generated: readonly Track[]): GeneratedPlaylist {
   });
 }
 
-function createBuilder(generated: readonly Track[]) {
+function createBuilder(
+  generated: readonly Track[],
+  artistTags: (name: string) => Promise<ArtistTagCandidate[]> = () =>
+    Promise.resolve([]),
+) {
   const catalog = {
     searchArtists: jest.fn((name: string) =>
       Promise.resolve([
@@ -116,6 +141,12 @@ function createBuilder(generated: readonly Track[]) {
     resolveTrack: jest.fn(() => Promise.resolve(null)),
     getArtistsByIds: jest.fn(() => Promise.resolve([])),
   };
+  const getTopTagsForArtist = jest.fn((artist: { name: string }) =>
+    artistTags(artist.name),
+  );
+  const discovery = {
+    getTopTagsForArtist,
+  } as unknown as DiscoveryCatalogPort;
   const generator = {
     execute: jest.fn<Promise<GeneratedPlaylist>, [PlaylistGenerationRequest]>(
       () => Promise.resolve(freshGeneration(generated)),
@@ -124,8 +155,9 @@ function createBuilder(generated: readonly Track[]) {
   const builder = new AiRefinementCandidateBuilder(
     new AiIntentResolver({ forMarket: jest.fn(() => catalog) }),
     generator as unknown as GeneratePlaylistUseCase,
+    discovery,
   );
-  return { builder, generator };
+  return { builder, generator, getTopTagsForArtist };
 }
 
 const CURRENT_TRACKS = [
@@ -465,5 +497,245 @@ describe('AiRefinementCandidateBuilder retain-and-fill target fulfillment', () =
     const outcome = await excludeTaylorFrom(builder);
 
     expect(outcome).toMatchObject(CONSTRAINTS_UNMET);
+  });
+});
+
+describe('AiRefinementCandidateBuilder selection filters', () => {
+  const GENRE_MIX: AiIntent = {
+    ...BASE_INTENT,
+    kind: 'genre_mix',
+    artists: [],
+    genres: ['rock'],
+    targetTrackCount: 20,
+    targetDurationMinutes: null,
+  };
+
+  function namedTrack(
+    id: string,
+    artist: string,
+    name: string,
+    releaseDate?: string,
+  ): Track {
+    return Track.create({
+      id: TrackId.create(id),
+      name,
+      artistId: ArtistId.create(`artist-${artist}`),
+      artistName: artist,
+      durationMs: TRACK_MINUTES * MINUTE_MS,
+      popularity: 50,
+      uri: `spotify:track:${id}`,
+      releaseDate,
+    });
+  }
+
+  function withFilters(filters: Partial<AiIntent['filters']>): AiIntent {
+    return { ...GENRE_MIX, filters: { ...GENRE_MIX.filters, ...filters } };
+  }
+
+  function currentTracks(liveIds: readonly number[] = []): Track[] {
+    return Array.from({ length: 20 }, (_, index) =>
+      namedTrack(
+        `c${index + 1}`,
+        index % 2 === 0 ? 'Voice Act' : 'Band Act',
+        liveIds.includes(index + 1)
+          ? `Song ${index + 1} - Live`
+          : `Song ${index + 1}`,
+        index < 12 ? '1995-05-01' : '2012-05-01',
+      ),
+    );
+  }
+
+  function replacements(count: number, releaseDate = '1995'): Track[] {
+    return Array.from({ length: count }, (_, index) =>
+      namedTrack(`n${index + 1}`, 'New Act', `New ${index + 1}`, releaseDate),
+    );
+  }
+
+  function readyTracks(outcome: unknown): string[] {
+    const ready = outcome as {
+      candidate: {
+        status: string;
+        result: { playlist: { tracks: Array<{ id: string }> } };
+      };
+    };
+    expect(ready.candidate.status).toBe('ready');
+    return ready.candidate.result.playlist.tracks.map((item) => item.id);
+  }
+
+  it('keeps the studio tracks and generates only the live replacements', async () => {
+    const { builder, generator } = createBuilder(replacements(3));
+
+    const outcome = await refine(
+      builder,
+      { filters: withFilters({ excludeLive: true }).filters },
+      GENRE_MIX,
+      currentTracks([2, 7, 15]),
+    );
+
+    expect(outcome).toMatchObject({ strategy: 'retain_and_fill' });
+    expect(generator.execute.mock.calls[0][0]).toMatchObject({
+      kind: 'genre_mix',
+      tracksPerSeed: 3,
+      filters: { excludeLive: true },
+    });
+    const ids = readyTracks(outcome);
+    expect(ids).toHaveLength(20);
+    expect(ids).not.toEqual(expect.arrayContaining(['c2', 'c7', 'c15']));
+    expect(ids).toEqual(expect.arrayContaining(['n1', 'n2', 'n3']));
+  });
+
+  it('keeps the tracks inside a new decade and fills the missing ones', async () => {
+    const { builder, generator } = createBuilder(replacements(8));
+
+    const outcome = await refine(
+      builder,
+      {
+        filters: withFilters({ releaseRange: { fromYear: 1990, toYear: 1999 } })
+          .filters,
+      },
+      GENRE_MIX,
+      currentTracks(),
+    );
+
+    expect(generator.execute.mock.calls[0][0]).toMatchObject({
+      tracksPerSeed: 8,
+      filters: { releaseRange: { fromYear: 1990, toYear: 1999 } },
+    });
+    const ids = readyTracks(outcome);
+    expect(ids).toHaveLength(20);
+    expect(ids.filter((id) => id.startsWith('c'))).toHaveLength(12);
+  });
+
+  it('retains only tracks whose artist positively qualifies for female vocals', async () => {
+    const { builder, generator, getTopTagsForArtist } = createBuilder(
+      replacements(10),
+      (name) =>
+        Promise.resolve(
+          name === 'Voice Act' ? [{ name: 'female vocalists', count: 70 }] : [],
+        ),
+    );
+
+    const outcome = await refine(
+      builder,
+      { filters: withFilters({ femaleVocals: true }).filters },
+      GENRE_MIX,
+      currentTracks(),
+    );
+
+    expect(getTopTagsForArtist).toHaveBeenCalledTimes(2);
+    expect(generator.execute.mock.calls[0][0]).toMatchObject({
+      tracksPerSeed: 10,
+      filters: { femaleVocals: true },
+    });
+    const ids = readyTracks(outcome);
+    expect(ids).toHaveLength(20);
+    expect(
+      ids
+        .filter((id) => id.startsWith('c'))
+        .every((id) => Number(id.slice(1)) % 2 === 1),
+    ).toBe(true);
+  });
+
+  it('never keeps tracks whose artist evidence is unknown', async () => {
+    const { builder } = createBuilder(replacements(10), (name) =>
+      name === 'Voice Act'
+        ? Promise.resolve([{ name: 'female vocalists', count: 70 }])
+        : Promise.reject(new Error('Last.fm down')),
+    );
+
+    const ids = readyTracks(
+      await refine(
+        builder,
+        { filters: withFilters({ femaleVocals: true }).filters },
+        GENRE_MIX,
+        currentTracks(),
+      ),
+    );
+
+    expect(ids.filter((id) => id.startsWith('c'))).toHaveLength(10);
+  });
+
+  it('fails as unavailable when no current artist can be checked', async () => {
+    const { builder, generator } = createBuilder(replacements(10), () =>
+      Promise.reject(new Error('Last.fm down')),
+    );
+
+    const outcome = await refine(
+      builder,
+      { filters: withFilters({ femaleVocals: true }).filters },
+      GENRE_MIX,
+      currentTracks(),
+    );
+
+    expect(outcome).toMatchObject({
+      candidate: {
+        status: 'failed',
+        failure: {
+          code: 'ARTIST_FILTER_LOOKUP_UNAVAILABLE',
+          category: 'provider_unavailable',
+        },
+      },
+    });
+    expect(generator.execute).not.toHaveBeenCalled();
+  });
+
+  it('reports insufficient replacements instead of relaxing the filter', async () => {
+    const { builder } = createBuilder(replacements(1));
+
+    const outcome = await refine(
+      builder,
+      { filters: withFilters({ excludeLive: true }).filters },
+      GENRE_MIX,
+      currentTracks([2, 7, 15]),
+    );
+
+    expect(outcome).toMatchObject({
+      candidate: {
+        status: 'failed',
+        failure: { code: 'AI_REFINEMENT_CONSTRAINTS_UNMET' },
+      },
+    });
+  });
+
+  it('asks for clarification when a preserved track violates the new filter', async () => {
+    const { builder, generator } = createBuilder(replacements(3));
+
+    const outcome = await builder.build({
+      current: GENRE_MIX,
+      proposed: withFilters({ excludeLive: true }),
+      preservation: { ...EMPTY_AI_PRESERVATION, positions: [2] },
+      currentResult: resultOf(currentTracks([2]), GENRE_MIX),
+      checkpoint: jest.fn(),
+    });
+
+    expect(outcome).toMatchObject({
+      status: 'needs_clarification',
+      clarification: {
+        reason: 'conflicting_changes',
+        names: ['Song 2 - Live'],
+      },
+    });
+    expect(generator.execute).not.toHaveBeenCalled();
+  });
+
+  it('keeps the current tracks and updates the recipe when a filter is cleared', async () => {
+    const { builder, generator } = createBuilder([]);
+    const current = withFilters({ excludeLive: true });
+
+    const outcome = await refine(
+      builder,
+      { filters: GENRE_MIX.filters },
+      current,
+      currentTracks(),
+    );
+
+    expect(generator.execute).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({
+      strategy: 'transform',
+      candidate: {
+        status: 'ready',
+        result: { recipe: { filters: { excludeLive: false } } },
+      },
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DiscoverPlaylistForm } from '@/components/playlist/discover-playlist-form'
 import { renderPlaylistCoverBase64 } from '@/lib/playlist-cover'
@@ -220,5 +220,97 @@ describe('DiscoverPlaylistForm region filter', () => {
         filters: { region: 'argentina' },
       },
     ])
+  })
+
+  it('offers every result filter in order and sends them canonically', async () => {
+    setAuthState(null)
+    const filtered = {
+      ...regionalDiscovery,
+      generation: {
+        ...regionalDiscovery.generation,
+        filters: {
+          region: null,
+          femaleVocals: true,
+          releaseRange: { fromYear: 1990, toYear: 1999 },
+          excludeLive: true,
+        },
+      },
+    }
+    const { calls } = stubApi({
+      'GET /api/artists/search': () =>
+        jsonResponse({ artists: [{ id: 'artist-1', name: 'Sade' }] }),
+      'POST /api/generate/discover': () =>
+        ndjsonResponse({ type: 'result', playlist: filtered }),
+    })
+    const user = userEvent.setup()
+    renderWithProviders(<DiscoverPlaylistForm />, { route: '/app/discover' })
+
+    const section = screen
+      .getByRole('heading', { name: 'Refine results' })
+      .closest('section')!
+    const selects = within(section)
+      .getAllByRole('button')
+      .filter((control) => control.getAttribute('aria-haspopup') === 'listbox')
+    expect(selects.map((control) => control.textContent)).toEqual([
+      'Any region',
+      'Any',
+      'Any',
+    ])
+    const vocals = within(section).getByRole('button', { name: /Vocals/ })
+    expect(vocals).toHaveAccessibleDescription(
+      'Optional · Filters result artists by their vocals.',
+    )
+    await user.click(vocals)
+    expect(
+      await screen.findByRole('option', { name: 'Female vocals' }),
+    ).toBeVisible()
+    expect(screen.queryByRole('option', { name: /women/i })).toBeNull()
+    await user.click(screen.getByRole('option', { name: 'Female vocals' }))
+    await user.click(within(section).getByRole('button', { name: /Decade/ }))
+    const decades = (await screen.findAllByRole('option')).map(
+      (option) => option.textContent,
+    )
+    expect(decades).toEqual([
+      'Any',
+      '2020–2029',
+      '2010–2019',
+      '2000–2009',
+      '1990–1999',
+      '1980–1989',
+      '1970–1979',
+      '1960–1969',
+      '1950–1959',
+    ])
+    await user.click(screen.getByRole('option', { name: '1990–1999' }))
+    const live = within(section).getByRole('switch', {
+      name: 'Exclude live versions',
+    })
+    expect(live).toHaveAccessibleDescription(
+      'Skips recordings identified as live or unplugged.',
+    )
+    await user.click(live)
+    expect(live).toHaveAttribute('aria-checked', 'true')
+
+    await user.type(screen.getByRole('combobox', { name: 'Artist' }), 'sade')
+    await user.click(
+      (await screen.findByRole('option', { name: /Sade/ }, { timeout: 3_000 }))
+        .firstElementChild!,
+    )
+    await user.click(screen.getByRole('button', { name: 'Generate playlist' }))
+    await screen.findByRole('heading', { name: 'Blendify · Mix · Jazz' })
+
+    const [post] = calls.filter((call) => call.url === '/api/generate/discover')
+    expect(post.body).toMatchObject({
+      kind: 'discover_artist',
+      filters: {
+        region: null,
+        femaleVocals: true,
+        releaseRange: { fromYear: 1990, toYear: 1999 },
+        excludeLive: true,
+      },
+    })
+    expect(
+      screen.getByText(/^Sade · Female vocals · 1990–1999 · No live versions · /),
+    ).toBeInTheDocument()
   })
 })

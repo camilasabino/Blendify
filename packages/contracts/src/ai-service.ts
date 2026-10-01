@@ -4,7 +4,9 @@ import {
   AI_REFINEMENT_MAX_LENGTH,
   AI_UNSUPPORTED_CONSTRAINT_CATEGORIES,
   AiMoodSchema,
+  MAX_RELEASE_YEAR,
   MAX_TRACKS,
+  MIN_RELEASE_YEAR,
   PlaylistKindSchema,
   PopularityModeSchema,
   TrackOrderModeSchema,
@@ -74,8 +76,22 @@ export const UnsupportedConstraintSchema = z.strictObject({
   userText: z.string().trim().min(1).max(AI_INTENT_USER_TEXT_MAX_LENGTH),
 });
 
+const IntentReleaseYearSchema = z
+  .number()
+  .int()
+  .min(MIN_RELEASE_YEAR)
+  .max(MAX_RELEASE_YEAR);
+
+export const IntentReleaseRangeSchema = z.strictObject({
+  fromYear: IntentReleaseYearSchema.nullable(),
+  toYear: IntentReleaseYearSchema.nullable(),
+});
+
 export const IntentFiltersSchema = z.strictObject({
   region: IntentNameSchema.nullable(),
+  femaleVocals: z.boolean(),
+  releaseRange: IntentReleaseRangeSchema.nullable(),
+  excludeLive: z.boolean(),
 });
 
 export const PlaylistIntentSchema = z.strictObject({
@@ -164,6 +180,9 @@ export const PositionListPatchSchema = z.strictObject({
 
 export const IntentFiltersPatchSchema = z.strictObject({
   region: nullableValuePatch(IntentNameSchema),
+  femaleVocals: nullableValuePatch(z.literal(true)),
+  releaseRange: nullableValuePatch(IntentReleaseRangeSchema),
+  excludeLive: nullableValuePatch(z.literal(true)),
 });
 
 export const IntentPatchSchema = z.strictObject({
@@ -254,6 +273,7 @@ export type UnsupportedConstraint = z.infer<typeof UnsupportedConstraintSchema>;
 export type UnsupportedConstraintCategory =
   (typeof UNSUPPORTED_CONSTRAINT_CATEGORIES)[number];
 export type ClarificationReason = (typeof CLARIFICATION_REASONS)[number];
+export type IntentReleaseRange = z.infer<typeof IntentReleaseRangeSchema>;
 export type IntentFilters = z.infer<typeof IntentFiltersSchema>;
 export type PlaylistIntent = z.infer<typeof PlaylistIntentSchema>;
 export type IntentClarification = z.infer<typeof IntentClarificationSchema>;

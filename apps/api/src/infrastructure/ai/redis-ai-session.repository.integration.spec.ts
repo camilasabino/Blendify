@@ -59,6 +59,12 @@ const RESULT = {
   recipe: {
     version: 1 as const,
     kind: 'artist_mix' as const,
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     tracksPerSeed: 1,
     seeds: [{ id: '4Z8W4fKeB5YxbusRsdQVPb', name: 'Radiohead' }],
     popularity: 'balanced' as const,
@@ -89,7 +95,12 @@ function withPendingCandidate(base: AiSession): AiSession {
           artists: ['Radiohead'],
           genres: [],
           seedTracks: [],
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           targetTrackCount: null,
           targetDurationMinutes: null,
           mood: null,

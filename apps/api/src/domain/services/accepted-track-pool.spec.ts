@@ -1,6 +1,7 @@
 import { Track } from '@/domain/track/track.entity';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
+import { isLiveVersion } from '@/domain/track/live-version';
 import { AcceptedTrackPool } from './accepted-track-pool';
 
 function track(
@@ -32,6 +33,20 @@ describe('AcceptedTrackPool', () => {
 
     expect(pool.offer(track('1', 'Creep'))).toBe(false);
     expect(pool.offer(track('2', 'Nude'))).toBe(true);
+    expect(pool.missing).toBe(1);
+  });
+
+  it('lets a studio version fill the slot a rejected live version never took', () => {
+    const pool = new AcceptedTrackPool(2, {
+      accepts: (item) => !isLiveVersion(item),
+    });
+
+    expect(pool.offer(track('1', 'Song - Live'))).toBe(false);
+    expect(pool.offer(track('2', 'Song'))).toBe(true);
+    expect(
+      pool.offer(track('3', 'Song (Live at Wembley)', 'artist-a', 99)),
+    ).toBe(false);
+    expect(ids(pool)).toEqual(['2']);
     expect(pool.missing).toBe(1);
   });
 

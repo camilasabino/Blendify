@@ -35,8 +35,10 @@ in three ways to start:
 
 - **Mix** — blend up to 12 artists, or up to 5 MusicBrainz genres.
 - **Discover** — branch out from one artist or one song.
-- Genre Mix and Discover results can be refined to one region (a musical scene
-  identified through Last.fm tags); artists you choose yourself are never filtered.
+- Results can be refined by decade (the release year the catalog reports for each
+  song's version) and by excluding live versions. Genre Mix and Discover results can
+  also be refined to one region (a musical scene) or to female vocals, both identified
+  through Last.fm artist tags; artists you choose yourself are never filtered by them.
 - **Create with AI** — describe the playlist in natural language, review what
   Blendify understood, then create it.
 

@@ -57,12 +57,28 @@ import {
   GenerationProgressTracker,
   type ProgressReporter,
 } from '@/application/services/generation-progress.tracker';
+import {
+  hasTrackSelectionFilters,
+  trackSelectionFilters,
+  withTrackSelectionFilters,
+} from '@/domain/selection-filters/track-selection-filters';
 
 const PER_ARTIST_FETCH_OVER_FETCH = 3;
 const ARTIST_CHART_TRACK_LIMIT = 50;
 
+type ArtistSourceAcceptance = {
+  acceptTrack?: TrackAcceptance;
+  /**
+   * Hard track filters reject resolved candidates, so a filtered mix keeps
+   * resolving the already loaded chart (bounded by its length) instead of
+   * stopping at the unfiltered over-fetch budget.
+   */
+  exhaustChart: boolean;
+};
+
 type ArtistTrackSource = {
   artist: Artist;
+  exhaustChart: boolean;
   pool: AcceptedTrackPool;
   /** `undefined` until loaded; `null` when no chart is usable. */
   chart: CatalogChartCursor<CatalogTrackRef> | null | undefined;
@@ -125,6 +141,7 @@ export class GenerateArtistMixUseCase {
         names: seedNames,
       });
 
+    const trackFilters = trackSelectionFilters(input.filters);
     const tracksByArtist = await this.fetchTracksForMix(
       catalog,
       artists,
@@ -132,7 +149,13 @@ export class GenerateArtistMixUseCase {
       input.popularity,
       tracker,
       input.maxTracks,
-      options?.acceptTrack,
+      {
+        acceptTrack: withTrackSelectionFilters(
+          trackFilters,
+          options?.acceptTrack,
+        ),
+        exhaustChart: hasTrackSelectionFilters(trackFilters),
+      },
     );
 
     const { tracks } = this.generation.generate(
@@ -170,6 +193,7 @@ export class GenerateArtistMixUseCase {
           name: artist.name,
           imageUrl: artist.imageUrl ?? null,
         })),
+        filters: input.filters,
         popularity: input.popularity,
         orderMode: input.orderMode,
       } satisfies PlaylistGeneration);
@@ -297,14 +321,14 @@ export class GenerateArtistMixUseCase {
     mode: PopularityModeValue,
     tracker?: GenerationProgressTracker,
     maxTracks?: number,
-    acceptTrack?: TrackAcceptance,
+    acceptance: ArtistSourceAcceptance = { exhaustChart: false },
   ): Promise<Map<string, Track[]>> {
     const totalNeeded = Math.min(
       artists.length * tracksPerSeed,
       maxTracks ?? MAX_TRACKS,
     );
     const sources = artists.map((artist) =>
-      this.createArtistSource(artist, acceptTrack),
+      this.createArtistSource(artist, acceptance),
     );
     const reportMatched = () => {
       tracker?.report(
@@ -361,10 +385,11 @@ export class GenerateArtistMixUseCase {
 
   private createArtistSource(
     artist: Artist,
-    acceptTrack?: TrackAcceptance,
+    { acceptTrack, exhaustChart }: ArtistSourceAcceptance,
   ): ArtistTrackSource {
     return {
       artist,
+      exhaustChart,
       pool: new AcceptedTrackPool(0, {
         accepts: (track) =>
           this.trackMatchesArtist(track, artist) &&
@@ -461,8 +486,9 @@ export class GenerateArtistMixUseCase {
         {
           concurrency: 1,
           artistId: source.artist.id.getValue(),
-          maxAttempts:
-            seedResolveAttemptLimit(source.pool.target) - source.attempted,
+          maxAttempts: source.exhaustChart
+            ? undefined
+            : seedResolveAttemptLimit(source.pool.target) - source.attempted,
           onProgress: () => onMatched?.(),
         },
       );

@@ -7,7 +7,12 @@ const INTENT: AiIntent = {
   artists: ['Radiohead', 'Interpol'],
   genres: [],
   seedTracks: [],
-  filters: { region: null },
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   targetTrackCount: 30,
   targetDurationMinutes: null,
   mood: null,

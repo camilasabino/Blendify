@@ -34,7 +34,7 @@ export const reviewIntent: AiIntentSummary = {
   kind: 'artist_mix',
   artists: ['Radiohead', 'Interpol'],
   genres: [],
-  filters: { region: null },
+  filters: { region: null, femaleVocals: false, releaseRange: null, excludeLive: false },
   seedTrack: null,
   targetTrackCount: 30,
   targetDurationMinutes: 60,

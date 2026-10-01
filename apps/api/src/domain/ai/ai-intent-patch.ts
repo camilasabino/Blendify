@@ -84,8 +84,19 @@ export function applyIntentPatch(
     genres: applyNames(intent.genres, patch.genres, aiGenreKey),
     seedTracks: applyTracks(intent.seedTracks, patch.seedTracks),
     filters: {
-      ...intent.filters,
       region: applyValue(intent.filters.region, patch.filters.region),
+      femaleVocals: applyFlag(
+        intent.filters.femaleVocals,
+        patch.filters.femaleVocals,
+      ),
+      releaseRange: applyValue(
+        intent.filters.releaseRange,
+        patch.filters.releaseRange,
+      ),
+      excludeLive: applyFlag(
+        intent.filters.excludeLive,
+        patch.filters.excludeLive,
+      ),
     },
     targetTrackCount: applyValue(
       intent.targetTrackCount,
@@ -137,6 +148,13 @@ function applyValue<T>(current: T | null, patch: ValuePatch<T>): T | null {
     return current;
   }
   return patch.operation === 'set' ? patch.value : null;
+}
+
+function applyFlag(current: boolean, patch: ValuePatch<true>): boolean {
+  if (patch === null) {
+    return current;
+  }
+  return patch.operation === 'set';
 }
 
 function applyNames(

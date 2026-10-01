@@ -11,7 +11,12 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: [],
     genres: [],
     seedTracks: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,
@@ -25,7 +30,12 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
 }
 
 function regionText(region: string): AiIntent['filters'] {
-  return { region };
+  return {
+    region,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  };
 }
 
 describe('resolveAiRegion', () => {
@@ -131,6 +141,9 @@ describe('resolveAiRegion', () => {
   it('has no region when neither the filter nor the genres name one', () => {
     expect(aiSelectionFilters(intent({ genres: ['rock'] }))).toEqual({
       region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
     });
   });
 });
@@ -154,7 +167,12 @@ describe('withCanonicalRegion', () => {
           filters: regionText('brasileras'),
         }),
       ).filters,
-    ).toEqual({ region: 'brazilian' });
+    ).toEqual({
+      region: 'brazilian',
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    });
   });
 
   it('is idempotent once the region is canonical', () => {

@@ -92,6 +92,19 @@ export const en = {
   'create.regionAny': 'Any region',
   'create.regionHint': 'Optional · Filters artists by region for all selected genres.',
   'discover.regionHint': 'Optional · Limits results to a scene or region.',
+  'create.vocals': 'Vocals',
+  'create.vocalsAny': 'Any',
+  'create.femaleVocals': 'Female vocals',
+  'create.vocalsHint': 'Optional · Filters result artists by their vocals.',
+  'create.decade': 'Decade',
+  'create.decadeAny': 'Any',
+  'create.decadeHint': 'Optional · Uses the release year of each song’s version.',
+  'create.eraAny': 'Any era',
+  'create.releaseRangeFrom': 'From {year}',
+  'create.releaseRangeTo': 'Up to {year}',
+  'create.excludeLive': 'Exclude live versions',
+  'create.excludeLiveHint': 'Skips recordings identified as live or unplugged.',
+  'create.noLiveVersions': 'No live versions',
   'region.latin': MUSIC_REGION_NAMES.latin,
   'region.american': MUSIC_REGION_NAMES.american,
   'region.british': MUSIC_REGION_NAMES.british,
@@ -219,6 +232,8 @@ export const en = {
     'Couldn’t load related music right now. Please try again.',
   'errors.regionLookupUnavailable':
     'Couldn’t check the region of the results right now. Try again later or remove the region.',
+  'errors.artistFilterLookupUnavailable':
+    'Couldn’t check the region or vocals of the results right now. Try again later or remove those filters.',
   'errors.genreLookupUnavailable':
     'Couldn’t find enough artists for this genre. Try another genre or try again later.',
   'errors.rateLimited':
@@ -628,6 +643,11 @@ export const en = {
     'Blendify can’t limit results to {names}. Edit your request with another region or without one.',
   'ai.clarify.regionNotSupported':
     'A region ({names}) only refines artists Blendify discovers, not artists you chose. Ask for music like that artist or remove the region.',
+  'ai.clarify.femaleVocalsNotSupported':
+    'Female vocals only refine artists Blendify discovers, not artists you chose. Ask for music like that artist or remove the vocals filter.',
+  'ai.clarify.invalidReleaseRange':
+    'That period ({names}) ends before it starts. Tell me the years again.',
+  'ai.option.discoverSimilarFiltered': 'Discover similar artists with that filter',
   'ai.clarify.invalidDuration':
     'That duration doesn’t work. Ask for a length of at least one minute.',
   'ai.clarify.optionsLabel': 'Choose an option',
@@ -657,6 +677,10 @@ export const en = {
   'ai.summary.basedOn': 'Based on',
   'ai.summary.genres': 'Genres',
   'ai.summary.region': 'Region',
+  'ai.summary.vocals': 'Vocals',
+  'ai.summary.femaleVocals': 'Female',
+  'ai.summary.era': 'Era',
+  'ai.summary.versions': 'Versions',
   'ai.summary.songs': 'Songs',
   'ai.summary.duration': 'Length',
   'ai.summary.durationValue': 'About {minutes} min',

@@ -31,6 +31,12 @@ function makePlaylist(): Playlist {
     tracks: [track],
     generation: {
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       version: 1,
       popularity: PopularityMode.BALANCED,
       orderMode: TrackOrderMode.RANDOM,

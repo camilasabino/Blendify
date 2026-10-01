@@ -13,12 +13,14 @@ from app.prompts.refinement import (
 from app.prompts.refinement_v1 import REFINEMENT_V1_PROMPT_VERSION, REFINEMENT_V1_SYSTEM_PROMPT
 from app.prompts.refinement_v2 import REFINEMENT_V2_PROMPT_VERSION, REFINEMENT_V2_SYSTEM_PROMPT
 from app.prompts.refinement_v3 import REFINEMENT_V3_PROMPT_VERSION, REFINEMENT_V3_SYSTEM_PROMPT
+from app.prompts.refinement_v4 import REFINEMENT_V4_PROMPT_VERSION, REFINEMENT_V4_SYSTEM_PROMPT
 from tests.fakes import current_intent, empty_preservation
 
 INTENT_V3_BASELINE_SHA256 = "4a523cd6a58f3ef21e0812fa209e4466289dc768eb682358474ac1bde7d8cf8f"
 REFINEMENT_V1_BASELINE_SHA256 = "6772d9e633197be47590eeea6503892a2f10e3f97b648696007f831d93a20bf7"
 REFINEMENT_V2_BASELINE_SHA256 = "19c932bed0036dd81b3ba8286e1d0c97b39db52d7bb2815897b56e8132c023f8"
 REFINEMENT_V3_BASELINE_SHA256 = "b677ca5d0b5f386c321c8dfb0b35c043f2e373bc4fe7163e2d550579f8526b99"
+REFINEMENT_V4_BASELINE_SHA256 = "ccf8946dde152f595aa76fd49d0fb64d74f379276ac64d37b003823e7787f309"
 
 
 def plan_request(refinement: str) -> PlanRefinementRequest:
@@ -30,10 +32,33 @@ def plan_request(refinement: str) -> PlanRefinementRequest:
 def test_refinement_has_its_own_prompt_version() -> None:
     request = build_refinement_model_request(plan_request("Remove Coldplay"))
 
-    assert REFINEMENT_PROMPT_VERSION == "refinement-v4"
+    assert REFINEMENT_PROMPT_VERSION == "refinement-v5"
     assert request.prompt_version == REFINEMENT_PROMPT_VERSION
     assert request.system_prompt == REFINEMENT_SYSTEM_PROMPT
     assert REFINEMENT_SYSTEM_PROMPT != INTENT_SYSTEM_PROMPT
+
+
+def test_refinement_v4_stays_frozen_for_the_accepted_baseline() -> None:
+    digest = hashlib.sha256(REFINEMENT_V4_SYSTEM_PROMPT.encode()).hexdigest()
+
+    assert REFINEMENT_V4_PROMPT_VERSION == "refinement-v4"
+    assert digest == REFINEMENT_V4_BASELINE_SHA256
+    assert REFINEMENT_V4_SYSTEM_PROMPT != REFINEMENT_SYSTEM_PROMPT
+
+
+def test_sets_replaces_and_clears_the_vocal_release_and_live_filters() -> None:
+    prompt = " ".join(REFINEMENT_SYSTEM_PROMPT.split())
+
+    assert 'filters.femaleVocals: {"operation": "set", "value": true}' in prompt
+    assert '"ya no importa la voz"' in prompt
+    assert "a new period replaces the current one" in prompt
+    assert '"sin importar el año"' in prompt
+    assert '"sacá los vivos"' in prompt
+    assert '"pueden ser en vivo"' in prompt
+    assert "never femaleVocals" in prompt
+    assert "female vocalists" not in prompt
+    assert '"solo grabaciones de estudio"' in prompt
+    assert "never set excludeLive for it" in prompt
 
 
 def test_intent_v3_stays_frozen_for_the_accepted_m2_baseline() -> None:

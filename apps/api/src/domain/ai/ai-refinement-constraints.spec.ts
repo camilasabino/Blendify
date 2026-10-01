@@ -10,7 +10,12 @@ const INTENT: AiIntent = {
   artists: ['Ed Sheeran'],
   genres: [],
   seedTracks: [],
-  filters: { region: null },
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   targetTrackCount: null,
   targetDurationMinutes: 30,
   mood: null,
@@ -44,6 +49,12 @@ function result(input: {
     recipe: {
       version: 1,
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       tracksPerSeed: 10,
       seeds: [],
       popularity: 'balanced',

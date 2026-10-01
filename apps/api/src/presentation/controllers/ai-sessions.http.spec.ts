@@ -110,7 +110,12 @@ function interpreted(
         artists: ['Radiohead', 'Interpol'],
         genres: [],
         seedTracks: [],
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         targetTrackCount: 30,
         targetDurationMinutes: null,
         mood: null,
@@ -158,7 +163,12 @@ function lessMainstreamPlan(): PlanRefinementResponse {
       artists: { add: [], remove: ['Interpol'] },
       genres: unchangedNames,
       seedTracks: unchangedNames,
-      filters: { region: null },
+      filters: {
+        region: null,
+        femaleVocals: null,
+        releaseRange: null,
+        excludeLive: null,
+      },
       targetTrackCount: null,
       targetDurationMinutes: null,
       mood: null,
@@ -188,7 +198,12 @@ function popularPlan(
       artists: unchangedNames,
       genres: unchangedNames,
       seedTracks: unchangedNames,
-      filters: { region: null },
+      filters: {
+        region: null,
+        femaleVocals: null,
+        releaseRange: null,
+        excludeLive: null,
+      },
       targetTrackCount: null,
       targetDurationMinutes: null,
       mood: null,
@@ -404,6 +419,12 @@ function generatedPlaylist(
     generation: {
       version: 1,
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       tracksPerSeed: 15,
       seeds: [{ id: 'radiohead-id', name: 'Radiohead' }],
       popularity: 'rarities',
@@ -621,7 +642,12 @@ describe('Create with AI sessions over HTTP', () => {
         kind: 'discover_track',
         artists: [],
         seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         unsupportedConstraints: [],
       }),
     );
@@ -882,7 +908,12 @@ describe('Create with AI sessions over HTTP', () => {
         kind: 'discover_artist',
         artists: ['Radiohead'],
         genres: [],
-        filters: { region: 'argentino' },
+        filters: {
+          region: 'argentino',
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         excludeArtists: [],
         unsupportedConstraints: [],
       }),
@@ -910,7 +941,12 @@ describe('Create with AI sessions over HTTP', () => {
         kind: 'artist_mix',
         artists: ['Radiohead'],
         genres: [],
-        filters: { region: 'argentinas' },
+        filters: {
+          region: 'argentinas',
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         excludeArtists: [],
         unsupportedConstraints: [],
       }),
@@ -1451,7 +1487,7 @@ describe('Create with AI sessions over HTTP', () => {
     });
     expect(state.destination).toBeNull();
     expect(JSON.stringify(restored.body)).not.toMatch(
-      /startedAt|attemptId|recipe|ownerUserId|originalPrompt|aiSafe|lease|"generation"/,
+      /startedAt|attemptId|recipe|ownerUserId|originalPrompt|aiSafe|\blease|"generation"/,
     );
     expectNoReadSideEffects(1);
   });
@@ -1521,7 +1557,7 @@ describe('Create with AI sessions over HTTP', () => {
     expect(AiSessionStateSchema.parse(response.body).execution).toEqual({
       status: 'generating',
     });
-    expect(response.text).not.toMatch(/attempt|lease|startedAt/);
+    expect(response.text).not.toMatch(/attempt|\blease|startedAt/);
 
     world.sessions.hasGenerationLock.mockResolvedValue(false);
     const interrupted = await readSession(sessionKey).expect(200);
@@ -1535,7 +1571,7 @@ describe('Create with AI sessions over HTTP', () => {
         seedNotFound: null,
       },
     });
-    expect(interrupted.text).not.toMatch(/attempt|lease|startedAt|failedAt/);
+    expect(interrupted.text).not.toMatch(/attempt|\blease|startedAt|failedAt/);
     expect(world.stored.get(sessionKey)?.execution?.status).toBe('generating');
     expectNoReadSideEffects(1);
   });
@@ -2268,7 +2304,12 @@ describe('Create with AI sessions over HTTP', () => {
         artists: unchangedNames,
         genres: unchangedNames,
         seedTracks: unchangedNames,
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: null,
+          releaseRange: null,
+          excludeLive: null,
+        },
         targetTrackCount: null,
         targetDurationMinutes: null,
         mood: null,
@@ -3186,7 +3227,12 @@ describe('Create with AI sessions over HTTP', () => {
             artists: NO_NAMES,
             genres: NO_NAMES,
             seedTracks: NO_NAMES,
-            filters: { region: null },
+            filters: {
+              region: null,
+              femaleVocals: null,
+              releaseRange: null,
+              excludeLive: null,
+            },
             targetTrackCount: null,
             targetDurationMinutes: null,
             mood: null,
@@ -3383,6 +3429,12 @@ describe('Create with AI sessions over HTTP', () => {
         generation: {
           version: 1,
           kind: 'artist_mix',
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           tracksPerSeed: 15,
           seeds: [{ id: SENTINELS.providerId, name: SENTINELS.providerArtist }],
           popularity: 'rarities',

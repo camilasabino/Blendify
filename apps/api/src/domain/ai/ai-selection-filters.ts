@@ -1,4 +1,9 @@
-import type { MusicRegion, SelectionFilters } from '@blendify/contracts';
+import type {
+  MusicRegion,
+  ReleaseRange,
+  SelectionFilters,
+} from '@blendify/contracts';
+import type { IntentReleaseRange } from '@blendify/contracts/ai-service';
 import { resolveGenreExpression } from '@/domain/genre/genre-expression-resolution';
 import {
   resolveMusicRegion,
@@ -39,7 +44,42 @@ export function resolveAiRegion(intent: AiIntent): AiRegionResolution {
 }
 
 export function aiSelectionFilters(intent: AiIntent): SelectionFilters {
-  return { region: resolveAiRegion(intent).region };
+  const releaseRange = intent.filters.releaseRange;
+  return {
+    region: resolveAiRegion(intent).region,
+    femaleVocals: intent.filters.femaleVocals,
+    releaseRange:
+      releaseRange && isValidAiReleaseRange(releaseRange)
+        ? toReleaseRange(releaseRange)
+        : null,
+    excludeLive: intent.filters.excludeLive,
+  };
+}
+
+export function isValidAiReleaseRange(range: IntentReleaseRange): boolean {
+  return (
+    range.fromYear === null ||
+    range.toYear === null ||
+    range.fromYear <= range.toYear
+  );
+}
+
+export function withCanonicalReleaseRange(intent: AiIntent): AiIntent {
+  const range = intent.filters.releaseRange;
+  if (range === null || range.fromYear !== null || range.toYear !== null) {
+    return intent;
+  }
+  return { ...intent, filters: { ...intent.filters, releaseRange: null } };
+}
+
+function toReleaseRange(range: IntentReleaseRange): ReleaseRange | null {
+  if (range.fromYear === null && range.toYear === null) {
+    return null;
+  }
+  return {
+    ...(range.fromYear === null ? {} : { fromYear: range.fromYear }),
+    ...(range.toYear === null ? {} : { toYear: range.toYear }),
+  };
 }
 
 export function withCanonicalRegion(intent: AiIntent): AiIntent {

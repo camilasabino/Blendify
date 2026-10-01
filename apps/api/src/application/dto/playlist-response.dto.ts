@@ -27,6 +27,8 @@ export function toTrackResponse(track: Track): TrackDto {
     artists: track.artists.map((artist) => ({ ...artist })),
     isrc: track.isrc,
     externalUrl: track.externalUrl,
+    releaseDate: track.releaseDate,
+    releaseDatePrecision: track.releaseDatePrecision,
   };
 }
 
@@ -45,6 +47,8 @@ export function fromTrackResponse(track: TrackDto): Track {
     artists: track.artists,
     isrc: track.isrc,
     externalUrl: track.externalUrl,
+    releaseDate: track.releaseDate,
+    releaseDatePrecision: track.releaseDatePrecision,
   });
 }
 

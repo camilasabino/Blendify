@@ -44,6 +44,25 @@ describe.each(LOCALES)('Create with AI clarification copy (%s)', (locale) => {
     expect(text).not.toContain('brazilian')
   })
 
+  it('explains why female vocals cannot refine the artists of an artist mix', () => {
+    const text = clarificationMessage(
+      { ...clarification('female_vocals_not_supported'), seedType: null, names: [] },
+      t,
+    )
+
+    expect(text).toBe(messages[locale]['ai.clarify.femaleVocalsNotSupported'])
+    expect(text.toLowerCase()).not.toContain('women')
+  })
+
+  it('asks again for a period that ends before it starts', () => {
+    expect(
+      clarificationMessage(
+        { ...clarification('invalid_release_range'), seedType: null, names: ['1999–1990'] },
+        t,
+      ),
+    ).toContain('1999–1990')
+  })
+
   it('quotes a region outside the curated list as the user wrote it', () => {
     const text = clarificationMessage(
       { ...clarification('unknown_region'), seedType: null, names: ['japonés'] },

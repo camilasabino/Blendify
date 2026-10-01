@@ -1,5 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { PopularityMode, SelectionFilters } from '@blendify/contracts';
+import {
+  emptySelectionFilters,
+  type PopularityMode,
+  type SelectionFilters,
+} from '@blendify/contracts';
 import { pickUniqueArtistMatch } from '@/domain/artist/artist-name-match';
 import { Artist } from '@/domain/artist/artist.entity';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
@@ -21,8 +25,10 @@ import {
   genreTrackGroupKey,
 } from '@/domain/genre/genre-catalog';
 import { tracksPerSeedArtist } from '@/domain/genre/genre-playlist-generation.service';
+import { primaryArtistName } from '@/domain/discovery/similar-track-query';
 import {
   type CatalogTrackCandidate,
+  type DiscoveryArtistIdentity,
   DISCOVERY_CATALOG,
   type DiscoveryCatalogPort,
   type SimilarArtistCandidate,
@@ -37,6 +43,12 @@ import {
 } from '@/domain/repositories/provider-quota.port';
 import { Track } from '@/domain/track/track.entity';
 import { GENRE_MIX_MAX_TRACKS_PER_ARTIST } from '@/domain/genre/genre-generation.constants';
+import {
+  trackSelectionFilters,
+  withTrackSelectionFilters,
+} from '@/domain/selection-filters/track-selection-filters';
+import { ArtistFilterQualifier } from './artist-filter-qualifier';
+import { ArtistTagLookup } from './artist-tag-lookup';
 import { RegionalGenreArtistPool } from './regional-genre-artist-pool';
 
 const SPOTIFY_VARIOUS_ARTISTS_ARTIST_ID = '0LyfQWJT6nXafLPZqxe9Of';
@@ -60,6 +72,11 @@ export interface GenreTrackCatalogResult {
 
 /** `null` skips this candidate and continues; `'stop'` ends the seed-fanout loop early (quota hit). */
 type SeedFanoutOutcome<T> = T | null | 'stop';
+
+type GenreArtistFilters = {
+  regionalPool: RegionalGenreArtistPool | null;
+  vocalQualifier: ArtistFilterQualifier | null;
+};
 
 type RegionalArtistSource = {
   cursor: CatalogChartCursor<CatalogTrackCandidate>;
@@ -95,10 +112,12 @@ export class GenreTrackCatalogService {
       });
     }
 
-    const region = options?.filters?.region ?? null;
-    const regionalPool = region
-      ? new RegionalGenreArtistPool(this.discoveryCatalog, region, this.logger)
-      : null;
+    const filters = options?.filters ?? emptySelectionFilters();
+    const artistFilters = this.artistFilters(filters);
+    const acceptTrack = withTrackSelectionFilters(
+      trackSelectionFilters(filters),
+      options?.acceptTrack,
+    );
 
     const tracksByGenre = new Map<string, Track[]>();
     const coverCandidates = new Map<string, string | undefined>();
@@ -114,14 +133,14 @@ export class GenreTrackCatalogService {
         maxPerArtist: GENRE_MIX_MAX_TRACKS_PER_ARTIST,
         claimedKeys,
         accepts: (track) =>
-          !this.isJunkTrack(track) && (options?.acceptTrack?.(track) ?? true),
+          !this.isJunkTrack(track) && (acceptTrack?.(track) ?? true),
       });
       const result = await this.resolveGenre(
         provider,
         genre,
         popularity,
         pool,
-        regionalPool,
+        artistFilters,
         () => {
           matched = Math.min(totalNeeded, baseMatched + pool.size);
           options?.onMatched?.(matched);
@@ -138,8 +157,34 @@ export class GenreTrackCatalogService {
     ) {
       this.quota.assertAvailable();
     }
+    artistFilters.vocalQualifier?.assertEnforceable();
 
     return { tracksByGenre, coverCandidates };
+  }
+
+  /**
+   * One Last.fm top-tags lookup per artist serves every artist-level check:
+   * genre qualification, region evidence and female vocals.
+   */
+  private artistFilters(filters: SelectionFilters): GenreArtistFilters {
+    const tags = new ArtistTagLookup(this.discoveryCatalog, this.logger);
+    if (filters.region) {
+      return {
+        regionalPool: new RegionalGenreArtistPool(
+          this.discoveryCatalog,
+          filters.region,
+          this.logger,
+          { femaleVocals: filters.femaleVocals, tags },
+        ),
+        vocalQualifier: null,
+      };
+    }
+    return {
+      regionalPool: null,
+      vocalQualifier: filters.femaleVocals
+        ? new ArtistFilterQualifier({ region: null, femaleVocals: true }, tags)
+        : null,
+    };
   }
 
   private async resolveGenre(
@@ -147,7 +192,7 @@ export class GenreTrackCatalogService {
     genre: CatalogGenre,
     popularity: PopularityMode,
     pool: AcceptedTrackPool,
-    regionalPool: RegionalGenreArtistPool | null,
+    { regionalPool, vocalQualifier }: GenreArtistFilters,
     onMatched: () => void,
   ): Promise<{
     genreKey: string;
@@ -166,7 +211,14 @@ export class GenreTrackCatalogService {
         )
       : null;
     if (!regionalPool) {
-      await this.resolveTagTracks(provider, genre, popularity, pool, onMatched);
+      await this.resolveTagTracks(
+        provider,
+        genre,
+        popularity,
+        pool,
+        vocalQualifier,
+        onMatched,
+      );
     }
 
     let coverUrl: string | undefined;
@@ -176,7 +228,7 @@ export class GenreTrackCatalogService {
         provider,
         genre,
         pool,
-        regionalArtists,
+        regionalArtists ?? vocalQualifier,
       );
       onMatched();
     }
@@ -194,6 +246,7 @@ export class GenreTrackCatalogService {
     genre: CatalogGenre,
     popularity: PopularityMode,
     pool: AcceptedTrackPool,
+    vocalQualifier: ArtistFilterQualifier | null,
     onMatched: () => void,
   ): Promise<void> {
     try {
@@ -205,7 +258,12 @@ export class GenreTrackCatalogService {
         provider,
         new CatalogChartCursor(chart, popularity),
         pool,
-        { onProgress: onMatched },
+        {
+          onProgress: onMatched,
+          admit: vocalQualifier
+            ? (refs) => admitQualifiedArtists(vocalQualifier, refs, chartArtist)
+            : undefined,
+        },
       );
     } catch (error) {
       if (isFatalCatalogError(error)) {
@@ -373,7 +431,7 @@ export class GenreTrackCatalogService {
     provider: CatalogProviderPort,
     genre: CatalogGenre,
     pool: AcceptedTrackPool,
-    regionalArtists: SimilarArtistCandidate[] | null,
+    artistSource: SimilarArtistCandidate[] | ArtistFilterQualifier | null,
   ): Promise<string | undefined> {
     // Each fallback seed costs Spotify searches, so cap fan-out tightly and
     // resolve seed artists lazily until the genre target is met.
@@ -387,7 +445,7 @@ export class GenreTrackCatalogService {
     const candidates = await this.seedArtistCandidates(
       genre,
       seedLimit,
-      regionalArtists,
+      artistSource,
     );
     const tracksPerArtist = tracksPerSeedArtist(pool.target, seedLimit);
     const seen = new Set<string>();
@@ -485,7 +543,7 @@ export class GenreTrackCatalogService {
   private async seedArtistCandidates(
     genre: CatalogGenre,
     limit: number,
-    regionalArtists: SimilarArtistCandidate[] | null,
+    artistSource: SimilarArtistCandidate[] | ArtistFilterQualifier | null,
   ): Promise<SimilarArtistCandidate[]> {
     const candidateLimit = Math.min(
       MAX_SEED_ARTIST_CANDIDATE_LIMIT,
@@ -496,12 +554,16 @@ export class GenreTrackCatalogService {
     );
 
     try {
-      return regionalArtists
-        ? regionalArtists.slice(0, candidateLimit)
-        : await this.discoveryCatalog.getTopArtistsForTag(
-            genre.id,
-            candidateLimit,
-          );
+      if (Array.isArray(artistSource)) {
+        return artistSource.slice(0, candidateLimit);
+      }
+      const candidates = await this.discoveryCatalog.getTopArtistsForTag(
+        genre.id,
+        candidateLimit,
+      );
+      return artistSource
+        ? await admitQualifiedArtists(artistSource, candidates, (c) => c)
+        : candidates;
     } catch (error) {
       if (isFatalCatalogError(error)) {
         throw error;
@@ -575,6 +637,22 @@ export class GenreTrackCatalogService {
       track.artistId.getValue() === SPOTIFY_VARIOUS_ARTISTS_ARTIST_ID
     );
   }
+}
+
+async function admitQualifiedArtists<T>(
+  qualifier: ArtistFilterQualifier,
+  candidates: T[],
+  identityOf: (candidate: T) => DiscoveryArtistIdentity,
+): Promise<T[]> {
+  await qualifier.prefetch(candidates.map(identityOf));
+  const verdicts = await Promise.all(
+    candidates.map((candidate) => qualifier.qualifies(identityOf(candidate))),
+  );
+  return candidates.filter((_, index) => verdicts[index]);
+}
+
+function chartArtist(ref: CatalogTrackCandidate): DiscoveryArtistIdentity {
+  return { name: primaryArtistName(ref.artistName) || ref.artistName };
 }
 
 function errorMessage(error: unknown): string {

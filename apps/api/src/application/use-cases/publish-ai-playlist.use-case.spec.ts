@@ -58,6 +58,12 @@ function generatedSession(
         recipe: {
           version: 1,
           kind: 'artist_mix',
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           tracksPerSeed: 1,
           seeds: [{ id: 'radiohead-id', name: 'Radiohead' }],
           popularity: 'balanced',
@@ -448,7 +454,12 @@ describe('PublishAiPlaylistUseCase', () => {
             artists: ['Radiohead'],
             genres: [],
             seedTracks: [],
-            filters: { region: null },
+            filters: {
+              region: null,
+              femaleVocals: false,
+              releaseRange: null,
+              excludeLive: false,
+            },
             targetTrackCount: null,
             targetDurationMinutes: null,
             mood: null,

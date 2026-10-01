@@ -18,6 +18,12 @@ function makePlaylist(id: string, spotifyId: string, name: string): Playlist {
     tracks: [],
     generation: {
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       version: 1,
       popularity: PopularityMode.BALANCED,
       orderMode: TrackOrderMode.ARTIST,
@@ -313,6 +319,12 @@ describe('SyncLibraryUseCase', () => {
       tracks: [],
       generation: {
         kind: 'artist_mix',
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         version: 1,
         popularity: PopularityMode.BALANCED,
         orderMode: TrackOrderMode.ARTIST,

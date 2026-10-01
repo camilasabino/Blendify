@@ -10,6 +10,12 @@ import { resolveAiGenreSeeds } from './ai-genre-seeds';
 import { evaluateRefinement } from './ai-refinement';
 
 const NO_NAMES = { add: [], remove: [] };
+const NO_FILTER_CHANGES: AiIntentPatch['filters'] = {
+  region: null,
+  femaleVocals: null,
+  releaseRange: null,
+  excludeLive: null,
+};
 const PLAYLIST_TRACK_COUNT = 30;
 
 function intent(overrides: Partial<AiIntent> = {}): AiIntent {
@@ -18,7 +24,12 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     targetTrackCount: 30,
     targetDurationMinutes: null,
     mood: null,
@@ -54,7 +65,7 @@ function interpreted(
       artists: NO_NAMES,
       genres: NO_NAMES,
       seedTracks: NO_NAMES,
-      filters: { region: null },
+      filters: NO_FILTER_CHANGES,
       targetTrackCount: null,
       targetDurationMinutes: null,
       mood: null,
@@ -893,12 +904,23 @@ describe('effective state comparison', () => {
 
 describe('region filter refinement', () => {
   const setRegion = (value: string) =>
-    interpreted({ filters: { region: { operation: 'set', value } } });
+    interpreted({
+      filters: { ...NO_FILTER_CHANGES, region: { operation: 'set', value } },
+    });
   const clearRegion = interpreted({
-    filters: { region: { operation: 'clear' } },
+    filters: { ...NO_FILTER_CHANGES, region: { operation: 'clear' } },
   });
   const regional = (seeds: Partial<AiIntent>, region: string | null) =>
-    intent({ artists: [], ...seeds, filters: { region } });
+    intent({
+      artists: [],
+      ...seeds,
+      filters: {
+        region,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
+    });
 
   describe.each<[string, Partial<AiIntent>]>([
     ['genre_mix', { kind: 'genre_mix', genres: ['rock'] }],
@@ -989,5 +1011,169 @@ describe('region filter refinement', () => {
         ),
       ),
     ).toBe('region_not_supported');
+  });
+});
+
+describe('vocal, release and live filter refinements', () => {
+  const patchFilters = (filters: Partial<AiIntentPatch['filters']>) =>
+    interpreted({ filters: { ...NO_FILTER_CHANGES, ...filters } });
+  const filtered = (
+    seeds: Partial<AiIntent>,
+    filters: Partial<AiIntent['filters']> = {},
+  ) =>
+    intent({
+      artists: [],
+      ...seeds,
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+        ...filters,
+      },
+    });
+  const NINETIES = { fromYear: 1990, toYear: 1999 };
+  const TWO_THOUSANDS = { fromYear: 2000, toYear: 2009 };
+
+  describe.each<[string, Partial<AiIntent>]>([
+    ['genre_mix', { kind: 'genre_mix', genres: ['rock'] }],
+    ['discover_artist', { kind: 'discover_artist', artists: ['Radiohead'] }],
+    [
+      'discover_track',
+      {
+        kind: 'discover_track',
+        seedTracks: [{ title: 'Creep', artist: 'Radiohead' }],
+      },
+    ],
+  ])('on a %s', (_kind, seeds) => {
+    it('sets and clears female vocals', () => {
+      expect(
+        evaluate(
+          patchFilters({ femaleVocals: { operation: 'set', value: true } }),
+          filtered(seeds),
+        ),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { filters: { femaleVocals: true } },
+      });
+      expect(
+        evaluate(
+          patchFilters({ femaleVocals: { operation: 'clear' } }),
+          filtered(seeds, { femaleVocals: true }),
+        ),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { filters: { femaleVocals: false } },
+      });
+    });
+
+    it('sets, replaces and clears the release range', () => {
+      expect(
+        evaluate(
+          patchFilters({ releaseRange: { operation: 'set', value: NINETIES } }),
+          filtered(seeds),
+        ),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { filters: { releaseRange: NINETIES } },
+      });
+      expect(
+        evaluate(
+          patchFilters({
+            releaseRange: { operation: 'set', value: TWO_THOUSANDS },
+          }),
+          filtered(seeds, { releaseRange: NINETIES }),
+        ),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { filters: { releaseRange: TWO_THOUSANDS } },
+      });
+      expect(
+        evaluate(
+          patchFilters({ releaseRange: { operation: 'clear' } }),
+          filtered(seeds, { releaseRange: NINETIES }),
+        ),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { filters: { releaseRange: null } },
+      });
+    });
+
+    it('sets and clears live exclusion', () => {
+      expect(
+        evaluate(
+          patchFilters({ excludeLive: { operation: 'set', value: true } }),
+          filtered(seeds),
+        ),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { filters: { excludeLive: true } },
+      });
+      expect(
+        evaluate(
+          patchFilters({ excludeLive: { operation: 'clear' } }),
+          filtered(seeds, { excludeLive: true }),
+        ),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { filters: { excludeLive: false } },
+      });
+    });
+
+    it('treats a repeated filter as unchanged', () => {
+      expect(
+        evaluate(
+          patchFilters({ excludeLive: { operation: 'set', value: true } }),
+          filtered(seeds, { excludeLive: true }),
+        ),
+      ).toEqual({ status: 'unchanged' });
+    });
+
+    it('asks again for a reversed release range', () => {
+      expect(
+        clarificationReason(
+          evaluate(
+            patchFilters({
+              releaseRange: {
+                operation: 'set',
+                value: { fromYear: 2005, toYear: 1995 },
+              },
+            }),
+            filtered(seeds),
+          ),
+        ),
+      ).toBe('invalid_release_range');
+    });
+  });
+
+  it('never applies female vocals to the artists of an artist mix', () => {
+    expect(
+      evaluate(
+        patchFilters({ femaleVocals: { operation: 'set', value: true } }),
+        intent({ kind: 'artist_mix', artists: ['Radiohead'] }),
+      ),
+    ).toMatchObject({
+      status: 'needs_clarification',
+      clarification: { reason: 'female_vocals_not_supported' },
+    });
+  });
+
+  it('applies release and live filters to an artist mix', () => {
+    expect(
+      evaluate(
+        patchFilters({
+          releaseRange: { operation: 'set', value: NINETIES },
+          excludeLive: { operation: 'set', value: true },
+        }),
+        intent({ kind: 'artist_mix', artists: ['Radiohead'] }),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: {
+        kind: 'artist_mix',
+        artists: ['Radiohead'],
+        filters: { releaseRange: NINETIES, excludeLive: true },
+      },
+    });
   });
 });

@@ -10,21 +10,23 @@ from app.prompts.intent_v1 import INTENT_V1_PROMPT_VERSION, INTENT_V1_SYSTEM_PRO
 from app.prompts.intent_v2 import INTENT_V2_PROMPT_VERSION, INTENT_V2_SYSTEM_PROMPT
 from app.prompts.intent_v3 import INTENT_V3_PROMPT_VERSION, INTENT_V3_SYSTEM_PROMPT
 from app.prompts.intent_v4 import INTENT_V4_PROMPT_VERSION, INTENT_V4_SYSTEM_PROMPT
+from app.prompts.intent_v5 import INTENT_V5_PROMPT_VERSION, INTENT_V5_SYSTEM_PROMPT
 
 INTENT_V1_BASELINE_SHA256 = "6f765db08aaf50eee3d7934fccbf8ebcbc132a18ee53d9acd1fd78b3dc4fbcb5"
 INTENT_V2_BASELINE_SHA256 = "274418d1f63e9f9ef65fe99f62af3027dffeece6783f933afe86c786ad3e64c2"
 INTENT_V3_BASELINE_SHA256 = "4a523cd6a58f3ef21e0812fa209e4466289dc768eb682358474ac1bde7d8cf8f"
 INTENT_V4_BASELINE_SHA256 = "6a8789ecde010f09c1a61c52d48a0234291ee40c7fab27083ab5028de6a59e28"
+INTENT_V5_BASELINE_SHA256 = "41b1c37f1c28b2cac7f8d528f7a32ed86c39e322b5f439632660349ac8cfeff9"
 
 
 def flat(prompt: str) -> str:
     return " ".join(prompt.split())
 
 
-def test_current_prompt_is_intent_v5() -> None:
+def test_current_prompt_is_intent_v6() -> None:
     request = build_intent_model_request("Pop music for an hour")
 
-    assert INTENT_PROMPT_VERSION == "intent-v5"
+    assert INTENT_PROMPT_VERSION == "intent-v6"
     assert request.prompt_version == INTENT_PROMPT_VERSION
     assert request.system_prompt == INTENT_SYSTEM_PROMPT
     assert request.user_prompt == "Pop music for an hour"
@@ -52,6 +54,35 @@ def test_intent_v3_stays_frozen_for_the_accepted_m2_baseline() -> None:
     assert INTENT_V3_PROMPT_VERSION == "intent-v3"
     assert digest == INTENT_V3_BASELINE_SHA256
     assert INTENT_V3_SYSTEM_PROMPT != INTENT_SYSTEM_PROMPT
+
+
+def test_intent_v5_stays_frozen_for_the_accepted_baseline() -> None:
+    digest = hashlib.sha256(INTENT_V5_SYSTEM_PROMPT.encode()).hexdigest()
+
+    assert INTENT_V5_PROMPT_VERSION == "intent-v5"
+    assert digest == INTENT_V5_BASELINE_SHA256
+    assert INTENT_V5_SYSTEM_PROMPT != INTENT_SYSTEM_PROMPT
+
+
+def test_current_prompt_interprets_vocal_release_and_live_filters() -> None:
+    prompt = flat(INTENT_SYSTEM_PROMPT)
+
+    assert "filters.femaleVocals: true when the user asks for female vocals" in prompt
+    assert "never who the artists are" in prompt
+    assert '"solo mujeres"' in prompt
+    assert "Never infer it from artist names" in prompt
+    assert "filters.releaseRange: the years the songs were released" in prompt
+    assert '"onda ochentosa"' in prompt
+    assert '"after 2015" start in 2016' in prompt
+    assert '"Antes de 2000" and "before 2000" end in 1999' in prompt
+    assert "filters.excludeLive: true only when the user asks to leave out live versions" in prompt
+    assert "It leaves out only live and unplugged performances" in prompt
+    assert '"solo grabaciones de estudio"' in prompt
+    assert "Never set excludeLive for it" in prompt
+    assert "female vocalists" not in prompt
+    assert "Last.fm" not in prompt
+    assert "Spotify" not in prompt
+    assert "release_date" not in prompt
 
 
 def test_intent_v4_stays_frozen_for_the_accepted_baseline() -> None:

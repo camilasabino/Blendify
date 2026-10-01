@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { supportedSelectionFilters } from '@blendify/contracts';
 import type { z } from 'zod';
 import {
   CATALOG_MATCH_SEARCH_LIMIT,
@@ -69,9 +70,17 @@ import {
   type ProgressReporter,
 } from '@/application/services/generation-progress.tracker';
 import {
-  REGION_QUALIFICATION_CONCURRENCY,
-  RegionArtistQualifier,
-} from '@/application/services/region-artist-qualifier';
+  ARTIST_FILTER_QUALIFICATION_CONCURRENCY,
+  ArtistFilterQualifier,
+} from '@/application/services/artist-filter-qualifier';
+import {
+  artistSelectionFilters,
+  hasArtistSelectionFilters,
+} from '@/domain/selection-filters/artist-selection-filters';
+import {
+  trackSelectionFilters,
+  withTrackSelectionFilters,
+} from '@/domain/selection-filters/track-selection-filters';
 
 const SEED_ARTIST_MATCH_CANDIDATES = 10;
 
@@ -113,7 +122,14 @@ export class GenerateDiscoverPlaylistUseCase {
     }
 
     if (input.kind === 'discover_track') {
-      return this.executeFromTrack(input, onProgress, options?.acceptTrack);
+      return this.executeFromTrack(
+        input,
+        onProgress,
+        withTrackSelectionFilters(
+          trackSelectionFilters(input.filters),
+          options?.acceptTrack,
+        ),
+      );
     }
     return this.executeFromArtist(input, onProgress, options?.acceptTrack);
   }
@@ -162,16 +178,16 @@ export class GenerateDiscoverPlaylistUseCase {
     const similarTarget = discoverSimilarTargetForTracks(
       input.targetTrackCount,
     );
-    const regionQualifier = this.regionQualifier(input);
+    const artistQualifier = this.artistQualifier(input);
     const resolvedSimilar = await this.resolveSimilarArtists(
       catalog,
       similarArtists,
       seed.id.getValue(),
       similarTarget,
       tracker,
-      regionQualifier,
+      artistQualifier,
     );
-    regionQualifier?.assertEnforceable();
+    artistQualifier?.assertEnforceable();
 
     if (resolvedSimilar.length < DISCOVER_MIN_SIMILAR) {
       throw new BusinessRuleError(
@@ -210,6 +226,7 @@ export class GenerateDiscoverPlaylistUseCase {
         description,
         artistIds: artists.map((a) => a.id),
         artists,
+        filters: supportedSelectionFilters('artist_mix', input.filters),
         tracksPerSeed,
         popularity: input.popularity,
         orderMode: input.orderMode,
@@ -272,13 +289,13 @@ export class GenerateDiscoverPlaylistUseCase {
       );
     }
 
-    const regionQualifier = this.regionQualifier(input);
+    const artistQualifier = this.artistQualifier(input);
     const selected = await this.selectDiverseTracks(
       catalog,
       seedTrack,
       similarRaw,
       input,
-      { tracker, acceptTrack, regionQualifier },
+      { tracker, acceptTrack, artistQualifier },
     );
 
     const tracksByArtist = groupTracksByArtist(selected);
@@ -389,7 +406,7 @@ export class GenerateDiscoverPlaylistUseCase {
       input,
       context,
     );
-    context.regionQualifier?.assertEnforceable();
+    context.artistQualifier?.assertEnforceable();
     const allowance = seedArtistTrackAllowance(relatedTracks.length, target);
     const keptSeedArtistTracks = seedArtistTracks.slice(0, allowance);
     const selected = [...relatedTracks, ...keptSeedArtistTracks];
@@ -425,7 +442,7 @@ export class GenerateDiscoverPlaylistUseCase {
     input: TrackDiscoverInput,
     context: TrackSelectionContext,
   ): Promise<{ relatedTracks: Track[]; seedArtistTracks: Track[] }> {
-    const { tracker, acceptTrack, regionQualifier } = context;
+    const { tracker, acceptTrack, artistQualifier } = context;
     const target = input.targetTrackCount;
     const seedArtistId = seedTrack.artistId.getValue();
     const isRelated = (track: Track) => !isSeedArtistTrack(track, seedArtistId);
@@ -448,7 +465,7 @@ export class GenerateDiscoverPlaylistUseCase {
         onMatched: reportMatched,
         countsTowardLimit: isRelated,
         acceptTrack,
-        regionQualifier,
+        artistQualifier,
       },
     );
     const resolved = [
@@ -464,7 +481,7 @@ export class GenerateDiscoverPlaylistUseCase {
           isRelated,
           reportMatched,
           acceptTrack,
-          regionQualifier,
+          artistQualifier,
         },
       )),
     ];
@@ -491,7 +508,7 @@ export class GenerateDiscoverPlaylistUseCase {
           maxAttempts: seedResolveAttemptLimit(missing),
           onMatched: (matched) => reportMatched(relatedTracks.length + matched),
           acceptTrack,
-          regionQualifier,
+          artistQualifier,
         },
       );
       seedArtistTracks.push(...extra.tracks);
@@ -511,7 +528,7 @@ export class GenerateDiscoverPlaylistUseCase {
       isRelated: (track: Track) => boolean;
       reportMatched: (matched: number) => void;
       acceptTrack?: TrackAcceptance;
-      regionQualifier: RegionArtistQualifier | null;
+      artistQualifier: ArtistFilterQualifier | null;
     },
   ): Promise<Track[]> {
     const found = state.resolved.filter(state.isRelated).length;
@@ -543,16 +560,20 @@ export class GenerateDiscoverPlaylistUseCase {
         onMatched: (matched) => state.reportMatched(found + matched),
         countsTowardLimit: state.isRelated,
         acceptTrack: state.acceptTrack,
-        regionQualifier: state.regionQualifier,
+        artistQualifier: state.artistQualifier,
       },
     );
     return more.tracks;
   }
 
-  private regionQualifier(input: DiscoverInput): RegionArtistQualifier | null {
-    const { region } = input.filters;
-    return region
-      ? new RegionArtistQualifier(this.discoveryCatalog, region, this.logger)
+  private artistQualifier(input: DiscoverInput): ArtistFilterQualifier | null {
+    const filters = artistSelectionFilters(input.filters);
+    return hasArtistSelectionFilters(filters)
+      ? ArtistFilterQualifier.create(
+          this.discoveryCatalog,
+          filters,
+          this.logger,
+        )
       : null;
   }
 
@@ -641,7 +662,7 @@ export class GenerateDiscoverPlaylistUseCase {
     seedId: string,
     limit: number,
     tracker?: GenerationProgressTracker,
-    regionQualifier?: RegionArtistQualifier | null,
+    artistQualifier?: ArtistFilterQualifier | null,
   ): Promise<Array<{ id: string; name: string; imageUrl?: string | null }>> {
     const resolved: Array<{
       id: string;
@@ -656,8 +677,8 @@ export class GenerateDiscoverPlaylistUseCase {
         break;
       }
       if (
-        regionQualifier &&
-        !(await qualifiesInOrder(regionQualifier, candidates, index, (c) => c))
+        artistQualifier &&
+        !(await qualifiesInOrder(artistQualifier, candidates, index, (c) => c))
       ) {
         continue;
       }
@@ -802,7 +823,7 @@ export class GenerateDiscoverPlaylistUseCase {
       onMatched?: (matched: number) => void;
       countsTowardLimit?: (track: Track) => boolean;
       acceptTrack?: TrackAcceptance;
-      regionQualifier?: RegionArtistQualifier | null;
+      artistQualifier?: ArtistFilterQualifier | null;
     },
   ): Promise<{ tracks: Track[]; attempted: number }> {
     const resolved: Track[] = [];
@@ -816,9 +837,9 @@ export class GenerateDiscoverPlaylistUseCase {
         break;
       }
       if (
-        options.regionQualifier &&
+        options.artistQualifier &&
         !(await qualifiesInOrder(
-          options.regionQualifier,
+          options.artistQualifier,
           candidates,
           index,
           candidateArtist,
@@ -906,7 +927,7 @@ class SimilarTrackCandidateList {
 type TrackSelectionContext = {
   tracker: GenerationProgressTracker;
   acceptTrack?: TrackAcceptance;
-  regionQualifier: RegionArtistQualifier | null;
+  artistQualifier: ArtistFilterQualifier | null;
 };
 
 function candidateArtist(candidate: SimilarTrackRef): DiscoveryArtistIdentity {
@@ -918,14 +939,14 @@ function candidateArtist(candidate: SimilarTrackRef): DiscoveryArtistIdentity {
 }
 
 async function qualifiesInOrder<T>(
-  qualifier: RegionArtistQualifier,
+  qualifier: ArtistFilterQualifier,
   candidates: readonly T[],
   index: number,
   identityOf: (candidate: T) => DiscoveryArtistIdentity,
 ): Promise<boolean> {
   await qualifier.prefetch(
     candidates
-      .slice(index, index + REGION_QUALIFICATION_CONCURRENCY)
+      .slice(index, index + ARTIST_FILTER_QUALIFICATION_CONCURRENCY)
       .map(identityOf),
   );
   return qualifier.qualifies(identityOf(candidates[index]));

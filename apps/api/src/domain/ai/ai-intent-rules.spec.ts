@@ -14,7 +14,12 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     targetTrackCount: 30,
     targetDurationMinutes: null,
     mood: null,
@@ -62,7 +67,12 @@ describe('normalizeAiIntent', () => {
     );
 
     expect(normalized.genres).toEqual(['rock', 'acoustic guitar']);
-    expect(normalized.filters).toEqual({ region: 'argentina' });
+    expect(normalized.filters).toEqual({
+      region: 'argentina',
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    });
   });
 
   it('stores a user-language region filter as its canonical region', () => {
@@ -71,10 +81,20 @@ describe('normalizeAiIntent', () => {
         intent({
           kind: 'discover_artist',
           artists: ['Radiohead'],
-          filters: { region: 'argentino' },
+          filters: {
+            region: 'argentino',
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
         }),
       ).filters,
-    ).toEqual({ region: 'argentina' });
+    ).toEqual({
+      region: 'argentina',
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    });
   });
 
   it('removes duplicate names without reordering them', () => {
@@ -99,7 +119,12 @@ describe('normalizeAiIntent', () => {
           kind: 'discover_artist',
           artists: [],
           seedTracks: [{ title: 'Teardrop', artist: null }],
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
         }),
       ).kind,
     ).toBe('discover_track');
@@ -143,7 +168,12 @@ describe('normalizeAiIntent', () => {
           kind: 'artist_mix',
           artists: [],
           seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
           mood: 'dark',
         }),
       ),
@@ -499,7 +529,12 @@ describe('findIntentClarification', () => {
           kind: 'genre_mix',
           artists: [],
           genres: ['rock argentino'],
-          filters: { region: 'Brasil' },
+          filters: {
+            region: 'Brasil',
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
         }),
       ),
     ).toMatchObject({
@@ -514,7 +549,12 @@ describe('findIntentClarification', () => {
         intent({
           kind: 'discover_artist',
           artists: ['Radiohead'],
-          filters: { region: 'japonés' },
+          filters: {
+            region: 'japonés',
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
         }),
       ),
     ).toMatchObject({ reason: 'unknown_region', names: ['japonés'] });
@@ -531,7 +571,16 @@ describe('findIntentClarification', () => {
     expect(
       findIntentClarification(
         normalizeAiIntent(
-          intent({ ...seeds, kind, filters: { region: 'Argentina' } }),
+          intent({
+            ...seeds,
+            kind,
+            filters: {
+              region: 'Argentina',
+              femaleVocals: false,
+              releaseRange: null,
+              excludeLive: false,
+            },
+          }),
         ),
       ),
     ).toBeNull();
@@ -543,7 +592,12 @@ describe('findIntentClarification', () => {
         intent({
           kind: 'artist_mix',
           artists: ['Radiohead'],
-          filters: { region: 'argentinas' },
+          filters: {
+            region: 'argentinas',
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
         }),
       ),
     );
@@ -559,7 +613,15 @@ describe('findIntentClarification', () => {
     expect(
       findIntentClarification(
         normalizeAiIntent(
-          intent({ kind: 'artist_mix', filters: { region: 'Brasil' } }),
+          intent({
+            kind: 'artist_mix',
+            filters: {
+              region: 'Brasil',
+              femaleVocals: false,
+              releaseRange: null,
+              excludeLive: false,
+            },
+          }),
         ),
       ),
     ).toMatchObject({ reason: 'region_not_supported', options: [] });
@@ -570,7 +632,12 @@ describe('findIntentClarification', () => {
       intent({
         kind: 'artist_mix',
         artists: ['Radiohead'],
-        filters: { region: 'Argentina' },
+        filters: {
+          region: 'Argentina',
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
       }),
     );
 
@@ -613,7 +680,12 @@ describe('findIntentClarification', () => {
           kind: 'discover_track',
           artists: [],
           seedTracks: [{ title: 'Imaginary Song', artist: 'Nobody Known' }],
-          filters: { region: null },
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
         }),
       ),
     ).toBeNull();
@@ -705,6 +777,120 @@ describe('clarification options and model clarifications', () => {
       names: [],
       unsupportedConstraints: [],
       options: [],
+    });
+  });
+
+  describe('vocal, release and live filters', () => {
+    const filters = (
+      overrides: Partial<AiIntent['filters']>,
+    ): AiIntent['filters'] => ({
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+      ...overrides,
+    });
+
+    it.each<[string, Partial<AiIntent>]>([
+      ['genre_mix', { kind: 'genre_mix', artists: [], genres: ['rock'] }],
+      ['discover_artist', { kind: 'discover_artist', artists: ['Radiohead'] }],
+      [
+        'discover_track',
+        {
+          kind: 'discover_track',
+          artists: [],
+          seedTracks: [{ title: 'Creep', artist: 'Radiohead' }],
+        },
+      ],
+    ])('accepts every filter on a %s', (_kind, seeds) => {
+      expect(
+        findIntentClarification(
+          normalizeAiIntent(
+            intent({
+              ...seeds,
+              filters: filters({
+                region: 'Argentina',
+                femaleVocals: true,
+                releaseRange: { fromYear: 1990, toYear: 1999 },
+                excludeLive: true,
+              }),
+            }),
+          ),
+        ),
+      ).toBeNull();
+    });
+
+    it('accepts release and live filters on an artist mix', () => {
+      expect(
+        findIntentClarification(
+          normalizeAiIntent(
+            intent({
+              kind: 'artist_mix',
+              artists: ['Soda Stereo'],
+              filters: filters({
+                releaseRange: { fromYear: 1980, toYear: 1989 },
+                excludeLive: true,
+              }),
+            }),
+          ),
+        ),
+      ).toBeNull();
+    });
+
+    it('asks before applying female vocals to artists the user named', () => {
+      expect(
+        findIntentClarification(
+          normalizeAiIntent(
+            intent({
+              kind: 'artist_mix',
+              artists: ['Radiohead'],
+              filters: filters({ femaleVocals: true }),
+            }),
+          ),
+        ),
+      ).toEqual({
+        reason: 'female_vocals_not_supported',
+        seedType: null,
+        limit: null,
+        names: [],
+        unsupportedConstraints: [],
+        options: [{ type: 'set_kind', kind: 'discover_artist' }],
+      });
+    });
+
+    it('asks again for a reversed release range instead of reordering it', () => {
+      expect(
+        findIntentClarification(
+          normalizeAiIntent(
+            intent({
+              kind: 'genre_mix',
+              artists: [],
+              genres: ['rock'],
+              filters: filters({
+                releaseRange: { fromYear: 1999, toYear: 1990 },
+              }),
+            }),
+          ),
+        ),
+      ).toMatchObject({
+        reason: 'invalid_release_range',
+        names: ['1999–1990'],
+      });
+    });
+
+    it('drops an empty release range', () => {
+      expect(
+        normalizeAiIntent(
+          intent({
+            kind: 'genre_mix',
+            artists: [],
+            genres: ['rock'],
+            filters: filters({
+              releaseRange: { fromYear: null, toYear: null },
+            }),
+          }),
+        ).filters.releaseRange,
+      ).toBeNull();
     });
   });
 });

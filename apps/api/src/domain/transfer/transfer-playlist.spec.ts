@@ -9,6 +9,12 @@ import { toTransferPlaylist } from './transfer-playlist';
 const generation: PlaylistGeneration = {
   version: 1,
   kind: 'artist_mix',
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   tracksPerSeed: 1,
   seeds: [{ id: 'daft-punk', name: 'Daft Punk' }],
   popularity: 'balanced',

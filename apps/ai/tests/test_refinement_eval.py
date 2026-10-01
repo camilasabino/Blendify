@@ -33,7 +33,18 @@ HISTORICAL_V2_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v2.json"
 HISTORICAL_V2_DATASET_SHA256 = "6a8432050f65f2a9c92c15e2f46388f56fe29f628fed07386740d1b49626bcd7"
 HISTORICAL_V3_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v3.json"
 HISTORICAL_V3_DATASET_SHA256 = "d81bc23bd0b373c2745b8cf421743e64f0884ffe3f1e5980da6236c098969752"
+HISTORICAL_V4_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v4.json"
+HISTORICAL_V4_DATASET_SHA256 = "0e854b40d1c3398bb0415aeafca857afe31c702af94ad5a89b00f7bbfd2a7ad8"
 CASES_BY_ID = {case.id: case for case in CASES}
+RELEASE_RANGE_SUPERSEDED_EXPECTATIONS: dict[str, dict[str, Any]] = {
+    "en-era-next-to-a-change": {
+        "outcome": "interpreted",
+        "changed": ["artists", "filters.releaseRange"],
+        "remove": {"artists": ["Interpol"]},
+        "set": {"filters.releaseRange": {"fromYear": 1990, "toYear": 1999}},
+        "unsupportedCategories": [],
+    },
+}
 LOCAL_GENRE_ADDITIONS = ("es-add-genre-place", "en-add-genre-place", "pt-add-genre-place")
 ARGENTINE_ROCK_ADDITION = {"genres": [["argentine rock"], ["rock argentino"]]}
 V1_CASES_WITH_A_REQUIRED_CLARIFICATION_REASON = {
@@ -148,8 +159,8 @@ def parsed(output: dict[str, object]) -> Any:
 def test_dataset_is_a_new_versioned_refinement_dataset_with_unique_ids() -> None:
     ids = [case.id for case in CASES]
 
-    assert DATASET_VERSION == "refinement-eval-v4"
-    assert DATASET_PATH.name == "refinement-eval-v4.json"
+    assert DATASET_VERSION == "refinement-eval-v5"
+    assert DATASET_PATH.name == "refinement-eval-v5.json"
     assert len(ids) == len(set(ids))
 
 
@@ -163,7 +174,7 @@ def test_historical_v1_dataset_stays_frozen_and_inside_the_current_dataset() -> 
         current = CASES_BY_ID[case.id]
         reason = V1_CASES_WITH_A_REQUIRED_CLARIFICATION_REASON.get(case.id)
         if reason is None:
-            assert current == case
+            assert_carried_over(case)
             continue
         assert "clarificationReason" not in case.expect
         assert (current.language, current.request) == (case.language, case.request)
@@ -177,7 +188,7 @@ def test_historical_v2_dataset_stays_frozen_and_inside_the_current_dataset() -> 
     assert digest == HISTORICAL_V2_DATASET_SHA256
     assert version == "refinement-eval-v2"
     for case in cases:
-        assert CASES_BY_ID[case.id] == case
+        assert_carried_over(case)
 
 
 def test_historical_v3_dataset_stays_frozen_and_inside_the_current_dataset() -> None:
@@ -187,7 +198,104 @@ def test_historical_v3_dataset_stays_frozen_and_inside_the_current_dataset() -> 
     assert digest == HISTORICAL_V3_DATASET_SHA256
     assert version == "refinement-eval-v3"
     for case in cases:
-        assert CASES_BY_ID[case.id] == case
+        assert_carried_over(case)
+
+
+def test_historical_v4_dataset_stays_frozen_and_inside_the_current_dataset() -> None:
+    digest = hashlib.sha256(HISTORICAL_V4_DATASET_PATH.read_bytes()).hexdigest()
+    version, cases = load_dataset(HISTORICAL_V4_DATASET_PATH)
+
+    assert digest == HISTORICAL_V4_DATASET_SHA256
+    assert version == "refinement-eval-v4"
+    for case in cases:
+        assert_carried_over(case)
+
+
+def assert_carried_over(case: Any) -> None:
+    current = CASES_BY_ID[case.id]
+    superseded = RELEASE_RANGE_SUPERSEDED_EXPECTATIONS.get(case.id)
+    if superseded is None:
+        assert current == case
+        return
+    assert "era" in case.expect["unsupportedCategories"]
+    assert (current.language, current.request) == (case.language, case.request)
+    assert current.expect == superseded
+
+
+FILTER_REFINEMENT_PATHS = (
+    "filters.femaleVocals",
+    "filters.releaseRange",
+    "filters.excludeLive",
+)
+
+
+@pytest.mark.parametrize("path", FILTER_REFINEMENT_PATHS)
+@pytest.mark.parametrize("operation", ["set", "clear"])
+def test_new_filter_refinements_cover_set_and_clear(path: str, operation: str) -> None:
+    covered = [
+        case
+        for case in CASES
+        if path in case.expect.get("changed", []) and path in case.expect.get(operation, [])
+    ]
+
+    assert covered
+    assert {case.language for case in covered} >= {"es", "en"}
+
+
+@pytest.mark.parametrize("kind", ["genre_mix", "discover_artist", "discover_track"])
+def test_new_filter_refinements_cover_every_kind_with_artist_filters(kind: str) -> None:
+    for path in FILTER_REFINEMENT_PATHS:
+        assert any(
+            path in case.expect.get("changed", []) and case.request.intent.kind == kind
+            for case in CASES
+        ), path
+
+
+def test_release_range_refinements_replace_the_current_period() -> None:
+    replaced = [
+        case
+        for case in CASES
+        if case.request.intent.filters.release_range is not None
+        and "filters.releaseRange" in case.expect.get("set", {})
+    ]
+
+    assert {case.expect["set"]["filters.releaseRange"]["fromYear"] for case in replaced} >= {
+        1995,
+        2000,
+    }
+
+
+def test_set_expectation_compares_a_release_range_by_value() -> None:
+    result = parsed(
+        refinement_output(
+            patch=unchanged_patch(
+                filters={
+                    "region": None,
+                    "femaleVocals": None,
+                    "releaseRange": {
+                        "operation": "set",
+                        "value": {"fromYear": 1990, "toYear": 1999},
+                    },
+                    "excludeLive": {"operation": "set", "value": True},
+                }
+            )
+        )
+    )
+
+    assert (
+        check_refinement_case(
+            {
+                "outcome": "interpreted",
+                "changed": ["filters.excludeLive", "filters.releaseRange"],
+                "set": {
+                    "filters.releaseRange": {"fromYear": 1990, "toYear": 1999},
+                    "filters.excludeLive": True,
+                },
+            },
+            result,
+        )
+        == []
+    )
 
 
 @pytest.mark.parametrize("kind", ["genre_mix", "discover_artist", "discover_track", "artist_mix"])
@@ -498,6 +606,25 @@ def test_every_case_that_accepts_a_clarification_states_its_reason(case: Any) ->
         assert case.expect.get("clarificationReason")
 
 
+@pytest.mark.parametrize(
+    "case_id",
+    [
+        "es-studio-only-not-exclude-live",
+        "en-studio-only-not-exclude-live",
+        "pt-studio-only-not-exclude-live",
+    ],
+)
+def test_studio_only_wording_is_a_clarification_never_an_exclude_live_change(
+    case_id: str,
+) -> None:
+    expect = CASES_BY_ID[case_id].expect
+
+    assert expect["outcome"] == "needs_clarification"
+    assert expect["clarificationReason"] == "unsupported_constraint"
+    assert expect["unsupportedCategories"] == ["other"]
+    assert "set" not in expect
+
+
 INJECTION_CASES = {
     "en": [
         "en-prompt-injection",
@@ -688,8 +815,8 @@ def test_preflight_states_the_refinement_run_bounds() -> None:
 
     assert plan.request_budget == len(CASES) * MAX_OUTPUT_VALIDATION_ATTEMPTS
     assert "Paid real-model refinement eval" in preflight
-    assert "refinement-v4" in preflight
-    assert "refinement-eval-v4" in preflight
+    assert "refinement-v5" in preflight
+    assert "refinement-eval-v5" in preflight
     assert all(case.request.refinement not in preflight for case in CASES)
 
 
@@ -706,7 +833,7 @@ async def test_fake_refinement_run_reports_failed_output_only_for_failed_cases()
     passed, failed = report["results"]  # type: ignore[misc]
 
     assert report["suite"] == "refinement"
-    assert report["promptVersion"] == "refinement-v4"
+    assert report["promptVersion"] == "refinement-v5"
     assert report["modelRequests"] == 3
     assert report["casesRequiringRetry"] == ["en-less-mainstream"]
     assert report["passed"] == 1

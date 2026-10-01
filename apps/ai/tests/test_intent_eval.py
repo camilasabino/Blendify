@@ -31,6 +31,27 @@ HISTORICAL_V3_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v3.json"
 HISTORICAL_V3_DATASET_SHA256 = "6ef41274bf59d7be2d750c48a9cb2242037899e4e68f8af1c9d1881029e583dc"
 HISTORICAL_V4_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v4.json"
 HISTORICAL_V4_DATASET_SHA256 = "e8be2837489f0dca04912cb2cf336e37fa3f5fe9e72d4dd98083e534e4456312"
+HISTORICAL_V5_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v5.json"
+HISTORICAL_V5_DATASET_SHA256 = "5184cdaecefc5976198ee1f82eeabf824ce3bbd2e4208b3dfdb9a7ce1fed89cf"
+RELEASE_RANGE_SUPERSEDED_EXPECTATIONS: dict[str, dict[str, Any]] = {
+    "es-era-random-order": {
+        "outcome": "interpreted",
+        "kind": "genre_mix",
+        "genres": ["rock nacional"],
+        "orderMode": "random",
+        "releaseRange": {"fromYear": 1980, "toYear": 1989},
+        "unsupportedCategories": [],
+    },
+    "en-mood-nostalgic-era": {
+        "outcome": "interpreted",
+        "kind": "genre_mix",
+        "artists": [],
+        "genres": [],
+        "mood": "nostalgic",
+        "releaseRange": {"fromYear": 1990, "toYear": 1999},
+        "unsupportedCategories": [],
+    },
+}
 DATASET_VERSION, CASES = load_dataset()
 ALL_DATASET_CASES = [
     case
@@ -39,6 +60,7 @@ ALL_DATASET_CASES = [
         HISTORICAL_V2_DATASET_PATH,
         HISTORICAL_V3_DATASET_PATH,
         HISTORICAL_V4_DATASET_PATH,
+        HISTORICAL_V5_DATASET_PATH,
         DATASET_PATH,
     )
     for case in load_dataset(path)[1]
@@ -53,7 +75,7 @@ PROVIDER_CONTENT_PATTERN = re.compile(r"spotify:|open\.spotify|https?://|\b[0-9A
 def test_dataset_is_versioned_with_unique_case_ids() -> None:
     ids = [case.id for case in CASES]
 
-    assert DATASET_VERSION == "intent-eval-v5"
+    assert DATASET_VERSION == "intent-eval-v6"
     assert len(ids) == len(set(ids))
 
 
@@ -77,15 +99,152 @@ def test_historical_v2_dataset_is_preserved_for_baseline_comparison() -> None:
     assert len(cases) == HISTORICAL_V2_CASE_COUNT
 
 
+def test_historical_v5_dataset_stays_frozen_and_inside_v6() -> None:
+    digest = hashlib.sha256(HISTORICAL_V5_DATASET_PATH.read_bytes()).hexdigest()
+    version, cases = load_dataset(HISTORICAL_V5_DATASET_PATH)
+
+    assert digest == HISTORICAL_V5_DATASET_SHA256
+    assert version == "intent-eval-v5"
+    for case in cases:
+        assert_carried_over(case)
+
+
 def test_historical_v4_dataset_stays_frozen_and_inside_v5() -> None:
     digest = hashlib.sha256(HISTORICAL_V4_DATASET_PATH.read_bytes()).hexdigest()
     version, cases = load_dataset(HISTORICAL_V4_DATASET_PATH)
-    current = {case.id: case for case in CASES}
 
     assert digest == HISTORICAL_V4_DATASET_SHA256
     assert version == "intent-eval-v4"
     for case in cases:
-        assert current[case.id] == case
+        assert_carried_over(case)
+
+
+def assert_carried_over(case: EvalCase) -> None:
+    current = {item.id: item for item in CASES}[case.id]
+    superseded = RELEASE_RANGE_SUPERSEDED_EXPECTATIONS.get(case.id)
+    if superseded is None:
+        assert current == case
+        return
+    assert "era" in case.expect["unsupportedCategories"]
+    assert (current.language, current.prompt) == (case.language, case.prompt)
+    assert current.expect == superseded
+
+
+FILTER_COVERAGE = {
+    "femaleVocals": {
+        "es": ["es-female-vocals-genre", "es-female-vocals-singular", "es-female-singers"],
+        "en": ["en-female-vocals-genre", "en-female-singers-discover"],
+        "pt": ["pt-female-vocals-genre", "pt-female-singers"],
+    },
+    "releaseRange": {
+        "es": ["es-decade", "es-year-range", "es-before-year", "es-until-year", "es-since-year"],
+        "en": ["en-decade", "en-after-year", "en-before-year"],
+        "pt": ["pt-decade", "pt-since-year"],
+    },
+    "excludeLive": {
+        "es": ["es-exclude-live", "es-exclude-live-recordings"],
+        "en": ["en-exclude-live", "en-exclude-live-recordings"],
+        "pt": ["pt-exclude-live", "pt-exclude-live-recordings"],
+    },
+}
+
+
+@pytest.mark.parametrize("filter_name", sorted(FILTER_COVERAGE))
+@pytest.mark.parametrize("language", ["es", "en", "pt"])
+def test_dataset_covers_each_new_filter_in_each_language(filter_name: str, language: str) -> None:
+    by_id = {case.id: case for case in CASES}
+
+    for case_id in FILTER_COVERAGE[filter_name][language]:
+        case = by_id[case_id]
+        assert case.language == language
+        assert case.expect[filter_name] not in (None, False)
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [
+        "es-only-women-not-vocals",
+        "en-only-women-not-vocals",
+        "pt-only-women-not-vocals",
+    ],
+)
+def test_demographic_wording_never_counts_as_female_vocals(case_id: str) -> None:
+    case = {item.id: item for item in CASES}[case_id]
+
+    assert case.expect["femaleVocals"] is False
+    assert case.expect["unsupportedCategories"] == ["artist_attribute"]
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [
+        "es-studio-only",
+        "en-studio-recordings",
+        "en-studio-versions-only",
+        "pt-studio-only",
+    ],
+)
+def test_studio_only_wording_never_sets_exclude_live(case_id: str) -> None:
+    case = {item.id: item for item in CASES}[case_id]
+
+    assert case.expect["excludeLive"] is False
+    assert case.expect["unsupportedCategories"] == ["other"]
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    ["es-style-era-not-range", "en-style-era-not-range", "pt-style-era-not-range"],
+)
+def test_stylistic_era_wording_never_sets_a_release_range(case_id: str) -> None:
+    case = {item.id: item for item in CASES}[case_id]
+
+    assert case.expect["releaseRange"] is None
+    assert case.expect["unsupportedCategories"] == ["era"]
+
+
+def test_release_range_boundaries_follow_the_stated_words() -> None:
+    by_id = {
+        case.id: case.expect["releaseRange"] for case in CASES if "releaseRange" in case.expect
+    }
+
+    assert by_id["es-before-year"] == {"fromYear": None, "toYear": 1999}
+    assert by_id["es-until-year"] == {"fromYear": None, "toYear": 1999}
+    assert by_id["es-since-year"] == {"fromYear": 2015, "toYear": None}
+    assert by_id["en-after-year"] == {"fromYear": 2016, "toYear": None}
+    assert by_id["es-year-range"] == {"fromYear": 1990, "toYear": 1995}
+
+
+def test_filter_expectations_compare_the_canonical_wire_filters() -> None:
+    filtered = interpretation(
+        kind="genre_mix",
+        artists=[],
+        genres=["rock"],
+        filters={
+            "region": None,
+            "femaleVocals": True,
+            "releaseRange": {"fromYear": 1990, "toYear": None},
+            "excludeLive": True,
+        },
+    )
+
+    assert (
+        check_case(
+            {
+                "outcome": "interpreted",
+                "femaleVocals": True,
+                "releaseRange": {"fromYear": 1990, "toYear": None},
+                "excludeLive": True,
+            },
+            filtered,
+        )
+        == []
+    )
+    assert check_case({"outcome": "interpreted", "releaseRange": None}, filtered) == [
+        "releaseRange: expected None, got {'fromYear': 1990, 'toYear': None}"
+    ]
+    assert check_case({"outcome": "interpreted", "femaleVocals": False}, filtered) == [
+        "femaleVocals: expected False, got True"
+    ]
 
 
 REGION_COVERAGE = {
@@ -107,7 +266,14 @@ def test_dataset_covers_region_filters_in_each_language(language: str) -> None:
 
 def test_region_expectation_accepts_any_listed_form_and_requires_none_when_null() -> None:
     discover = interpretation(
-        kind="discover_artist", artists=["Radiohead"], filters={"region": "Argentine"}
+        kind="discover_artist",
+        artists=["Radiohead"],
+        filters={
+            "region": "Argentine",
+            "femaleVocals": False,
+            "releaseRange": None,
+            "excludeLive": False,
+        },
     )
     plain = interpretation(kind="discover_artist", artists=["Radiohead"])
 
@@ -124,13 +290,12 @@ def test_region_expectation_accepts_any_listed_form_and_requires_none_when_null(
 def test_historical_v3_dataset_stays_frozen_and_inside_v4() -> None:
     digest = hashlib.sha256(HISTORICAL_V3_DATASET_PATH.read_bytes()).hexdigest()
     version, cases = load_dataset(HISTORICAL_V3_DATASET_PATH)
-    current = {case.id: case for case in CASES}
 
     assert digest == HISTORICAL_V3_DATASET_SHA256
     assert version == "intent-eval-v3"
     assert DATASET_PATH != HISTORICAL_V3_DATASET_PATH
     for case in cases:
-        assert current[case.id] == case
+        assert_carried_over(case)
 
 
 GENRE_COVERAGE = {
@@ -183,6 +348,7 @@ LOCAL_GENRE_ALTERNATIVES = {
     "en-genre-local-brazilian-funk": ("en", "brazilian funk", "funk carioca"),
     "pt-genre-local-trap-brasileiro": ("pt", "trap brasileiro", "brazilian trap"),
     "pt-genre-local-mpb": ("pt", "mpb", "brazilian popular music"),
+    "es-every-filter": ("es", "rock argentino", "argentine rock"),
 }
 
 
@@ -333,8 +499,9 @@ def test_dataset_never_infers_an_era_from_a_nostalgic_mood() -> None:
 
     assert nostalgic.expect["mood"] == "nostalgic"
     assert nostalgic.expect["unsupportedCategories"] == []
+    assert "releaseRange" not in nostalgic.expect
     assert nostalgic_era.expect["mood"] == "nostalgic"
-    assert nostalgic_era.expect["unsupportedCategories"] == ["era"]
+    assert nostalgic_era.expect["releaseRange"] == {"fromYear": 1990, "toYear": 1999}
 
 
 def test_dataset_covers_every_kind_language_and_outcome() -> None:

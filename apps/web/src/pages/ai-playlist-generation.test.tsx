@@ -668,7 +668,7 @@ describe('Create with AI playlist title', () => {
 
   function genreMixSession(region: MusicRegion | null) {
     const generation = aiGeneration({
-      intent: { ...aiIntent, kind: 'genre_mix', artists: [], genres: ['Rock'], filters: { region } },
+      intent: { ...aiIntent, kind: 'genre_mix', artists: [], genres: ['Rock'], filters: { ...aiIntent.filters, region } },
     })
     return generatedAiSessionState({
       ...generation,

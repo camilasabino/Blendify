@@ -13,6 +13,10 @@ import { User } from '@/domain/user/user.entity';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
 import { SpotifyApiClient } from './spotify-api.client';
+import {
+  readSpotifyRelease,
+  type SpotifyAlbumRelease,
+} from './spotify-track-release';
 
 const ADD_TRACKS_CHUNK_SIZE = 100;
 const MAX_COVER_IMAGE_BYTES = 256 * 1024;
@@ -37,7 +41,7 @@ interface SpotifyPlaylistTrack {
   popularity?: number;
   preview_url?: string | null;
   artists?: Array<{ id?: string; name?: string }>;
-  album?: { name?: string; images?: SpotifyImage[] };
+  album?: SpotifyAlbumRelease & { name?: string; images?: SpotifyImage[] };
   external_ids?: { isrc?: string | null };
   external_urls?: { spotify?: string | null };
 }
@@ -527,5 +531,6 @@ function mapPlaylistTrack(item?: SpotifyPlaylistTrack | null): Track | null {
     })),
     isrc: item.external_ids?.isrc ?? undefined,
     externalUrl: item.external_urls?.spotify ?? undefined,
+    ...readSpotifyRelease(item.album),
   });
 }

@@ -14,6 +14,12 @@ const generated = GeneratedPlaylist.create({
   generation: {
     version: 1,
     kind: 'artist_mix',
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     tracksPerSeed: 1,
     seeds: [{ id: 'artist-1', name: 'Sade' }],
     popularity: 'balanced',
@@ -34,27 +40,48 @@ const requests: Record<string, PlaylistGenerationRequest> = {
   artist_mix: {
     ...shared,
     kind: 'artist_mix',
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     artistIds: ['artist-1'],
     tracksPerSeed: 1,
   },
   genre_mix: {
     ...shared,
     kind: 'genre_mix',
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     genreIds: ['jazz'],
     tracksPerSeed: 1,
   },
   discover_artist: {
     ...shared,
     kind: 'discover_artist',
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     artistId: 'artist-1',
     targetTrackCount: 15,
   },
   discover_track: {
     ...shared,
     kind: 'discover_track',
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     trackId: 'track-1',
     track: {
       id: 'track-1',

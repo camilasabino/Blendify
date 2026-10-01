@@ -9,6 +9,8 @@ AI_INTENT_LIST_MAX_ITEMS = 25
 AI_INTENT_TARGET_TRACK_COUNT_MAX = 1_000
 AI_INTENT_TARGET_DURATION_MINUTES_MAX = 10_080
 AI_INTENT_USER_TEXT_MAX_LENGTH = 300
+MIN_RELEASE_YEAR = 1900
+MAX_RELEASE_YEAR = 2100
 
 PlaylistKind = Literal["artist_mix", "genre_mix", "discover_artist", "discover_track"]
 PopularityMode = Literal["popular", "balanced", "rarities"]
@@ -56,6 +58,7 @@ TargetTrackCount = Annotated[int, Field(ge=1, le=AI_INTENT_TARGET_TRACK_COUNT_MA
 TargetDurationMinutes = Annotated[
     int, Field(ge=0, le=AI_INTENT_TARGET_DURATION_MINUTES_MAX, strict=True)
 ]
+ReleaseYear = Annotated[int, Field(ge=MIN_RELEASE_YEAR, le=MAX_RELEASE_YEAR, strict=True)]
 
 
 class IntentTrackReference(WireModel):
@@ -68,8 +71,16 @@ class UnsupportedConstraint(WireModel):
     user_text: UserText
 
 
+class IntentReleaseRange(WireModel):
+    from_year: ReleaseYear | None
+    to_year: ReleaseYear | None
+
+
 class IntentFilters(WireModel):
     region: IntentName | None
+    female_vocals: Annotated[bool, Field(strict=True)]
+    release_range: IntentReleaseRange | None
+    exclude_live: Annotated[bool, Field(strict=True)]
 
 
 class PlaylistIntent(WireModel):

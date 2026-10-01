@@ -19,6 +19,12 @@ const NOW = new Date('2026-09-25T12:00:00.000Z');
 const generation: PlaylistGeneration = {
   version: 1,
   kind: 'artist_mix',
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   tracksPerSeed: 1,
   seeds: [{ id: 'sade', name: 'Sade' }],
   popularity: 'balanced',

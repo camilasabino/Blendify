@@ -16,7 +16,12 @@ import type {
   AiIntentClarification,
   AiTrackReference,
 } from './ai-intent';
-import { resolveAiRegion, withCanonicalRegion } from './ai-selection-filters';
+import {
+  isValidAiReleaseRange,
+  resolveAiRegion,
+  withCanonicalRegion,
+  withCanonicalReleaseRange,
+} from './ai-selection-filters';
 import {
   kindForSeedType,
   presentSeedTypes,
@@ -30,7 +35,7 @@ export const MIN_TARGET_DURATION_MINUTES = 1;
 const MOOD_ONLY_KIND: PlaylistKind = 'genre_mix';
 
 export function normalizeAiIntent(intent: AiIntent): AiIntent {
-  const regional = withCanonicalRegion(intent);
+  const regional = withCanonicalReleaseRange(withCanonicalRegion(intent));
   const normalized: AiIntent = {
     ...regional,
     artists: uniqueNames(regional.artists),
@@ -91,7 +96,9 @@ export function findIntentClarification(
     durationClarification(intent) ??
     orderingClarification(intent) ??
     genreClarification(intent) ??
-    regionClarification(intent)
+    regionClarification(intent) ??
+    femaleVocalsClarification(intent) ??
+    releaseRangeClarification(intent)
   );
 }
 
@@ -191,14 +198,44 @@ function regionClarification(intent: AiIntent): AiIntentClarification | null {
     return null;
   }
 
-  const discoverOption: AiClarificationOption[] =
-    intent.artists.length === 1
-      ? [{ type: 'set_kind', kind: 'discover_artist' }]
-      : [];
   return clarify('region_not_supported', {
     names: [region],
-    options: discoverOption,
+    options: discoverArtistOption(intent),
   });
+}
+
+function femaleVocalsClarification(
+  intent: AiIntent,
+): AiIntentClarification | null {
+  if (
+    !intent.filters.femaleVocals ||
+    supportsSelectionFilter(intent.kind, 'femaleVocals')
+  ) {
+    return null;
+  }
+
+  return clarify('female_vocals_not_supported', {
+    options: discoverArtistOption(intent),
+  });
+}
+
+function releaseRangeClarification(
+  intent: AiIntent,
+): AiIntentClarification | null {
+  const range = intent.filters.releaseRange;
+  if (range === null || isValidAiReleaseRange(range)) {
+    return null;
+  }
+
+  return clarify('invalid_release_range', {
+    names: [`${range.fromYear}–${range.toYear}`],
+  });
+}
+
+function discoverArtistOption(intent: AiIntent): AiClarificationOption[] {
+  return intent.artists.length === 1
+    ? [{ type: 'set_kind', kind: 'discover_artist' }]
+    : [];
 }
 
 function orderingClarification(intent: AiIntent): AiIntentClarification | null {

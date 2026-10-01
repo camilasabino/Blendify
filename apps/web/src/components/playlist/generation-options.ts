@@ -8,12 +8,13 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type {
-  MusicRegion,
   PlaylistGeneration,
   PopularityMode,
+  SelectionFilters,
   TrackOrderMode,
 } from '@blendify/contracts'
 import { REGION_LABEL_KEYS, type GenreLabelSource } from '@/components/genres/genre-labels'
+import { releaseRangeLabel } from '@/components/playlist/release-decades'
 import type { MessageKey } from '@/i18n/messages'
 import type { useT } from '@/i18n/use-t'
 import type { AppMode } from '@/lib/capabilities'
@@ -74,13 +75,13 @@ const SUMMARY_SEED_LIMIT = 3
 export function buildGenerationSummary(
   {
     seedNames,
-    region,
+    filters,
     popularity,
     orderMode,
     trackCount,
   }: Readonly<{
     seedNames: string[]
-    region?: MusicRegion | null
+    filters?: SelectionFilters | null
     popularity: PopularityMode
     orderMode: TrackOrderMode
     trackCount: number
@@ -100,11 +101,23 @@ export function buildGenerationSummary(
 
   return [
     seeds,
-    region ? t(REGION_LABEL_KEYS[region]) : null,
+    ...(filters ? selectionFilterLabels(filters, t) : []),
     popularityOption ? t(popularityOption.labelKey) : null,
     orderOption ? t(orderOption.labelKey) : null,
     trackCount > 0 ? formatSongCount(trackCount, t) : null,
   ].filter((item): item is string => Boolean(item))
+}
+
+export function selectionFilterLabels(
+  filters: SelectionFilters,
+  t: ReturnType<typeof useT>,
+): string[] {
+  return [
+    filters.region ? t(REGION_LABEL_KEYS[filters.region]) : null,
+    filters.femaleVocals ? t('create.femaleVocals') : null,
+    filters.releaseRange ? releaseRangeLabel(filters.releaseRange, t) : null,
+    filters.excludeLive ? t('create.noLiveVersions') : null,
+  ].filter((item): item is string => item !== null)
 }
 
 export function generationSeedNames(
@@ -129,7 +142,7 @@ export function buildRecipeSummary(
   return buildGenerationSummary(
     {
       seedNames: generationSeedNames(generation, genreLabel),
-      region: 'filters' in generation ? generation.filters.region : null,
+      filters: 'filters' in generation ? generation.filters : null,
       popularity: generation.popularity,
       orderMode: generation.orderMode,
       trackCount,

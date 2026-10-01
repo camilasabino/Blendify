@@ -27,6 +27,7 @@ import {
 import { Artist } from '@/domain/artist/artist.entity';
 import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
 import type { AiSessionRepositoryPort } from '@/domain/repositories/ai-session.repository.port';
+import type { DiscoveryCatalogPort } from '@/domain/repositories/discovery-catalog.port';
 import { Track } from '@/domain/track/track.entity';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
@@ -57,7 +58,12 @@ const INTENT: AiIntent = {
   artists: ['Radiohead', 'Interpol'],
   genres: [],
   seedTracks: [],
-  filters: { region: null },
+  filters: {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  },
   targetTrackCount: 3,
   targetDurationMinutes: null,
   mood: null,
@@ -97,6 +103,12 @@ const GENERATED: AiSessionExecution = {
     recipe: {
       version: 1,
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       tracksPerSeed: 2,
       seeds: [{ id: '4Z8W4fKeB5YxbusRsdQVPb', name: 'Radiohead' }],
       popularity: 'balanced',
@@ -150,6 +162,12 @@ function freshGeneration(ids = ['new-1', 'new-2', 'new-3']): GeneratedPlaylist {
     generation: {
       version: 1,
       kind: 'artist_mix',
+      filters: {
+        region: null,
+        femaleVocals: false,
+        releaseRange: null,
+        excludeLive: false,
+      },
       tracksPerSeed: 3,
       seeds: [{ id: '4Z8W4fKeB5YxbusRsdQVPb', name: 'Radiohead' }],
       popularity: 'rarities',
@@ -167,7 +185,12 @@ const UNCHANGED_PATCH = {
   artists: NO_NAMES,
   genres: NO_NAMES,
   seedTracks: NO_NAMES,
-  filters: { region: null },
+  filters: {
+    region: null,
+    femaleVocals: null,
+    releaseRange: null,
+    excludeLive: null,
+  },
   targetTrackCount: null,
   targetDurationMinutes: null,
   mood: null,
@@ -275,6 +298,9 @@ function createWorld(
     getArtistsByIds: jest.fn(() => Promise.resolve([])),
   };
   const catalogs = { forMarket: jest.fn(() => catalog) };
+  const discovery = {
+    getTopTagsForArtist: jest.fn(() => Promise.resolve([])),
+  } as unknown as DiscoveryCatalogPort;
   const generator = {
     execute: jest.fn<Promise<GeneratedPlaylist>, [PlaylistGenerationRequest]>(
       () => Promise.resolve(freshGeneration()),
@@ -283,6 +309,7 @@ function createWorld(
   const candidates = new AiRefinementCandidateBuilder(
     new AiIntentResolver(catalogs),
     generator as unknown as GeneratePlaylistUseCase,
+    discovery,
   );
   const useCase = new ProposeAiRefinementUseCase(
     sessions,

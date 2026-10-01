@@ -4,6 +4,7 @@ import {
   type AiIntentSummary as AiIntentSummaryDto,
 } from '@blendify/contracts'
 import { REGION_LABEL_KEYS, useGenreLabel } from '@/components/genres/genre-labels'
+import { releaseRangeLabel } from '@/components/playlist/release-decades'
 import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 import {
@@ -37,6 +38,10 @@ export function AiIntentSummary({
   const region = supportsSelectionFilter(intent.kind, 'region')
     ? intent.filters.region
     : null
+  const femaleVocals =
+    supportsSelectionFilter(intent.kind, 'femaleVocals') &&
+    intent.filters.femaleVocals
+  const { releaseRange, excludeLive } = intent.filters
   const basedOn =
     intent.artists.length > 0
       ? intent.artists.join(' · ')
@@ -85,6 +90,15 @@ export function AiIntentSummary({
           <SummaryItem label={t('ai.summary.region')}>
             {t(REGION_LABEL_KEYS[region])}
           </SummaryItem>
+        ) : null}
+        {femaleVocals ? (
+          <SummaryItem label={t('ai.summary.vocals')}>{t('ai.summary.femaleVocals')}</SummaryItem>
+        ) : null}
+        {releaseRange ? (
+          <SummaryItem label={t('ai.summary.era')}>{releaseRangeLabel(releaseRange, t)}</SummaryItem>
+        ) : null}
+        {excludeLive ? (
+          <SummaryItem label={t('ai.summary.versions')}>{t('create.noLiveVersions')}</SummaryItem>
         ) : null}
         {intent.mood && !intent.moodNotAppliedReason ? (
           <SummaryItem label={t('ai.summary.mood')}>{t(MOOD_LABEL_KEYS[intent.mood])}</SummaryItem>

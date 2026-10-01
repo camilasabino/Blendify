@@ -11,6 +11,8 @@ export const PLAYLIST_NAME_MAX_LENGTH = 100;
 export const MAX_TRACKS = 50;
 export const MIN_DISCOVER_TRACKS = 1;
 export const TRANSFER_TOKEN_MAX_LENGTH = 48_000;
+export const MIN_RELEASE_YEAR = 1900;
+export const MAX_RELEASE_YEAR = 2100;
 
 export const POPULARITY_MODES = ['popular', 'balanced', 'rarities'] as const;
 export const TRACK_ORDER_MODES = ['artist', 'title', 'random'] as const;
@@ -52,6 +54,13 @@ export const MUSIC_REGIONS = [
   'spanish',
 ] as const;
 export const GENRE_LABEL_LOCALES = ['en', 'es', 'pt'] as const;
+export const RELEASE_DATE_PRECISIONS = ['year', 'month', 'day'] as const;
+export const SELECTION_FILTER_NAMES = [
+  'region',
+  'femaleVocals',
+  'releaseRange',
+  'excludeLive',
+] as const;
 
 export const PopularityModeSchema = z.enum(POPULARITY_MODES);
 export const TrackOrderModeSchema = z.enum(TRACK_ORDER_MODES);
@@ -64,6 +73,7 @@ export const DiscoverTrackTargetSchema = z
   .max(MAX_TRACKS);
 export const BulkLibraryActionSchema = z.enum(BULK_LIBRARY_ACTIONS);
 export const MusicRegionSchema = z.enum(MUSIC_REGIONS);
+export const ReleaseDatePrecisionSchema = z.enum(RELEASE_DATE_PRECISIONS);
 
 export type PopularityMode = z.infer<typeof PopularityModeSchema>;
 export type TrackOrderMode = z.infer<typeof TrackOrderModeSchema>;
@@ -72,6 +82,7 @@ export type PlaylistStatus = z.infer<typeof PlaylistStatusSchema>;
 export type DiscoverTrackTarget = z.infer<typeof DiscoverTrackTargetSchema>;
 export type BulkLibraryAction = z.infer<typeof BulkLibraryActionSchema>;
 export type MusicRegion = z.infer<typeof MusicRegionSchema>;
+export type ReleaseDatePrecision = z.infer<typeof ReleaseDatePrecisionSchema>;
 export type GenreLabelLocale = (typeof GENRE_LABEL_LOCALES)[number];
 
 export const ArtistSchema = z.object({
@@ -111,6 +122,8 @@ export const TrackSchema = z.object({
     .optional(),
   isrc: z.string().min(1).optional(),
   externalUrl: z.string().min(1).optional(),
+  releaseDate: z.string().min(1).max(10).optional(),
+  releaseDatePrecision: ReleaseDatePrecisionSchema.optional(),
 });
 
 export const TrackSeedSchema = TrackSchema.pick({
@@ -142,24 +155,72 @@ export const PlaylistSeedSchema = z.discriminatedUnion('type', [
   TrackSeedSchema.extend({ type: z.literal('track') }),
 ]);
 
+const ReleaseYearSchema = z
+  .number()
+  .int()
+  .min(MIN_RELEASE_YEAR)
+  .max(MAX_RELEASE_YEAR);
+
+export const ReleaseRangeSchema = z
+  .strictObject({
+    fromYear: ReleaseYearSchema.optional(),
+    toYear: ReleaseYearSchema.optional(),
+  })
+  .refine(
+    (range) => range.fromYear !== undefined || range.toYear !== undefined,
+    { message: 'A release range needs at least one bound' },
+  )
+  .refine(
+    (range) =>
+      range.fromYear === undefined ||
+      range.toYear === undefined ||
+      range.fromYear <= range.toYear,
+    { message: 'fromYear must not be after toYear', path: ['toYear'] },
+  );
+
 export const SelectionFiltersSchema = z.strictObject({
   region: MusicRegionSchema.nullable().default(null),
+  femaleVocals: z.boolean().default(false),
+  releaseRange: ReleaseRangeSchema.nullable().default(null),
+  excludeLive: z.boolean().default(false),
 });
 
 export function emptySelectionFilters(): SelectionFilters {
-  return { region: null };
+  return {
+    region: null,
+    femaleVocals: false,
+    releaseRange: null,
+    excludeLive: false,
+  };
 }
-
-const SelectionFiltersFieldSchema =
-  SelectionFiltersSchema.default(emptySelectionFilters);
 
 export const SELECTION_FILTER_SUPPORT: Readonly<
   Record<PlaylistKind, Readonly<Record<SelectionFilterName, boolean>>>
 > = {
-  artist_mix: { region: false },
-  genre_mix: { region: true },
-  discover_artist: { region: true },
-  discover_track: { region: true },
+  artist_mix: {
+    region: false,
+    femaleVocals: false,
+    releaseRange: true,
+    excludeLive: true,
+  },
+  genre_mix: {
+    region: true,
+    femaleVocals: true,
+    releaseRange: true,
+    excludeLive: true,
+  },
+  discover_artist: {
+    region: true,
+    femaleVocals: true,
+    releaseRange: true,
+    excludeLive: true,
+  },
+  discover_track: {
+    region: true,
+    femaleVocals: true,
+    releaseRange: true,
+    excludeLive: true,
+  },
 };
 
 export function supportsSelectionFilter(
@@ -171,6 +232,57 @@ export function supportsSelectionFilter(
 
 export function supportsAnySelectionFilter(kind: PlaylistKind): boolean {
   return Object.values(SELECTION_FILTER_SUPPORT[kind]).some(Boolean);
+}
+
+export function isSelectionFilterActive(
+  filters: SelectionFilters,
+  filter: SelectionFilterName,
+): boolean {
+  const value = filters[filter];
+  return value !== null && value !== false;
+}
+
+export function activeSelectionFilters(
+  filters: SelectionFilters,
+): SelectionFilterName[] {
+  return SELECTION_FILTER_NAMES.filter((filter) =>
+    isSelectionFilterActive(filters, filter),
+  );
+}
+
+export function supportedSelectionFilters(
+  kind: PlaylistKind,
+  filters: SelectionFilters,
+): SelectionFilters {
+  const empty = emptySelectionFilters();
+  return {
+    region: supportsSelectionFilter(kind, 'region')
+      ? filters.region
+      : empty.region,
+    femaleVocals: supportsSelectionFilter(kind, 'femaleVocals')
+      ? filters.femaleVocals
+      : empty.femaleVocals,
+    releaseRange: supportsSelectionFilter(kind, 'releaseRange')
+      ? filters.releaseRange
+      : empty.releaseRange,
+    excludeLive: supportsSelectionFilter(kind, 'excludeLive')
+      ? filters.excludeLive
+      : empty.excludeLive,
+  };
+}
+
+function selectionFiltersFieldFor(kind: PlaylistKind) {
+  return SelectionFiltersSchema.superRefine((filters, ctx) => {
+    for (const filter of activeSelectionFilters(filters)) {
+      if (!supportsSelectionFilter(kind, filter)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [filter],
+          message: `${filter} is not supported for ${kind}`,
+        });
+      }
+    }
+  }).default(emptySelectionFilters);
 }
 
 export const GenerationSettingsSchema = z.object({
@@ -185,6 +297,7 @@ export const PlaylistGenerationSchema = z.discriminatedUnion('kind', [
     tracksPerSeed: z.number().int().min(1).max(MAX_TRACKS),
     // Keep historical generation recipes readable after lowering UI limits.
     seeds: z.array(ArtistSchema).min(1).max(20),
+    filters: selectionFiltersFieldFor('artist_mix'),
   }),
   GenerationSettingsSchema.extend({
     kind: z.literal('genre_mix'),
@@ -193,19 +306,19 @@ export const PlaylistGenerationSchema = z.discriminatedUnion('kind', [
       .array(GenreSchema.pick({ id: true, name: true }))
       .min(1)
       .max(10),
-    filters: SelectionFiltersFieldSchema,
+    filters: selectionFiltersFieldFor('genre_mix'),
   }),
   GenerationSettingsSchema.extend({
     kind: z.literal('discover_artist'),
     targetTrackCount: DiscoverTrackTargetSchema,
     seed: ArtistSchema,
-    filters: SelectionFiltersFieldSchema,
+    filters: selectionFiltersFieldFor('discover_artist'),
   }),
   GenerationSettingsSchema.extend({
     kind: z.literal('discover_track'),
     targetTrackCount: DiscoverTrackTargetSchema,
     seed: TrackSeedSchema,
-    filters: SelectionFiltersFieldSchema,
+    filters: selectionFiltersFieldFor('discover_track'),
   }),
 ]);
 
@@ -220,6 +333,7 @@ export const ArtistMixRequestSchema = PlaylistMetadataSchema.extend({
   kind: z.literal('artist_mix'),
   artistIds: z.array(z.string().min(1)).min(1).max(MAX_ARTISTS),
   artists: z.array(ArtistSchema).max(MAX_ARTISTS).optional(),
+  filters: selectionFiltersFieldFor('artist_mix'),
   tracksPerSeed: z.number().int().min(1).max(MAX_TRACKS),
   popularity: PopularityModeSchema,
   orderMode: TrackOrderModeSchema.default('random'),
@@ -228,7 +342,7 @@ export const ArtistMixRequestSchema = PlaylistMetadataSchema.extend({
 export const GenreMixRequestSchema = PlaylistMetadataSchema.extend({
   kind: z.literal('genre_mix'),
   genreIds: z.array(z.string().min(1)).min(1).max(MAX_GENRES),
-  filters: SelectionFiltersFieldSchema,
+  filters: selectionFiltersFieldFor('genre_mix'),
   tracksPerSeed: z.number().int().min(1).max(MAX_TRACKS),
   popularity: PopularityModeSchema,
   orderMode: TrackOrderModeSchema.default('random'),
@@ -244,7 +358,7 @@ export const DiscoverArtistRequestSchema = PlaylistMetadataSchema.extend({
   artistId: z.string().min(1),
   artist: ArtistSchema.optional(),
   targetTrackCount: DiscoverTrackTargetSchema,
-  filters: SelectionFiltersFieldSchema,
+  filters: selectionFiltersFieldFor('discover_artist'),
   popularity: PopularityModeSchema,
   orderMode: TrackOrderModeSchema.default('random'),
 }).strict();
@@ -254,7 +368,7 @@ export const DiscoverTrackRequestSchema = PlaylistMetadataSchema.extend({
   trackId: z.string().min(1),
   track: TrackSeedSchema,
   targetTrackCount: DiscoverTrackTargetSchema,
-  filters: SelectionFiltersFieldSchema,
+  filters: selectionFiltersFieldFor('discover_track'),
   popularity: PopularityModeSchema,
   orderMode: TrackOrderModeSchema.default('random'),
 }).strict();
@@ -561,6 +675,8 @@ export const AI_CLARIFICATION_REASONS = [
   'conflicting_regions',
   'unknown_region',
   'region_not_supported',
+  'female_vocals_not_supported',
+  'invalid_release_range',
 ] as const;
 
 export const AiUnsupportedConstraintCategorySchema = z.enum(
@@ -665,6 +781,8 @@ export const AI_REFINEMENT_CLARIFICATION_REASONS = [
   'conflicting_regions',
   'unknown_region',
   'region_not_supported',
+  'female_vocals_not_supported',
+  'invalid_release_range',
   'conflicting_changes',
   'preserved_track_out_of_range',
   'preserved_artist_not_found',
@@ -816,6 +934,21 @@ export const AiIntentChangeSchema = z.discriminatedUnion('field', [
     field: z.literal('region'),
     from: MusicRegionSchema.nullable(),
     to: MusicRegionSchema.nullable(),
+  }),
+  z.strictObject({
+    field: z.literal('femaleVocals'),
+    from: z.boolean(),
+    to: z.boolean(),
+  }),
+  z.strictObject({
+    field: z.literal('releaseRange'),
+    from: ReleaseRangeSchema.nullable(),
+    to: ReleaseRangeSchema.nullable(),
+  }),
+  z.strictObject({
+    field: z.literal('excludeLive'),
+    from: z.boolean(),
+    to: z.boolean(),
   }),
   z.strictObject({ field: z.literal('seedTracks'), ...AiTrackListChangeShape }),
   z.strictObject({
@@ -994,8 +1127,9 @@ export type TrackDto = z.infer<typeof TrackSchema>;
 export type TrackSeedDto = z.infer<typeof TrackSeedSchema>;
 export type GenreDto = z.infer<typeof GenreSchema>;
 export type PlaylistSeedDto = z.infer<typeof PlaylistSeedSchema>;
+export type ReleaseRange = z.infer<typeof ReleaseRangeSchema>;
 export type SelectionFilters = z.infer<typeof SelectionFiltersSchema>;
-export type SelectionFilterName = keyof SelectionFilters;
+export type SelectionFilterName = (typeof SELECTION_FILTER_NAMES)[number];
 export type PlaylistGeneration = z.infer<typeof PlaylistGenerationSchema>;
 export type CreateMixRequest = z.input<typeof CreateMixRequestSchema>;
 export type CreateDiscoverRequest = z.input<typeof CreateDiscoverRequestSchema>;

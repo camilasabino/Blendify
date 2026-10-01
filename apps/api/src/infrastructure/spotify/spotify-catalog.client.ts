@@ -14,11 +14,16 @@ import {
 } from '@/domain/repositories/catalog-provider.port';
 import { readTrackPopularity } from '@/domain/track/track-popularity';
 import { Track, type TrackArtist } from '@/domain/track/track.entity';
+import type { ReleaseDatePrecision } from '@blendify/contracts';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
 import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import { pickResolvedTrack } from './pick-resolved-track';
 import { SpotifyApiClient } from './spotify-api.client';
+import {
+  readSpotifyRelease,
+  type SpotifyAlbumRelease,
+} from './spotify-track-release';
 
 export interface CatalogTokenSource {
   getAccessToken(): Promise<string>;
@@ -44,7 +49,7 @@ interface SpotifyTrack {
   uri: string;
   preview_url?: string | null;
   artists: { id: string; name: string }[];
-  album?: { name: string; images?: SpotifyImage[] };
+  album?: SpotifyAlbumRelease & { name: string; images?: SpotifyImage[] };
   external_ids?: { isrc?: string | null };
   external_urls?: { spotify?: string | null };
 }
@@ -70,11 +75,15 @@ type CachedTrack = {
   artists?: TrackArtist[];
   isrc?: string;
   externalUrl?: string;
+  releaseDate?: string;
+  releaseDatePrecision?: ReleaseDatePrecision;
 };
 
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const ARTIST_CACHE_TTL_MS = 30 * 60 * 1000;
 const RESOLVE_CACHE_TTL_MS = 30 * 60 * 1000;
+const SEARCH_TRACKS_CACHE_NAMESPACE = 'search-tracks-v2';
+const RESOLVE_TRACK_CACHE_NAMESPACE = 'resolve-track-v2';
 
 type CachedResolution = { track: CachedTrack | null };
 
@@ -127,7 +136,12 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
   ): Promise<Track[]> {
     const safeLimit = Math.min(Math.max(options.limit ?? 10, 1), 10);
     const offset = Math.max(options.offset ?? 0, 0);
-    const key = this.cacheKey('search-tracks', query, safeLimit, offset);
+    const key = this.cacheKey(
+      SEARCH_TRACKS_CACHE_NAMESPACE,
+      query,
+      safeLimit,
+      offset,
+    );
     const cached = await this.cache?.getJson<CachedTrack[]>(key);
     if (cached) {
       return cached.map(hydrateTrack);
@@ -169,9 +183,10 @@ export class SpotifyCatalogClient implements CatalogProviderPort {
       return null;
     }
     const expectedArtistId = options.artistId?.trim() || undefined;
-    const key = `${this.cacheKey('resolve-track', `${artist}\u0000${title}`)}${
-      expectedArtistId ?? ''
-    }`;
+    const key = `${this.cacheKey(
+      RESOLVE_TRACK_CACHE_NAMESPACE,
+      `${artist}\u0000${title}`,
+    )}${expectedArtistId ?? ''}`;
     const cached = await this.cache?.getJson<CachedResolution>(key);
     if (cached) {
       return cached.track ? hydrateTrack(cached.track) : null;
@@ -389,6 +404,7 @@ function mapTrack(
     artists: item.artists,
     isrc: item.external_ids?.isrc ?? undefined,
     externalUrl: item.external_urls?.spotify ?? undefined,
+    ...readSpotifyRelease(item.album),
   });
 }
 
@@ -425,6 +441,8 @@ function serializeTrack(track: Track): CachedTrack {
     artists: [...track.artists],
     isrc: track.isrc,
     externalUrl: track.externalUrl,
+    releaseDate: track.releaseDate,
+    releaseDatePrecision: track.releaseDatePrecision,
   };
 }
 
@@ -443,6 +461,8 @@ function hydrateTrack(track: CachedTrack): Track {
     artists: track.artists,
     isrc: track.isrc,
     externalUrl: track.externalUrl,
+    releaseDate: track.releaseDate,
+    releaseDatePrecision: track.releaseDatePrecision,
   });
 }
 

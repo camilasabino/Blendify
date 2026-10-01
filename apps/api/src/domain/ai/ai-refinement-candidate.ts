@@ -15,6 +15,12 @@ import {
 } from './ai-intent';
 import { aiNameKey, aiTrackKey } from './ai-intent-rules';
 import { seedTypeOfKind } from './ai-seeds';
+import {
+  hasTrackSelectionFilters,
+  sameReleaseRange,
+  trackSelectionFilters,
+  type TrackSelectionFilters,
+} from '@/domain/selection-filters/track-selection-filters';
 import { aiSelectionFilters } from './ai-selection-filters';
 import {
   candidateTrackCountForDuration,
@@ -40,8 +46,11 @@ export type AiRefinementAssembly =
   | { status: 'order_conflict' }
   | { status: 'insufficient'; reason: 'no_tracks' | 'unfilled_positions' };
 
+export type AiTrackEligibility = (track: Track) => boolean;
+
 export interface AiRefinementAssemblyInput {
   currentTracks: readonly Track[];
+  isEligible?: AiTrackEligibility;
   preservedPositions: readonly number[];
   strategy: AiRefinementStrategy;
   generatedTracks: readonly Track[];
@@ -54,8 +63,10 @@ export function refinementStrategy(input: {
   current: AiIntent;
   proposed: AiIntent;
   currentTracks: readonly Track[];
+  isEligible?: AiTrackEligibility;
 }): AiRefinementStrategy {
   const { current, proposed, currentTracks } = input;
+  const isEligible = input.isEligible ?? everyTrack;
 
   if (generationBasis(current) !== generationBasis(proposed)) {
     const droppedArtists = removedArtistSeeds(current, proposed);
@@ -65,7 +76,9 @@ export function refinementStrategy(input: {
   }
 
   const isExcluded = excludedBy(proposed);
-  const retained = currentTracks.filter((track) => !isExcluded(track));
+  const retained = currentTracks.filter(
+    (track) => !isExcluded(track) && isEligible(track),
+  );
   const targetsChanged =
     current.targetTrackCount !== proposed.targetTrackCount ||
     current.targetDurationMinutes !== proposed.targetDurationMinutes;
@@ -95,10 +108,36 @@ export function fillCandidateTrackCount(
   return Math.min(MAX_TRACKS, Math.max(1, target - keptTrackCount));
 }
 
+export function narrowedTrackFilters(
+  current: AiIntent,
+  proposed: AiIntent,
+): TrackSelectionFilters | null {
+  const before = trackSelectionFilters(aiSelectionFilters(current));
+  const after = trackSelectionFilters(aiSelectionFilters(proposed));
+  const narrowed = {
+    releaseRange: sameReleaseRange(before.releaseRange, after.releaseRange)
+      ? null
+      : after.releaseRange,
+    excludeLive: after.excludeLive && !before.excludeLive,
+  };
+  return hasTrackSelectionFilters(narrowed) ? narrowed : null;
+}
+
+export function addsFemaleVocals(
+  current: AiIntent,
+  proposed: AiIntent,
+): boolean {
+  return (
+    aiSelectionFilters(proposed).femaleVocals &&
+    !aiSelectionFilters(current).femaleVocals
+  );
+}
+
 export function retainedTracks(
   currentTracks: readonly Track[],
   proposed: AiIntent,
   strategy: AiRefinementStrategy,
+  isEligible: AiTrackEligibility = everyTrack,
 ): Track[] {
   if (strategy.kind === 'regenerate') {
     return [];
@@ -113,6 +152,7 @@ export function retainedTracks(
   return currentTracks.filter(
     (track) =>
       !isExcluded(track) &&
+      isEligible(track) &&
       !creditedArtistKeys(track).some((artist) => dropped.has(artist)),
   );
 }
@@ -145,9 +185,12 @@ export function assembleRefinementCandidate(
   const isExcluded = excludedBy(intent);
 
   const retained = takeUnique(
-    retainedTracks(currentTracks, intent, input.strategy).filter(
-      (track) => !usedIds.has(trackId(track)),
-    ),
+    retainedTracks(
+      currentTracks,
+      intent,
+      input.strategy,
+      input.isEligible,
+    ).filter((track) => !usedIds.has(trackId(track))),
     usedIds,
   );
   const allowedGenerated = input.generatedTracks.filter(
@@ -244,7 +287,7 @@ function generationBasis(intent: AiIntent): string {
   return JSON.stringify({
     kind: intent.kind,
     seeds: basisSeeds(intent),
-    filters: aiSelectionFilters(intent),
+    region: aiSelectionFilters(intent).region,
     popularity: intent.popularity ?? AI_DEFAULT_POPULARITY,
   });
 }
@@ -328,6 +371,10 @@ function takeUnique(tracks: readonly Track[], usedIds: Set<string>): Track[] {
 
 function trackId(track: Track): string {
   return track.id.getValue();
+}
+
+function everyTrack(): boolean {
+  return true;
 }
 
 function sortedUnique(values: string[]): string[] {

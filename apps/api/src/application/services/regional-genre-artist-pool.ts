@@ -3,12 +3,13 @@ import type { MusicRegion } from '@blendify/contracts';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { artistTagsMatchGenre } from '@/domain/genre/artist-genre-tags';
 import { musicRegionTag } from '@/domain/region/artist-region-tags';
+import { artistTagsMatchFemaleVocals } from '@/domain/selection-filters/artist-vocal-tags';
 import type {
   DiscoveryCatalogPort,
   SimilarArtistCandidate,
 } from '@/domain/repositories/discovery-catalog.port';
 import { ArtistTagLookup, artistIdentityKey } from './artist-tag-lookup';
-import { REGION_QUALIFICATION_CONCURRENCY } from './region-artist-qualifier';
+import { ARTIST_FILTER_QUALIFICATION_CONCURRENCY } from './artist-filter-qualifier';
 
 const REGION_ARTIST_PAGE_SIZE = 50;
 const REGION_ARTIST_MAX_PAGES = 5;
@@ -18,15 +19,16 @@ export class RegionalGenreArtistPool {
   private readonly artists: SimilarArtistCandidate[] = [];
   private loadedPages = 0;
   private exhausted = false;
-  private readonly tags: ArtistTagLookup;
 
   constructor(
     private readonly discoveryCatalog: DiscoveryCatalogPort,
     private readonly region: MusicRegion,
     private readonly logger: Logger,
-  ) {
-    this.tags = new ArtistTagLookup(discoveryCatalog, logger);
-  }
+    private readonly options: {
+      femaleVocals: boolean;
+      tags: ArtistTagLookup;
+    },
+  ) {}
 
   async qualifiedArtists(
     genreId: string,
@@ -44,14 +46,17 @@ export class RegionalGenreArtistPool {
     while (qualified.length < target && inspected < inspectionLimit) {
       const batch = await this.artistsAt(
         inspected,
-        Math.min(REGION_QUALIFICATION_CONCURRENCY, inspectionLimit - inspected),
+        Math.min(
+          ARTIST_FILTER_QUALIFICATION_CONCURRENCY,
+          inspectionLimit - inspected,
+        ),
       );
       if (batch.length === 0) {
         break;
       }
 
       const batchTags = await Promise.all(
-        batch.map((artist) => this.tags.tagsFor(artist)),
+        batch.map((artist) => this.options.tags.tagsFor(artist)),
       );
       for (const [index, tags] of batchTags.entries()) {
         const key = artistIdentityKey(batch[index]);
@@ -59,6 +64,7 @@ export class RegionalGenreArtistPool {
           failed += 1;
         } else if (
           artistTagsMatchGenre(tags, genreId) &&
+          (!this.options.femaleVocals || artistTagsMatchFemaleVocals(tags)) &&
           !qualifiedKeys.has(key)
         ) {
           qualifiedKeys.add(key);

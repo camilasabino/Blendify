@@ -1,3 +1,4 @@
+import { emptySelectionFilters } from '@blendify/contracts';
 import type { AiIntent } from '@/domain/ai/ai-intent';
 import type { ResolvedAiSeeds } from '@/domain/ai/ai-resolved-seeds';
 import { MAX_TRACKS } from '@/domain/constants';
@@ -10,7 +11,12 @@ function intent(overrides: Partial<AiIntent>): AiIntent {
     artists: [],
     genres: [],
     seedTracks: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,
@@ -34,6 +40,9 @@ const TWO_ARTISTS = seeds({
   ],
 });
 
+const ROCK = { id: 'rock', name: 'Rock' };
+const RADIOHEAD = { id: 'radiohead-id', name: 'Radiohead' };
+
 describe('buildAiExecutionPlan', () => {
   it('maps an artist mix onto the existing request with resolved snapshots and default settings', () => {
     const plan = buildAiExecutionPlan(
@@ -50,6 +59,7 @@ describe('buildAiExecutionPlan', () => {
         { id: 'radiohead-id', name: 'Radiohead', imageUrl: 'https://img/r' },
         { id: 'interpol-id', name: 'Interpol', imageUrl: null },
       ],
+      filters: emptySelectionFilters(),
       tracksPerSeed: 10,
       popularity: 'balanced',
       orderMode: 'random',
@@ -136,7 +146,7 @@ describe('buildAiExecutionPlan', () => {
     ).toMatchObject({ filters: { region: null } });
   });
 
-  it('carries the region filter into discover requests and never into artist mixes', () => {
+  it('carries the region filter into discover requests', () => {
     const radiohead = seeds({
       artists: [{ id: 'radiohead-id', name: 'Radiohead' }],
     });
@@ -146,7 +156,12 @@ describe('buildAiExecutionPlan', () => {
         intent({
           kind: 'discover_artist',
           artists: ['Radiohead'],
-          filters: { region: 'argentina' },
+          filters: {
+            region: 'argentina',
+            femaleVocals: false,
+            releaseRange: null,
+            excludeLive: false,
+          },
         }),
         radiohead,
       ).request,
@@ -154,12 +169,67 @@ describe('buildAiExecutionPlan', () => {
       kind: 'discover_artist',
       filters: { region: 'argentina' },
     });
+  });
+
+  it.each<[AiIntent['kind'], Partial<AiIntent>, Partial<ResolvedAiSeeds>]>([
+    ['genre_mix', { genres: ['rock'] }, { genres: [ROCK] }],
+    ['discover_artist', { artists: ['Radiohead'] }, { artists: [RADIOHEAD] }],
+    ['artist_mix', { artists: ['Radiohead'] }, { artists: [RADIOHEAD] }],
+  ])(
+    'carries the canonical track-level filters into a %s request',
+    (kind, intentSeeds, resolved) => {
+      const request = buildAiExecutionPlan(
+        intent({
+          kind,
+          ...intentSeeds,
+          filters: {
+            region: null,
+            femaleVocals: false,
+            releaseRange: { fromYear: 1990, toYear: null },
+            excludeLive: true,
+          },
+        }),
+        seeds(resolved),
+      ).request;
+
+      expect(request).toMatchObject({
+        kind,
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: { fromYear: 1990 },
+          excludeLive: true,
+        },
+      });
+    },
+  );
+
+  it('carries female vocals into a genre mix like the manual form', () => {
     expect(
       buildAiExecutionPlan(
-        intent({ kind: 'artist_mix', artists: ['Radiohead'] }),
-        radiohead,
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['rock'],
+          filters: {
+            region: 'argentina',
+            femaleVocals: true,
+            releaseRange: { fromYear: 1990, toYear: 1999 },
+            excludeLive: true,
+          },
+        }),
+        seeds({ genres: [{ id: 'rock', name: 'Rock' }] }),
       ).request,
-    ).not.toHaveProperty('filters');
+    ).toMatchObject({
+      kind: 'genre_mix',
+      genreIds: ['rock'],
+      filters: {
+        region: 'argentina',
+        femaleVocals: true,
+        releaseRange: { fromYear: 1990, toYear: 1999 },
+        excludeLive: true,
+      },
+    });
   });
 
   it('keeps an artist seed authoritative over the mood', () => {
@@ -181,7 +251,12 @@ describe('buildAiExecutionPlan', () => {
       intent({
         kind: 'discover_track',
         seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
-        filters: { region: null },
+        filters: {
+          region: null,
+          femaleVocals: false,
+          releaseRange: null,
+          excludeLive: false,
+        },
         targetTrackCount: 20,
       }),
       seeds({

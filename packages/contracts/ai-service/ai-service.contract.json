@@ -200,6 +200,12 @@
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
+                      "excludeLive": {
+                        "type": "boolean"
+                      },
+                      "femaleVocals": {
+                        "type": "boolean"
+                      },
                       "region": {
                         "anyOf": [
                           {
@@ -211,10 +217,54 @@
                             "maxLength": 200
                           }
                         ]
+                      },
+                      "releaseRange": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "fromYear": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1900,
+                                    "maximum": 2100
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "toYear": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1900,
+                                    "maximum": 2100
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "fromYear",
+                              "toYear"
+                            ]
+                          }
+                        ]
                       }
                     },
                     "required": [
-                      "region"
+                      "excludeLive",
+                      "femaleVocals",
+                      "region",
+                      "releaseRange"
                     ]
                   },
                   "genres": {
@@ -471,6 +521,12 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
+              "excludeLive": {
+                "type": "boolean"
+              },
+              "femaleVocals": {
+                "type": "boolean"
+              },
               "region": {
                 "anyOf": [
                   {
@@ -482,10 +538,54 @@
                     "maxLength": 200
                   }
                 ]
+              },
+              "releaseRange": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "fromYear": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1900,
+                            "maximum": 2100
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "toYear": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1900,
+                            "maximum": 2100
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "fromYear",
+                      "toYear"
+                    ]
+                  }
+                ]
               }
             },
             "required": [
-              "region"
+              "excludeLive",
+              "femaleVocals",
+              "region",
+              "releaseRange"
             ]
           },
           "genres": {
@@ -937,6 +1037,90 @@
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
+                      "excludeLive": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "operation": {
+                                    "type": "string",
+                                    "const": "clear"
+                                  }
+                                },
+                                "required": [
+                                  "operation"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "operation": {
+                                    "type": "string",
+                                    "const": "set"
+                                  },
+                                  "value": {
+                                    "type": "boolean",
+                                    "const": true
+                                  }
+                                },
+                                "required": [
+                                  "operation",
+                                  "value"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "femaleVocals": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "operation": {
+                                    "type": "string",
+                                    "const": "clear"
+                                  }
+                                },
+                                "required": [
+                                  "operation"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "operation": {
+                                    "type": "string",
+                                    "const": "set"
+                                  },
+                                  "value": {
+                                    "type": "boolean",
+                                    "const": true
+                                  }
+                                },
+                                "required": [
+                                  "operation",
+                                  "value"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "region": {
                         "anyOf": [
                           {
@@ -979,10 +1163,85 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "releaseRange": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "operation": {
+                                    "type": "string",
+                                    "const": "clear"
+                                  }
+                                },
+                                "required": [
+                                  "operation"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "operation": {
+                                    "type": "string",
+                                    "const": "set"
+                                  },
+                                  "value": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "fromYear": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1900,
+                                            "maximum": 2100
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "toYear": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1900,
+                                            "maximum": 2100
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "fromYear",
+                                      "toYear"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "operation",
+                                  "value"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "required": [
-                      "region"
+                      "excludeLive",
+                      "femaleVocals",
+                      "region",
+                      "releaseRange"
                     ]
                   },
                   "genres": {

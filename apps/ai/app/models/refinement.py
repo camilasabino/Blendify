@@ -6,6 +6,7 @@ from app.models.intent import (
     AI_INTENT_LIST_MAX_ITEMS,
     IntentClarification,
     IntentName,
+    IntentReleaseRange,
     IntentTrackReference,
     Mood,
     PlaylistIntent,
@@ -76,6 +77,16 @@ class SetRegion(WireModel):
     value: IntentName
 
 
+class EnableFilter(WireModel):
+    operation: Literal["set"]
+    value: Literal[True]
+
+
+class SetReleaseRange(WireModel):
+    operation: Literal["set"]
+    value: IntentReleaseRange
+
+
 class SetMood(WireModel):
     operation: Literal["set"]
     value: Mood
@@ -101,6 +112,8 @@ DurationMinutesPatch = Annotated[
     SetDurationMinutes | ClearValue | AdjustDurationMinutes, Field(discriminator="operation")
 ]
 RegionPatch = Annotated[SetRegion | ClearValue, Field(discriminator="operation")]
+FilterFlagPatch = Annotated[EnableFilter | ClearValue, Field(discriminator="operation")]
+ReleaseRangePatch = Annotated[SetReleaseRange | ClearValue, Field(discriminator="operation")]
 MoodPatch = Annotated[SetMood | ClearValue, Field(discriminator="operation")]
 PopularityPatch = Annotated[SetPopularity | ClearValue, Field(discriminator="operation")]
 OrderModePatch = Annotated[SetOrderMode | ClearValue, Field(discriminator="operation")]
@@ -124,6 +137,9 @@ class PositionListPatch(WireModel):
 
 class IntentFiltersPatch(WireModel):
     region: RegionPatch | None
+    female_vocals: FilterFlagPatch | None
+    release_range: ReleaseRangePatch | None
+    exclude_live: FilterFlagPatch | None
 
 
 class IntentPatch(WireModel):

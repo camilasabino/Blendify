@@ -16,6 +16,7 @@ import {
   MAX_GENRES,
   SELECTION_FILTER_SUPPORT,
   emptySelectionFilters,
+  supportedSelectionFilters,
   supportsAnySelectionFilter,
   type PopularityMode,
   type SelectionFilters,
@@ -337,7 +338,7 @@ export function MixPlaylistForm() {
   const [mode, setMode] = useState<MixSeedMode>('artists')
   const [artists, setArtists] = useState<Artist[]>([])
   const [genres, setGenres] = useState<Genre[]>([])
-  const [genreFilters, setGenreFilters] = useState<SelectionFilters>(
+  const [filters, setFilters] = useState<SelectionFilters>(
     emptySelectionFilters,
   )
   const genreLabel = useGenreLabel()
@@ -388,8 +389,8 @@ export function MixPlaylistForm() {
         translate: t,
       })
     }
-    return genreMixPlaylistName(genres, genreFilters.region)
-  }, [mode, artists, genres, genreFilters, genreMixPlaylistName, t])
+    return genreMixPlaylistName(genres, filters.region)
+  }, [mode, artists, genres, filters, genreMixPlaylistName, t])
 
   useLayoutEffect(() => {
     const next = clampedTrackCount(
@@ -577,6 +578,7 @@ export function MixPlaylistForm() {
                 name: a.name,
                 imageUrl: a.imageUrl ?? null,
               })),
+              filters: supportedSelectionFilters('artist_mix', filters),
               tracksPerSeed: values.tracksPerArtist,
               popularity: values.popularity,
               orderMode: values.orderMode,
@@ -586,7 +588,7 @@ export function MixPlaylistForm() {
               name,
               description,
               genreIds: genres.map((g) => g.id),
-              filters: genreFilters,
+              filters: supportedSelectionFilters('genre_mix', filters),
               popularity: values.popularity,
               tracksPerSeed: values.tracksPerGenre,
               orderMode: values.orderMode,
@@ -622,7 +624,7 @@ export function MixPlaylistForm() {
     setMode('artists')
     setArtists([])
     setGenres([])
-    setGenreFilters(emptySelectionFilters())
+    setFilters(emptySelectionFilters())
     setPasteList('')
     setPasteOpen(false)
     setResolveError(null)
@@ -654,7 +656,7 @@ export function MixPlaylistForm() {
             mode === 'artists'
               ? artists.map((a) => a.name)
               : genres.map(genreLabel),
-          region: mode === 'genres' ? genreFilters.region : null,
+          filters: supportedSelectionFilters(mixKind, filters),
           popularity,
           orderMode,
           trackCount: estimate.total,
@@ -794,8 +796,8 @@ export function MixPlaylistForm() {
             <ResultFiltersSection
               step={3}
               supported={SELECTION_FILTER_SUPPORT[mixKind]}
-              filters={genreFilters}
-              onChange={setGenreFilters}
+              filters={filters}
+              onChange={setFilters}
               regionHintKey="create.regionHint"
             />
 

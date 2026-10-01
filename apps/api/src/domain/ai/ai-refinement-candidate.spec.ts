@@ -4,8 +4,10 @@ import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { TrackId } from '@/domain/value-objects/track-id.vo';
 import type { AiIntent } from './ai-intent';
 import {
+  addsFemaleVocals,
   assembleRefinementCandidate,
   fillCandidateTrackCount,
+  narrowedTrackFilters,
   refinementArrangement,
   refinementStrategy,
   type AiRefinementAssemblyInput,
@@ -32,7 +34,12 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,
@@ -213,6 +220,121 @@ describe('refinementStrategy', () => {
         }).kind,
       ).toBe('regenerate');
     });
+  });
+});
+
+describe('selection filter refinements', () => {
+  const genreMix = intent({ kind: 'genre_mix', artists: [], genres: ['rock'] });
+  const withFilters = (filters: Partial<AiIntent['filters']>): AiIntent => ({
+    ...genreMix,
+    filters: { ...genreMix.filters, ...filters },
+  });
+  const LIVE = new Set(['i1', 'c1', 'r3']);
+  const isStudio = (candidate: Track) => !LIVE.has(candidate.id.getValue());
+
+  it('narrows only the track filters the refinement adds or changes', () => {
+    expect(
+      narrowedTrackFilters(genreMix, withFilters({ excludeLive: true })),
+    ).toEqual({
+      releaseRange: null,
+      excludeLive: true,
+    });
+    expect(
+      narrowedTrackFilters(
+        withFilters({ releaseRange: { fromYear: 1980, toYear: 1989 } }),
+        withFilters({ releaseRange: { fromYear: 1990, toYear: 1999 } }),
+      ),
+    ).toEqual({
+      releaseRange: { fromYear: 1990, toYear: 1999 },
+      excludeLive: false,
+    });
+    expect(
+      narrowedTrackFilters(withFilters({ excludeLive: true }), genreMix),
+    ).toBeNull();
+    expect(
+      narrowedTrackFilters(
+        withFilters({ releaseRange: { fromYear: 1990, toYear: null } }),
+        withFilters({ releaseRange: { fromYear: 1990, toYear: null } }),
+      ),
+    ).toBeNull();
+  });
+
+  it('detects a newly requested female-vocals filter only', () => {
+    expect(
+      addsFemaleVocals(genreMix, withFilters({ femaleVocals: true })),
+    ).toBe(true);
+    expect(
+      addsFemaleVocals(withFilters({ femaleVocals: true }), genreMix),
+    ).toBe(false);
+  });
+
+  it.each([
+    ['exclude live', { excludeLive: true }],
+    ['a release range', { releaseRange: { fromYear: 1990, toYear: 1999 } }],
+    ['female vocals', { femaleVocals: true }],
+  ])(
+    'retains eligible tracks and fills the rest after %s',
+    (_label, filters) => {
+      const strategy = refinementStrategy({
+        current: genreMix,
+        proposed: withFilters(filters),
+        currentTracks: CURRENT,
+        isEligible: isStudio,
+      });
+
+      expect(strategy).toEqual({ kind: 'retain_and_fill', droppedArtists: [] });
+      expect(
+        fillCandidateTrackCount(withFilters(filters), 3, CURRENT.length),
+      ).toBe(3);
+    },
+  );
+
+  it('keeps every current track when the filter drops nothing', () => {
+    expect(
+      refinementStrategy({
+        current: genreMix,
+        proposed: withFilters({ excludeLive: true }),
+        currentTracks: CURRENT,
+        isEligible: () => true,
+      }).kind,
+    ).toBe('transform');
+  });
+
+  it('keeps the existing regenerate behavior for a region change', () => {
+    expect(
+      refinementStrategy({
+        current: genreMix,
+        proposed: withFilters({ region: 'argentina' }),
+        currentTracks: CURRENT,
+      }).kind,
+    ).toBe('regenerate');
+  });
+
+  it('assembles the eligible current tracks followed by the replacements', () => {
+    const replacements = [
+      track('n1', 'New'),
+      track('n2', 'New'),
+      track('n3', 'New'),
+    ];
+    expect(
+      assembled({
+        intent: withFilters({ excludeLive: true }),
+        strategy: { kind: 'retain_and_fill', droppedArtists: [] },
+        generatedTracks: replacements,
+        isEligible: isStudio,
+      }),
+    ).toEqual(['r1', 'r2', 'i2', 'n1', 'n2', 'n3']);
+  });
+
+  it('returns only the eligible tracks when replacements genuinely run out', () => {
+    expect(
+      assembled({
+        intent: withFilters({ excludeLive: true }),
+        strategy: { kind: 'retain_and_fill', droppedArtists: [] },
+        generatedTracks: [track('n1', 'New')],
+        isEligible: isStudio,
+      }),
+    ).toEqual(['r1', 'r2', 'i2', 'n1']);
   });
 });
 

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel
+
 from app.models.intent import IntentTrackReference
 from app.models.refinement import (
     AdjustDurationMinutes,
@@ -22,11 +24,11 @@ from evals.intent_eval import (
     normalize_name,
 )
 
-DATASET_PATH = Path(__file__).resolve().parent / "refinement-eval-v4.json"
+DATASET_PATH = Path(__file__).resolve().parent / "refinement-eval-v5.json"
 
 RefinementResult = InterpretedRefinement | RefinementClarificationNeeded
 ListPatch = NameListPatch | TrackListPatch | PositionListPatch
-PatchValue = str | int
+PatchValue = str | int | bool
 PatchItem = str | int | IntentTrackReference
 
 SCALAR_PATHS = (
@@ -37,6 +39,9 @@ SCALAR_PATHS = (
     "popularity",
     "orderMode",
     "filters.region",
+    "filters.femaleVocals",
+    "filters.releaseRange",
+    "filters.excludeLive",
     "preservation.firstTracks",
 )
 LIST_PATHS = (
@@ -49,7 +54,12 @@ LIST_PATHS = (
     "preservation.artists",
 )
 PATCH_PATHS = frozenset({*SCALAR_PATHS, *LIST_PATHS})
-NO_FILTERS = {"region": None}
+NO_FILTERS = {
+    "region": None,
+    "femaleVocals": False,
+    "releaseRange": None,
+    "excludeLive": False,
+}
 EXPECTATION_KEYS = frozenset(
     {
         "outcome",
@@ -87,7 +97,10 @@ def load_dataset(path: Path = DATASET_PATH) -> tuple[str, list[RefinementEvalCas
             language=case["language"],
             request=PlanRefinementRequest.model_validate(
                 {
-                    "intent": {"filters": NO_FILTERS, **case["intent"]},
+                    "intent": {
+                        **case["intent"],
+                        "filters": {**NO_FILTERS, **case["intent"].get("filters", {})},
+                    },
                     "preservation": case["preservation"],
                     "refinement": case["refinement"],
                 }
@@ -145,6 +158,9 @@ def _scalar_operations(result: InterpretedRefinement) -> dict[str, Any]:
         "popularity": patch.popularity,
         "orderMode": patch.order_mode,
         "filters.region": patch.filters.region,
+        "filters.femaleVocals": patch.filters.female_vocals,
+        "filters.releaseRange": patch.filters.release_range,
+        "filters.excludeLive": patch.filters.exclude_live,
         "preservation.firstTracks": result.preservation.first_tracks,
     }
 
@@ -248,9 +264,11 @@ def _check_categories(expect: dict[str, Any], categories: Sequence[str]) -> list
     return failures
 
 
-def _set_value(operation: Any) -> PatchValue | None:
+def _set_value(operation: Any) -> PatchValue | dict[str, Any] | None:
     if operation is None or isinstance(operation, ClearValue | AdjustDurationMinutes):
         return None
+    if isinstance(operation.value, BaseModel):
+        return operation.value.model_dump(mode="json", by_alias=True)
     return operation.value
 
 

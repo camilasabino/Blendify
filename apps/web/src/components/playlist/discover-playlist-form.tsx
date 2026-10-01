@@ -405,7 +405,7 @@ export function DiscoverPlaylistForm() {
     : buildGenerationSummary(
         {
           seedNames: seedName ? [seedName] : [],
-          region: filters.region,
+          filters,
           popularity: form.watch('popularity'),
           orderMode: form.watch('orderMode'),
           trackCount: targetTrackCount,

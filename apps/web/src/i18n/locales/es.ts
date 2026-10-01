@@ -93,6 +93,19 @@ export const es: Record<MessageKey, string> = {
   'create.regionAny': 'Cualquier región',
   'create.regionHint': 'Opcional · Filtra los artistas por región para todos los géneros seleccionados.',
   'discover.regionHint': 'Opcional · Limita los resultados a una escena o región.',
+  'create.vocals': 'Voces',
+  'create.vocalsAny': 'Cualquiera',
+  'create.femaleVocals': 'Voces femeninas',
+  'create.vocalsHint': 'Opcional · Filtra los artistas de los resultados por sus voces.',
+  'create.decade': 'Década',
+  'create.decadeAny': 'Cualquiera',
+  'create.decadeHint': 'Opcional · Usa el año de lanzamiento de la versión de cada canción.',
+  'create.eraAny': 'Cualquier época',
+  'create.releaseRangeFrom': 'Desde {year}',
+  'create.releaseRangeTo': 'Hasta {year}',
+  'create.excludeLive': 'Excluir versiones en vivo',
+  'create.excludeLiveHint': 'Evita grabaciones identificadas como en vivo o unplugged.',
+  'create.noLiveVersions': 'Sin versiones en vivo',
   'region.latin': 'Latinoamérica',
   'region.american': 'Estados Unidos',
   'region.british': 'Reino Unido',
@@ -257,6 +270,8 @@ export const es: Record<MessageKey, string> = {
     'No se pudo cargar música relacionada. Intenta de nuevo.',
   'errors.regionLookupUnavailable':
     'No pudimos comprobar la región de los resultados. Intenta más tarde o quita la región.',
+  'errors.artistFilterLookupUnavailable':
+    'No pudimos comprobar la región o las voces de los resultados. Intenta más tarde o quita esos filtros.',
   'errors.genreLookupUnavailable':
     'No encontramos suficientes artistas para este género. Prueba con otro género o intenta más tarde.',
   'errors.artistResolve':
@@ -638,6 +653,11 @@ export const es: Record<MessageKey, string> = {
     'Blendify no puede limitar los resultados a {names}. Edita tu pedido con otra región o sin región.',
   'ai.clarify.regionNotSupported':
     'Una región ({names}) solo refina los artistas que descubre Blendify, no los que elegiste. Pide música parecida a ese artista o quita la región.',
+  'ai.clarify.femaleVocalsNotSupported':
+    'Las voces femeninas solo refinan los artistas que descubre Blendify, no los que elegiste. Pide música parecida a ese artista o quita el filtro de voces.',
+  'ai.clarify.invalidReleaseRange':
+    'Ese período ({names}) termina antes de empezar. Indica los años de nuevo.',
+  'ai.option.discoverSimilarFiltered': 'Descubrir artistas parecidos con ese filtro',
   'ai.clarify.invalidDuration':
     'Esa duración no sirve. Pide una duración de al menos un minuto.',
   'ai.clarify.optionsLabel': 'Elige una opción',
@@ -667,6 +687,10 @@ export const es: Record<MessageKey, string> = {
   'ai.summary.basedOn': 'Basado en',
   'ai.summary.genres': 'Géneros',
   'ai.summary.region': 'Región',
+  'ai.summary.vocals': 'Voces',
+  'ai.summary.femaleVocals': 'Femeninas',
+  'ai.summary.era': 'Época',
+  'ai.summary.versions': 'Versiones',
   'ai.summary.songs': 'Canciones',
   'ai.summary.duration': 'Duración',
   'ai.summary.durationValue': 'Unos {minutes} min',

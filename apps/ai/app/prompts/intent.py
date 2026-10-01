@@ -1,7 +1,7 @@
 from app.models.intent import IntentInterpretation
 from app.providers.model_provider import ModelIntentRequest, ModelOutputSpec
 
-INTENT_PROMPT_VERSION = "intent-v5"
+INTENT_PROMPT_VERSION = "intent-v6"
 INTENT_MODEL_OUTPUT = ModelOutputSpec(
     name="playlist_intent_interpretation", result_type=IntentInterpretation
 )
@@ -84,9 +84,9 @@ Fields
   - "romantic": love songs, affectionate, passionate about love;
   - "angry": aggressive, furious, full of rage;
   - "dark": ominous, mysterious, sinister, gloomy;
-  - "nostalgic": looking back, reminiscing; it never implies a decade, and a decade the
-    user states stays an era constraint ("nostalgic 90s music" is mood "nostalgic" plus
-    an era);
+  - "nostalgic": looking back, reminiscing; it never implies a decade, and a period
+    the user states follows the filters.releaseRange rules ("nostalgic music from the
+    90s" is mood "nostalgic" plus a release range);
   - "dreamy": ethereal, hazy, dream-like; not the same as calm.
   Words such as sentimental, intense, passionate or chill can fit more than one value or
   none: decide from the rest of the request. When no value clearly fits, set null and
@@ -112,19 +112,50 @@ Fields
   rules instead: a place that describes the style stays in the genre and filters.region
   stays null. Keep only the first region the user names and report any other under
   unsupportedConstraints as other. A place never adds an artist, song or genre by itself.
+- filters.femaleVocals: true when the user asks for female vocals or female singers
+  ("with female vocals", "female singers", "con voces femeninas", "con voz femenina",
+  "con cantantes mujeres", "com vocais femininos", "com cantoras"); otherwise false. It
+  describes the voices heard in the songs, never who the artists are. A request about
+  the artists themselves ("only women", "solo mujeres", "bandas de mujeres", "só
+  mulheres", "artists who are women") is an artist_attribute under unsupportedConstraints
+  and femaleVocals stays false. Never infer it from artist names. Blendify decides
+  whether it can apply.
+- filters.releaseRange: the years the songs were released, when the user asks for music
+  from a period; otherwise null. fromYear and toYear are inclusive four-digit years, and
+  an open side is null. A decade covers its ten years: "de los 80", "de los años 80",
+  "from the 80s", "80s songs" and "dos anos 80" are 1980 to 1989; "de los 2000" is 2000
+  to 2009. "Entre 1990 y 1995" is 1990 to 1995. "Antes de 2000" and "before 2000" end
+  in 1999; "hasta 1999" and "until 1999" end in 1999; "desde 2015" and "since 2015"
+  start in 2015; "después de 2015" and "after 2015" start in 2016. Use it only when the
+  words refer to when the music was released; a sound or style that only evokes a
+  period ("onda ochentosa", "sonido ochentoso", "80s vibe", "sounds like the 80s", "som
+  oitentista") is not a release period: report it under unsupportedConstraints as era
+  and keep releaseRange null.
+- filters.excludeLive: true only when the user asks to leave out live versions or live
+  recordings ("no live versions", "exclude live recordings", "sin versiones en vivo",
+  "sin grabaciones en vivo", "sin vivos", "sem versões ao vivo", "sem gravações ao
+  vivo"); otherwise false. It leaves out only live and unplugged performances. A
+  request for studio recordings only ("only studio recordings", "studio versions only",
+  "solo grabaciones de estudio", "solo versiones de estudio", "só gravações de
+  estúdio", "apenas versões de estúdio") promises more than that: it would also have
+  to leave out demos, remixes, alternate takes and acoustic versions. Never set
+  excludeLive for it: report it under unsupportedConstraints as other, quoting the
+  user's words. The same applies to any request to leave out remixes, demos, acoustic
+  or other versions.
 - excludeArtists / excludeTracks: artists or songs the user wants left out.
 - unsupportedConstraints: every other requirement, each with the closest category:
   duration (a playlist length with no amount of time, such as "a long playlist"), era
-  (decades, years, release dates), energy, mood (a feeling outside the mood list), activity
-  (running, studying, parties, dancing), tempo (speed, BPM), progression (how the playlist
-  should change from start to end), artist_attribute (gender, nationality, age or any other
-  fact about artists, except a region written in filters.region), other (anything else,
-  such as a limit of songs per artist, lyrics language or a musical characteristic).
-  userText is a short quote of the user's own words. Never drop such a requirement and
-  never express it through another field. Genres and regions are not constraints: words
-  written into a genre (its style, place or characteristic) or into filters.region are
-  never reported again under unsupportedConstraints. Plain descriptive words that ask for
-  nothing are not requirements.
+  (a period that only describes a sound or style, or any other time requirement not
+  written in filters.releaseRange), energy, mood (a feeling outside the mood list),
+  activity (running, studying, parties, dancing), tempo (speed, BPM), progression (how
+  the playlist should change from start to end), artist_attribute (gender, nationality,
+  age or any other fact about artists, except a region written in filters.region),
+  other (anything else, such as a limit of songs per artist, lyrics language or a
+  musical characteristic). userText is a short quote of the user's own words. Never drop
+  such a requirement and never express it through another field. Genres and filters are
+  not constraints: words written into a genre (its style, place or characteristic) or
+  into filters are never reported again under unsupportedConstraints. Plain descriptive
+  words that ask for nothing are not requirements.
 
 Language
 - Requests may be in English, Spanish or Brazilian Portuguese, or mix them. Interpret

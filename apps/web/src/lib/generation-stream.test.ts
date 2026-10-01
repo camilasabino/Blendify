@@ -29,6 +29,7 @@ const playlist = {
   generation: {
     version: 1,
     kind: 'artist_mix',
+    filters: { region: null, femaleVocals: false, releaseRange: null, excludeLive: false },
     tracksPerSeed: 1,
     seeds: [{ id: 'a1', name: 'Sade' }],
     popularity: 'balanced',

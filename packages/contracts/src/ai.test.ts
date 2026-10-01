@@ -34,7 +34,12 @@ const READY_SESSION = {
     kind: 'artist_mix',
     artists: ['Radiohead', 'Interpol'],
     genres: [],
-    filters: { region: null },
+    filters: {
+      region: null,
+      femaleVocals: false,
+      releaseRange: null,
+      excludeLive: false,
+    },
     seedTrack: null,
     targetTrackCount: 30,
     targetDurationMinutes: null,
@@ -120,7 +125,13 @@ describe('AI session contracts', () => {
         ...READY_SESSION.intent,
         ...seeds,
         kind,
-        filters: { region: 'argentina' },
+        filters: {
+          ...READY_SESSION.intent.filters,
+          region: 'argentina',
+          femaleVocals: true,
+          releaseRange: { fromYear: 1990, toYear: 1999 },
+          excludeLive: true,
+        },
       },
     };
 
