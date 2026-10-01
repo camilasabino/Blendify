@@ -1,4 +1,5 @@
 import { GENRE_REGIONS } from '@blendify/contracts';
+import genreRegionAliases from './data/genre-region-aliases.json';
 import { splitRegionalGenreExpression } from './genre-regions';
 
 describe('splitRegionalGenreExpression', () => {
@@ -36,6 +37,40 @@ describe('splitRegionalGenreExpression', () => {
   });
 
   it.each([
+    ['argentinos', 'argentina'],
+    ['argentinas', 'argentina'],
+    ['brasileiros', 'brazilian'],
+    ['brasileiras', 'brazilian'],
+    ['británicos', 'british'],
+    ['británicas', 'british'],
+    ['britânicos', 'british'],
+    ['mexicanas', 'mexico'],
+    ['latino-americanos', 'latin'],
+    ['estadounidenses', 'american'],
+    ['españoles', 'spanish'],
+    ['espanhóis', 'spanish'],
+  ])('resolves the plural region form %p to %p', (label, region) => {
+    expect(splitRegionalGenreExpression(`rock ${label}`)).toEqual({
+      region,
+      genreExpression: 'rock',
+    });
+  });
+
+  it('resolves the plural of every region alias to the same region', () => {
+    const strays = GENRE_REGIONS.flatMap((region) =>
+      genreRegionAliases[region]
+        .filter((alias) => /[aeo]$/.test(alias))
+        .map((alias) => [
+          alias,
+          splitRegionalGenreExpression(`rock ${alias}s`)?.region,
+        ])
+        .filter(([, found]) => found !== region),
+    );
+
+    expect(strays).toEqual([]);
+  });
+
+  it.each([
     ['rock argentino', 'argentina', 'rock'],
     ['rock da argentina', 'argentina', 'rock'],
     ['Brazilian pop', 'brazilian', 'pop'],
@@ -58,6 +93,10 @@ describe('splitRegionalGenreExpression', () => {
     ['rock in United Kingdom', 'british', 'rock'],
     ['pop en Argentina', 'argentina', 'pop'],
     ['indie rock in Brazil', 'brazilian', 'indie rock'],
+    ['kasekòs mexicanos', 'mexico', 'kasekòs'],
+    ['Forró do Brasil', 'brazilian', 'forró'],
+    ['Música Clássica brasileira', 'brazilian', 'música clássica'],
+    ['electrónica de Argentina', 'argentina', 'electrónica'],
   ])('splits %p into %p + %p', (expression, region, genreExpression) => {
     expect(splitRegionalGenreExpression(expression)).toEqual({
       region,
@@ -73,6 +112,7 @@ describe('splitRegionalGenreExpression', () => {
     'britpop',
     'tragédie en musique',
     'indie rock',
+    'rock ukes',
     '',
   ])('returns null without a regional modifier in %p', (expression) => {
     expect(splitRegionalGenreExpression(expression)).toBeNull();

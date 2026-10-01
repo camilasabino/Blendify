@@ -7,13 +7,14 @@ import genreSearchAliases from './data/genre-search-aliases.json';
 import musicBrainzGenres from './data/musicbrainz-genres.json';
 import {
   findGenre,
+  findInflectedGenres,
   GENRE_CATALOG,
   genreTrackGroupKey,
   getExploreSuggestions,
   listMainGenres,
-  searchGenres,
   toGenreDto,
 } from './genre-catalog';
+import { searchGenres } from './genre-search';
 import { splitRegionalGenreExpression } from './genre-regions';
 
 const CANONICAL_KEYS = new Set(GENRE_CATALOG.map((g) => genreLookupKey(g.id)));
@@ -52,6 +53,49 @@ describe('MusicBrainz genre catalog', () => {
     expect(findGenre('kaseko')?.id).toBe('kaseko');
     expect(findGenre('KASÉKÒ')?.id).toBe('kasékò');
     expect(findGenre('kasekò')).toBeUndefined();
+  });
+
+  it.each([
+    ['rancheras', 'ranchera'],
+    ['corridos tumbados', 'corrido tumbado'],
+    ['corridos tumbado', 'corrido tumbado'],
+    ['sertanejos', 'sertanejo'],
+    ['heavy metals', 'heavy metal'],
+    ['FORROS', 'forró'],
+    ['electrónicas', 'electronic'],
+    ['electronicas', 'electronica'],
+  ])('resolves the plural %p through the known term %p', (input, canonical) => {
+    expect(findGenre(input)).toBeUndefined();
+    expect(findInflectedGenres(input).map((genre) => genre.id)).toEqual([
+      canonical,
+    ]);
+  });
+
+  it.each(['blues', 'breaks', 'afrobeats', 'baladas', 'ranchera'])(
+    'never reinterprets the exact term %p morphologically',
+    (input) => {
+      expect(findInflectedGenres(input)).toEqual([]);
+    },
+  );
+
+  it('reports every genre a plural can stand for instead of guessing', () => {
+    expect(findInflectedGenres('kasekòs').map((genre) => genre.id)).toEqual([
+      'kaseko',
+      'kasékò',
+    ]);
+    expect(findInflectedGenres('glorptrances')).toEqual([]);
+  });
+
+  it('resolves the regular plural of every canonical genre back to itself', () => {
+    const strays = GENRE_CATALOG.flatMap((genre) => {
+      const plural = `${genreLookupKey(genre.id)}s`;
+      const ids = findGenre(plural)
+        ? []
+        : findInflectedGenres(plural).map((match) => match.id);
+      return ids.some((id) => id !== genre.id) ? [[plural, ids]] : [];
+    });
+
+    expect(strays).toEqual([]);
   });
 
   it('exposes localized labels with a canonical fallback name', () => {

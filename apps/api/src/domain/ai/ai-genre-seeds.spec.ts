@@ -28,6 +28,43 @@ describe('resolveAiGenreSeeds', () => {
     });
   });
 
+  it.each([
+    ['ranchera mexicana', 'ranchera', 'mexico'],
+    ['rancheras mexicanas', 'ranchera', 'mexico'],
+    ['rock argentinos', 'rock', 'argentina'],
+    ['pop brasileiros', 'pop', 'brazilian'],
+    ['rock británicos', 'rock', 'british'],
+  ])(
+    'resolves the inflected %p to genre %p and region %p',
+    (expression, genre, region) => {
+      expect(resolveAiGenreSeeds([expression])).toMatchObject({
+        genres: [{ id: genre }],
+        region,
+        unknown: [],
+        ambiguous: [],
+        conflictingRegions: [],
+      });
+    },
+  );
+
+  it('resolves plural genre names to the same canonical seed', () => {
+    expect(
+      resolveAiGenreSeeds(['corridos tumbados', 'corridos tumbado']).genres,
+    ).toEqual([{ id: 'corrido tumbado', name: 'Corrido Tumbado' }]);
+  });
+
+  it('leaves approximate spellings and ambiguous plurals to clarification', () => {
+    expect(
+      resolveAiGenreSeeds(['corrdo tumbado', 'alternatve rock', 'kasekòs']),
+    ).toEqual({
+      genres: [],
+      region: null,
+      unknown: ['corrdo tumbado', 'alternatve rock'],
+      ambiguous: ['kasekòs'],
+      conflictingRegions: [],
+    });
+  });
+
   it('applies one shared region to every genre of the request', () => {
     expect(
       resolveAiGenreSeeds(['argentine rock', 'pop argentino', 'jazz']),
@@ -121,6 +158,10 @@ describe('aiGenreKey', () => {
     expect(aiGenreKey('rock argentino')).not.toBe(aiGenreKey('British rock'));
     expect(aiGenreKey('rock de UK')).toBe(aiGenreKey('British rock'));
     expect(aiGenreKey('indie rock')).not.toBe(aiGenreKey('rock'));
+    expect(aiGenreKey('rancheras mexicanas')).toBe(
+      aiGenreKey('ranchera mexicana'),
+    );
+    expect(aiGenreKey('corridos tumbados')).toBe(aiGenreKey('Corrido Tumbado'));
   });
 
   it('falls back to the normalized name for unresolved expressions', () => {

@@ -408,6 +408,33 @@ describe('genre refinement through the deterministic canonical genre resolver', 
     });
   });
 
+  it('adds a plural regional genre through the same resolver as the initial request', () => {
+    const result = evaluate(
+      interpreted({ genres: { add: ['rancheras mexicanas'], remove: [] } }),
+      genreIntent(['corrido tumbado']),
+    );
+
+    expect(result).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['corrido tumbado', 'rancheras mexicanas'] },
+    });
+    expect(
+      result.status === 'proposed' && resolveAiGenreSeeds(result.intent.genres),
+    ).toMatchObject({
+      genres: [{ id: 'corrido tumbado' }, { id: 'ranchera' }],
+      region: 'mexico',
+    });
+  });
+
+  it('treats adding the plural of a present genre as unchanged', () => {
+    expect(
+      evaluate(
+        interpreted({ genres: { add: ['corridos tumbados'], remove: [] } }),
+        genreIntent(['corrido tumbado']),
+      ),
+    ).toEqual({ status: 'unchanged' });
+  });
+
   it('treats adding a genre already present under another spelling as unchanged', () => {
     expect(
       evaluate(

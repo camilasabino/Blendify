@@ -344,6 +344,18 @@ describe('findIntentClarification', () => {
     });
   });
 
+  it('executes plural genre and region forms without clarification', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['rancheras mexicanas', 'corridos tumbados'],
+        }),
+      ),
+    ).toBeNull();
+  });
+
   it('executes a genre whose geography is part of the style', () => {
     expect(
       findIntentClarification(

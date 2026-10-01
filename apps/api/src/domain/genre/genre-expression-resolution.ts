@@ -1,11 +1,16 @@
 import { foldedGenreLookupKey, type GenreRegion } from '@blendify/contracts';
 import { MAX_GENRES } from '@/domain/constants';
-import { findGenre, GENRE_CATALOG, type CatalogGenre } from './genre-catalog';
+import {
+  findGenre,
+  findNormalizedGenres,
+  GENRE_CATALOG,
+  type CatalogGenre,
+} from './genre-catalog';
 import { splitRegionalGenreExpression } from './genre-regions';
 
 const MIN_STYLE_FAMILY_MEMBERS = 2;
 
-export type GenreExpressionMatch = 'exact' | 'style_family';
+export type GenreExpressionMatch = 'exact' | 'inflected' | 'style_family';
 
 export type GenreExpressionResolution =
   | {
@@ -46,6 +51,26 @@ export function resolveGenreExpression(
   const exact = findGenre(expression);
   if (exact) {
     return { status: 'resolved', match: 'exact', genres: [exact] };
+  }
+
+  const regionalCandidates = regional
+    ? findNormalizedGenres(regional.genreExpression)
+    : [];
+  if (regional && regionalCandidates.length === 1) {
+    return {
+      status: 'resolved',
+      match: 'inflected',
+      genres: regionalCandidates,
+      region: regional.region,
+    };
+  }
+
+  const candidates = findNormalizedGenres(expression);
+  if (candidates.length === 1) {
+    return { status: 'resolved', match: 'inflected', genres: candidates };
+  }
+  if (regionalCandidates.length > 1 || candidates.length > 1) {
+    return { status: 'ambiguous', expression };
   }
   if (regional) {
     return { status: 'unknown', expression };

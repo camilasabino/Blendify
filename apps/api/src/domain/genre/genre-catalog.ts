@@ -7,6 +7,7 @@ import {
 import genreSearchAliases from './data/genre-search-aliases.json';
 import musicBrainzGenres from './data/musicbrainz-genres.json';
 import { formatGenreDisplayName } from './genre-display-name';
+import { inflectionVariants } from './genre-inflection';
 
 export type GenreLabels = Partial<Record<GenreLabelLocale, string>>;
 
@@ -71,6 +72,10 @@ function localizedTerms(genre: CatalogGenre): string[] {
   return [...Object.values(genre.labels), ...genre.aliases];
 }
 
+export function genreTerms(genre: CatalogGenre): string[] {
+  return [genre.id, ...localizedTerms(genre)];
+}
+
 function buildLookup(): Map<string, CatalogGenre> {
   const lookup = new Map<string, CatalogGenre>();
   for (const genre of GENRE_CATALOG) {
@@ -87,30 +92,22 @@ function buildLookup(): Map<string, CatalogGenre> {
   return lookup;
 }
 
-function buildFoldedLookup(): Map<string, CatalogGenre | null> {
-  const lookup = new Map<string, CatalogGenre | null>();
+function buildFoldedIndex(): Map<string, CatalogGenre[]> {
+  const index = new Map<string, CatalogGenre[]>();
   for (const genre of GENRE_CATALOG) {
-    for (const term of [genre.id, ...localizedTerms(genre)]) {
+    for (const term of genreTerms(genre)) {
       const key = foldedGenreLookupKey(term);
-      const existing = lookup.get(key);
-      lookup.set(
-        key,
-        existing === undefined || existing === genre ? genre : null,
-      );
+      const owners = index.get(key) ?? [];
+      if (!owners.includes(genre)) {
+        index.set(key, [...owners, genre]);
+      }
     }
   }
-  return lookup;
+  return index;
 }
 
 const GENRE_LOOKUP = buildLookup();
-const FOLDED_GENRE_LOOKUP = buildFoldedLookup();
-
-const SEARCH_INDEX = GENRE_CATALOG.map((genre) => ({
-  genre,
-  keys: [
-    ...new Set([genre.id, ...localizedTerms(genre)].map(foldedGenreLookupKey)),
-  ],
-}));
+const FOLDED_GENRE_INDEX = buildFoldedIndex();
 
 const featuredMains: CatalogGenre[] = FEATURED_GENRE_IDS.map((id) =>
   GENRE_LOOKUP.get(id),
@@ -121,11 +118,36 @@ export function findGenre(value: string): CatalogGenre | undefined {
   if (!key) {
     return undefined;
   }
-  return (
-    GENRE_LOOKUP.get(key) ??
-    FOLDED_GENRE_LOOKUP.get(foldedGenreLookupKey(value)) ??
-    undefined
+  const folded = FOLDED_GENRE_INDEX.get(foldedGenreLookupKey(value)) ?? [];
+  return GENRE_LOOKUP.get(key) ?? (folded.length === 1 ? folded[0] : undefined);
+}
+
+export function findInflectedGenres(value: string): CatalogGenre[] {
+  const key = genreLookupKey(value);
+  const foldedKey = foldedGenreLookupKey(value);
+  if (!key || GENRE_LOOKUP.has(key) || FOLDED_GENRE_INDEX.has(foldedKey)) {
+    return [];
+  }
+
+  const exact = inflectionVariants(key).flatMap(
+    (variant) => GENRE_LOOKUP.get(variant) ?? [],
   );
+  if (exact.length > 0) {
+    return [...new Set(exact)];
+  }
+  const folded = inflectionVariants(foldedKey).flatMap(
+    (variant) => FOLDED_GENRE_INDEX.get(variant) ?? [],
+  );
+  return [...new Set(folded)];
+}
+
+export function findNormalizedGenres(value: string): CatalogGenre[] {
+  const exact = findGenre(value);
+  if (exact) {
+    return [exact];
+  }
+  const folded = FOLDED_GENRE_INDEX.get(foldedGenreLookupKey(value));
+  return folded ? [...folded] : findInflectedGenres(value);
 }
 
 export function listMainGenres(): CatalogGenre[] {
@@ -271,59 +293,6 @@ export function getExploreSuggestions(
     genres: page,
     hasMore: pool.length > offset + limit,
   };
-}
-
-function scoreMatch(keys: readonly string[], q: string): number {
-  if (keys.some((key) => key === q)) {
-    return 100;
-  }
-  if (keys.some((key) => key.startsWith(q))) {
-    return 80;
-  }
-  if (keys.some((key) => key.includes(q))) {
-    return 60;
-  }
-
-  const tokens = q.split(' ').filter((t) => t.length >= 2);
-  if (tokens.length < 2) {
-    return 0;
-  }
-
-  const matched = tokens.filter((token) =>
-    keys.some((key) => key.includes(token)),
-  ).length;
-  if (matched === 0) {
-    return 0;
-  }
-  if (matched === tokens.length) {
-    return 75;
-  }
-  return 25 + matched * 8;
-}
-
-export function searchGenres(query: string, limit = 16): CatalogGenre[] {
-  const q = foldedGenreLookupKey(query);
-  if (!q) {
-    return listMainGenres().slice(0, limit);
-  }
-
-  const ranked = SEARCH_INDEX.map(({ genre, keys }) => ({
-    g: genre,
-    score: scoreMatch(keys, q),
-  }))
-    .filter((x) => x.score > 0)
-    .sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      const lenDiff = a.g.id.length - b.g.id.length;
-      if (lenDiff !== 0) {
-        return lenDiff;
-      }
-      return a.g.name.localeCompare(b.g.name);
-    });
-
-  return ranked.slice(0, limit).map((x) => x.g);
 }
 
 export function toGenreDto(genre: CatalogGenre) {

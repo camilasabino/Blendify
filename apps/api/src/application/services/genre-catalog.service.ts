@@ -3,9 +3,9 @@ import {
   GENRE_CATALOG,
   getExploreSuggestions,
   listMainGenres,
-  searchGenres,
   type CatalogGenre,
 } from '@/domain/genre/genre-catalog';
+import { searchGenres } from '@/domain/genre/genre-search';
 
 @Injectable()
 export class GenreCatalogService {

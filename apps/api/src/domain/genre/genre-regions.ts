@@ -1,9 +1,11 @@
 import {
   foldedGenreLookupKey,
   GENRE_REGIONS,
+  genreLookupKey,
   type GenreRegion,
 } from '@blendify/contracts';
 import genreRegionAliases from './data/genre-region-aliases.json';
+import { singularTokenForms } from './genre-inflection';
 
 const REGION_CONNECTORS = new Set([
   'de',
@@ -47,18 +49,23 @@ export interface RegionalGenreExpression {
 export function splitRegionalGenreExpression(
   expression: string,
 ): RegionalGenreExpression | null {
-  const tokens = foldedGenreLookupKey(expression).split(' ').filter(Boolean);
+  const words = genreLookupKey(expression).split(' ').filter(Boolean);
+  const folded = words.map(foldedGenreLookupKey);
+  const tokenForms = folded.map((token) => [
+    token,
+    ...singularTokenForms(token),
+  ]);
 
   for (const alias of ALIASES_LONGEST_FIRST) {
     const size = alias.tokens.length;
-    if (size > tokens.length) {
+    if (size > words.length) {
       continue;
     }
-    if (startsWithTokens(tokens.slice(-size), alias.tokens)) {
-      return regional(alias.region, trimConnectors(tokens.slice(0, -size)));
+    if (matchesAliasTokens(tokenForms.slice(-size), alias.tokens)) {
+      return regional(alias.region, words, folded, 0, words.length - size);
     }
-    if (startsWithTokens(tokens.slice(0, size), alias.tokens)) {
-      return regional(alias.region, trimConnectors(tokens.slice(size)));
+    if (matchesAliasTokens(tokenForms.slice(0, size), alias.tokens)) {
+      return regional(alias.region, words, folded, size, words.length);
     }
   }
   return null;
@@ -66,23 +73,25 @@ export function splitRegionalGenreExpression(
 
 function regional(
   region: GenreRegion,
-  genreTokens: string[],
+  words: string[],
+  folded: string[],
+  start: number,
+  end: number,
 ): RegionalGenreExpression {
-  return { region, genreExpression: genreTokens.join(' ') };
+  let first = start;
+  let last = end;
+  while (first < last && REGION_CONNECTORS.has(folded[first])) {
+    first += 1;
+  }
+  while (last > first && REGION_CONNECTORS.has(folded[last - 1])) {
+    last -= 1;
+  }
+  return { region, genreExpression: words.slice(first, last).join(' ') };
 }
 
-function startsWithTokens(tokens: string[], prefix: string[]): boolean {
-  return prefix.every((token, index) => tokens[index] === token);
-}
-
-function trimConnectors(tokens: string[]): string[] {
-  let start = 0;
-  let end = tokens.length;
-  while (start < end && REGION_CONNECTORS.has(tokens[start])) {
-    start += 1;
-  }
-  while (end > start && REGION_CONNECTORS.has(tokens[end - 1])) {
-    end -= 1;
-  }
-  return tokens.slice(start, end);
+function matchesAliasTokens(
+  tokenForms: string[][],
+  aliasTokens: string[],
+): boolean {
+  return aliasTokens.every((token, index) => tokenForms[index].includes(token));
 }
