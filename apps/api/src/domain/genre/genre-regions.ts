@@ -12,8 +12,11 @@ const REGION_CONNECTORS = new Set([
   'del',
   'dos',
   'das',
+  'en',
   'from',
+  'in',
   'of',
+  'the',
 ]);
 
 const REGION_ALIASES: Readonly<Record<GenreRegion, readonly string[]>> =

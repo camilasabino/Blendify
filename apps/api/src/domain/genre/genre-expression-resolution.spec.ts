@@ -41,6 +41,17 @@ describe('resolveGenreExpression', () => {
     ['rock britânico', 'rock', 'british'],
     ['latin rock', 'rock', 'latin'],
     ['rock español', 'rock', 'spanish'],
+    ['r&b de uk', 'r&b', 'british'],
+    ['UK pop', 'pop', 'british'],
+    ['rock del Reino Unido', 'rock', 'british'],
+    ['rock from the UK', 'rock', 'british'],
+    ['rock de argentina', 'rock', 'argentina'],
+    ['pop do Brasil', 'pop', 'brazilian'],
+    ['rock en UK', 'rock', 'british'],
+    ['rock en Reino Unido', 'rock', 'british'],
+    ['rock in the UK', 'rock', 'british'],
+    ['rock in United Kingdom', 'rock', 'british'],
+    ['indie rock en UK', 'indie rock', 'british'],
   ])(
     'separates %p into genre %p and region %p',
     (expression, genre, region) => {
@@ -48,19 +59,29 @@ describe('resolveGenreExpression', () => {
     },
   );
 
-  it('keeps a canonical genre whose remainder is not a genre', () => {
-    expect(resolved('brazilian bass')).toEqual({
-      genres: ['brazilian bass'],
-      region: undefined,
-    });
-  });
-
-  it.each(['argentina', 'brazilian', 'argentine glorptrance'])(
-    'never turns a region alone into a genre: %p',
+  it.each(['brazilian bass', 'UK garage', 'tragédie en musique'])(
+    'keeps the canonical genre %p whose remainder is not a genre',
     (expression) => {
-      expect(resolved(expression)).toBe('unknown');
+      expect(resolved(expression)).toEqual({
+        genres: [expression.toLowerCase()],
+        region: undefined,
+      });
     },
   );
+
+  it.each([
+    'argentina',
+    'brazilian',
+    'argentine glorptrance',
+    'de UK',
+    'UK',
+    'from the UK',
+    'en UK',
+    'in the UK',
+    'británica',
+  ])('never turns a region alone into a genre: %p', (expression) => {
+    expect(resolved(expression)).toBe('unknown');
+  });
 
   it.each(['definitely not a genre', 'glorptrance', '', '   '])(
     'keeps %p unknown',

@@ -38,12 +38,39 @@ describe('resolveAiGenreSeeds', () => {
     });
   });
 
+  it.each([
+    [['british pop', 'british rock', 'british r&b']],
+    [['UK pop', 'UK rock', 'UK R&B']],
+    [['pop', 'rock', 'r&b de uk']],
+    [['pop from the UK', 'rock', 'r&b']],
+    [['pop en UK', 'rock en Reino Unido', 'r&b in the UK']],
+  ])(
+    'resolves adjectival and prepositional UK forms of %p to the same British seeds',
+    (expressions) => {
+      expect(resolveAiGenreSeeds(expressions)).toEqual({
+        genres: [
+          { id: 'pop', name: 'Pop' },
+          { id: 'rock', name: 'Rock' },
+          { id: 'r&b', name: 'R&B' },
+        ],
+        region: 'british',
+        unknown: [],
+        ambiguous: [],
+        conflictingRegions: [],
+      });
+    },
+  );
+
   it('reports regional expressions that ask for different regions', () => {
     expect(
       resolveAiGenreSeeds(['rock argentino', 'jazz', 'pop brasileiro']),
     ).toMatchObject({
       region: null,
       conflictingRegions: ['rock argentino', 'pop brasileiro'],
+    });
+    expect(resolveAiGenreSeeds(['rock de UK', 'pop do Brasil'])).toMatchObject({
+      region: null,
+      conflictingRegions: ['rock de UK', 'pop do Brasil'],
     });
   });
 
@@ -64,10 +91,10 @@ describe('resolveAiGenreSeeds', () => {
   });
 
   it('never accepts a region alone', () => {
-    expect(resolveAiGenreSeeds(['argentina'])).toEqual({
+    expect(resolveAiGenreSeeds(['argentina', 'de UK'])).toEqual({
       genres: [],
       region: null,
-      unknown: ['argentina'],
+      unknown: ['argentina', 'de UK'],
       ambiguous: [],
       conflictingRegions: [],
     });
@@ -92,6 +119,7 @@ describe('aiGenreKey', () => {
     expect(aiGenreKey('rock argentino')).toBe(aiGenreKey('Argentine Rock'));
     expect(aiGenreKey('rock argentino')).not.toBe(aiGenreKey('rock'));
     expect(aiGenreKey('rock argentino')).not.toBe(aiGenreKey('British rock'));
+    expect(aiGenreKey('rock de UK')).toBe(aiGenreKey('British rock'));
     expect(aiGenreKey('indie rock')).not.toBe(aiGenreKey('rock'));
   });
 

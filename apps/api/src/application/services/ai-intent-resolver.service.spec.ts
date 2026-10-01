@@ -168,6 +168,34 @@ describe('AiIntentResolver', () => {
     expect(catalog.searchArtists).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [['british pop', 'british rock', 'british r&b']],
+    [['pop', 'rock', 'r&b de uk']],
+  ])(
+    'resolves the regional genres %p to the same British seeds',
+    async (genres) => {
+      const { resolver } = createResolver();
+
+      const resolution = await resolver.resolve(
+        intent({ kind: 'genre_mix', genres }),
+      );
+
+      expect(resolution).toEqual({
+        status: 'resolved',
+        seeds: {
+          artists: [],
+          genres: [
+            { id: 'pop', name: 'Pop' },
+            { id: 'rock', name: 'Rock' },
+            { id: 'r&b', name: 'R&B' },
+          ],
+          region: 'british',
+          track: null,
+        },
+      });
+    },
+  );
+
   it('never executes genres that ask for different regions', async () => {
     const { resolver } = createResolver();
 

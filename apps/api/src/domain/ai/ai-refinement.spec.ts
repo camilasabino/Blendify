@@ -6,6 +6,7 @@ import {
   type AiPreservation,
   type AiPreservationPatch,
 } from './ai-intent-patch';
+import { resolveAiGenreSeeds } from './ai-genre-seeds';
 import { evaluateRefinement } from './ai-refinement';
 
 const NO_NAMES = { add: [], remove: [] };
@@ -381,6 +382,29 @@ describe('genre refinement through the deterministic canonical genre resolver', 
     ).toMatchObject({
       status: 'proposed',
       intent: { genres: ['argentine rock'] },
+    });
+  });
+
+  it('moves the current genres to the UK region named by a prepositional refinement', () => {
+    const result = evaluate(
+      interpreted({
+        genres: {
+          add: ['pop de UK', 'rock de UK', 'r&b de UK'],
+          remove: ['pop', 'rock', 'r&b'],
+        },
+      }),
+      genreIntent(['pop', 'rock', 'r&b']),
+    );
+
+    expect(result).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['pop de UK', 'rock de UK', 'r&b de UK'] },
+    });
+    expect(
+      result.status === 'proposed' && resolveAiGenreSeeds(result.intent.genres),
+    ).toMatchObject({
+      genres: [{ id: 'pop' }, { id: 'rock' }, { id: 'r&b' }],
+      region: 'british',
     });
   });
 
