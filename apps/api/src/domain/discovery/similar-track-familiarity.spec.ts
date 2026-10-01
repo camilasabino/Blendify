@@ -1,6 +1,9 @@
 import { PopularityMode } from '@blendify/contracts';
 import { catalogCandidateBudget } from '@/domain/genre/catalog-window';
-import { selectSimilarTrackCandidates } from './similar-track-familiarity';
+import {
+  orderSimilarTrackCandidates,
+  selectSimilarTrackCandidates,
+} from './similar-track-familiarity';
 
 type Candidate = { name: string; playcount?: number };
 
@@ -244,4 +247,59 @@ describe('selectSimilarTrackCandidates', () => {
       'negative',
     ]);
   });
+});
+
+describe('orderSimilarTrackCandidates', () => {
+  const pool: Candidate[] = [
+    ...knownPool(100),
+    { name: 'unknown-a' },
+    { name: 'unknown-b' },
+  ];
+  const ranked = byPlaycountDesc(knownPool(100));
+
+  it('starts with the familiarity window and then lists every other candidate once', () => {
+    const window = selectSimilarTrackCandidates(
+      pool,
+      PopularityMode.POPULAR,
+      15,
+      seededRandom(7),
+    );
+    const ordered = orderSimilarTrackCandidates(
+      pool,
+      PopularityMode.POPULAR,
+      15,
+      seededRandom(7),
+    );
+
+    expect(ordered.slice(0, window.length)).toEqual(window);
+    expect(new Set(ordered).size).toBe(pool.length);
+    expect(ordered.slice(-2).map((candidate) => candidate.name)).toEqual([
+      'unknown-a',
+      'unknown-b',
+    ]);
+  });
+
+  it.each([
+    [PopularityMode.POPULAR, 0, 50],
+    [PopularityMode.RARITIES, 50, 100],
+  ])(
+    'expands %s past the window toward its own end of the ranking first',
+    (mode, start, end) => {
+      const ordered = orderSimilarTrackCandidates(
+        pool,
+        mode,
+        15,
+        seededRandom(42),
+      );
+      const near = new Set(ranked.slice(start, end));
+
+      const afterWindow = ordered.slice(
+        catalogCandidateBudget(15),
+        catalogCandidateBudget(15) + 10,
+      );
+      expect(afterWindow.every((candidate) => near.has(candidate.name))).toBe(
+        true,
+      );
+    },
+  );
 });

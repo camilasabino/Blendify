@@ -8,6 +8,7 @@ export const DISCOVER_SIMILAR_TRACK_FETCH = 100;
 export const DISCOVER_FALLBACK_TOP_TRACKS_MIN = 20;
 export const DISCOVER_FALLBACK_TOP_TRACKS_MAX = 50;
 export const DISCOVER_FALLBACK_SIMILAR_ARTISTS_LIMIT = 12;
+export const DISCOVER_FALLBACK_TOP_TRACKS_PER_ARTIST = 8;
 
 /**
  * How many similar artists to include (seed is excluded from the mix).

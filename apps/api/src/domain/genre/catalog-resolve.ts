@@ -1,19 +1,12 @@
 import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
 import type { Track } from '@/domain/track/track.entity';
-import type { PopularityMode } from '@blendify/contracts';
-import {
-  catalogEntryKey,
-  catalogPoolBounds,
-  nextCatalogBatch,
-  type CatalogTrackRef,
-} from './catalog-window';
+import type { AcceptedTrackPool } from '@/domain/services/accepted-track-pool';
+import type { CatalogChartCursor, CatalogTrackRef } from './catalog-window';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 
 /** Serial resolves — Dev Mode cannot sustain parallel search bursts. */
 const DEFAULT_CONCURRENCY = 1;
-
-const ATTEMPT_BUDGET_OVER_FETCH = 6;
 
 const SEED_ATTEMPT_MULTIPLIER = 3;
 const SEED_ATTEMPT_MIN_OVER_FETCH = 12;
@@ -30,130 +23,86 @@ export function isFatalCatalogError(error: unknown): boolean {
   return error instanceof CatalogUnavailableError || isSpotifyQuotaError(error);
 }
 
-/**
- * Resolve Last.fm catalog refs to Spotify tracks with minimal API budget.
- * Stops at `needed`, aborts immediately on Spotify quota/rate-limit.
- */
 export type CatalogResolveProgress = {
   matched: number;
   needed: number;
   attempted: number;
 };
 
-export async function resolveCatalogTracks(
-  provider: CatalogProviderPort,
-  refs: CatalogTrackRef[],
-  options: {
-    needed: number;
-    concurrency?: number;
-    maxPerArtist?: number;
-    /** Spotify artist id selected by the user — reject homonyms. */
-    artistId?: string;
-    onProgress?: (update: CatalogResolveProgress) => void;
-  },
-): Promise<Track[]> {
-  const needed = Math.max(0, options.needed);
-  if (needed === 0 || refs.length === 0) {
-    return [];
-  }
+type CatalogResolveOptions = {
+  concurrency?: number;
+  /** Spotify artist id selected by the user — reject homonyms. */
+  artistId?: string;
+  onProgress?: (update: CatalogResolveProgress) => void;
+};
 
+/**
+ * Offer resolved refs to `pool` until it is full. A ref counts as attempted
+ * only once it was sent to Spotify.
+ */
+export async function resolveRefsIntoPool<T extends CatalogTrackRef>(
+  provider: CatalogProviderPort,
+  refs: T[],
+  pool: AcceptedTrackPool,
+  options: CatalogResolveOptions & {
+    attemptedBefore?: number;
+    onAttempted?: (entry: T) => void;
+  } = {},
+): Promise<number> {
   const concurrency = Math.max(1, options.concurrency ?? DEFAULT_CONCURRENCY);
-  const maxPerArtist = options.maxPerArtist ?? Number.POSITIVE_INFINITY;
   const artistId = options.artistId?.trim() || undefined;
-  const collected: Track[] = [];
-  const seenIds = new Set<string>();
-  const perArtist = new Map<string, number>();
   let attempted = 0;
 
-  for (
-    let i = 0;
-    i < refs.length && collected.length < needed;
-    i += concurrency
-  ) {
+  for (let i = 0; i < refs.length && !pool.isFull; i += concurrency) {
     const batch = refs.slice(i, i + concurrency);
     const resolved = await resolveCatalogBatch(provider, batch, artistId);
     attempted += batch.length;
 
-    acceptResolvedTracks(resolved, {
-      needed,
-      artistId,
-      maxPerArtist,
-      collected,
-      seenIds,
-      perArtist,
-    });
+    for (const entry of batch) {
+      options.onAttempted?.(entry);
+    }
+    for (const track of resolved) {
+      if (track && (!artistId || track.artistId.getValue() === artistId)) {
+        pool.offer(track);
+      }
+    }
 
     options.onProgress?.({
-      matched: collected.length,
-      needed,
-      attempted,
+      matched: pool.size,
+      needed: pool.target,
+      attempted: (options.attemptedBefore ?? 0) + attempted,
     });
   }
 
-  return collected;
+  return attempted;
 }
 
-async function resolveCatalogBatch(
+function resolveCatalogBatch(
   provider: CatalogProviderPort,
   batch: CatalogTrackRef[],
   artistId: string | undefined,
 ): Promise<Array<Track | null>> {
   return Promise.all(
-    batch.map(async (ref) => {
-      try {
-        return await provider.resolveTrack(ref.artistName, ref.trackName, {
-          artistId,
-        });
-      } catch (error) {
-        if (isFatalCatalogError(error)) {
-          throw error;
-        }
-        return null;
-      }
-    }),
+    batch.map((ref) => resolveCatalogRef(provider, ref, artistId)),
   );
 }
 
-function acceptResolvedTracks(
-  resolved: Array<Track | null>,
-  state: {
-    needed: number;
-    artistId: string | undefined;
-    maxPerArtist: number;
-    collected: Track[];
-    seenIds: Set<string>;
-    perArtist: Map<string, number>;
-  },
-): void {
-  for (const track of resolved) {
-    if (!track || state.collected.length >= state.needed) {
-      continue;
+/** A miss or a non-fatal provider error resolves to `null`. */
+export async function resolveCatalogRef(
+  provider: CatalogProviderPort,
+  ref: CatalogTrackRef,
+  artistId?: string,
+): Promise<Track | null> {
+  try {
+    return await provider.resolveTrack(ref.artistName, ref.trackName, {
+      artistId,
+    });
+  } catch (error) {
+    if (isFatalCatalogError(error)) {
+      throw error;
     }
-    if (state.artistId && track.artistId.getValue() !== state.artistId) {
-      continue;
-    }
-    const id = track.id.getValue();
-    if (state.seenIds.has(id)) {
-      continue;
-    }
-    const trackArtistId = track.artistId.getValue();
-    const used = state.perArtist.get(trackArtistId) ?? 0;
-    if (used >= state.maxPerArtist) {
-      continue;
-    }
-    state.seenIds.add(id);
-    state.perArtist.set(trackArtistId, used + 1);
-    state.collected.push(track);
+    return null;
   }
-}
-
-/** How many Spotify resolves to attempt for a target playlist size. */
-export function resolveAttemptBudget(needed: number): number {
-  if (needed <= 0) {
-    return 0;
-  }
-  // Small over-fetch only — each attempt is a Spotify search.
-  return needed + ATTEMPT_BUDGET_OVER_FETCH;
 }
 
 export function seedResolveAttemptLimit(needed: number): number {
@@ -167,91 +116,31 @@ export function seedResolveAttemptLimit(needed: number): number {
 }
 
 /**
- * Resolve tracks from a Last.fm chart using the popularity pool, then expand
- * the pool toward the rest of the chart until `needed` is filled or the chart
- * is exhausted.
+ * Resumable chart resolution: continues from the cursor's unattempted entries
+ * until the pool is full, the chart is exhausted, or `maxAttempts` resolves
+ * were spent by this call.
  */
-export async function resolveCatalogWithPoolExpand(
+export async function resolveChartIntoPool<T extends CatalogTrackRef>(
   provider: CatalogProviderPort,
-  chart: CatalogTrackRef[],
-  mode: PopularityMode,
-  needed: number,
-  options: {
-    concurrency?: number;
-    maxPerArtist?: number;
-    artistId?: string;
-    maxAttempts?: number;
-    random?: () => number;
-    onProgress?: (update: CatalogResolveProgress) => void;
-  } = {},
-): Promise<Track[]> {
-  if (chart.length === 0 || needed <= 0) {
-    return [];
-  }
-
-  const collected: Track[] = [];
-  const seenIds = new Set<string>();
-  const attemptedKeys = new Set<string>();
-  let bounds = catalogPoolBounds(chart.length, mode);
-  const random = options.random ?? Math.random;
+  cursor: CatalogChartCursor<T>,
+  pool: AcceptedTrackPool,
+  options: CatalogResolveOptions & { maxAttempts?: number } = {},
+): Promise<number> {
   const maxAttempts = options.maxAttempts ?? Number.POSITIVE_INFINITY;
   let attempted = 0;
 
-  while (collected.length < needed && attempted < maxAttempts) {
-    const remaining = needed - collected.length;
-    const {
-      batch: candidates,
-      bounds: nextBounds,
-      exhausted,
-    } = nextCatalogBatch(chart, mode, remaining, attemptedKeys, bounds, random);
-    bounds = nextBounds;
-
-    if (exhausted || candidates.length === 0) {
+  while (!pool.isFull && attempted < maxAttempts) {
+    const batch = cursor.next(pool.missing).slice(0, maxAttempts - attempted);
+    if (batch.length === 0) {
       break;
     }
 
-    const batch = candidates.slice(0, maxAttempts - attempted);
-
-    for (const entry of batch) {
-      attemptedKeys.add(catalogEntryKey(entry));
-    }
-
-    let batchAttempted = 0;
-    const resolved = await resolveCatalogTracks(provider, batch, {
-      needed: remaining,
-      concurrency: options.concurrency,
-      maxPerArtist: options.maxPerArtist,
-      artistId: options.artistId,
-      onProgress: (update) => {
-        batchAttempted = update.attempted;
-        options.onProgress?.({
-          matched: collected.length + update.matched,
-          needed,
-          attempted: attempted + update.attempted,
-        });
-      },
-    });
-
-    attempted += batchAttempted;
-
-    for (const track of resolved) {
-      const id = track.id.getValue();
-      if (seenIds.has(id)) {
-        continue;
-      }
-      seenIds.add(id);
-      collected.push(track);
-      if (collected.length >= needed) {
-        break;
-      }
-    }
-
-    options.onProgress?.({
-      matched: collected.length,
-      needed,
-      attempted,
+    attempted += await resolveRefsIntoPool(provider, batch, pool, {
+      ...options,
+      attemptedBefore: attempted,
+      onAttempted: (entry) => cursor.markAttempted(entry),
     });
   }
 
-  return collected;
+  return attempted;
 }

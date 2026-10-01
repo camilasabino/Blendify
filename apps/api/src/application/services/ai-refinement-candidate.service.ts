@@ -21,7 +21,10 @@ import type {
   AiGenerationResult,
   AiRefinementCandidate,
 } from '@/domain/ai/ai-session';
-import { totalDurationMs } from '@/domain/ai/ai-track-selection';
+import {
+  exclusionMatcher,
+  totalDurationMs,
+} from '@/domain/ai/ai-track-selection';
 import { unmetGenerationConstraints } from '@/domain/ai/ai-unmet-constraints';
 import { AiGenerationError } from '@/domain/errors/ai-generation.error';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
@@ -98,7 +101,16 @@ export class AiRefinementCandidateBuilder {
       generated =
         strategy.kind === 'transform'
           ? null
-          : await this.generate(input, strategy, currentTracks);
+          : await this.generate(
+              input,
+              strategy,
+              keptTracks(
+                currentTracks,
+                preservation.positions,
+                input.proposed,
+                strategy,
+              ),
+            );
     } catch (error) {
       if (error instanceof AiSessionError) {
         throw error;
@@ -182,7 +194,7 @@ export class AiRefinementCandidateBuilder {
   private async generate(
     input: AiRefinementCandidateInput,
     strategy: AiRefinementStrategy,
-    currentTracks: readonly Track[],
+    kept: readonly Track[],
   ): Promise<GeneratedPlaylist> {
     input.checkpoint();
     const resolution = await this.resolver.resolve(
@@ -203,12 +215,17 @@ export class AiRefinementCandidateBuilder {
       strategy.kind === 'retain_and_fill'
         ? fillCandidateTrackCount(
             input.proposed,
-            retainedTracks(currentTracks, input.proposed, strategy).length,
-            currentTracks.length,
+            kept.length,
+            input.currentResult.playlist.tracks.length,
           )
         : undefined,
     );
-    const generated = await this.generator.execute(plan.request);
+    const isExcluded = exclusionMatcher(plan.exclusions);
+    const keptIds = new Set(kept.map((track) => track.id.getValue()));
+    const generated = await this.generator.execute(plan.request, {
+      acceptTrack: (track) =>
+        !isExcluded(track) && !keptIds.has(track.id.getValue()),
+    });
     input.checkpoint();
     return generated;
   }
@@ -248,6 +265,19 @@ export class AiRefinementCandidateBuilder {
       }),
     };
   }
+}
+
+function keptTracks(
+  currentTracks: readonly Track[],
+  preservedPositions: readonly number[],
+  proposed: AiIntent,
+  strategy: AiRefinementStrategy,
+): Track[] {
+  const fixed = preservedPositions.map(
+    (position) => currentTracks[position - 1],
+  );
+  const retained = retainedTracks(currentTracks, proposed, strategy);
+  return [...new Set([...fixed, ...retained])];
 }
 
 function coverFor(

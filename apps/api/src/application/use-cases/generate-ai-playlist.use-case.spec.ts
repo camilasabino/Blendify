@@ -30,6 +30,7 @@ import {
 import { GenerateAiPlaylistUseCase } from './generate-ai-playlist.use-case';
 import type {
   GeneratePlaylistUseCase,
+  PlaylistGenerationOptions as GenerationOptions,
   PlaylistGenerationRequest,
 } from './generate-playlist.use-case';
 
@@ -241,12 +242,15 @@ function createWorld(initial: AiSession | null = session()) {
   } satisfies CatalogProviderPort;
   const catalogs = { forMarket: jest.fn(() => catalog) };
   const generator = {
-    execute: jest.fn((request: PlaylistGenerationRequest) => {
-      void request;
-      return Promise.resolve(
-        generated([track('r1', 'Radiohead'), track('i1', 'Interpol')]),
-      );
-    }),
+    execute: jest.fn(
+      (request: PlaylistGenerationRequest, options?: GenerationOptions) => {
+        void request;
+        void options;
+        return Promise.resolve(
+          generated([track('r1', 'Radiohead'), track('i1', 'Interpol')]),
+        );
+      },
+    ),
   };
   const useCase = new GenerateAiPlaylistUseCase(
     sessions,
@@ -1006,5 +1010,111 @@ describe('GenerateAiPlaylistUseCase', () => {
       expect(JSON.stringify(body)).not.toContain('"targetTrackCount":30');
       expect(JSON.stringify(body)).not.toContain('"generation"');
     }
+  });
+
+  describe('target fulfillment', () => {
+    function titled(id: string, artist: string, title: string): Track {
+      return Track.create({
+        id: TrackId.create(id),
+        name: title,
+        artistId: ArtistId.create(`${artist}-id`),
+        artistName: artist,
+        durationMs: 4 * MINUTE_MS,
+        popularity: 50,
+        uri: `spotify:track:${id}`,
+      });
+    }
+
+    function serveCandidates(
+      world: ReturnType<typeof createWorld>,
+      candidates: Track[],
+    ) {
+      world.generator.execute.mockImplementation((request, options) => {
+        const requested =
+          request.kind === 'artist_mix'
+            ? request.tracksPerSeed * request.artistIds.length
+            : candidates.length;
+        const accepts = options?.acceptTrack ?? (() => true);
+        return Promise.resolve(
+          generated(candidates.filter(accepts).slice(0, requested)),
+        );
+      });
+    }
+
+    const excludingClassics = intent({
+      targetTrackCount: 10,
+      excludeTracks: [
+        { title: 'Creep', artist: 'Radiohead' },
+        { title: 'Karma Police', artist: null },
+      ],
+    });
+
+    it('refills past excluded tracks instead of returning a short playlist', async () => {
+      const world = createWorld(
+        session({
+          aiSafe: {
+            intent: excludingClassics,
+            preservation: EMPTY_AI_PRESERVATION,
+          },
+        }),
+      );
+      serveCandidates(world, [
+        titled('creep', 'Radiohead', 'Creep'),
+        titled('creep-live', 'Radiohead', 'Creep - Live'),
+        titled('karma', 'Radiohead', 'Karma Police'),
+        ...Array.from({ length: 12 }, (_, index) =>
+          track(`ok${index}`, index % 2 ? 'Radiohead' : 'Interpol'),
+        ),
+      ]);
+
+      const { session: result } = await run(world);
+
+      const tracks =
+        result.execution?.status === 'generated'
+          ? result.execution.result.playlist.tracks
+          : [];
+      expect(tracks).toHaveLength(10);
+      expect(tracks.some((item) => /Creep|Karma Police/.test(item.name))).toBe(
+        false,
+      );
+      expect(result.execution).toMatchObject({
+        result: { unmetConstraints: [] },
+      });
+    });
+
+    it('reports the count shortfall only after the candidates are genuinely exhausted', async () => {
+      const world = createWorld(
+        session({
+          aiSafe: {
+            intent: excludingClassics,
+            preservation: EMPTY_AI_PRESERVATION,
+          },
+        }),
+      );
+      serveCandidates(world, [
+        titled('creep', 'Radiohead', 'Creep'),
+        titled('karma', 'Radiohead', 'Karma Police'),
+        titled('karma-remastered', 'Radiohead', 'Karma Police - Remastered'),
+        ...Array.from({ length: 7 }, (_, index) =>
+          track(`ok${index}`, index % 2 ? 'Radiohead' : 'Interpol'),
+        ),
+      ]);
+
+      const { session: result } = await run(world);
+
+      const tracks =
+        result.execution?.status === 'generated'
+          ? result.execution.result.playlist.tracks
+          : [];
+      expect(tracks).toHaveLength(7);
+      expect(tracks.some((item) => /Creep|Karma Police/.test(item.name))).toBe(
+        false,
+      );
+      expect(result.execution).toMatchObject({
+        result: {
+          unmetConstraints: [{ type: 'track_count', requested: 10, actual: 7 }],
+        },
+      });
+    });
   });
 });

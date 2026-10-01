@@ -12,6 +12,7 @@ import { AiIntentResolver } from '@/application/services/ai-intent-resolver.serv
 import { AiRefinementCandidateBuilder } from '@/application/services/ai-refinement-candidate.service';
 import type {
   GeneratePlaylistUseCase,
+  PlaylistGenerationOptions,
   PlaylistGenerationRequest,
 } from '@/application/use-cases/generate-playlist.use-case';
 
@@ -391,6 +392,76 @@ describe('AiRefinementCandidateBuilder settings-only and relative refinements', 
       BASE_INTENT,
       observedShort,
     );
+
+    expect(outcome).toMatchObject(CONSTRAINTS_UNMET);
+  });
+});
+
+describe('AiRefinementCandidateBuilder retain-and-fill target fulfillment', () => {
+  const COUNT_INTENT: AiIntent = {
+    ...BASE_INTENT,
+    targetTrackCount: 20,
+    targetDurationMinutes: null,
+  };
+  const KEPT = tracks('ed', 'Ed Sheeran', 15);
+  const REMOVED = tracks('ts', 'Taylor Swift', 5);
+
+  function createChartBuilder(chart: readonly Track[]) {
+    const { builder, generator } = createBuilder([]);
+    generator.execute.mockImplementation(
+      (
+        request: PlaylistGenerationRequest,
+        options?: PlaylistGenerationOptions,
+      ) => {
+        const requested =
+          request.kind === 'artist_mix'
+            ? request.tracksPerSeed * request.artistIds.length
+            : chart.length;
+        const accepts = options?.acceptTrack ?? (() => true);
+        return Promise.resolve(
+          freshGeneration(chart.filter(accepts).slice(0, requested)),
+        );
+      },
+    );
+    return { builder, generator };
+  }
+
+  function excludeTaylorFrom(builder: AiRefinementCandidateBuilder) {
+    return refine(builder, { excludeArtists: ['Taylor Swift'] }, COUNT_INTENT, [
+      ...KEPT,
+      ...REMOVED,
+    ]);
+  }
+
+  it('fills every removed slot with valid replacements the generator can still reach', async () => {
+    const { builder } = createChartBuilder([
+      ...KEPT,
+      ...tracks('ts-more', 'Taylor Swift', 20),
+      ...tracks('new', 'Ed Sheeran', 5),
+    ]);
+
+    const outcome = await excludeTaylorFrom(builder);
+
+    const ready = outcome.status === 'candidate' && outcome.candidate;
+    const result =
+      ready && ready.status === 'ready' ? ready.result.playlist.tracks : [];
+    expect(outcome).toMatchObject({
+      strategy: 'retain_and_fill',
+      candidate: { status: 'ready' },
+    });
+    expect(result).toHaveLength(20);
+    expect(new Set(result.map((item) => item.id)).size).toBe(20);
+    expect(result.map((item) => item.artistName)).not.toContain('Taylor Swift');
+  });
+
+  it('keeps the insufficient-result failure when only some replacements exist', async () => {
+    const { builder } = createChartBuilder([
+      ...KEPT,
+      ...tracks('ts-more', 'Taylor Swift', 20),
+      ...tracks('new', 'Ed Sheeran', 3),
+    ]);
+
+    const outcome = await excludeTaylorFrom(builder);
 
     expect(outcome).toMatchObject(CONSTRAINTS_UNMET);
   });

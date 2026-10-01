@@ -157,6 +157,38 @@ export function nextCatalogBatch<
   }
 }
 
+export class CatalogChartCursor<
+  T extends { trackName: string; artistName?: string },
+> {
+  private readonly attemptedKeys = new Set<string>();
+  private bounds: { start: number; end: number };
+
+  constructor(
+    private readonly entries: T[],
+    private readonly mode: PopularityModeValue,
+    private readonly random: () => number = Math.random,
+  ) {
+    this.bounds = catalogPoolBounds(entries.length, mode);
+  }
+
+  next(needed: number): T[] {
+    const { batch, bounds } = nextCatalogBatch(
+      this.entries,
+      this.mode,
+      needed,
+      this.attemptedKeys,
+      this.bounds,
+      this.random,
+    );
+    this.bounds = bounds;
+    return batch;
+  }
+
+  markAttempted(entry: T): void {
+    this.attemptedKeys.add(catalogEntryKey(entry));
+  }
+}
+
 /**
  * Pick a shuffled candidate window from a Last.fm-ordered chart.
  *
@@ -190,27 +222,4 @@ export function sliceCatalogWindow<T>(
     return [];
   }
   return shuffleCopy(pool, random).slice(0, Math.min(pool.length, budget));
-}
-
-export function interleaveArtistCatalogWindows<T>(
-  charts: T[][],
-  mode: PopularityModeValue,
-  perArtist: number,
-  random: () => number = Math.random,
-): T[] {
-  const windows = charts.map((chart) =>
-    sliceCatalogWindow(chart, mode, perArtist, random).slice(0, perArtist),
-  );
-  const merged: T[] = [];
-
-  for (let round = 0; round < perArtist; round += 1) {
-    for (const window of windows) {
-      const entry = window[round];
-      if (entry !== undefined) {
-        merged.push(entry);
-      }
-    }
-  }
-
-  return merged;
 }

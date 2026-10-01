@@ -1,7 +1,7 @@
 import { MAX_ARTISTS, PopularityMode } from '@blendify/contracts';
 import { Artist } from '@/domain/artist/artist.entity';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
-import { catalogCandidateBudget } from '@/domain/genre/catalog-window';
+import { seedResolveAttemptLimit } from '@/domain/genre/catalog-resolve';
 import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
 import type {
   DiscoveryArtistIdentity,
@@ -15,7 +15,7 @@ import type { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import { GenerateDiscoverPlaylistUseCase } from './generate-discover-playlist.use-case';
 
 const TARGET = 15;
-const BUDGET = catalogCandidateBudget(TARGET);
+const RESOLVE_LIMIT = seedResolveAttemptLimit(TARGET);
 
 function slug(value: string): string {
   return value.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-');
@@ -158,14 +158,15 @@ describe('GenerateDiscoverPlaylistUseCase discover_track familiarity', () => {
   });
 
   it.each(Object.values(PopularityMode))(
-    'never exceeds target plus overfetch resolve attempts in %s mode',
+    'keeps resolving past misses within the bounded resolve limit in %s mode',
     async (mode) => {
       const context = setup(similar, (name) => Number(name.at(-1)) % 2 === 0);
 
-      await execute(context.useCase, mode);
+      const playlist = await execute(context.useCase, mode);
 
+      expect(playlist.tracks).toHaveLength(TARGET);
       expect(context.resolveTrack.mock.calls.length).toBeLessThanOrEqual(
-        BUDGET,
+        RESOLVE_LIMIT,
       );
     },
   );
@@ -195,13 +196,13 @@ describe('GenerateDiscoverPlaylistUseCase discover_track familiarity', () => {
     },
   );
 
-  it('fails when too few candidates resolve instead of widening the budget', async () => {
+  it('fails once the bounded resolve limit is spent without enough matches', async () => {
     const context = setup(similar, () => false);
 
     await expect(
       execute(context.useCase, PopularityMode.POPULAR),
     ).rejects.toBeInstanceOf(BusinessRuleError);
-    expect(context.resolveTrack).toHaveBeenCalledTimes(BUDGET);
+    expect(context.resolveTrack).toHaveBeenCalledTimes(RESOLVE_LIMIT);
   });
 });
 

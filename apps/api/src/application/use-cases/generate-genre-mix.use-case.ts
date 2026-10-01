@@ -10,6 +10,7 @@ import {
   trackCoverSource,
 } from '@/domain/playlist/generated-playlist';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import type { TrackAcceptance } from '@/domain/services/accepted-track-pool';
 import { MAX_GENRES, maxTracksPerSeedForCount } from '@/domain/constants';
 import {
   findGenre,
@@ -49,7 +50,7 @@ export class GenerateGenreMixUseCase {
 
   async execute(
     raw: GenerateGenreMixDto,
-    options?: { onProgress?: ProgressReporter },
+    options?: { onProgress?: ProgressReporter; acceptTrack?: TrackAcceptance },
   ): Promise<GeneratedPlaylist> {
     const input = GenerateGenreMixSchema.parse(raw);
     const tracker = new GenerationProgressTracker(options?.onProgress);
@@ -93,6 +94,7 @@ export class GenerateGenreMixUseCase {
         input.tracksPerSeed,
         {
           region: input.region,
+          acceptTrack: options?.acceptTrack,
           onMatched: (matched) => {
             tracker.report(
               'matching_tracks',

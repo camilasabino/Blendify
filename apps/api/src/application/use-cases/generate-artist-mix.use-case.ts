@@ -28,15 +28,23 @@ import { Artist } from '@/domain/artist/artist.entity';
 import { pickBestArtistMatch } from '@/domain/artist/artist-name-match';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { Track } from '@/domain/track/track.entity';
+import {
+  AcceptedTrackPool,
+  type TrackAcceptance,
+} from '@/domain/services/accepted-track-pool';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import { MAX_TRACKS, maxTracksPerSeedForCount } from '@/domain/constants';
 import {
   isFatalCatalogError,
   isSpotifyQuotaError,
-  resolveCatalogWithPoolExpand,
+  resolveChartIntoPool,
   seedResolveAttemptLimit,
 } from '@/domain/genre/catalog-resolve';
+import {
+  CatalogChartCursor,
+  type CatalogTrackRef,
+} from '@/domain/genre/catalog-window';
 import {
   buildDefaultPlaylistDescription,
   buildDefaultPlaylistName,
@@ -51,6 +59,17 @@ import {
 } from '@/application/services/generation-progress.tracker';
 
 const PER_ARTIST_FETCH_OVER_FETCH = 3;
+const ARTIST_CHART_TRACK_LIMIT = 50;
+
+type ArtistTrackSource = {
+  artist: Artist;
+  pool: AcceptedTrackPool;
+  /** `undefined` until loaded; `null` when no chart is usable. */
+  chart: CatalogChartCursor<CatalogTrackRef> | null | undefined;
+  attempted: number;
+  searched: boolean;
+  exhausted: boolean;
+};
 
 function isPendingArtistId(id: string): boolean {
   return id.startsWith('pending:');
@@ -71,7 +90,7 @@ export class GenerateArtistMixUseCase {
 
   async execute(
     raw: GenerateArtistMixDto,
-    options?: { onProgress?: ProgressReporter },
+    options?: { onProgress?: ProgressReporter; acceptTrack?: TrackAcceptance },
   ): Promise<GeneratedPlaylist> {
     const input = GenerateArtistMixSchema.parse(raw);
     const tracker = new GenerationProgressTracker(options?.onProgress);
@@ -113,6 +132,7 @@ export class GenerateArtistMixUseCase {
       input.popularity,
       tracker,
       input.maxTracks,
+      options?.acceptTrack,
     );
 
     const { tracks } = this.generation.generate(
@@ -277,112 +297,135 @@ export class GenerateArtistMixUseCase {
     mode: PopularityModeValue,
     tracker?: GenerationProgressTracker,
     maxTracks?: number,
+    acceptTrack?: TrackAcceptance,
   ): Promise<Map<string, Track[]>> {
-    const map = new Map<string, Track[]>();
     const totalNeeded = Math.min(
       artists.length * tracksPerSeed,
-      maxTracks ?? artists.length * tracksPerSeed,
+      maxTracks ?? MAX_TRACKS,
     );
-    let matched = 0;
-    tracker?.report('matching_tracks', 0, Math.max(1, totalNeeded));
-
-    for (const artist of artists) {
-      this.quota.assertAvailable();
-
-      const artistId = artist.id.getValue();
-      const baseMatched = matched;
-      // Small over-fetch so a shortfall on one seed can be topped up from others.
-      const fetchBudget = Math.min(
-        MAX_TRACKS,
-        tracksPerSeed + PER_ARTIST_FETCH_OVER_FETCH,
+    const sources = artists.map((artist) =>
+      this.createArtistSource(artist, acceptTrack),
+    );
+    const reportMatched = () => {
+      tracker?.report(
+        'matching_tracks',
+        Math.min(totalNeeded, sumPoolSizes(sources)),
+        Math.max(1, totalNeeded),
       );
-      const collected = await this.fetchTracksForArtist(
+    };
+    reportMatched();
+
+    // Small over-fetch first; a seed that runs dry is topped up below.
+    const fetchBudget = Math.min(
+      MAX_TRACKS,
+      tracksPerSeed + PER_ARTIST_FETCH_OVER_FETCH,
+    );
+    for (const source of sources) {
+      this.quota.assertAvailable();
+      await this.fillArtistSource(
         catalog,
-        artist,
+        source,
         fetchBudget,
         mode,
-        (seedMatched) => {
-          matched = Math.min(totalNeeded, baseMatched + seedMatched);
-          tracker?.report('matching_tracks', matched, Math.max(1, totalNeeded));
-        },
+        reportMatched,
       );
-
-      matched = Math.min(
-        totalNeeded,
-        baseMatched + Math.min(collected.length, tracksPerSeed),
-      );
-      tracker?.report('matching_tracks', matched, Math.max(1, totalNeeded));
-      map.set(artistId, collected);
+      reportMatched();
     }
 
-    return map;
+    for (const source of sources) {
+      const shortfall = totalNeeded - sumPoolSizes(sources);
+      if (shortfall <= 0) {
+        break;
+      }
+      if (source.exhausted) {
+        continue;
+      }
+      this.quota.assertAvailable();
+      await this.fillArtistSource(
+        catalog,
+        source,
+        Math.min(MAX_TRACKS, source.pool.size + shortfall),
+        mode,
+        reportMatched,
+      );
+      reportMatched();
+    }
+
+    return new Map(
+      sources.map((source) => [
+        source.artist.id.getValue(),
+        source.pool.tracks,
+      ]),
+    );
+  }
+
+  private createArtistSource(
+    artist: Artist,
+    acceptTrack?: TrackAcceptance,
+  ): ArtistTrackSource {
+    return {
+      artist,
+      pool: new AcceptedTrackPool(0, {
+        accepts: (track) =>
+          this.trackMatchesArtist(track, artist) &&
+          (acceptTrack?.(track) ?? true),
+      }),
+      chart: undefined,
+      attempted: 0,
+      searched: false,
+      exhausted: false,
+    };
   }
 
   /**
    * Chart pool (popular 0–40% / balanced full / rarities 60–100%), shuffled.
    * If the preferred band underfills, expand toward the rest of the chart.
-   * Remaining shortfall → artist search.
+   * Remaining shortfall → artist search. Resumable: a later call with a larger
+   * target continues from the unattempted chart entries.
    */
-  private async fetchTracksForArtist(
+  private async fillArtistSource(
     catalog: CatalogProviderPort,
-    artist: Artist,
-    tracksPerSeed: number,
+    source: ArtistTrackSource,
+    target: number,
     mode: PopularityModeValue,
-    onMatched?: (matched: number) => void,
-  ): Promise<Track[]> {
-    const collected = await this.fetchTracksForArtistFromLastFm(
-      catalog,
-      artist,
-      tracksPerSeed,
-      mode,
-      onMatched,
-    );
+    onMatched?: () => void,
+  ): Promise<void> {
+    source.pool.growTarget(target);
 
-    if (collected.length < tracksPerSeed) {
+    await this.fillFromLastFm(catalog, source, mode, onMatched);
+    if (!source.pool.isFull && !source.searched) {
       this.quota.assertAvailable();
-      await this.appendArtistSearchFallback(
-        catalog,
-        artist,
-        collected,
-        tracksPerSeed,
-        onMatched,
-      );
+      source.searched = true;
+      await this.appendArtistSearchFallback(catalog, source, onMatched);
     }
 
-    return collected;
+    source.exhausted = !source.pool.isFull;
   }
 
   private async appendArtistSearchFallback(
     catalog: CatalogProviderPort,
-    artist: Artist,
-    collected: Track[],
-    tracksPerSeed: number,
-    onMatched?: (matched: number) => void,
+    source: ArtistTrackSource,
+    onMatched?: () => void,
   ): Promise<void> {
     try {
-      const page = await catalog.searchTracks(`artist:"${artist.name}"`, {
-        limit: CATALOG_MATCH_SEARCH_LIMIT,
-        offset: 0,
-      });
-      const seen = new Set(collected.map((t) => t.id.getValue()));
+      const page = await catalog.searchTracks(
+        `artist:"${source.artist.name}"`,
+        {
+          limit: CATALOG_MATCH_SEARCH_LIMIT,
+          offset: 0,
+        },
+      );
       for (const track of page) {
-        if (!this.trackMatchesArtist(track, artist)) {
-          continue;
+        if (source.pool.offer(track)) {
+          onMatched?.();
         }
-        const id = track.id.getValue();
-        if (seen.has(id)) {
-          continue;
-        }
-        seen.add(id);
-        collected.push(track);
-        onMatched?.(Math.min(collected.length, tracksPerSeed));
       }
     } catch (error) {
       if (error instanceof CatalogUnavailableError) {
         throw error;
       }
       if (isSpotifyQuotaError(error)) {
-        if (collected.length === 0) {
+        if (source.pool.size === 0) {
           throw error;
         }
         return;
@@ -395,43 +438,32 @@ export class GenerateArtistMixUseCase {
     }
   }
 
-  private async fetchTracksForArtistFromLastFm(
+  private async fillFromLastFm(
     catalog: CatalogProviderPort,
-    artist: Artist,
-    tracksPerSeed: number,
+    source: ArtistTrackSource,
     mode: PopularityModeValue,
-    onMatched?: (matched: number) => void,
-  ): Promise<Track[]> {
-    if (!this.discoveryCatalog.isConfigured()) {
-      return [];
+    onMatched?: () => void,
+  ): Promise<void> {
+    if (!this.discoveryCatalog.isConfigured() || source.chart === null) {
+      return;
     }
 
     try {
-      const chart = await this.discoveryCatalog.getTopTracksForArtist(
-        { name: artist.name },
-        50,
-      );
-      if (chart.length === 0) {
-        return [];
+      source.chart ??= await this.loadArtistChart(source.artist, mode);
+      if (!source.chart) {
+        return;
       }
 
-      const refs = chart.map((entry) => ({
-        ...entry,
-        artistName: artist.name,
-      }));
-
-      return await resolveCatalogWithPoolExpand(
+      source.attempted += await resolveChartIntoPool(
         catalog,
-        refs,
-        mode,
-        tracksPerSeed,
+        source.chart,
+        source.pool,
         {
           concurrency: 1,
-          artistId: artist.id.getValue(),
-          maxAttempts: seedResolveAttemptLimit(tracksPerSeed),
-          onProgress: (update) => {
-            onMatched?.(Math.min(update.matched, tracksPerSeed));
-          },
+          artistId: source.artist.id.getValue(),
+          maxAttempts:
+            seedResolveAttemptLimit(source.pool.target) - source.attempted,
+          onProgress: () => onMatched?.(),
         },
       );
     } catch (error) {
@@ -439,8 +471,26 @@ export class GenerateArtistMixUseCase {
         throw error;
       }
       this.logger.warn(`Last.fm track fetch failed: ${errorMessage(error)}`);
-      return [];
+      source.chart = null;
     }
+  }
+
+  private async loadArtistChart(
+    artist: Artist,
+    mode: PopularityModeValue,
+  ): Promise<CatalogChartCursor<CatalogTrackRef> | null> {
+    const chart = await this.discoveryCatalog.getTopTracksForArtist(
+      { name: artist.name },
+      ARTIST_CHART_TRACK_LIMIT,
+    );
+    if (chart.length === 0) {
+      return null;
+    }
+
+    return new CatalogChartCursor(
+      chart.map((entry) => ({ ...entry, artistName: artist.name })),
+      mode,
+    );
   }
 
   private trackMatchesArtist(track: Track, artist: Artist): boolean {
@@ -453,6 +503,10 @@ export class GenerateArtistMixUseCase {
       track.artistName.trim().toLowerCase() === artist.name.trim().toLowerCase()
     );
   }
+}
+
+function sumPoolSizes(sources: readonly ArtistTrackSource[]): number {
+  return sources.reduce((total, source) => total + source.pool.size, 0);
 }
 
 function errorMessage(error: unknown): string {

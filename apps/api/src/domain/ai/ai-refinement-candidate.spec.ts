@@ -216,13 +216,22 @@ describe('refinementStrategy', () => {
 });
 
 describe('fillCandidateTrackCount', () => {
-  it('asks for the target plus the retained tracks, never above MAX_TRACKS', () => {
+  it('asks only for the tracks missing next to the kept ones', () => {
     expect(
       fillCandidateTrackCount(intent({ targetTrackCount: 10 }), 6, 6),
-    ).toBe(16);
-    expect(fillCandidateTrackCount(intent(), 5, 6)).toBe(11);
+    ).toBe(4);
+    expect(fillCandidateTrackCount(intent(), 5, 6)).toBe(1);
     expect(
       fillCandidateTrackCount(intent({ targetTrackCount: 50 }), 40, 40),
+    ).toBe(10);
+  });
+
+  it('asks for a full duration pool, since kept tracks are never generated again', () => {
+    expect(
+      fillCandidateTrackCount(intent({ targetDurationMinutes: 60 }), 10, 12),
+    ).toBe(30);
+    expect(
+      fillCandidateTrackCount(intent({ targetDurationMinutes: 600 }), 10, 12),
     ).toBe(MAX_TRACKS);
   });
 });

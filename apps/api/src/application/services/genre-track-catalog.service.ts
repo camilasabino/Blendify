@@ -7,12 +7,15 @@ import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.err
 import {
   isFatalCatalogError,
   isSpotifyQuotaError,
-  resolveAttemptBudget,
-  resolveCatalogTracks,
-  resolveCatalogWithPoolExpand,
+  resolveCatalogRef,
+  resolveChartIntoPool,
   seedResolveAttemptLimit,
 } from '@/domain/genre/catalog-resolve';
-import { interleaveArtistCatalogWindows } from '@/domain/genre/catalog-window';
+import { CatalogChartCursor } from '@/domain/genre/catalog-window';
+import {
+  AcceptedTrackPool,
+  type TrackAcceptance,
+} from '@/domain/services/accepted-track-pool';
 import {
   type CatalogGenre,
   genreTrackGroupKey,
@@ -39,7 +42,7 @@ import { RegionalGenreArtistPool } from './regional-genre-artist-pool';
 const SPOTIFY_VARIOUS_ARTISTS_ARTIST_ID = '0LyfQWJT6nXafLPZqxe9Of';
 
 const GENRE_TAG_TRACK_CANDIDATE_LIMIT = 100;
-const MIN_TAG_COVERAGE_RATIO = 0.5;
+const REGIONAL_ARTIST_EXPANSION_LIMIT = 2;
 const SEED_ARTIST_FALLBACK_RATIO = 0.35;
 const MIN_SEED_ARTIST_FALLBACK_LIMIT = 5;
 const MAX_SEED_ARTIST_FALLBACK_LIMIT = 8;
@@ -57,6 +60,12 @@ export interface GenreTrackCatalogResult {
 
 /** `null` skips this candidate and continues; `'stop'` ends the seed-fanout loop early (quota hit). */
 type SeedFanoutOutcome<T> = T | null | 'stop';
+
+type RegionalArtistSource = {
+  cursor: CatalogChartCursor<CatalogTrackCandidate>;
+  accepted: number;
+  exhausted: boolean;
+};
 
 @Injectable()
 export class GenreTrackCatalogService {
@@ -76,6 +85,7 @@ export class GenreTrackCatalogService {
     options?: {
       region?: GenreRegion;
       onMatched?: (matched: number) => void;
+      acceptTrack?: TrackAcceptance;
     },
   ): Promise<GenreTrackCatalogResult> {
     this.quota.assertAvailable();
@@ -97,26 +107,30 @@ export class GenreTrackCatalogService {
     const coverCandidates = new Map<string, string | undefined>();
     let matched = 0;
     const totalNeeded = genres.length * tracksPerSeed;
+    const claimedKeys = new Set<string>();
 
     // Serial genre fetches keep Spotify Dev Mode quota usage predictable.
     for (const genre of genres) {
       this.quota.assertAvailable();
       const baseMatched = matched;
+      const pool = new AcceptedTrackPool(tracksPerSeed, {
+        maxPerArtist: GENRE_MIX_MAX_TRACKS_PER_ARTIST,
+        claimedKeys,
+        accepts: (track) =>
+          !this.isJunkTrack(track) && (options?.acceptTrack?.(track) ?? true),
+      });
       const result = await this.resolveGenre(
         provider,
         genre,
         popularity,
-        tracksPerSeed,
+        pool,
         regionalPool,
-        (seedMatched) => {
-          matched = Math.min(totalNeeded, baseMatched + seedMatched);
+        () => {
+          matched = Math.min(totalNeeded, baseMatched + pool.size);
           options?.onMatched?.(matched);
         },
       );
-      matched = Math.min(
-        totalNeeded,
-        baseMatched + Math.min(result.tracks.length, tracksPerSeed),
-      );
+      matched = Math.min(totalNeeded, baseMatched + result.tracks.length);
       options?.onMatched?.(matched);
       tracksByGenre.set(result.genreKey, result.tracks);
       coverCandidates.set(result.genreKey, result.coverUrl);
@@ -135,9 +149,9 @@ export class GenreTrackCatalogService {
     provider: CatalogProviderPort,
     genre: CatalogGenre,
     popularity: PopularityMode,
-    tracksPerSeed: number,
+    pool: AcceptedTrackPool,
     regionalPool: RegionalGenreArtistPool | null,
-    onMatched?: (matched: number) => void,
+    onMatched: () => void,
   ): Promise<{
     genreKey: string;
     tracks: Track[];
@@ -145,122 +159,180 @@ export class GenreTrackCatalogService {
   }> {
     const genreKey = genreTrackGroupKey(genre.id);
     const regionalArtists = regionalPool
-      ? await regionalPool.qualifiedArtists(
-          genre.id,
-          tracksPerSeed + SEED_ARTIST_CANDIDATE_BUFFER,
-        )
-      : null;
-    let collected = regionalArtists
       ? await this.resolveRegionalArtistTracks(
           provider,
-          regionalArtists,
+          regionalPool,
+          genre.id,
           popularity,
-          tracksPerSeed,
+          pool,
           onMatched,
         )
-      : await this.resolveTagTracks(
-          provider,
-          genre,
-          popularity,
-          tracksPerSeed,
-          onMatched,
-        );
+      : null;
+    if (!regionalPool) {
+      await this.resolveTagTracks(provider, genre, popularity, pool, onMatched);
+    }
 
     let coverUrl: string | undefined;
-    if (collected.length < Math.ceil(tracksPerSeed * MIN_TAG_COVERAGE_RATIO)) {
+    if (!pool.isFull) {
       this.quota.assertAvailable();
-      const fallback = await this.resolveSeedArtistTracks(
+      coverUrl = await this.resolveSeedArtistTracks(
         provider,
         genre,
-        tracksPerSeed,
+        pool,
         regionalArtists,
       );
-      coverUrl = fallback.coverUrl;
-      if (fallback.tracks.length > collected.length) {
-        collected = fallback.tracks;
-        onMatched?.(Math.min(collected.length, tracksPerSeed));
-      }
+      onMatched();
     }
 
+    const tracks = pool.tracks;
     if (!coverUrl) {
-      coverUrl = collected.find((track) => track.albumImageUrl)?.albumImageUrl;
+      coverUrl = tracks.find((track) => track.albumImageUrl)?.albumImageUrl;
     }
 
-    return { genreKey, tracks: collected, coverUrl };
+    return { genreKey, tracks, coverUrl };
   }
 
   private async resolveTagTracks(
     provider: CatalogProviderPort,
     genre: CatalogGenre,
     popularity: PopularityMode,
-    tracksPerSeed: number,
-    onMatched?: (matched: number) => void,
-  ): Promise<Track[]> {
+    pool: AcceptedTrackPool,
+    onMatched: () => void,
+  ): Promise<void> {
     try {
       const chart = await this.discoveryCatalog.getTopTracksForTag(
         genre.id,
         GENRE_TAG_TRACK_CANDIDATE_LIMIT,
       );
-      if (chart.length === 0) {
-        return [];
-      }
-
-      const resolved = await resolveCatalogWithPoolExpand(
+      await resolveChartIntoPool(
         provider,
-        chart,
-        popularity,
-        tracksPerSeed,
-        {
-          maxPerArtist: GENRE_MIX_MAX_TRACKS_PER_ARTIST,
-          onProgress: (update) => {
-            onMatched?.(Math.min(update.matched, tracksPerSeed));
-          },
-        },
+        new CatalogChartCursor(chart, popularity),
+        pool,
+        { onProgress: onMatched },
       );
-      return resolved.filter((track) => !this.isJunkTrack(track));
     } catch (error) {
       if (isFatalCatalogError(error)) {
         throw error;
       }
       this.logger.warn(`Tag chart resolve failed: ${errorMessage(error)}`);
-      return [];
     }
   }
 
+  /**
+   * Explores qualified regional artists progressively: deeper into each
+   * artist chart, then further down the regional artist ranking, within one
+   * Spotify resolve budget per genre. Never leaves the selected region.
+   */
   private async resolveRegionalArtistTracks(
     provider: CatalogProviderPort,
-    artists: SimilarArtistCandidate[],
+    regionalPool: RegionalGenreArtistPool,
+    genreId: string,
     popularity: PopularityMode,
-    tracksPerSeed: number,
-    onMatched?: (matched: number) => void,
-  ): Promise<Track[]> {
-    if (artists.length === 0) {
-      return [];
-    }
+    pool: AcceptedTrackPool,
+    onMatched: () => void,
+  ): Promise<SimilarArtistCandidate[]> {
+    const step = pool.target + SEED_ARTIST_CANDIDATE_BUFFER;
+    const sources: RegionalArtistSource[] = [];
+    let attemptsLeft = seedResolveAttemptLimit(pool.target);
+    let qualified: SimilarArtistCandidate[] = [];
 
-    const charts = await this.loadArtistCharts(artists);
-    const refs = interleaveArtistCatalogWindows(
-      charts,
-      popularity,
-      GENRE_MIX_MAX_TRACKS_PER_ARTIST,
-    ).slice(0, seedResolveAttemptLimit(tracksPerSeed));
-
-    try {
-      const resolved = await resolveCatalogTracks(provider, refs, {
-        needed: tracksPerSeed,
-        maxPerArtist: GENRE_MIX_MAX_TRACKS_PER_ARTIST,
-        onProgress: (update) => {
-          onMatched?.(Math.min(update.matched, tracksPerSeed));
-        },
-      });
-      return resolved.filter((track) => !this.isJunkTrack(track));
-    } catch (error) {
-      if (isFatalCatalogError(error)) {
-        throw error;
+    for (let expansion = 0; ; expansion += 1) {
+      const next = await regionalPool.qualifiedArtists(
+        genreId,
+        step * (expansion + 1),
+      );
+      if (expansion > 0 && next.length === qualified.length) {
+        break;
       }
-      this.logger.warn(`Regional chart resolve failed: ${errorMessage(error)}`);
-      return [];
+
+      const charts = await this.loadArtistCharts(next.slice(qualified.length));
+      sources.push(
+        ...charts.map((chart) => ({
+          cursor: new CatalogChartCursor(chart, popularity),
+          accepted: 0,
+          exhausted: false,
+        })),
+      );
+      qualified = next;
+
+      attemptsLeft -= await this.resolveRegionalSources(
+        provider,
+        sources,
+        pool,
+        attemptsLeft,
+        onMatched,
+      );
+      if (
+        pool.isFull ||
+        attemptsLeft <= 0 ||
+        expansion >= REGIONAL_ARTIST_EXPANSION_LIMIT
+      ) {
+        break;
+      }
     }
+
+    return qualified;
+  }
+
+  private async resolveRegionalSources(
+    provider: CatalogProviderPort,
+    sources: RegionalArtistSource[],
+    pool: AcceptedTrackPool,
+    maxAttempts: number,
+    onMatched: () => void,
+  ): Promise<number> {
+    let attempted = 0;
+
+    while (!pool.isFull && attempted < maxAttempts) {
+      const layer = this.nextRegionalLayer(sources);
+      if (layer.length === 0) {
+        break;
+      }
+
+      for (const { source, entry } of layer) {
+        if (pool.isFull || attempted >= maxAttempts) {
+          break;
+        }
+        source.cursor.markAttempted(entry);
+        attempted += 1;
+        const track = await resolveCatalogRef(provider, entry);
+        if (track && pool.offer(track)) {
+          source.accepted += 1;
+          onMatched();
+        }
+      }
+    }
+
+    return attempted;
+  }
+
+  /** One round-robin window per artist: first picks of every artist come first. */
+  private nextRegionalLayer(
+    sources: RegionalArtistSource[],
+  ): Array<{ source: RegionalArtistSource; entry: CatalogTrackCandidate }> {
+    const windows = sources.map((source) => {
+      const open = GENRE_MIX_MAX_TRACKS_PER_ARTIST - source.accepted;
+      if (source.exhausted || open <= 0) {
+        return [];
+      }
+      const window = source.cursor.next(open).slice(0, open);
+      source.exhausted = window.length === 0;
+      return window.map((entry) => ({ source, entry }));
+    });
+    const layer: Array<{
+      source: RegionalArtistSource;
+      entry: CatalogTrackCandidate;
+    }> = [];
+
+    for (let round = 0; round < GENRE_MIX_MAX_TRACKS_PER_ARTIST; round += 1) {
+      for (const window of windows) {
+        const pick = window[round];
+        if (pick) {
+          layer.push(pick);
+        }
+      }
+    }
+    return layer;
   }
 
   private async loadArtistCharts(
@@ -299,75 +371,70 @@ export class GenreTrackCatalogService {
     }
   }
 
+  /** Returns the cover of the first seed artist when the fallback ran. */
   private async resolveSeedArtistTracks(
     provider: CatalogProviderPort,
     genre: CatalogGenre,
-    tracksPerSeed: number,
+    pool: AcceptedTrackPool,
     regionalArtists: SimilarArtistCandidate[] | null,
-  ): Promise<{ tracks: Track[]; coverUrl: string | undefined }> {
-    // Each fallback seed costs a Spotify search, so cap fan-out tightly.
+  ): Promise<string | undefined> {
+    // Each fallback seed costs Spotify searches, so cap fan-out tightly and
+    // resolve seed artists lazily until the genre target is met.
     const seedLimit = Math.min(
       MAX_SEED_ARTIST_FALLBACK_LIMIT,
       Math.max(
         MIN_SEED_ARTIST_FALLBACK_LIMIT,
-        Math.ceil(tracksPerSeed * SEED_ARTIST_FALLBACK_RATIO),
+        Math.ceil(pool.target * SEED_ARTIST_FALLBACK_RATIO),
       ),
     );
-    const seedArtists = await this.resolveSeedArtists(
-      provider,
+    const candidates = await this.seedArtistCandidates(
       genre,
       seedLimit,
       regionalArtists,
     );
-    if (seedArtists.length === 0) {
-      return { tracks: [], coverUrl: undefined };
-    }
-
-    const collected: Track[] = [];
+    const tracksPerArtist = tracksPerSeedArtist(pool.target, seedLimit);
     const seen = new Set<string>();
-    const perArtistSeen = new Map<string, number>();
-    const tracksPerArtist = tracksPerSeedArtist(
-      tracksPerSeed,
-      seedArtists.length,
-    );
-    const fetchTarget = Math.min(
-      resolveAttemptBudget(tracksPerSeed),
-      seedArtists.length * tracksPerArtist,
-    );
+    let resolvedArtists = 0;
+    let coverUrl: string | undefined;
 
-    for (const artist of seedArtists) {
-      if (collected.length >= fetchTarget) {
+    for (const candidate of candidates) {
+      if (pool.isFull || resolvedArtists >= seedLimit) {
         break;
       }
       this.quota.assertAvailable();
 
+      const artist = await this.resolveOneSeedArtist(
+        provider,
+        candidate.name,
+        seen,
+        pool.size,
+      );
+      if (artist === 'stop') {
+        break;
+      }
+      if (!artist) {
+        continue;
+      }
+      resolvedArtists += 1;
+      if (resolvedArtists === 1) {
+        coverUrl = artist.imageUrl;
+      }
+
+      this.quota.assertAvailable();
       const page = await this.searchTracksForSeedArtist(
         provider,
         artist,
-        collected.length,
+        pool.size,
       );
       if (page === 'stop') {
         break;
       }
-      if (page === null) {
-        continue;
+      if (page !== null) {
+        this.offerSeedArtistTracks(page, artist, tracksPerArtist, pool);
       }
-
-      this.collectMatchingSeedTracks({
-        page,
-        artistId: artist.id.getValue(),
-        tracksPerArtist,
-        fetchTarget,
-        collected,
-        seen,
-        perArtistSeen,
-      });
     }
 
-    return {
-      tracks: collected,
-      coverUrl: seedArtists[0]?.imageUrl,
-    };
+    return coverUrl;
   }
 
   private async searchTracksForSeedArtist(
@@ -399,55 +466,30 @@ export class GenreTrackCatalogService {
     }
   }
 
-  private collectMatchingSeedTracks(input: {
-    page: Track[];
-    artistId: string;
-    tracksPerArtist: number;
-    fetchTarget: number;
-    collected: Track[];
-    seen: Set<string>;
-    perArtistSeen: Map<string, number>;
-  }): void {
-    const {
-      page,
-      artistId,
-      tracksPerArtist,
-      fetchTarget,
-      collected,
-      seen,
-      perArtistSeen,
-    } = input;
+  private offerSeedArtistTracks(
+    page: Track[],
+    artist: Artist,
+    tracksPerArtist: number,
+    pool: AcceptedTrackPool,
+  ): void {
+    const artistId = artist.id.getValue();
+    let offered = 0;
 
     for (const track of page) {
-      if (track.artistId.getValue() !== artistId) {
-        continue;
-      }
-      if (this.isJunkTrack(track)) {
-        continue;
-      }
-      const id = track.id.getValue();
-      if (seen.has(id)) {
-        continue;
-      }
-      const used = perArtistSeen.get(artistId) ?? 0;
-      if (used >= tracksPerArtist) {
+      if (pool.isFull || offered >= tracksPerArtist) {
         break;
       }
-      seen.add(id);
-      perArtistSeen.set(artistId, used + 1);
-      collected.push(track);
-      if (collected.length >= fetchTarget) {
-        break;
+      if (track.artistId.getValue() === artistId && pool.offer(track)) {
+        offered += 1;
       }
     }
   }
 
-  private async resolveSeedArtists(
-    provider: CatalogProviderPort,
+  private async seedArtistCandidates(
     genre: CatalogGenre,
     limit: number,
     regionalArtists: SimilarArtistCandidate[] | null,
-  ): Promise<Artist[]> {
+  ): Promise<SimilarArtistCandidate[]> {
     const candidateLimit = Math.min(
       MAX_SEED_ARTIST_CANDIDATE_LIMIT,
       Math.max(
@@ -457,40 +499,12 @@ export class GenreTrackCatalogService {
     );
 
     try {
-      const candidates = regionalArtists
+      return regionalArtists
         ? regionalArtists.slice(0, candidateLimit)
         : await this.discoveryCatalog.getTopArtistsForTag(
             genre.id,
             candidateLimit,
           );
-      if (candidates.length === 0) {
-        return [];
-      }
-
-      const resolved: Artist[] = [];
-      const seen = new Set<string>();
-
-      for (const candidate of candidates) {
-        if (resolved.length >= limit) {
-          break;
-        }
-        this.quota.assertAvailable();
-
-        const outcome = await this.resolveOneSeedArtist(
-          provider,
-          candidate.name,
-          seen,
-          resolved.length,
-        );
-        if (outcome === 'stop') {
-          break;
-        }
-        if (outcome) {
-          resolved.push(outcome);
-        }
-      }
-
-      return resolved;
     } catch (error) {
       if (isFatalCatalogError(error)) {
         throw error;

@@ -5,6 +5,7 @@ import {
 } from '@blendify/contracts';
 import type { z } from 'zod';
 import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
+import type { TrackAcceptance } from '@/domain/services/accepted-track-pool';
 import {
   monotonicProgressReporter,
   type ProgressReporter,
@@ -12,6 +13,11 @@ import {
 import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import { GenerateGenreMixUseCase } from './generate-genre-mix.use-case';
 import { GenerateDiscoverPlaylistUseCase } from './generate-discover-playlist.use-case';
+
+export interface PlaylistGenerationOptions {
+  onProgress?: ProgressReporter;
+  acceptTrack?: TrackAcceptance;
+}
 
 export type PlaylistGenerationRequest =
   | z.output<typeof GenerateMixRequestSchema>
@@ -27,17 +33,18 @@ export class GeneratePlaylistUseCase {
 
   execute(
     request: PlaylistGenerationRequest,
-    options?: { onProgress?: ProgressReporter },
+    options?: PlaylistGenerationOptions,
   ): Promise<GeneratedPlaylist> {
     switch (request.kind) {
       case 'artist_mix':
-        return this.artistMix.execute(request, progressOptions(options));
+        return this.artistMix.execute(request, generationOptions(options));
       case 'genre_mix':
-        return this.genreMix.execute(request, progressOptions(options));
+        return this.genreMix.execute(request, generationOptions(options));
       default:
         return this.discover.execute(
           request,
-          progressOptions({
+          generationOptions({
+            ...options,
             onProgress: monotonicProgressReporter(options?.onProgress),
           }),
         );
@@ -45,6 +52,12 @@ export class GeneratePlaylistUseCase {
   }
 }
 
-function progressOptions(options?: { onProgress?: ProgressReporter }) {
-  return options?.onProgress ? { onProgress: options.onProgress } : undefined;
+function generationOptions(
+  options?: PlaylistGenerationOptions,
+): PlaylistGenerationOptions | undefined {
+  const selected = {
+    ...(options?.onProgress ? { onProgress: options.onProgress } : {}),
+    ...(options?.acceptTrack ? { acceptTrack: options.acceptTrack } : {}),
+  };
+  return Object.keys(selected).length > 0 ? selected : undefined;
 }

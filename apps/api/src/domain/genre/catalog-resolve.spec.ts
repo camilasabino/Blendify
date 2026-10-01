@@ -1,10 +1,12 @@
 import {
   isSpotifyQuotaError,
-  resolveAttemptBudget,
-  resolveCatalogTracks,
-  resolveCatalogWithPoolExpand,
+  resolveChartIntoPool,
+  resolveRefsIntoPool,
   seedResolveAttemptLimit,
+  type CatalogResolveProgress,
 } from './catalog-resolve';
+import { CatalogChartCursor, type CatalogTrackRef } from './catalog-window';
+import { AcceptedTrackPool } from '@/domain/services/accepted-track-pool';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
@@ -25,15 +27,39 @@ function makeTrack(id: string, artistId = 'a1'): Track {
   });
 }
 
-describe('resolveAttemptBudget', () => {
-  it('keeps a small over-fetch only', () => {
-    expect(resolveAttemptBudget(20)).toBe(26);
-    expect(resolveAttemptBudget(4)).toBe(10);
-    expect(resolveAttemptBudget(0)).toBe(0);
-  });
-});
+async function resolveCatalogTracks(
+  provider: CatalogProviderPort,
+  refs: CatalogTrackRef[],
+  options: {
+    needed: number;
+    concurrency?: number;
+    artistId?: string;
+    onProgress?: (update: CatalogResolveProgress) => void;
+  },
+): Promise<Track[]> {
+  const pool = new AcceptedTrackPool(options.needed);
+  await resolveRefsIntoPool(provider, refs, pool, options);
+  return pool.tracks;
+}
 
-describe('resolveCatalogTracks', () => {
+async function resolveCatalogWithPoolExpand(
+  provider: CatalogProviderPort,
+  chart: CatalogTrackRef[],
+  mode: PopularityMode,
+  needed: number,
+  options: { concurrency?: number; maxAttempts?: number; random: () => number },
+): Promise<Track[]> {
+  const pool = new AcceptedTrackPool(needed);
+  await resolveChartIntoPool(
+    provider,
+    new CatalogChartCursor(chart, mode, options.random),
+    pool,
+    options,
+  );
+  return pool.tracks;
+}
+
+describe('resolveRefsIntoPool', () => {
   it('stops after needed and stays serial-friendly', async () => {
     let calls = 0;
     const provider = {
@@ -210,7 +236,7 @@ describe('resolveCatalogTracks', () => {
   });
 });
 
-describe('resolveCatalogWithPoolExpand', () => {
+describe('resolveChartIntoPool', () => {
   it('expands beyond the popular 40% when the head pool fails to resolve', async () => {
     const chart = Array.from({ length: 50 }, (_, i) => ({
       artistName: 'A',
@@ -367,6 +393,62 @@ describe('resolveCatalogWithPoolExpand', () => {
       ),
     ).rejects.toBeInstanceOf(CatalogUnavailableError);
     expect(resolveTrack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('resolveChartIntoPool resumption', () => {
+  it('continues from unattempted chart entries when the pool target grows', async () => {
+    const attempted: string[] = [];
+    const provider = {
+      resolveTrack: (_artist: string, title: string) => {
+        attempted.push(title);
+        return Promise.resolve(makeTrack(title.replace('Song ', 't')));
+      },
+    } as unknown as CatalogProviderPort;
+    const chart = Array.from({ length: 20 }, (_, i) => ({
+      artistName: 'A',
+      trackName: `Song ${i}`,
+    }));
+    const cursor = new CatalogChartCursor(chart, 'balanced', () => 0);
+    const pool = new AcceptedTrackPool(3);
+
+    await resolveChartIntoPool(provider, cursor, pool);
+    pool.growTarget(6);
+    await resolveChartIntoPool(provider, cursor, pool);
+
+    expect(pool.size).toBe(6);
+    expect(attempted).toHaveLength(6);
+    expect(new Set(attempted).size).toBe(6);
+  });
+
+  it('never counts another version of an accepted recording toward the target', async () => {
+    const provider = {
+      resolveTrack: (_artist: string, title: string) =>
+        Promise.resolve(
+          Track.create({
+            id: TrackId.create(title),
+            name: title,
+            artistId: ArtistId.create('a1'),
+            artistName: 'A',
+            durationMs: 180_000,
+            popularity: 40,
+            uri: `spotify:track:${title}`,
+          }),
+        ),
+    } as unknown as CatalogProviderPort;
+    const chart = ['One', 'One - Live', 'One - Demo', 'Two', 'Three'].map(
+      (trackName) => ({ artistName: 'A', trackName }),
+    );
+
+    const tracks = await resolveCatalogWithPoolExpand(
+      provider,
+      chart,
+      PopularityMode.BALANCED,
+      3,
+      { random: () => 0.999 },
+    );
+
+    expect(tracks.map((track) => track.name)).toEqual(['One', 'Two', 'Three']);
   });
 });
 

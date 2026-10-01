@@ -10,6 +10,7 @@ import {
   type AiSession,
 } from '@/domain/ai/ai-session';
 import {
+  exclusionMatcher,
   selectAiTracks,
   totalDurationMs,
 } from '@/domain/ai/ai-track-selection';
@@ -183,10 +184,11 @@ export class GenerateAiPlaylistUseCase {
 
     requireAuthority(lease);
     const plan = buildAiExecutionPlan(intent, resolution.seeds);
-    const generated = await this.generator.execute(
-      plan.request,
-      onProgress ? { onProgress } : undefined,
-    );
+    const isExcluded = exclusionMatcher(plan.exclusions);
+    const generated = await this.generator.execute(plan.request, {
+      ...(onProgress ? { onProgress } : {}),
+      acceptTrack: (track) => !isExcluded(track),
+    });
     requireAuthority(lease);
     const selection = selectAiTracks({
       tracks: generated.tracks,

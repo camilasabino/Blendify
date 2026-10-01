@@ -80,15 +80,18 @@ export function refinementStrategy(input: {
 
 export function fillCandidateTrackCount(
   proposed: AiIntent,
-  retainedTrackCount: number,
+  keptTrackCount: number,
   currentTrackCount: number,
 ): number {
-  const target =
-    proposed.targetTrackCount ??
-    (proposed.targetDurationMinutes === null
-      ? currentTrackCount
-      : candidateTrackCountForDuration(proposed.targetDurationMinutes));
-  return Math.min(MAX_TRACKS, target + retainedTrackCount);
+  if (
+    proposed.targetTrackCount === null &&
+    proposed.targetDurationMinutes !== null
+  ) {
+    return candidateTrackCountForDuration(proposed.targetDurationMinutes);
+  }
+
+  const target = proposed.targetTrackCount ?? currentTrackCount;
+  return Math.min(MAX_TRACKS, Math.max(1, target - keptTrackCount));
 }
 
 export function retainedTracks(

@@ -121,29 +121,22 @@ export class GenrePlaylistGenerationService {
 
   generate(input: GenreGenerationInput): GenreGenerationResult {
     const allocation = new Map<string, number>();
-    const selectedByGenre = new Map<string, Track[]>();
+    const taken = new Set<string>();
+    const byRealArtist = new Map<string, Track[]>();
 
     for (const [genreId, tracks] of input.tracksByGenre.entries()) {
-      const cleaned = this.deduplication.deduplicate(tracks);
+      const unclaimed = this.deduplication
+        .deduplicate(tracks)
+        .filter((track) => !taken.has(this.duplicateSpec.keyFor(track)));
       const diverse = selectTracksWithArtistDiversity(
-        cleaned,
+        unclaimed,
         input.tracksPerSeed,
         { maxPerArtist: GENRE_MIX_MAX_TRACKS_PER_ARTIST },
       );
       allocation.set(genreId, diverse.length);
-      selectedByGenre.set(genreId, diverse);
-    }
 
-    const seen = new Set<string>();
-    const byRealArtist = new Map<string, Track[]>();
-
-    for (const tracks of selectedByGenre.values()) {
-      for (const track of tracks) {
-        const key = this.duplicateSpec.keyFor(track);
-        if (seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
+      for (const track of diverse) {
+        taken.add(this.duplicateSpec.keyFor(track));
         const artistId = track.artistId.getValue();
         const bucket = byRealArtist.get(artistId);
         if (bucket) {

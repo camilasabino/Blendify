@@ -1028,7 +1028,7 @@ describe('ProposeAiRefinementUseCase', () => {
       expect(world.generator.execute).toHaveBeenCalledTimes(1);
       expect(world.generator.execute.mock.calls[0][0]).toMatchObject({
         popularity: 'balanced',
-        tracksPerSeed: 4,
+        tracksPerSeed: 1,
       });
     });
 

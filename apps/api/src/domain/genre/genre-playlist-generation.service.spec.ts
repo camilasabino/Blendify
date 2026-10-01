@@ -109,4 +109,38 @@ describe('GenrePlaylistGenerationService', () => {
     const names = result.tracks.map((t) => t.name);
     expect(names).not.toContain('A1 - Live');
   });
+
+  it('replaces a track already taken by an earlier genre with an unused candidate of the later genre', () => {
+    const service = new GenrePlaylistGenerationService();
+    const shared = [track('s1', 'Shared 1'), track('s2', 'Shared 2')];
+    const tracksByGenre = new Map([
+      [
+        'rock',
+        [...shared, track('r1', 'R1'), track('r2', 'R2'), track('r3', 'R3')],
+      ],
+      [
+        'pop',
+        [
+          ...shared,
+          track('p1', 'P1'),
+          track('p2', 'P2'),
+          track('p3', 'P3'),
+          track('p4', 'P4'),
+          track('p5', 'P5'),
+        ],
+      ],
+    ]);
+
+    const result = service.generate({
+      tracksByGenre,
+      tracksPerSeed: 5,
+      orderMode: TrackOrderMode.ARTIST,
+    });
+
+    const artists = result.tracks.map((t) => t.artistId.getValue());
+    expect(result.tracks).toHaveLength(10);
+    expect(new Set(artists).size).toBe(10);
+    expect(artists.filter((id) => id.startsWith('p'))).toHaveLength(5);
+    expect(result.allocation.get('pop')).toBe(5);
+  });
 });

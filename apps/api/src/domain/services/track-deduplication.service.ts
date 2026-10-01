@@ -20,7 +20,7 @@ export class TrackDeduplicationService {
         continue;
       }
 
-      byKey.set(key, this.prefer(existing, track));
+      byKey.set(key, this.preferred(existing, track));
     }
 
     return Array.from(byKey.values());
@@ -38,7 +38,7 @@ export class TrackDeduplicationService {
     return result;
   }
 
-  private prefer(a: Track, b: Track): Track {
+  preferred(a: Track, b: Track): Track {
     const aAlternate = this.alternateSpec.isSatisfiedBy(a);
     const bAlternate = this.alternateSpec.isSatisfiedBy(b);
 
