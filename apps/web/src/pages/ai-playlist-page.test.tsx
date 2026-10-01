@@ -455,6 +455,84 @@ describe('Create with AI page', () => {
     expect(promptField()).toHaveValue(PROMPT)
   })
 
+  describe('when the Create with AI limit is reached', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function advanceWait(ms: number) {
+      for (let elapsed = 0; elapsed < ms; elapsed += 30_000) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(Math.min(30_000, ms - elapsed))
+        })
+      }
+    }
+
+    function rateLimited(details: Record<string, unknown> = {}) {
+      return jsonResponse(
+        { statusCode: 429, code: 'RATE_LIMITED', message: 'raw', details },
+        429,
+      )
+    }
+
+    it('pauses the request and enables Retry only once the wait is over', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      const responses = [
+        () => rateLimited({ retryAfterSeconds: 291 }),
+        () => jsonResponse(createdSession(READY_SESSION), 201),
+      ]
+      const { calls } = stubApi({ 'POST /api/ai/sessions': () => responses.shift()!() })
+      renderPage()
+
+      await user.type(promptField(), 'rancheras')
+      await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Create with AI is temporarily paused')
+      expect(alert).toHaveTextContent(
+        'You’ve reached the temporary Create with AI limit. You can try again in about 5 minutes.',
+      )
+      expect(document.body).not.toHaveTextContent(/Too many requests|429|rate limit|OpenAI/i)
+      expect(screen.getByRole('button', { name: 'Try again in about 5 minutes' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Review request' })).toBeDisabled()
+      expect(promptField()).toHaveValue('rancheras')
+
+      await advanceWait(120_000)
+      expect(screen.getByRole('button', { name: 'Try again in about 3 minutes' })).toBeDisabled()
+
+      await advanceWait(171_000)
+      const retry = screen.getByRole('button', { name: 'Try again' })
+      expect(retry).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Review request' })).toBeEnabled()
+      expect(sessionCalls(calls)).toHaveLength(1)
+      expect(promptField()).toHaveValue('rancheras')
+
+      await user.click(retry)
+
+      await screen.findByRole('heading', { name: 'Here’s what Blendify understood' })
+      expect(sessionCalls(calls).map((call) => call.body)).toEqual([
+        { prompt: 'rancheras' },
+        { prompt: 'rancheras' },
+      ])
+    })
+
+    it('asks to come back in a few minutes when the wait is unknown', async () => {
+      const user = userEvent.setup()
+      stubApi({ 'POST /api/ai/sessions': () => rateLimited() })
+      renderPage()
+
+      await user.type(promptField(), PROMPT)
+      await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'You’ve reached the temporary Create with AI limit. Try again in a few minutes.',
+      )
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+      expect(promptField()).toHaveValue(PROMPT)
+    })
+  })
+
   it('asks to rephrase a rejected request instead of offering Retry', async () => {
     const user = userEvent.setup()
     stubApi({

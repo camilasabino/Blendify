@@ -1274,7 +1274,7 @@ blocks an `api` deploy.
 
 The public endpoints that call the AI service, `POST /api/ai/sessions` and
 `POST /api/ai/sessions/:id/refinements`, share the rate-limit bucket `interpret`
-(default 10 per 10 minutes per client, fail-closed). Refinements are also capped
+(default 30 per 10 minutes per client, fail-closed). Refinements are also capped
 per session by `AI_REFINEMENTS_PER_SESSION` (default 10). A refinement sends the
 AI service only the session's AI-safe intent, the positions or user-authored
 artist names to keep, and the user's refinement text; never tracks, provider IDs

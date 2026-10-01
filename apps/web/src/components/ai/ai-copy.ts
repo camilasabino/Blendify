@@ -10,7 +10,12 @@ import type {
 } from '@blendify/contracts'
 import type { GenreLabelSource } from '@/components/genres/genre-labels'
 import type { MessageKey } from '@/i18n/messages'
-import { ApiError, getApiErrorMessage } from '@/lib/api-error'
+import {
+  ApiError,
+  formatWaitLabel,
+  getApiErrorMessage,
+  readRetryAfterSeconds,
+} from '@/lib/api-error'
 
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string
 
@@ -78,6 +83,19 @@ export function aiErrorMessage(error: unknown, t: Translate): string {
     return t(AI_ERROR_KEYS[error.code])
   }
   return getApiErrorMessage(error, t, 'ai.error.generic')
+}
+
+export function isAiRateLimited(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.code === 'RATE_LIMITED'
+}
+
+export function aiRateLimitRetryAfterSeconds(error: unknown): number | null {
+  return isAiRateLimited(error) ? readRetryAfterSeconds(error.details) : null
+}
+
+export function aiRateLimitMessage(error: ApiError, t: Translate): string {
+  const wait = formatWaitLabel(t, readRetryAfterSeconds(error.details))
+  return wait ? t('ai.error.paused.wait', { wait }) : t('ai.error.paused.later')
 }
 
 export function canRetryAiRequest(error: unknown): boolean {

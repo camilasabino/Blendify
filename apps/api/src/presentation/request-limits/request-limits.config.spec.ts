@@ -42,7 +42,7 @@ describe('resolveRateLimits', () => {
 
   it('defines a dedicated fail-closed AI interpretation bucket', () => {
     expect(DEFAULT_RATE_LIMITS.interpret).toEqual({
-      limit: 10,
+      limit: 30,
       windowMs: 600_000,
       onStoreUnavailable: 'fail-closed',
     });
@@ -50,6 +50,28 @@ describe('resolveRateLimits', () => {
       limit: 4,
       windowMs: 300_000,
       onStoreUnavailable: 'fail-closed',
+    });
+  });
+
+  it('keeps the non-AI bucket defaults', () => {
+    expect(DEFAULT_RATE_LIMITS).toMatchObject({
+      search: { limit: 60, windowMs: 60_000, onStoreUnavailable: 'fail-open' },
+      similar: { limit: 60, windowMs: 60_000, onStoreUnavailable: 'fail-open' },
+      resolve: {
+        limit: 20,
+        windowMs: 60_000,
+        onStoreUnavailable: 'fail-closed',
+      },
+      generation: {
+        limit: 12,
+        windowMs: 600_000,
+        onStoreUnavailable: 'fail-closed',
+      },
+      transfer: {
+        limit: 10,
+        windowMs: 600_000,
+        onStoreUnavailable: 'fail-closed',
+      },
     });
   });
 

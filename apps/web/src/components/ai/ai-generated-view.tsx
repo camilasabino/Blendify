@@ -7,6 +7,7 @@ import type {
   TrackDto,
 } from '@blendify/contracts'
 import { Button } from '@/components/ui/button'
+import { useAiRateLimitWait } from '@/hooks/use-ai-rate-limit-wait'
 import { useAiRefinementDraft } from '@/hooks/use-ai-refinement-draft'
 import type {
   AiFlowState,
@@ -16,6 +17,7 @@ import type {
 import { useT } from '@/i18n/use-t'
 import type { AppMode } from '@/lib/capabilities'
 import { AiGeneratedPlaylist } from './ai-generated-playlist'
+import { isAiRateLimited } from './ai-copy'
 import { AiPlaylistDestination } from './ai-playlist-destination'
 import { AiRefinementBadge } from './ai-refinement-badge'
 import { AiRefinementComposer } from './ai-refinement-composer'
@@ -94,6 +96,8 @@ export function AiGeneratedView({
   const statusKey = statusMessageKey(flow.refinementActivity, settlement)
   const refinementError = flow.refinementError
   const showsDetachedError = Boolean(refinementError) && !canRefine && flow.refinement === null
+  const rateLimitError = isComposing && isAiRateLimited(refinementError) ? refinementError : null
+  const rateLimitWaitSeconds = useAiRateLimitWait(rateLimitError)
   const hasRefinementSurface = isComposing || pendingId !== null
   const hadRefinementSurface = useRef(hasRefinementSurface)
   const { close: closeDraft, open: openDraft, reset: resetDraft } = draft
@@ -163,6 +167,10 @@ export function AiGeneratedView({
   }
 
   function submit() {
+    if (rateLimitWaitSeconds !== null) {
+      return
+    }
+
     const refinement = draft.text.trim()
     if (!refinement) {
       draft.setValidationError(t('ai.refine.required'))
@@ -260,10 +268,12 @@ export function AiGeneratedView({
           isPending={isRefining}
           validationError={draft.validationError}
           requestError={
-            refinementError
+            refinementError && !rateLimitError
               ? refinementErrorMessage(refinementError, t, 'ai.refine.error.generic')
               : null
           }
+          rateLimitError={rateLimitError}
+          rateLimitWaitSeconds={rateLimitWaitSeconds}
           selectedCount={draft.selected.size}
           keptCount={draft.locked.size}
           textareaRef={textareaRef}

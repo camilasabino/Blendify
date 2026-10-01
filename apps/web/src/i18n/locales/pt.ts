@@ -592,6 +592,12 @@ export const pt: Record<MessageKey, string> = {
     'Esta sessão expirou. Envie seu pedido de novo para começar outra.',
   'ai.error.optionUnavailable':
     'Essa opção não está mais disponível. O Blendify carregou a versão mais recente do seu pedido.',
+  'ai.error.paused.title': 'Criar com IA está temporariamente pausado',
+  'ai.error.paused.wait':
+    'Você atingiu o limite temporário do Criar com IA. Você pode tentar de novo em {wait}.',
+  'ai.error.paused.later':
+    'Você atingiu o limite temporário do Criar com IA. Tente de novo em alguns minutos.',
+  'ai.error.paused.retryIn': 'Tentar de novo em {wait}',
   'ai.error.generic': 'Não foi possível ler seu pedido. Tente de novo.',
   'ai.clarify.title': 'Uma coisa para confirmar',
   'ai.clarify.ambiguous':

@@ -39,7 +39,7 @@ export const DEFAULT_RATE_LIMITS: RateLimitPolicies = {
     onStoreUnavailable: 'fail-closed',
   },
   interpret: {
-    limit: 10,
+    limit: 30,
     windowMs: 600_000,
     onStoreUnavailable: 'fail-closed',
   },

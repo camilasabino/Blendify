@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { AiClarification } from '@/components/ai/ai-clarification'
-import { aiErrorMessage, canRetryAiRequest } from '@/components/ai/ai-copy'
+import { aiErrorMessage, canRetryAiRequest, isAiRateLimited } from '@/components/ai/ai-copy'
 import { AiCurrentRequest } from '@/components/ai/ai-current-request'
 import { AiGeneratedView } from '@/components/ai/ai-generated-view'
 import { generationRequestErrorMessage } from '@/components/ai/ai-generation-copy'
@@ -9,6 +9,7 @@ import { AiGenerationFailure } from '@/components/ai/ai-generation-failure'
 import { AiGenerationProgress } from '@/components/ai/ai-generation-progress'
 import { AiIntentSummary } from '@/components/ai/ai-intent-summary'
 import { AiPromptForm } from '@/components/ai/ai-prompt-form'
+import { AiRateLimitNotice, AiRateLimitRetryButton } from '@/components/ai/ai-rate-limit-notice'
 import { AiReviewActions } from '@/components/ai/ai-review-actions'
 import { Button } from '@/components/ui/button'
 import { ErrorState } from '@/components/ui/feedback'
@@ -16,6 +17,7 @@ import { FormSection } from '@/components/ui/form-section'
 import { PageContainer } from '@/components/ui/page-container'
 import { PageHeader } from '@/components/ui/page-header'
 import { LoadingState } from '@/components/ui/spinner'
+import { useAiRateLimitWait } from '@/hooks/use-ai-rate-limit-wait'
 import { useAiSession, type AiFlowPhase, type AiFlowState } from '@/hooks/use-ai-session'
 import { useCapabilities } from '@/hooks/use-capabilities'
 import { useDocumentTitle } from '@/hooks/use-document-title'
@@ -128,6 +130,12 @@ export function AiPlaylistPage() {
     : aiErrorMessage(requestError, t)
   const canRetryRequest =
     composing !== null && !composing.restoreFailed && canRetryAiRequest(requestError)
+  const rateLimitError =
+    composing !== null && !composing.restoreFailed && isAiRateLimited(composing.error)
+      ? composing.error
+      : null
+  const rateLimitWaitSeconds = useAiRateLimitWait(rateLimitError)
+  const isRateLimitWaiting = rateLimitWaitSeconds !== null
 
   function changePrompt(next: string) {
     setPrompt(next)
@@ -135,6 +143,10 @@ export function AiPlaylistPage() {
   }
 
   function submitPrompt() {
+    if (isRateLimitWaiting) {
+      return
+    }
+
     const trimmed = prompt.trim()
     if (!trimmed) {
       setValidationError(t('ai.promptRequired'))
@@ -191,6 +203,7 @@ export function AiPlaylistPage() {
             onPromptChange={changePrompt}
             onSubmit={submitPrompt}
             isPending={isInterpreting}
+            isSubmitBlocked={isRateLimitWaiting}
             validationError={validationError}
             textareaRef={targets.textarea}
             onCancel={isEditing ? cancelEdit : undefined}
@@ -202,7 +215,13 @@ export function AiPlaylistPage() {
         {isInterpreting ? t('ai.interpreting') : ''}
       </p>
 
-      {requestError && !isInterpreting ? (
+      {rateLimitError && !isInterpreting ? (
+        <AiRateLimitNotice error={rateLimitError}>
+          <AiRateLimitRetryButton waitSeconds={rateLimitWaitSeconds} onRetry={submitPrompt} />
+        </AiRateLimitNotice>
+      ) : null}
+
+      {requestError && !rateLimitError && !isInterpreting ? (
         <ErrorState message={requestErrorMessage} messageRole="alert">
           {composing?.restoreFailed ? (
             <Button

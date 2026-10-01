@@ -585,6 +585,12 @@ export const en = {
     'This session expired. Submit your request again to start a new one.',
   'ai.error.optionUnavailable':
     'That choice is no longer available. Blendify loaded the latest version of your request.',
+  'ai.error.paused.title': 'Create with AI is temporarily paused',
+  'ai.error.paused.wait':
+    'You’ve reached the temporary Create with AI limit. You can try again in {wait}.',
+  'ai.error.paused.later':
+    'You’ve reached the temporary Create with AI limit. Try again in a few minutes.',
+  'ai.error.paused.retryIn': 'Try again in {wait}',
   'ai.error.generic': 'Couldn’t read your request. Try again.',
   'ai.clarify.title': 'One thing to confirm',
   'ai.clarify.ambiguous':

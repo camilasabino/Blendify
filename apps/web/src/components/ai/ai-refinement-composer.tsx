@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useT } from '@/i18n/use-t'
 import type { MessageKey } from '@/i18n/messages'
+import { formatWaitLabel, type ApiError } from '@/lib/api-error'
+import { AiRateLimitNotice } from './ai-rate-limit-notice'
 
 const EXAMPLE_KEYS: readonly MessageKey[] = [
   'ai.refine.example.lessMainstream',
@@ -24,6 +26,8 @@ type AiRefinementComposerProps = Readonly<{
   isPending: boolean
   validationError: string | null
   requestError: string | null
+  rateLimitError: ApiError | null
+  rateLimitWaitSeconds: number | null
   selectedCount: number
   keptCount: number
   textareaRef: RefObject<HTMLTextAreaElement | null>
@@ -37,6 +41,8 @@ export function AiRefinementComposer({
   isPending,
   validationError,
   requestError,
+  rateLimitError,
+  rateLimitWaitSeconds,
   selectedCount,
   keptCount,
   textareaRef,
@@ -46,6 +52,7 @@ export function AiRefinementComposer({
   const fieldId = useId()
   const hintId = useId()
   const errorId = useId()
+  const wait = formatWaitLabel(t, rateLimitWaitSeconds)
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -57,6 +64,13 @@ export function AiRefinementComposer({
       event.preventDefault()
       onSubmit()
     }
+  }
+
+  function submitLabel() {
+    if (isPending) {
+      return t('ai.refine.refining')
+    }
+    return wait ? t('ai.error.paused.retryIn', { wait }) : t('ai.refine.submit')
   }
 
   function applyExample(key: MessageKey) {
@@ -133,10 +147,17 @@ export function AiRefinementComposer({
           </p>
         ) : null}
 
+        {rateLimitError && !isPending ? <AiRateLimitNotice error={rateLimitError} /> : null}
+
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button type="submit" className="w-full sm:w-auto" loading={isPending}>
+          <Button
+            type="submit"
+            className="w-full sm:w-auto"
+            loading={isPending}
+            disabled={wait !== null}
+          >
             {isPending ? null : <Sparkles aria-hidden className="size-4" />}
-            {isPending ? t('ai.refine.refining') : t('ai.refine.submit')}
+            {submitLabel()}
           </Button>
           {isPending ? null : (
             <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onCancel}>

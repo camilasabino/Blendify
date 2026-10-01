@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AiRefinementDto } from '@blendify/contracts'
 import {
@@ -133,6 +133,63 @@ describe('Create with AI refinement', () => {
       expect(screen.getByRole('heading', { name: SUGGESTED_TITLE })).toHaveFocus(),
     )
     expect(document.body.textContent).not.toContain('server detail')
+  })
+
+  it('pauses a refinement at the Create with AI limit and keeps the draft until the wait is over', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      const responses = [
+        () =>
+          jsonResponse(
+            {
+              statusCode: 429,
+              code: 'RATE_LIMITED',
+              message: 'server detail',
+              details: { retryAfterSeconds: 45 },
+            },
+            429,
+          ),
+        () => refinementResult({ id: AI_REFINEMENT_ID, status: 'unchanged' }),
+      ]
+      const { calls } = await renderPage({ [REFINE_ROUTE]: () => responses.shift()!() })
+      const textarea = await openComposer(user)
+
+      await user.click(screen.getByRole('checkbox', { name: 'Keep “Song 2” in place' }))
+      await user.type(textarea, 'make it less mainstream')
+      await user.click(screen.getByRole('button', { name: 'Propose changes' }))
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Create with AI is temporarily paused')
+      expect(alert).toHaveTextContent(
+        'You’ve reached the temporary Create with AI limit. You can try again in about 45 seconds.',
+      )
+      expect(document.body).not.toHaveTextContent(/Too many requests|server detail/)
+      expect(screen.getByRole('button', { name: 'Try again in about 45 seconds' })).toBeDisabled()
+      expect(textarea).toHaveValue('make it less mainstream')
+      expect(screen.getByRole('checkbox', { name: 'Keep “Song 2” in place' })).toBeChecked()
+      expect(screen.getByRole('heading', { name: SUGGESTED_TITLE })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Apply changes' })).toBeNull()
+
+      for (const step of [30_000, 15_000]) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(step)
+        })
+      }
+      const submit = screen.getByRole('button', { name: 'Propose changes' })
+      expect(submit).toBeEnabled()
+      expect(refinementCalls(calls)).toHaveLength(1)
+
+      await user.click(submit)
+
+      await screen.findByRole('heading', { name: 'No changes needed' })
+      expect(refinementCalls(calls).map((call) => call.body)).toEqual([
+        { refinement: 'make it less mainstream', preservePositions: { add: [2], remove: [] } },
+        { refinement: 'make it less mainstream', preservePositions: { add: [2], remove: [] } },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('hides Refine playlist once the playlist has a destination', async () => {

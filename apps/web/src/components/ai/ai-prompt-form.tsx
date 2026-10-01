@@ -21,6 +21,7 @@ type AiPromptFormProps = Readonly<{
   onPromptChange: (prompt: string) => void
   onSubmit: () => void
   isPending: boolean
+  isSubmitBlocked?: boolean
   validationError: string | null
   textareaRef: RefObject<HTMLTextAreaElement | null>
   onCancel?: () => void
@@ -31,6 +32,7 @@ export function AiPromptForm({
   onPromptChange,
   onSubmit,
   isPending,
+  isSubmitBlocked = false,
   validationError,
   textareaRef,
   onCancel,
@@ -101,6 +103,7 @@ export function AiPromptForm({
           size="lg"
           className="w-full sm:w-auto"
           loading={isPending}
+          disabled={isSubmitBlocked}
         >
           {!isPending ? <Sparkles aria-hidden className="size-4" /> : null}
           {isPending ? t('ai.submitting') : t('ai.submit')}

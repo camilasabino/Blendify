@@ -1,7 +1,13 @@
 import { AI_CLARIFICATION_REASONS, type AiClarification } from '@blendify/contracts'
 import { LOCALES, messages, type Locale, type MessageKey } from '@/i18n/messages'
 import { ApiError } from '@/lib/api-error'
-import { aiErrorMessage, canRetryAiRequest, clarificationMessage } from './ai-copy'
+import {
+  aiErrorMessage,
+  aiRateLimitMessage,
+  canRetryAiRequest,
+  clarificationMessage,
+  isAiRateLimited,
+} from './ai-copy'
 
 function apiError(status: number, code: string) {
   return new ApiError(code, status, { statusCode: status, code, message: 'Raw server message' })
@@ -102,5 +108,40 @@ describe.each(LOCALES)('Create with AI clarification copy (%s)', (locale) => {
 
     expect(aiErrorMessage(error, t)).toBe(t('ai.error.generic'))
     expect(canRetryAiRequest(error)).toBe(true)
+  })
+})
+
+describe('Create with AI temporary limit copy', () => {
+  const t = translator('en')
+
+  function rateLimited(details?: Record<string, unknown>) {
+    return new ApiError('RATE_LIMITED', 429, {
+      statusCode: 429,
+      code: 'RATE_LIMITED',
+      message: 'Raw server message',
+      details,
+    })
+  }
+
+  it.each([
+    [291, 'You’ve reached the temporary Create with AI limit. You can try again in about 5 minutes.'],
+    [45, 'You’ve reached the temporary Create with AI limit. You can try again in about 45 seconds.'],
+    [0, 'You’ve reached the temporary Create with AI limit. Try again in a few minutes.'],
+    ['soon', 'You’ve reached the temporary Create with AI limit. Try again in a few minutes.'],
+  ])('describes a retryAfterSeconds of %s', (retryAfterSeconds, message) => {
+    expect(aiRateLimitMessage(rateLimited({ retryAfterSeconds }), t)).toBe(message)
+  })
+
+  it('recognizes only Blendify request limits', () => {
+    expect(isAiRateLimited(rateLimited())).toBe(true)
+    expect(isAiRateLimited(apiError(429, 'AI_RATE_LIMITED'))).toBe(false)
+    expect(isAiRateLimited(apiError(429, 'SPOTIFY_RATE_LIMITED'))).toBe(false)
+    expect(isAiRateLimited(apiError(503, 'CAPACITY_EXCEEDED'))).toBe(false)
+  })
+
+  it('keeps the generic request-limit copy outside interpretation and refinement', () => {
+    expect(aiErrorMessage(rateLimited({ retryAfterSeconds: 30 }), t)).toBe(
+      'Too many requests. Try again in about 30 seconds.',
+    )
   })
 })

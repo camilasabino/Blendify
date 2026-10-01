@@ -151,7 +151,7 @@ function waitCountLabel(
   return t(many, { n })
 }
 
-function readRetryAfterSeconds(details?: Record<string, unknown>): number | null {
+export function readRetryAfterSeconds(details?: Record<string, unknown>): number | null {
   const retryRaw = details?.retryAfterSeconds
   if (typeof retryRaw === 'number' && Number.isFinite(retryRaw) && retryRaw > 0) {
     return retryRaw
