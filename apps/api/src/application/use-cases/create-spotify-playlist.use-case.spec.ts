@@ -4,6 +4,7 @@ import type {
   PlaylistGeneration,
   PlaylistSeedDto,
 } from '@blendify/contracts';
+import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
 import type { MusicProviderPort } from '@/domain/repositories/music-provider.port';
 import type { UsageStatsRepositoryPort } from '@/domain/repositories/usage-stats.repository.port';
@@ -340,6 +341,25 @@ describe('CreateSpotifyPlaylistUseCase', () => {
         },
       ],
     });
+  });
+
+  it('does not publish when Discover rejects a pool without enough related artists', async () => {
+    const context = setup();
+    context.discover.mockRejectedValue(
+      new BusinessRuleError(
+        'Not enough related tracks to build a Discover mix. Try another song.',
+        'DISCOVER_NOT_ENOUGH_SIMILAR',
+      ),
+    );
+
+    await expect(
+      context.useCase.execute({
+        userId: 'user-1',
+        request: discoverTrackRequest,
+      }),
+    ).rejects.toMatchObject({ code: 'DISCOVER_NOT_ENOUGH_SIMILAR' });
+    expect(context.publish).not.toHaveBeenCalled();
+    expect(context.recordMix).not.toHaveBeenCalled();
   });
 
   it('keeps Discover progress monotonic across generation and publication', async () => {

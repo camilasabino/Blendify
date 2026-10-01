@@ -507,3 +507,239 @@ describe('GenerateDiscoverPlaylistUseCase seed snapshot popularity', () => {
     await expect(seedPopularity(null)).resolves.toBeNull();
   });
 });
+
+describe('GenerateDiscoverPlaylistUseCase seed artist share', () => {
+  const BERRA = makeTrack('Adrián Berra', 'Un Beso en la Nariz');
+  const SERU = makeTrack('Serú Girán', 'Seminare');
+
+  type Fixture = {
+    seed: Track;
+    similarTracks?: SimilarTrackCandidate[];
+    similarArtists?: string[];
+    topTracks?: Record<string, number>;
+    resolve?: (artistName: string, trackName: string) => Track | null;
+  };
+
+  function discoverCase(fixture: Fixture) {
+    const resolveTrack = jest.fn((artistName: string, trackName: string) =>
+      Promise.resolve(
+        fixture.resolve
+          ? fixture.resolve(artistName, trackName)
+          : makeTrack(artistName, trackName),
+      ),
+    );
+    const getTopTracksForArtist = jest.fn((artistName: string) =>
+      Promise.resolve(
+        Array.from(
+          { length: fixture.topTracks?.[artistName] ?? 0 },
+          (_, index) => ({
+            artistName,
+            trackName: `${artistName} Hit ${index}`,
+            playcount: 50_000 - index * 1_000,
+          }),
+        ),
+      ),
+    );
+    const getSimilarArtists = jest
+      .fn()
+      .mockResolvedValue(
+        (fixture.similarArtists ?? []).map((name) => ({ name })),
+      );
+    const catalog = {
+      searchTracks: jest.fn().mockResolvedValue([fixture.seed]),
+      resolveTrack,
+    } as unknown as CatalogProviderPort;
+    const discovery = {
+      isConfigured: () => true,
+      getSimilarTracks: jest
+        .fn()
+        .mockResolvedValue(fixture.similarTracks ?? []),
+      getTopTracksForArtist,
+      getSimilarArtists,
+    } as unknown as DiscoveryCatalogPort;
+    const useCase = new GenerateDiscoverPlaylistUseCase(
+      {} as GenerateArtistMixUseCase,
+      discovery,
+      { forMarket: () => catalog },
+      { assertAvailable: jest.fn() },
+    );
+
+    const run = (targetTrackCount = TARGET) =>
+      useCase.execute({
+        kind: 'discover_track',
+        market: 'AR',
+        trackId: fixture.seed.id.getValue(),
+        track: {
+          id: fixture.seed.id.getValue(),
+          name: fixture.seed.name,
+          artistId: fixture.seed.artistId.getValue(),
+          artistName: fixture.seed.artistName,
+        },
+        targetTrackCount,
+        popularity: PopularityMode.BALANCED,
+        orderMode: 'random',
+      });
+
+    return { run, resolveTrack, getTopTracksForArtist, getSimilarArtists };
+  }
+
+  function candidates(artistName: string, count: number, offset = 0) {
+    return Array.from({ length: count }, (_, index) => ({
+      name: `${artistName} Song ${index + offset}`,
+      artistName,
+      playcount: 10_000 + index,
+    }));
+  }
+
+  function neighbors(count: number): SimilarTrackCandidate[] {
+    return Array.from({ length: count }, (_, index) => ({
+      name: `Neighbor Song ${index}`,
+      artistName: `Neighbor ${index}`,
+      playcount: 10_000 + index,
+    }));
+  }
+
+  function seedArtistCount(tracks: readonly Track[], seed: Track): number {
+    return tracks.filter((track) => track.artistId.equals(seed.artistId))
+      .length;
+  }
+
+  function rejectionCode(promise: Promise<unknown>) {
+    return promise.then(
+      () => null,
+      (error: BusinessRuleError) => error.code,
+    );
+  }
+
+  it('fills an empty similar-track answer from similar artists instead of the seed artist', async () => {
+    const context = discoverCase({
+      seed: BERRA,
+      similarArtists: ['Kevin Johansen', 'Jorge Drexler', 'Coti', 'Juanse'],
+      topTracks: {
+        'Adrián Berra': 20,
+        'Kevin Johansen': 8,
+        'Jorge Drexler': 8,
+        Coti: 8,
+        Juanse: 8,
+      },
+    });
+
+    const playlist = await context.run();
+
+    expect(playlist.tracks).toHaveLength(TARGET);
+    expect(seedArtistCount(playlist.tracks, BERRA)).toBe(0);
+    expect(
+      new Set(playlist.tracks.map((track) => track.artistId.getValue())).size,
+    ).toBeGreaterThan(1);
+    expect(context.getTopTracksForArtist).not.toHaveBeenCalledWith(
+      'Adrián Berra',
+      expect.any(Number),
+    );
+  });
+
+  it('rejects a seed-artist-only pool before resolving any track on Spotify', async () => {
+    const context = discoverCase({
+      seed: BERRA,
+      topTracks: { 'Adrián Berra': 20 },
+    });
+
+    await expect(rejectionCode(context.run())).resolves.toBe(
+      'DISCOVER_NOT_ENOUGH_SIMILAR',
+    );
+    expect(context.getSimilarArtists).toHaveBeenCalled();
+    expect(context.resolveTrack).not.toHaveBeenCalled();
+  });
+
+  it('keeps a varied similar-track answer without fallbacks', async () => {
+    const context = discoverCase({
+      seed: SERU,
+      similarTracks: [
+        ...candidates('Charly García', 4),
+        ...candidates('Luis Alberto Spinetta', 3),
+        ...candidates('Sui Generis', 3),
+        ...candidates('Pescado Rabioso', 3),
+        ...candidates('Fito Páez', 2),
+        ...candidates('León Gieco', 2),
+        ...candidates('Serú Girán', 3),
+      ],
+    });
+
+    const playlist = await context.run();
+
+    expect(playlist.tracks).toHaveLength(TARGET);
+    expect(
+      new Set(playlist.tracks.map((track) => track.artistId.getValue())).size,
+    ).toBeGreaterThanOrEqual(6);
+    expect(seedArtistCount(playlist.tracks, SERU)).toBe(0);
+    expect(context.getSimilarArtists).not.toHaveBeenCalled();
+    expect(context.getTopTracksForArtist).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { target: 1, related: 1, seed: 5, tracks: 1, fromSeed: 0 },
+    { target: 1, related: 0, seed: 5, tracks: null, fromSeed: 0 },
+    { target: 3, related: 2, seed: 5, tracks: null, fromSeed: 0 },
+    { target: 4, related: 3, seed: 5, tracks: 4, fromSeed: 1 },
+    { target: 15, related: 9, seed: 10, tracks: 12, fromSeed: 3 },
+    { target: 50, related: 40, seed: 20, tracks: 50, fromSeed: 10 },
+    { target: 50, related: 50, seed: 20, tracks: 50, fromSeed: 0 },
+  ])(
+    'caps seed-artist tracks for target $target with $related related candidate(s)',
+    async ({ target, related, seed, tracks, fromSeed }) => {
+      const context = discoverCase({
+        seed: BERRA,
+        similarTracks: [
+          ...neighbors(related),
+          ...candidates('Adrián Berra', seed),
+        ],
+        topTracks: { 'Adrián Berra': 0 },
+      });
+
+      if (tracks === null) {
+        await expect(rejectionCode(context.run(target))).resolves.toBe(
+          'DISCOVER_NOT_ENOUGH_SIMILAR',
+        );
+        return;
+      }
+
+      const playlist = await context.run(target);
+
+      expect(playlist.tracks).toHaveLength(tracks);
+      expect(seedArtistCount(playlist.tracks, BERRA)).toBe(fromSeed);
+    },
+  );
+
+  it('counts a Spotify co-credit with the seed artist as the seed artist', async () => {
+    const context = discoverCase({
+      seed: BERRA,
+      similarTracks: neighbors(8),
+      resolve: (artistName, trackName) => {
+        const base = makeTrack(artistName, trackName);
+        if (Number(trackName.at(-1)) % 2 === 1) {
+          return base;
+        }
+        return Track.create({
+          id: base.id,
+          name: base.name,
+          artistId: base.artistId,
+          artistName,
+          durationMs: base.durationMs,
+          popularity: base.popularity,
+          uri: base.uri,
+          artists: [
+            { id: base.artistId.getValue(), name: artistName },
+            { id: BERRA.artistId.getValue(), name: BERRA.artistName },
+          ],
+        });
+      },
+    });
+
+    const playlist = await context.run(8);
+
+    const coCredited = playlist.tracks.filter((track) =>
+      track.artists.some((artist) => artist.id === BERRA.artistId.getValue()),
+    );
+    expect(playlist.tracks).toHaveLength(5);
+    expect(coCredited).toHaveLength(1);
+  });
+});
