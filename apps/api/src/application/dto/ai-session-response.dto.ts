@@ -12,7 +12,7 @@ import {
   type AiIntent,
   type AiIntentClarification,
 } from '@/domain/ai/ai-intent';
-import { resolveCuratedGenreSeeds } from '@/domain/ai/ai-genre-seeds';
+import { resolveAiGenreSeeds } from '@/domain/ai/ai-genre-seeds';
 import type { AiGenerationResult, AiSession } from '@/domain/ai/ai-session';
 import { aiSessionId } from '@/application/services/ai-session-credential';
 
@@ -42,12 +42,13 @@ export function toAiSessionCreatedResponse(
 }
 
 export function toIntentSummary(intent: AiIntent): AiIntentSummary {
+  const genreSeeds = resolveAiGenreSeeds(intent.genres);
+
   return {
     kind: intent.kind,
     artists: intent.artists,
-    genres: resolveCuratedGenreSeeds(intent.genres).genres.map(
-      (genre) => genre.name,
-    ),
+    genres: genreSeeds.genres.map((genre) => genre.name),
+    region: genreSeeds.region,
     seedTrack: intent.seedTracks[0] ?? null,
     targetTrackCount: intent.targetTrackCount,
     targetDurationMinutes: intent.targetDurationMinutes,

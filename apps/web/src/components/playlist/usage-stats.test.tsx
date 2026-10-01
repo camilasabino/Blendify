@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { useLocaleStore } from '@/i18n/use-locale'
 import { UsageStatsView } from './usage-stats'
 
 function statsWithArtist(artist: {
@@ -70,5 +71,26 @@ describe('UsageStatsView', () => {
     fireEvent.error(img as HTMLImageElement)
 
     expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('shows top genres with their localized label', () => {
+    useLocaleStore.getState().setLocale('es')
+    const stats = {
+      ...statsWithArtist({ seedKey: 'artist-1', name: 'Sade' }),
+      topGenres: [
+        {
+          seedKey: 'ballad',
+          name: 'Ballad',
+          useCount: 3,
+          lastUsedAt: '2026-09-25T00:00:00.000Z',
+        },
+      ],
+    }
+
+    render(<UsageStatsView stats={stats} />)
+
+    expect(screen.getByText('Balada')).toBeVisible()
+    expect(screen.queryByText('Ballad')).not.toBeInTheDocument()
+    useLocaleStore.getState().setLocale('en')
   })
 })

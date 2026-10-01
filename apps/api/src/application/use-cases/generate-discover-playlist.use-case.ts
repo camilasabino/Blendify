@@ -45,6 +45,7 @@ import {
 } from '@/domain/playlist/discover-playlist-name';
 import { primaryArtistName } from '@/domain/discovery/similar-track-query';
 import { selectSimilarTrackCandidates } from '@/domain/discovery/similar-track-familiarity';
+import { orderBySimilarityRankingBands } from '@/domain/discovery/similar-artist-ranking-bands';
 import {
   isSeedArtistCandidate,
   isSeedArtistTrack,
@@ -117,7 +118,7 @@ export class GenerateDiscoverPlaylistUseCase {
         DISCOVER_SIMILAR_FETCH,
       );
       const seedKey = normalizeArtistName(seed.name);
-      similarNames = similar
+      similarNames = orderBySimilarityRankingBands(similar)
         .map((a) => a.name.trim())
         .filter((name) => name && normalizeArtistName(name) !== seedKey);
     } catch (error) {

@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GenreCatalogService } from '@/application/services/genre-catalog.service';
-import { toGenreDto } from '@/domain/genre/curated-genres';
+import { toGenreDto } from '@/domain/genre/genre-catalog';
 import { SearchQuerySchema, type SearchQuery } from '@blendify/contracts';
 import { ZodValidationPipe } from '@/presentation/pipes/zod-validation.pipe';
 
@@ -11,13 +11,13 @@ export class GenresController {
   constructor(private readonly catalog: GenreCatalogService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List curated genres' })
+  @ApiOperation({ summary: 'List featured genres' })
   list() {
     return { genres: this.catalog.listMain().map(toGenreDto) };
   }
 
   @Get('search')
-  @ApiOperation({ summary: 'Search curated genres' })
+  @ApiOperation({ summary: 'Search genres' })
   search(@Query(new ZodValidationPipe(SearchQuerySchema)) query: SearchQuery) {
     return {
       genres: this.catalog

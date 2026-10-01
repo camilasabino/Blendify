@@ -1,29 +1,29 @@
 {
-  "happy": ["dance-pop", "disco", "funk", "motown", "power-pop"],
-  "calm": ["ambient", "chill-out", "lo-fi-beats", "bossa-nova", "indie-folk"],
+  "happy": ["dance-pop", "disco", "funk", "motown", "power pop"],
+  "calm": ["ambient", "chillout", "lo-fi hip hop", "bossa nova", "indie folk"],
   "energetic": [
     "edm",
-    "electro-house",
-    "drum-and-bass",
-    "hard-rock",
-    "pop-punk"
+    "electro house",
+    "drum and bass",
+    "hard rock",
+    "pop punk"
   ],
-  "sad": ["slowcore", "sad-rap", "emo", "blues", "singer-songwriter"],
-  "romantic": ["r-b", "quiet-storm", "neo-soul", "bolero", "soft-rock"],
-  "angry": ["punk", "hardcore-punk", "thrash-metal", "nu-metal", "rap-metal"],
+  "sad": ["slowcore", "emo rap", "emo", "blues", "singer-songwriter"],
+  "romantic": ["r&b", "quiet storm", "neo soul", "bolero", "soft rock"],
+  "angry": ["punk", "hardcore punk", "thrash metal", "nu metal", "rap metal"],
   "dark": [
-    "gothic-rock",
+    "gothic rock",
     "post-punk",
-    "dark-ambient",
-    "doom-metal",
-    "trip-hop"
+    "dark ambient",
+    "doom metal",
+    "trip hop"
   ],
   "nostalgic": [
-    "adult-standards",
-    "mellow-gold",
-    "classic-rock",
-    "new-wave",
+    "traditional pop",
+    "yacht rock",
+    "classic rock",
+    "new wave",
     "synthwave"
   ],
-  "dreamy": ["dream-pop", "shoegaze", "ethereal-wave", "chillwave"]
+  "dreamy": ["dream pop", "shoegaze", "ethereal wave", "chillwave"]
 }

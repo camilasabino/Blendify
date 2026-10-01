@@ -51,7 +51,7 @@ describe('AI capability matrix', () => {
 });
 
 describe('normalizeAiIntent', () => {
-  it('removes genres that resolve to the same canonical curated genre', () => {
+  it('removes genres that resolve to the same canonical genre', () => {
     const normalized = normalizeAiIntent(
       intent({
         kind: 'genre_mix',
@@ -323,7 +323,7 @@ describe('findIntentClarification', () => {
     ).toMatchObject({ reason: 'invalid_duration', options: [] });
   });
 
-  it('validates genres against the local curated catalog', () => {
+  it('validates genres against the local genre catalog', () => {
     expect(
       findIntentClarification(
         intent({ kind: 'genre_mix', artists: [], genres: ['Pop', 'shoegaze'] }),
@@ -334,13 +334,13 @@ describe('findIntentClarification', () => {
         intent({
           kind: 'genre_mix',
           artists: [],
-          genres: ['shoegaze', 'definitely not a genre', 'custom:anything'],
+          genres: ['shoegaze', 'definitely not a genre'],
         }),
       ),
     ).toMatchObject({
       reason: 'unknown_genres',
       seedType: 'genre',
-      names: ['definitely not a genre', 'custom:anything'],
+      names: ['definitely not a genre'],
     });
   });
 
@@ -381,14 +381,14 @@ describe('findIntentClarification', () => {
         intent({
           kind: 'genre_mix',
           artists: [],
-          genres: ['acoustic guitar'],
+          genres: ['chamber'],
           mood: 'calm',
         }),
       ),
     ).toBeNull();
   });
 
-  it('executes instrumental through its curated genres with a mood', () => {
+  it('executes instrumental as its canonical genre with a mood', () => {
     expect(
       findIntentClarification(
         intent({
@@ -407,7 +407,7 @@ describe('findIntentClarification', () => {
         intent({
           kind: 'genre_mix',
           artists: [],
-          genres: ['acoustic'],
+          genres: ['dark'],
           mood: 'calm',
         }),
       ),
@@ -415,22 +415,53 @@ describe('findIntentClarification', () => {
       reason: 'ambiguous_genres',
       seedType: 'genre',
       limit: MAX_GENRES,
-      names: ['acoustic'],
+      names: ['dark'],
       unsupportedConstraints: [],
       options: [],
     });
   });
 
-  it('asks for a more specific genre when a curated family cannot fit beside other genres', () => {
+  it('asks for a more specific genre when a style family cannot fit beside other genres', () => {
     expect(
       findIntentClarification(
         intent({
           kind: 'genre_mix',
           artists: [],
-          genres: ['jazz', 'instrumental'],
+          genres: ['jazz', 'acoustic'],
         }),
       ),
-    ).toMatchObject({ reason: 'ambiguous_genres', names: ['instrumental'] });
+    ).toMatchObject({ reason: 'ambiguous_genres', names: ['acoustic'] });
+  });
+
+  it('executes regional genres that share one region', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['rock argentino', 'argentine pop', 'jazz'],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('asks which region to use when genres name different regions', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['British rock', 'jazz', 'pop brasileiro'],
+        }),
+      ),
+    ).toEqual({
+      reason: 'conflicting_regions',
+      seedType: 'genre',
+      limit: null,
+      names: ['British rock', 'pop brasileiro'],
+      unsupportedConstraints: [],
+      options: [],
+    });
   });
 
   it('reports unknown genres before ambiguous ones', () => {

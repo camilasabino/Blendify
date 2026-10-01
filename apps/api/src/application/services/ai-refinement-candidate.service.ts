@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { resolveCuratedGenreSeeds } from '@/domain/ai/ai-genre-seeds';
+import { resolveAiGenreSeeds } from '@/domain/ai/ai-genre-seeds';
 import { AI_DEFAULT_ORDER_MODE, type AiIntent } from '@/domain/ai/ai-intent';
 import type { AiPreservation } from '@/domain/ai/ai-intent-patch';
 import { moodExecutionFor } from '@/domain/ai/ai-mood-execution';
@@ -248,9 +248,9 @@ export class AiRefinementCandidateBuilder {
         mood: moodExecutionFor({
           kind: proposed.kind,
           mood: proposed.mood,
-          explicitGenreIds: resolveCuratedGenreSeeds(
-            proposed.genres,
-          ).genres.map((genre) => genre.id),
+          explicitGenreIds: resolveAiGenreSeeds(proposed.genres).genres.map(
+            (genre) => genre.id,
+          ),
         }),
         trackCount: playlist.tracks.length,
         durationMs,

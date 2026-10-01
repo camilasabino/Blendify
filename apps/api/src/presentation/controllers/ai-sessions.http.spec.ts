@@ -705,7 +705,7 @@ describe('Create with AI sessions over HTTP', () => {
     },
   );
 
-  it('reviews duration and a curated genre without any provider', async () => {
+  it('reviews duration and a catalog genre without any provider', async () => {
     world.interpreter.interpretIntent.mockResolvedValue(
       interpreted({
         kind: 'genre_mix',
@@ -778,7 +778,7 @@ describe('Create with AI sessions over HTTP', () => {
     expectNoProviderCalls(world);
   });
 
-  it('reviews a geographic genre as its canonical curated genre', async () => {
+  it('reviews a geographic genre as its canonical genre and region', async () => {
     world.interpreter.interpretIntent.mockResolvedValue(
       interpreted({
         kind: 'genre_mix',
@@ -798,7 +798,8 @@ describe('Create with AI sessions over HTTP', () => {
     expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
       intent: {
-        genres: ['Argentine Rock'],
+        genres: ['Rock'],
+        region: 'argentina',
         targetDurationMinutes: 60,
         unmetConstraints: [],
       },
@@ -806,7 +807,7 @@ describe('Create with AI sessions over HTTP', () => {
     expectNoProviderCalls(world);
   });
 
-  it('reviews instrumental music as curated genres next to its mood', async () => {
+  it('reviews instrumental music as its canonical genre next to its mood', async () => {
     world.interpreter.interpretIntent.mockResolvedValue(
       interpreted({
         kind: 'genre_mix',
@@ -826,13 +827,8 @@ describe('Create with AI sessions over HTTP', () => {
       status: 'ready',
       clarification: null,
       intent: {
-        genres: [
-          'Instrumental Hip Hop',
-          'Instrumental Rock',
-          'Instrumental Funk',
-          'Instrumental Soul',
-          'Instrumental Acoustic Guitar',
-        ],
+        genres: ['Instrumental'],
+        region: null,
         mood: 'calm',
         unmetConstraints: [],
       },
@@ -840,24 +836,24 @@ describe('Create with AI sessions over HTTP', () => {
     expectNoProviderCalls(world);
   });
 
-  it('reviews an English form of a local genre as the local catalog genre', async () => {
+  it('reviews a localized regional genre as canonical genre and region', async () => {
     world.interpreter.interpretIntent.mockResolvedValue(
       interpreted({
         kind: 'genre_mix',
         artists: [],
-        genres: ['argentine pop'],
+        genres: ['baladas latinas'],
         excludeArtists: [],
         unsupportedConstraints: [],
       }),
     );
 
-    const response = await createSession({ prompt: 'Pop argentino' }).expect(
+    const response = await createSession({ prompt: 'baladas latinas' }).expect(
       201,
     );
 
     expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
-      intent: { genres: ['Pop Argentino'], unmetConstraints: [] },
+      intent: { genres: ['Ballad'], region: 'latin', unmetConstraints: [] },
     });
     expectNoProviderCalls(world);
   });
@@ -867,7 +863,7 @@ describe('Create with AI sessions over HTTP', () => {
       interpreted({
         kind: 'genre_mix',
         artists: [],
-        genres: ['acoustic'],
+        genres: ['dark'],
         mood: 'calm',
         excludeArtists: [],
         unsupportedConstraints: [],
@@ -875,7 +871,7 @@ describe('Create with AI sessions over HTTP', () => {
     );
 
     const response = await createSession({
-      prompt: 'música acústica relajante',
+      prompt: 'música dark relajante',
     }).expect(201);
 
     expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
@@ -884,7 +880,7 @@ describe('Create with AI sessions over HTTP', () => {
       clarification: {
         reason: 'ambiguous_genres',
         seedType: 'genre',
-        names: ['acoustic'],
+        names: ['dark'],
         options: [],
       },
     });

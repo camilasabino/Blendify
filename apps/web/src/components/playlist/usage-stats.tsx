@@ -2,6 +2,7 @@ import { type ReactNode, useState } from 'react'
 import { Music2 } from 'lucide-react'
 import type { RankedSeedUsage, UserUsageStats } from '@/lib/api'
 import { GenreIcon } from '@/components/genres/genre-icon'
+import { useGenreLabel } from '@/components/genres/genre-labels'
 import { EmptyState } from '@/components/ui/feedback'
 import { useT } from '@/i18n/use-t'
 import { barWidthPercent, isUsageStatsEmpty } from '@/lib/usage-stats'
@@ -72,11 +73,13 @@ function RankBarRow({
   index,
   max,
   leading,
+  displayName,
 }: Readonly<{
   item: RankedSeedUsage
   index: number
   max: number
   leading: (item: RankedSeedUsage) => ReactNode
+  displayName: (item: RankedSeedUsage) => string
 }>) {
   const t = useT()
   const countLabel =
@@ -93,7 +96,7 @@ function RankBarRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="truncate text-sm font-medium text-cream-100">
-            {item.name}
+            {displayName(item)}
           </span>
           <span className="shrink-0 text-xs tabular-nums text-cream-300">
             {countLabel}
@@ -115,11 +118,13 @@ function RankBars({
   items,
   empty,
   leading,
+  displayName,
 }: Readonly<{
   title: string
   items: RankedSeedUsage[]
   empty: string
   leading: (item: RankedSeedUsage) => ReactNode
+  displayName: (item: RankedSeedUsage) => string
 }>) {
   const max = items.reduce((highest, item) => Math.max(highest, item.useCount), 0)
 
@@ -137,6 +142,7 @@ function RankBars({
               index={index}
               max={max}
               leading={leading}
+              displayName={displayName}
             />
           ))}
         </ol>
@@ -147,6 +153,7 @@ function RankBars({
 
 export function UsageStatsView({ stats }: Readonly<{ stats: UserUsageStats }>) {
   const t = useT()
+  const genreLabel = useGenreLabel()
 
   if (isUsageStatsEmpty(stats)) {
     return (
@@ -187,12 +194,14 @@ export function UsageStatsView({ stats }: Readonly<{ stats: UserUsageStats }>) {
           items={stats.topArtists}
           empty={t('stats.topEmpty')}
           leading={artistRankLeading}
+          displayName={(item) => item.name}
         />
         <RankBars
           title={t('stats.topGenres')}
           items={stats.topGenres}
           empty={t('stats.topEmpty')}
           leading={genreRankLeading}
+          displayName={(item) => genreLabel({ id: item.seedKey, name: item.name })}
         />
       </div>
     </div>

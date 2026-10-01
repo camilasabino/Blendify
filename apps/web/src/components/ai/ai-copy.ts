@@ -7,6 +7,7 @@ import type {
   PopularityMode,
   TrackOrderMode,
 } from '@blendify/contracts'
+import type { GenreLabelSource } from '@/components/genres/genre-labels'
 import type { MessageKey } from '@/i18n/messages'
 import { ApiError, getApiErrorMessage } from '@/lib/api-error'
 
@@ -114,6 +115,8 @@ export function clarificationMessage(clarification: AiClarificationDetails, t: T
       return t('ai.clarify.unknownGenres', { names })
     case 'ambiguous_genres':
       return t('ai.clarify.ambiguousGenres', { names })
+    case 'conflicting_regions':
+      return t('ai.clarify.conflictingRegions', { names })
   }
 }
 
@@ -138,6 +141,7 @@ export function optionLabel(
   option: AiClarificationOption,
   clarification: AiClarification,
   t: Translate,
+  genreLabel: (genre: GenreLabelSource) => string,
 ): string {
   switch (option.type) {
     case 'set_kind':
@@ -146,7 +150,9 @@ export function optionLabel(
       }
       return t(SEED_KIND_OPTION_KEYS[option.kind])
     case 'keep_seed':
-      return t('ai.option.keepSeed', { name: option.label })
+      return t('ai.option.keepSeed', {
+        name: option.seedType === 'genre' ? genreLabel({ name: option.label }) : option.label,
+      })
     case 'set_track_count':
       return t('ai.option.trackCount', { count: option.trackCount })
     case 'set_order_mode':

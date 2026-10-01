@@ -1,38 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import {
-  CURATED_GENRES,
+  GENRE_CATALOG,
   getExploreSuggestions,
   listMainGenres,
-  searchCuratedGenres,
-  type CuratedGenre,
-} from '@/domain/genre/curated-genres';
+  searchGenres,
+  type CatalogGenre,
+} from '@/domain/genre/genre-catalog';
 
 @Injectable()
 export class GenreCatalogService {
-  listAll(): CuratedGenre[] {
-    return CURATED_GENRES;
+  listAll(): readonly CatalogGenre[] {
+    return GENRE_CATALOG;
   }
 
-  listMain(): CuratedGenre[] {
+  listMain(): CatalogGenre[] {
     return listMainGenres();
   }
 
   search(
     query: string,
     options: { offset?: number; limit?: number } = {},
-  ): CuratedGenre[] {
+  ): CatalogGenre[] {
     const offset = Math.max(0, options.offset ?? 0);
     const limit = Math.min(16, Math.max(1, options.limit ?? 8));
-    return searchCuratedGenres(query, offset + limit).slice(
-      offset,
-      offset + limit,
-    );
+    return searchGenres(query, offset + limit).slice(offset, offset + limit);
   }
 
   explore(
     selectedIds: string[],
     options: { limit?: number; offset?: number } = {},
-  ): { genres: CuratedGenre[]; hasMore: boolean } {
+  ): { genres: CatalogGenre[]; hasMore: boolean } {
     return getExploreSuggestions(selectedIds, options);
   }
 }

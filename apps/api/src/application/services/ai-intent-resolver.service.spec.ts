@@ -62,7 +62,7 @@ function createResolver() {
 }
 
 describe('AiIntentResolver', () => {
-  it('resolves supported genres from the curated catalog without provider calls', async () => {
+  it('resolves supported genres from the MusicBrainz catalog without provider calls', async () => {
     const { catalog, resolver } = createResolver();
 
     const resolution = await resolver.resolve(
@@ -74,7 +74,7 @@ describe('AiIntentResolver', () => {
       seeds: {
         artists: [],
         genres: [
-          { id: 'dream-pop', name: 'Dream Pop' },
+          { id: 'dream pop', name: 'Dream Pop' },
           { id: 'shoegaze', name: 'Shoegaze' },
         ],
         track: null,
@@ -98,22 +98,22 @@ describe('AiIntentResolver', () => {
     expect(catalog.searchTracks).not.toHaveBeenCalled();
   });
 
-  it.each(['definitely not a genre', 'custom:anything'])(
-    'reports an unknown genre: %s',
-    async (name) => {
-      const { resolver } = createResolver();
+  it('reports an unknown genre', async () => {
+    const { resolver } = createResolver();
 
-      const resolution = await resolver.resolve(
-        intent({ kind: 'genre_mix', genres: ['shoegaze', name] }),
-      );
+    const resolution = await resolver.resolve(
+      intent({
+        kind: 'genre_mix',
+        genres: ['shoegaze', 'definitely not a genre'],
+      }),
+    );
 
-      expect(resolution).toEqual({
-        status: 'not_found',
-        seedType: 'genre',
-        names: [name],
-      });
-    },
-  );
+    expect(resolution).toEqual({
+      status: 'not_found',
+      seedType: 'genre',
+      names: ['definitely not a genre'],
+    });
+  });
 
   it('resolves semantic genre expressions to canonical seeds without provider calls', async () => {
     const { catalog, resolver } = createResolver();
@@ -121,7 +121,7 @@ describe('AiIntentResolver', () => {
     const resolution = await resolver.resolve(
       intent({
         kind: 'genre_mix',
-        genres: ['argentine rock', 'acoustic guitar'],
+        genres: ['argentine rock', 'chamber'],
         mood: 'calm',
       }),
     );
@@ -131,13 +131,11 @@ describe('AiIntentResolver', () => {
       seeds: {
         artists: [],
         genres: [
-          { id: 'argentine-rock', name: 'Argentine Rock' },
-          { id: 'acoustic-guitar-cover', name: 'Acoustic Guitar Cover' },
-          {
-            id: 'instrumental-acoustic-guitar',
-            name: 'Instrumental Acoustic Guitar',
-          },
+          { id: 'rock', name: 'Rock' },
+          { id: 'chamber folk', name: 'Chamber Folk' },
+          { id: 'chamber pop', name: 'Chamber Pop' },
         ],
+        region: 'argentina',
         track: null,
       },
     });
@@ -145,13 +143,13 @@ describe('AiIntentResolver', () => {
     expect(catalog.searchTracks).not.toHaveBeenCalled();
   });
 
-  it('resolves local-language genre expressions through the curated aliases', async () => {
+  it('separates a shared regional modifier from local-language genres', async () => {
     const { catalog, resolver } = createResolver();
 
     const resolution = await resolver.resolve(
       intent({
         kind: 'genre_mix',
-        genres: ['rock argentino', 'jazz brasileiro'],
+        genres: ['rock argentino', 'baladas'],
       }),
     );
 
@@ -160,13 +158,31 @@ describe('AiIntentResolver', () => {
       seeds: {
         artists: [],
         genres: [
-          { id: 'argentine-rock', name: 'Argentine Rock' },
-          { id: 'brazilian-jazz', name: 'Brazilian Jazz' },
+          { id: 'rock', name: 'Rock' },
+          { id: 'ballad', name: 'Ballad' },
         ],
+        region: 'argentina',
         track: null,
       },
     });
     expect(catalog.searchArtists).not.toHaveBeenCalled();
+  });
+
+  it('never executes genres that ask for different regions', async () => {
+    const { resolver } = createResolver();
+
+    const resolution = await resolver.resolve(
+      intent({
+        kind: 'genre_mix',
+        genres: ['rock argentino', 'pop brasileiro'],
+      }),
+    );
+
+    expect(resolution).toEqual({
+      status: 'not_found',
+      seedType: 'genre',
+      names: ['rock argentino', 'pop brasileiro'],
+    });
   });
 
   it('never executes an ambiguous genre expression', async () => {

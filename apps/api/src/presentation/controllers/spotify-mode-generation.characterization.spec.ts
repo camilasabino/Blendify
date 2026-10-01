@@ -166,7 +166,13 @@ function createWorld() {
         })),
       ),
     ),
-    getTopArtistsForTag: jest.fn(() => Promise.resolve([])),
+    getTopArtistsForTag: jest.fn(
+      (_tag: string): Promise<Array<{ name: string }>> => Promise.resolve([]),
+    ),
+    getTopTagsForArtist: jest.fn(
+      (_artist: string): Promise<Array<{ name: string; count: number }>> =>
+        Promise.resolve([]),
+    ),
   };
 
   const users = {
@@ -604,6 +610,53 @@ describe('Spotify Mode generation characterization', () => {
           }),
         ],
       });
+    });
+  });
+
+  describe('genre mix with a region', () => {
+    it('filters the genre by region and records the region in the recipe', async () => {
+      world.discovery.getTopArtistsForTag.mockImplementation((tag) =>
+        Promise.resolve(
+          tag === 'argentina'
+            ? [
+                { name: 'jazz Artist 1' },
+                { name: 'tango Artist 1' },
+                { name: 'jazz Artist 2' },
+              ]
+            : [],
+        ),
+      );
+      world.discovery.getTopTagsForArtist.mockImplementation((artist) =>
+        Promise.resolve([
+          { name: artist.split(' ')[0], count: 100 },
+          { name: 'argentina', count: 80 },
+        ]),
+      );
+
+      const response = await request(httpServer())
+        .post('/api/playlists/mix')
+        .send({
+          kind: 'genre_mix',
+          genreIds: ['jazz'],
+          region: 'argentina',
+          tracksPerSeed: 4,
+          popularity: 'balanced',
+        })
+        .expect(201);
+
+      const playlist = PlaylistDetailSchema.parse(response.body);
+      expect(playlist.generation).toMatchObject({
+        kind: 'genre_mix',
+        seeds: [{ id: 'jazz', name: 'Jazz' }],
+        region: 'argentina',
+      });
+      expect(new Set(playlist.tracks.map((track) => track.artistName))).toEqual(
+        new Set(['jazz Artist 1', 'jazz Artist 2']),
+      );
+      expect(world.discovery.getTopTracksForTag).not.toHaveBeenCalled();
+      expect(
+        world.discovery.getTopArtistsForTag.mock.calls.map(([tag]) => tag),
+      ).toEqual(['argentina']);
     });
   });
 

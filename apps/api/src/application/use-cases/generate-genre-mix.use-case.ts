@@ -12,10 +12,10 @@ import {
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { MAX_GENRES, maxTracksPerSeedForCount } from '@/domain/constants';
 import {
-  findCuratedGenre,
+  findGenre,
   genreTrackGroupKey,
-  type CuratedGenre,
-} from '@/domain/genre/curated-genres';
+  type CatalogGenre,
+} from '@/domain/genre/genre-catalog';
 import { GenrePlaylistGenerationService } from '@/domain/genre/genre-playlist-generation.service';
 import {
   buildDefaultPlaylistDescription,
@@ -91,6 +91,7 @@ export class GenerateGenreMixUseCase {
         input.popularity,
         input.tracksPerSeed,
         {
+          region: input.region,
           onMatched: (matched) => {
             tracker.report(
               'matching_tracks',
@@ -129,6 +130,7 @@ export class GenerateGenreMixUseCase {
         kind: 'genre_mix',
         tracksPerSeed: input.tracksPerSeed,
         seeds: genres.map(({ id, name }) => ({ id, name })),
+        ...(input.region ? { region: input.region } : {}),
         popularity: input.popularity,
         orderMode: input.orderMode,
       },
@@ -138,16 +140,16 @@ export class GenerateGenreMixUseCase {
     });
   }
 
-  private resolveGenres(genreIds: string[]): CuratedGenre[] {
+  private resolveGenres(genreIds: string[]): CatalogGenre[] {
     if (genreIds.length > MAX_GENRES) {
       throw BusinessRuleError.tooManyGenres(genreIds.length);
     }
 
-    const resolved: CuratedGenre[] = [];
+    const resolved: CatalogGenre[] = [];
     const seen = new Set<string>();
 
     for (const raw of genreIds) {
-      const found = findCuratedGenre(raw);
+      const found = findGenre(raw);
       if (!found) {
         continue;
       }

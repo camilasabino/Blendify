@@ -163,7 +163,8 @@ describe('diffIntents', () => {
         }),
       ),
     ).toEqual([
-      { field: 'genres', added: ['Argentine Rock'], removed: ['Indie Rock'] },
+      { field: 'genres', added: ['Rock'], removed: ['Indie Rock'] },
+      { field: 'region', from: null, to: 'argentina' },
       { field: 'excludeArtists', added: ['Coldplay'], removed: [] },
       {
         field: 'excludeTracks',
@@ -171,6 +172,15 @@ describe('diffIntents', () => {
         removed: [],
       },
     ]);
+  });
+
+  it('reports a region change even when the canonical genres stay the same', () => {
+    expect(
+      diffIntents(
+        intent({ kind: 'genre_mix', artists: [], genres: ['rock argentino'] }),
+        intent({ kind: 'genre_mix', artists: [], genres: ['rock británico'] }),
+      ),
+    ).toEqual([{ field: 'region', from: 'argentina', to: 'british' }]);
   });
 
   it('ignores case-only artist rewrites and reports kind and seed changes', () => {

@@ -20,6 +20,7 @@ const READY_SESSION: AiSessionDto = {
     kind: 'artist_mix',
     artists: ['Radiohead', 'Interpol'],
     genres: [],
+    region: null,
     seedTrack: null,
     targetTrackCount: 30,
     targetDurationMinutes: null,
@@ -571,6 +572,36 @@ describe('Create with AI page', () => {
     expect(screen.getByRole('heading', { level: 1, name: title })).toBeVisible()
     expect(screen.getByRole('button', { name: submit })).toBeVisible()
     expect(screen.getByRole('textbox', { name: label })).toBeVisible()
+  })
+
+  it('shows the localized genre label in the confirmation for a Latin ballad request', async () => {
+    const user = userEvent.setup()
+    const latinBalladSession: AiSessionDto = {
+      ...READY_SESSION,
+      intent: {
+        ...READY_SESSION.intent!,
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['Ballad'],
+        region: 'latin',
+        excludeArtists: [],
+      },
+    }
+    stubApi({ 'POST /api/ai/sessions': () => jsonResponse(createdSession(latinBalladSession), 201) })
+    renderPage()
+
+    act(() => {
+      useLocaleStore.getState().setLocale('es')
+    })
+
+    await user.type(screen.getByRole('textbox'), 'armame una playlist de baladas latinas')
+    await user.click(screen.getByRole('button', { name: 'Revisar pedido' }))
+
+    const genres = (await screen.findByText('Géneros')).parentElement as HTMLElement
+    expect(within(genres).getByText('Balada')).toBeVisible()
+    expect(screen.queryByText('Ballad')).not.toBeInTheDocument()
+    const region = screen.getByText('Región').parentElement as HTMLElement
+    expect(within(region).getByText('Latinoamérica')).toBeVisible()
   })
 
   it('keeps the compact request card usable in a translated locale', async () => {

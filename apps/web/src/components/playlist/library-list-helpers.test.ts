@@ -6,7 +6,10 @@ import {
   libraryKindKey,
   pendingReferencesRemovedPlaylist,
 } from './library-list-helpers'
+import { genreLabel } from '@/components/genres/genre-labels'
 import { activePlaylist } from '@/test/playlist-fixtures'
+
+const identityLabel = ({ name }: { name: string }) => name
 
 const t = (key: string, vars?: Record<string, string | number>) =>
   `${key}:${JSON.stringify(vars ?? {})}`
@@ -29,7 +32,7 @@ function playlist(
 
 describe('libraryDisplayTitle', () => {
   it('uses the seed name for generated single-seed playlists', () => {
-    expect(libraryDisplayTitle(playlist('Blendify · Mix · Guster', ['Guster']), t)).toBe(
+    expect(libraryDisplayTitle(playlist('Blendify · Mix · Guster', ['Guster']), t, identityLabel)).toBe(
       'Guster',
     )
   })
@@ -39,24 +42,36 @@ describe('libraryDisplayTitle', () => {
       libraryDisplayTitle(
         playlist('Blendify · Mix · Guster + Dispatch', ['Guster', 'Dispatch']),
         t,
+        identityLabel,
       ),
     ).toBe('Guster + Dispatch')
   })
 
   it('summarizes larger seed lists with the full seed count', () => {
     expect(
-      libraryDisplayTitle(playlist('Blendify · Mix · A + 4', ['A', 'B', 'C'], 5), t),
+      libraryDisplayTitle(playlist('Blendify · Mix · A + 4', ['A', 'B', 'C'], 5), t, identityLabel),
     ).toBe('library.titleMany:{"first":"A","second":"B","count":3}')
   })
 
   it('keeps names the user renamed', () => {
-    expect(libraryDisplayTitle(playlist('Road trip', ['Guster']), t)).toBe(
+    expect(libraryDisplayTitle(playlist('Road trip', ['Guster']), t, identityLabel)).toBe(
       'Road trip',
     )
   })
 
+  it('shows genre seeds with their localized label', () => {
+    const genrePlaylist = {
+      name: 'Blendify · Mix · Ballad',
+      seedCount: 1,
+      seeds: [{ type: 'genre' as const, id: 'ballad', name: 'Ballad' }],
+    }
+    expect(
+      libraryDisplayTitle(genrePlaylist, t, (genre) => genreLabel(genre, 'es')),
+    ).toBe('Balada')
+  })
+
   it('falls back to the stored name without seeds', () => {
-    expect(libraryDisplayTitle(playlist('Blendify · Mix', []), t)).toBe(
+    expect(libraryDisplayTitle(playlist('Blendify · Mix', []), t, identityLabel)).toBe(
       'Blendify · Mix',
     )
   })

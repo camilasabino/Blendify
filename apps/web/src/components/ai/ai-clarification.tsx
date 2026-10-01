@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 import { Pencil } from 'lucide-react'
 import type { AiClarification as AiClarificationDto } from '@blendify/contracts'
+import { useGenreLabel } from '@/components/genres/genre-labels'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/i18n/use-t'
 import { CATEGORY_LABEL_KEYS, clarificationMessage, optionLabel } from './ai-copy'
@@ -21,6 +22,7 @@ export function AiClarification({
   headingRef,
 }: AiClarificationProps) {
   const t = useT()
+  const genreLabel = useGenreLabel()
   const hasOptions = clarification.options.length > 0
 
   return (
@@ -63,7 +65,7 @@ export function AiClarification({
                 variant="secondary"
                 onClick={() => onChoose(option.id)}
               >
-                {optionLabel(option, clarification, t)}
+                {optionLabel(option, clarification, t, genreLabel)}
               </Button>
             ))}
           </div>

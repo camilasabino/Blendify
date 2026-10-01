@@ -3,6 +3,7 @@ import {
   type AiIntentChangeDto,
   type AiRefinementClarificationDto,
 } from '@blendify/contracts'
+import { genreLabel } from '@/components/genres/genre-labels'
 import { LOCALES, messages, type Locale, type MessageKey } from '@/i18n/messages'
 import { ApiError } from '@/lib/api-error'
 import { clarificationMessage } from './ai-copy'
@@ -11,6 +12,8 @@ import {
   refinementClarificationMessage,
   refinementErrorMessage,
 } from './ai-refinement-copy'
+
+const identityLabel = ({ name }: { name: string }) => name
 
 function translator(locale: Locale) {
   return (key: MessageKey, vars?: Record<string, string | number>) =>
@@ -103,7 +106,7 @@ describe.each(LOCALES)('Create with AI refinement copy (%s)', (locale) => {
 
   it('labels every intent change field with fixed localized copy', () => {
     for (const change of EVERY_FIELD) {
-      const view = intentChangeView(change, t)
+      const view = intentChangeView(change, t, identityLabel)
       expect(view.label, change.field).not.toMatch(/\{\w+\}|^ai\./)
       const values = view.type === 'value' ? [view.from, view.to] : [...view.added, ...view.removed]
       for (const value of values) {
@@ -184,7 +187,7 @@ describe('English refinement copy', () => {
   })
 
   it('renders canonical before and after values', () => {
-    expect(intentChangeView({ field: 'popularity', from: 'balanced', to: 'rarities' }, t)).toEqual({
+    expect(intentChangeView({ field: 'popularity', from: 'balanced', to: 'rarities' }, t, identityLabel)).toEqual({
       key: 'popularity',
       type: 'value',
       label: 'Familiarity',
@@ -192,7 +195,16 @@ describe('English refinement copy', () => {
       to: 'Lesser-known',
     })
     expect(
-      intentChangeView({ field: 'excludeArtists', added: ['Coldplay'], removed: [] }, t),
+      intentChangeView({ field: 'excludeArtists', added: ['Coldplay'], removed: [] }, t, identityLabel),
     ).toMatchObject({ label: 'Avoiding artists', added: ['Coldplay'] })
+  })
+
+  it('localizes genre names through the shared genre label', () => {
+    const view = intentChangeView(
+      { field: 'genres', added: ['Latin Ballad'], removed: ['Ballad'] },
+      t,
+      ({ name }) => genreLabel({ name }, 'es'),
+    )
+    expect(view).toMatchObject({ type: 'list', added: ['Balada latina'], removed: ['Balada'] })
   })
 })

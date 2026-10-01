@@ -32,6 +32,7 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { popoverSurfaceClass, usePopover } from '@/hooks/use-popover'
 import { useLocaleStore } from '@/i18n/use-locale'
+import { useGenreLabel } from '@/components/genres/genre-labels'
 import { useT } from '@/i18n/use-t'
 import { formatSongCount } from '@/lib/song-count'
 import {
@@ -437,6 +438,7 @@ export function LibraryItem({
   onAskConfirm: (confirm: PendingLibraryConfirm) => void
 }>) {
   const t = useT()
+  const genreLabel = useGenreLabel()
   const queryClient = useQueryClient()
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState(playlist.name)
@@ -498,7 +500,7 @@ export function LibraryItem({
     }
   }
 
-  const title = libraryDisplayTitle(playlist, t)
+  const title = libraryDisplayTitle(playlist, t, genreLabel)
   const cover = <LibraryItemCover imageUrl={playlist.imageUrl} />
   const meta = (
     <LibraryItemMeta

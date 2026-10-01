@@ -65,7 +65,7 @@ export type AiSessionCreated = AiSessionCreatedDto
 export type AiSessionState = AiSessionStateDto
 export type AiGeneration = AiGenerationDto
 export type Artist = ArtistDto
-export type CuratedGenre = GenreDto
+export type Genre = GenreDto
 export type {
   BulkLibraryAction,
   BulkLibraryResult,
@@ -392,7 +392,7 @@ export const api = {
     }),
 
   listGenres: () =>
-    request<{ genres: CuratedGenre[] }>('/api/genres'),
+    request<{ genres: Genre[] }>('/api/genres'),
 
   searchGenres: (
     q: string,
@@ -404,7 +404,7 @@ export const api = {
       limit: String(options.limit ?? 8),
     })
     return request<{
-      genres: CuratedGenre[]
+      genres: Genre[]
     }>(`/api/genres/search?${params.toString()}`)
   },
 
@@ -417,7 +417,7 @@ export const api = {
       offset: String(options.offset ?? 0),
       limit: String(options.limit ?? 8),
     })
-    return request<{ genres: CuratedGenre[]; hasMore: boolean }>(
+    return request<{ genres: Genre[]; hasMore: boolean }>(
       `/api/genres/explore?${params.toString()}`,
     )
   },

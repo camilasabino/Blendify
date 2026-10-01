@@ -263,6 +263,60 @@ describe('track contracts', () => {
   });
 });
 
+describe('genre region contracts', () => {
+  const genreMix = {
+    kind: 'genre_mix',
+    genreIds: ['rock', 'alternative rock'],
+    tracksPerSeed: 10,
+    popularity: 'balanced',
+  };
+  const recipe = {
+    version: 1,
+    kind: 'genre_mix',
+    tracksPerSeed: 10,
+    seeds: [{ id: 'rock', name: 'Rock' }],
+    popularity: 'balanced',
+    orderMode: 'random',
+  };
+
+  it('keeps genre mixes without a region valid', () => {
+    expect(GenerateMixRequestSchema.parse(genreMix)).not.toHaveProperty(
+      'region',
+    );
+    expect(PlaylistGenerationSchema.parse(recipe)).not.toHaveProperty('region');
+  });
+
+  it('carries one canonical Last.fm region tag', () => {
+    expect(
+      GenerateMixRequestSchema.parse({ ...genreMix, region: 'argentina' }),
+    ).toMatchObject({ region: 'argentina' });
+    expect(
+      PlaylistGenerationSchema.parse({ ...recipe, region: 'brazilian' }),
+    ).toMatchObject({ region: 'brazilian' });
+  });
+
+  it.each(['Argentina', 'argentinian rock', ['latin', 'british']])(
+    'rejects %p as a region',
+    (region) => {
+      expect(
+        GenerateMixRequestSchema.safeParse({ ...genreMix, region }).success,
+      ).toBe(false);
+    },
+  );
+
+  it('rejects a region on artist mixes', () => {
+    expect(
+      GenerateMixRequestSchema.safeParse({
+        kind: 'artist_mix',
+        artistIds: ['artist-1'],
+        tracksPerSeed: 10,
+        popularity: 'balanced',
+        region: 'latin',
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe('guest generation contracts', () => {
   const artistMix = {
     kind: 'artist_mix',

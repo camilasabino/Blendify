@@ -1,33 +1,34 @@
+import type { GenreRegion } from '@blendify/contracts';
 import { normalizeArtistName } from '@/domain/artist/artist-name-match';
 import { MAX_GENRES } from '@/domain/constants';
-import type { CuratedGenre } from '@/domain/genre/curated-genres';
+import type { CatalogGenre } from '@/domain/genre/genre-catalog';
 import {
   resolveGenreExpression,
   type GenreExpressionMatch,
 } from '@/domain/genre/genre-expression-resolution';
 import type { ResolvedAiSeed } from './ai-resolved-seeds';
 
-const RESOLVED_GENRE_KEY_PREFIX = 'curated:';
+const RESOLVED_GENRE_KEY_PREFIX = 'genre:';
 const EXPANDED_MATCHES: ReadonlySet<GenreExpressionMatch> = new Set([
-  'curated_family',
   'style_family',
 ]);
 
-export interface CuratedGenreSeeds {
+export interface AiGenreSeeds {
   genres: ResolvedAiSeed[];
+  region: GenreRegion | null;
   unknown: string[];
   ambiguous: string[];
+  conflictingRegions: string[];
 }
 
 interface ResolvedExpression {
   expression: string;
   isExpansion: boolean;
-  genres: CuratedGenre[];
+  genres: CatalogGenre[];
+  region?: GenreRegion;
 }
 
-export function resolveCuratedGenreSeeds(
-  expressions: string[],
-): CuratedGenreSeeds {
+export function resolveAiGenreSeeds(expressions: string[]): AiGenreSeeds {
   const resolved: ResolvedExpression[] = [];
   const unknown: string[] = [];
   const ambiguous = new Set<string>();
@@ -41,6 +42,7 @@ export function resolveCuratedGenreSeeds(
           expression,
           isExpansion: EXPANDED_MATCHES.has(resolution.match),
           genres: resolution.genres,
+          region: resolution.region,
         });
         break;
       case 'ambiguous':
@@ -60,14 +62,21 @@ export function resolveCuratedGenreSeeds(
       .forEach((entry) => ambiguous.add(entry.expression));
   }
 
+  const regional = executable.filter((entry) => entry.region !== undefined);
+  const regions = new Set(regional.map((entry) => entry.region));
+  const [region = null] = regions.size === 1 ? [...regions] : [];
+
   return {
     genres: uniqueSeeds(executable),
+    region,
     unknown,
     ambiguous: expressions.filter((expression) => ambiguous.has(expression)),
+    conflictingRegions:
+      regions.size > 1 ? regional.map((entry) => entry.expression) : [],
   };
 }
 
-export function isCuratedGenreName(name: string): boolean {
+export function isCatalogGenreName(name: string): boolean {
   const resolution = resolveGenreExpression(name);
 
   return (
@@ -84,7 +93,8 @@ export function aiGenreKey(expression: string): string {
   const ids = resolution.genres
     .map((genre) => genre.id)
     .sort((left, right) => left.localeCompare(right));
-  return `${RESOLVED_GENRE_KEY_PREFIX}${ids.join('|')}`;
+  const region = resolution.region ? `@${resolution.region}` : '';
+  return `${RESOLVED_GENRE_KEY_PREFIX}${ids.join('|')}${region}`;
 }
 
 function uniqueSeeds(entries: ResolvedExpression[]): ResolvedAiSeed[] {

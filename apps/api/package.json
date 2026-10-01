@@ -20,7 +20,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy"
+    "prisma:deploy": "prisma migrate deploy",
+    "genres:sync": "node scripts/sync-musicbrainz-genres.mjs"
   },
   "dependencies": {
     "@blendify/contracts": "^0.0.0",

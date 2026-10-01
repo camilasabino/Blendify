@@ -239,7 +239,7 @@ describe('evaluateRefinement', () => {
       'invalid_duration',
     ],
     [
-      'a genre outside the curated catalog',
+      'a genre outside the genre catalog',
       interpreted({ genres: { add: ['not-a-real-genre'], remove: [] } }),
       intent({ kind: 'genre_mix', artists: [], genres: ['shoegaze'] }),
       'unknown_genres',
@@ -251,10 +251,16 @@ describe('evaluateRefinement', () => {
       'ambiguous_genres',
     ],
     [
-      'a curated broad style that no longer fits beside the current genres',
-      interpreted({ genres: { add: ['instrumental'], remove: [] } }),
+      'a broad style that no longer fits beside the current genres',
+      interpreted({ genres: { add: ['acoustic'], remove: [] } }),
       intent({ kind: 'genre_mix', artists: [], genres: ['shoegaze'] }),
       'ambiguous_genres',
+    ],
+    [
+      'a second region beside the current regional genre',
+      interpreted({ genres: { add: ['argentine rock'], remove: [] } }),
+      intent({ kind: 'genre_mix', artists: [], genres: ['brazilian pop'] }),
+      'conflicting_regions',
     ],
     [
       'removing every seed',
@@ -341,11 +347,11 @@ describe('evaluateRefinement', () => {
   });
 });
 
-describe('genre refinement through the deterministic curated resolver', () => {
+describe('genre refinement through the deterministic canonical genre resolver', () => {
   const genreIntent = (genres: string[]) =>
     intent({ kind: 'genre_mix', artists: [], genres });
 
-  it('adds a semantic genre expression that resolves to a curated genre', () => {
+  it('adds a semantic genre expression that resolves to a catalog genre', () => {
     expect(
       evaluate(
         interpreted({ genres: { add: ['argentine rock'], remove: [] } }),
@@ -357,7 +363,7 @@ describe('genre refinement through the deterministic curated resolver', () => {
     });
   });
 
-  it('removes a genre by its canonical curated identity', () => {
+  it('removes a genre by its canonical identity', () => {
     expect(
       evaluate(
         interpreted({ genres: { add: [], remove: ['Argentine-Rock'] } }),
@@ -408,7 +414,7 @@ describe('genre refinement through the deterministic curated resolver', () => {
     ).toEqual({ status: 'unchanged' });
   });
 
-  it('adds a local-language genre expression through its curated alias', () => {
+  it('adds a local-language genre expression through its localized alias', () => {
     expect(
       evaluate(
         interpreted({ genres: { add: ['rock argentino'], remove: [] } }),
@@ -450,7 +456,7 @@ describe('genre refinement through the deterministic curated resolver', () => {
     ).toEqual({ status: 'unchanged' });
   });
 
-  it('swaps a genre for instrumental music through its curated genres', () => {
+  it('swaps a genre for instrumental music through its catalog genres', () => {
     expect(
       evaluate(
         interpreted({ genres: { add: ['instrumental'], remove: ['rock'] } }),

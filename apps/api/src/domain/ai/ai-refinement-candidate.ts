@@ -7,7 +7,7 @@ import {
   createOrderingStrategy,
 } from '@/domain/services/strategies/track-ordering.strategy';
 import type { Track } from '@/domain/track/track.entity';
-import { resolveCuratedGenreSeeds } from './ai-genre-seeds';
+import { resolveAiGenreSeeds } from './ai-genre-seeds';
 import {
   AI_DEFAULT_ORDER_MODE,
   AI_DEFAULT_POPULARITY,
@@ -240,6 +240,7 @@ function generationBasis(intent: AiIntent): string {
   return JSON.stringify({
     kind: intent.kind,
     seeds: basisSeeds(intent),
+    region: resolveAiGenreSeeds(intent.genres).region,
     popularity: intent.popularity ?? AI_DEFAULT_POPULARITY,
   });
 }
@@ -256,7 +257,7 @@ function basisSeeds(intent: AiIntent): string[] {
 }
 
 function effectiveGenreIds(intent: AiIntent): string[] {
-  const explicit = resolveCuratedGenreSeeds(intent.genres).genres.map(
+  const explicit = resolveAiGenreSeeds(intent.genres).genres.map(
     (genre) => genre.id,
   );
   if (explicit.length > 0 || intent.mood === null) {

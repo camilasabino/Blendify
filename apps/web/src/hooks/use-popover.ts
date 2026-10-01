@@ -126,7 +126,9 @@ export function usePopover<TPanel extends HTMLElement = HTMLDivElement>({
   const focusItem = useCallback((target: 'first' | 'last' | 'selected') => {
     const items = panelItems(panelRef.current)
     const selected = items.find(
-      (item) => item.getAttribute('aria-checked') === 'true',
+      (item) =>
+        item.getAttribute('aria-checked') === 'true' ||
+        item.getAttribute('aria-selected') === 'true',
     )
     const next =
       (target === 'selected' ? selected : undefined) ??

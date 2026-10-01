@@ -1,4 +1,4 @@
-import { PopularityMode } from '@blendify/contracts';
+import { MAX_ARTISTS, PopularityMode } from '@blendify/contracts';
 import { Artist } from '@/domain/artist/artist.entity';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { catalogCandidateBudget } from '@/domain/genre/catalog-window';
@@ -449,6 +449,129 @@ describe('GenerateDiscoverPlaylistUseCase intermediate targets', () => {
         targetTrackCount: 1,
       },
     });
+  });
+});
+
+describe('GenerateDiscoverPlaylistUseCase discover_artist similarity depth', () => {
+  const similar = Array.from({ length: 40 }, (_, index) => ({
+    name: `Similar ${index + 1}`,
+  }));
+
+  function rankOf(name: string): number {
+    return Number(name.replace('Similar ', ''));
+  }
+
+  function band(name: string): 'head' | 'middle' | 'tail' {
+    const rank = rankOf(name);
+    if (rank <= 10) {
+      return 'head';
+    }
+    return rank <= 25 ? 'middle' : 'tail';
+  }
+
+  function setupArtistDiscover(misses: Set<string> = new Set()) {
+    const artistMix = { execute: jest.fn().mockResolvedValue({ kept: true }) };
+    const catalog = {
+      getArtistsByIds: jest
+        .fn()
+        .mockResolvedValue([
+          Artist.create({ id: ArtistId.create('sade'), name: 'Sade' }),
+        ]),
+      searchArtists: jest.fn((name: string) =>
+        Promise.resolve(
+          misses.has(name)
+            ? []
+            : [Artist.create({ id: ArtistId.create(slug(name)), name })],
+        ),
+      ),
+    };
+    const discovery = {
+      isConfigured: () => true,
+      getSimilarArtists: jest.fn().mockResolvedValue(similar),
+    };
+    const useCase = new GenerateDiscoverPlaylistUseCase(
+      artistMix as unknown as GenerateArtistMixUseCase,
+      discovery as unknown as DiscoveryCatalogPort,
+      { forMarket: () => catalog as unknown as CatalogProviderPort },
+      { assertAvailable: jest.fn() },
+    );
+
+    const run = async (
+      popularity: PopularityMode = PopularityMode.BALANCED,
+    ) => {
+      await useCase.execute({
+        kind: 'discover_artist',
+        artistId: 'sade',
+        artist: { id: 'sade', name: 'Sade' },
+        targetTrackCount: 50,
+        popularity,
+        orderMode: 'random',
+      });
+      const [mixInput] = artistMix.execute.mock.lastCall as [
+        { artists: Array<{ name: string }>; popularity: PopularityMode },
+      ];
+      return mixInput;
+    };
+    const searched = () =>
+      catalog.searchArtists.mock.calls.map(([name]) => name);
+
+    return { run, searched, discovery };
+  }
+
+  it('draws a bounded artist set from every similarity band of the 40 candidates', async () => {
+    const context = setupArtistDiscover();
+
+    const mixInput = await context.run();
+
+    expect(context.discovery.getSimilarArtists).toHaveBeenCalledWith(
+      'Sade',
+      40,
+    );
+    const names = mixInput.artists.map((artist) => artist.name);
+    expect(names).toHaveLength(MAX_ARTISTS);
+    expect(names).not.toEqual(
+      similar.slice(0, MAX_ARTISTS).map((artist) => artist.name),
+    );
+    const bands = names.map(band);
+    const count = (name: string) => bands.filter((b) => b === name).length;
+    expect(count('tail')).toBeGreaterThan(0);
+    expect(count('middle')).toBeGreaterThan(count('tail'));
+    expect(count('head')).toBeGreaterThan(count('middle'));
+  });
+
+  it('continues through the diversified order when Spotify misses a candidate', async () => {
+    const misses = new Set(['Similar 1', 'Similar 11', 'Similar 26']);
+    const context = setupArtistDiscover(misses);
+
+    const mixInput = await context.run();
+
+    const names = mixInput.artists.map((artist) => artist.name);
+    expect(names).toHaveLength(MAX_ARTISTS);
+    expect(names.some((name) => misses.has(name))).toBe(false);
+    expect(context.searched()).toHaveLength(MAX_ARTISTS + misses.size);
+    expect(new Set(context.searched().map(band))).toEqual(
+      new Set(['head', 'middle', 'tail']),
+    );
+  });
+
+  it('keeps the same artists for every popularity mode and passes it to the mix', async () => {
+    const modes = [
+      PopularityMode.POPULAR,
+      PopularityMode.BALANCED,
+      PopularityMode.RARITIES,
+    ];
+    const results = [];
+    for (const mode of modes) {
+      results.push(await setupArtistDiscover().run(mode));
+    }
+
+    const [first, ...rest] = results.map((input) =>
+      input.artists.map((artist) => artist.name),
+    );
+    for (const names of rest) {
+      expect(names).toEqual(first);
+    }
+    expect(results.map((input) => input.popularity)).toEqual(modes);
   });
 });
 

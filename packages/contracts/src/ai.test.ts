@@ -34,6 +34,7 @@ const READY_SESSION = {
     kind: 'artist_mix',
     artists: ['Radiohead', 'Interpol'],
     genres: [],
+    region: null,
     seedTrack: null,
     targetTrackCount: 30,
     targetDurationMinutes: null,
@@ -106,6 +107,27 @@ describe('AI session contracts', () => {
     };
 
     expect(AiSessionSchema.parse(moodOnly)).toEqual(moodOnly);
+  });
+
+  it('carries a canonical region beside canonical genres', () => {
+    const regional = {
+      ...READY_SESSION,
+      intent: {
+        ...READY_SESSION.intent,
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['Rock'],
+        region: 'argentina',
+      },
+    };
+
+    expect(AiSessionSchema.parse(regional)).toEqual(regional);
+    expect(
+      AiSessionSchema.safeParse({
+        ...regional,
+        intent: { ...regional.intent, region: 'Argentina' },
+      }).success,
+    ).toBe(false);
   });
 
   it('carries an unresolved seed track as user-authored names only', () => {

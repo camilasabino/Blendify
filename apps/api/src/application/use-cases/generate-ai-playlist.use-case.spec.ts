@@ -299,7 +299,7 @@ describe('GenerateAiPlaylistUseCase', () => {
     expect(JSON.stringify(result.aiSafe)).not.toContain('radiohead-id');
   });
 
-  it('generates a genre mix from curated genres without any catalog lookup', async () => {
+  it('generates a genre mix from catalog genres without any catalog lookup', async () => {
     const world = createWorld(
       session({
         aiSafe: {

@@ -1,4 +1,5 @@
 import type { BulkLibraryAction, PlaylistSummary } from '@blendify/contracts'
+import type { GenreLabelSource } from '@/components/genres/genre-labels'
 import type { PendingLibraryConfirm } from '@/components/playlist/library-types'
 import type { MessageKey } from '@/i18n/messages'
 import { GENERATED_NAME_PREFIX } from '@/lib/playlist-name'
@@ -8,12 +9,13 @@ type Translate = (key: MessageKey, vars?: Record<string, string | number>) => st
 export function libraryDisplayTitle(
   playlist: Pick<PlaylistSummary, 'name' | 'seeds' | 'seedCount'>,
   t: Translate,
+  genreLabel: (genre: GenreLabelSource) => string,
 ): string {
   if (!playlist.name.startsWith(GENERATED_NAME_PREFIX)) {
     return playlist.name
   }
   const names = playlist.seeds
-    .map((seed) => seed.name.trim())
+    .map((seed) => (seed.type === 'genre' ? genreLabel(seed) : seed.name).trim())
     .filter(Boolean)
   if (names.length === 0) {
     return playlist.name

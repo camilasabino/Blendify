@@ -4,6 +4,7 @@ import type {
   AiTrackReference,
   PlaylistKind,
 } from '@blendify/contracts'
+import { REGION_LABEL_KEYS, type GenreLabelSource } from '@/components/genres/genre-labels'
 import type { MessageKey } from '@/i18n/messages'
 import { ApiError, getApiErrorMessage, isRequestLimited } from '@/lib/api-error'
 import {
@@ -157,7 +158,11 @@ function minutesLabel(value: number | null, t: Translate): string {
     : t('ai.summary.durationValue', { minutes: value })
 }
 
-export function intentChangeView(change: AiIntentChangeDto, t: Translate): IntentChangeView {
+export function intentChangeView(
+  change: AiIntentChangeDto,
+  t: Translate,
+  genreLabel: (genre: GenreLabelSource) => string,
+): IntentChangeView {
   const key = change.field
   switch (change.field) {
     case 'kind':
@@ -168,8 +173,15 @@ export function intentChangeView(change: AiIntentChangeDto, t: Translate): Inten
         from: t(KIND_LABEL_KEYS[change.from]),
         to: t(KIND_LABEL_KEYS[change.to]),
       }
-    case 'artists':
     case 'genres':
+      return {
+        key,
+        type: 'list',
+        label: t(LIST_FIELD_LABEL_KEYS[change.field]),
+        added: change.added.map((name) => genreLabel({ name })),
+        removed: change.removed.map((name) => genreLabel({ name })),
+      }
+    case 'artists':
     case 'excludeArtists':
       return {
         key,
@@ -202,6 +214,14 @@ export function intentChangeView(change: AiIntentChangeDto, t: Translate): Inten
         label: t('ai.summary.duration'),
         from: minutesLabel(change.from, t),
         to: minutesLabel(change.to, t),
+      }
+    case 'region':
+      return {
+        key,
+        type: 'value',
+        label: t('ai.summary.region'),
+        from: change.from ? t(REGION_LABEL_KEYS[change.from]) : t('create.regionAny'),
+        to: change.to ? t(REGION_LABEL_KEYS[change.to]) : t('create.regionAny'),
       }
     case 'mood':
       return {

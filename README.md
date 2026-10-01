@@ -33,7 +33,8 @@ Blendify builds a playlist from music you already know and previews it before
 anything is saved. It combines the Spotify catalog with Last.fm discovery data,
 in three ways to start:
 
-- **Mix** — blend up to 12 artists or up to 5 curated genres.
+- **Mix** — blend up to 12 artists, or up to 5 MusicBrainz genres with an
+  optional region.
 - **Discover** — branch out from one artist or one song.
 - **Create with AI** — describe the playlist in natural language, review what
   Blendify understood, then create it.

@@ -1,0 +1,68 @@
+{
+  "ballad": {
+    "en": ["ballads"],
+    "es": ["baladas"],
+    "pt": ["baladas"]
+  },
+  "chillout": {
+    "en": ["chill out"]
+  },
+  "classical": {
+    "en": ["classical music"],
+    "es": ["clásica"],
+    "pt": ["clássica", "música erudita"]
+  },
+  "drum and bass": {
+    "en": ["drum & bass", "drum n bass", "dnb"]
+  },
+  "edm": {
+    "en": ["electronic dance music"]
+  },
+  "electronic": {
+    "en": ["electronic music"],
+    "es": ["música electrónica"],
+    "pt": ["música eletrônica"]
+  },
+  "hip hop": {
+    "en": ["rap"],
+    "es": ["rap"],
+    "pt": ["rap"]
+  },
+  "instrumental": {
+    "en": ["instrumental music"],
+    "es": ["música instrumental"],
+    "pt": ["música instrumental"]
+  },
+  "j-pop": {
+    "en": ["jpop"]
+  },
+  "k-pop": {
+    "en": ["kpop"]
+  },
+  "latin": {
+    "en": ["latin music"]
+  },
+  "lo-fi": {
+    "en": ["lofi"]
+  },
+  "lo-fi hip hop": {
+    "en": ["lofi hip hop", "lo-fi beats", "lofi beats"]
+  },
+  "mpb": {
+    "en": ["brazilian popular music"],
+    "es": ["música popular brasileña"],
+    "pt": ["música popular brasileira"]
+  },
+  "r&b": {
+    "en": ["rnb", "r and b"]
+  },
+  "reggaeton": {
+    "es": ["reggaetón"]
+  },
+  "rock and roll": {
+    "en": ["rock & roll", "rock n roll"]
+  },
+  "singer-songwriter": {
+    "es": ["cantautora", "cantautores"]
+  }
+}

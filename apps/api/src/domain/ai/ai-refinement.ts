@@ -9,7 +9,7 @@ import type {
 } from '@blendify/contracts/ai-service';
 import { constraintCapability } from './ai-capability-matrix';
 import { isSameEffectiveState } from './ai-effective-state';
-import { isCuratedGenreName } from './ai-genre-seeds';
+import { isCatalogGenreName } from './ai-genre-seeds';
 import type {
   AiIntent,
   AiIntentClarification,
@@ -130,7 +130,7 @@ export function evaluateRefinement(
 
 function genreExclusions(excludedArtists: string[]): AiUnsupportedConstraint[] {
   return excludedArtists
-    .filter(isCuratedGenreName)
+    .filter(isCatalogGenreName)
     .map((name) => ({ category: 'genre_exclusion', userText: name }));
 }
 

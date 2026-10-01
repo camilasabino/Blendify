@@ -8,7 +8,7 @@ import type { IntentClarification } from '@blendify/contracts/ai-service';
 import { normalizeArtistName } from '@/domain/artist/artist-name-match';
 import { MAX_ARTISTS, MAX_GENRES, MAX_TRACKS } from '@/domain/constants';
 import { constraintCapability } from './ai-capability-matrix';
-import { aiGenreKey, resolveCuratedGenreSeeds } from './ai-genre-seeds';
+import { aiGenreKey, resolveAiGenreSeeds } from './ai-genre-seeds';
 import type {
   AiClarificationOption,
   AiIntent,
@@ -159,7 +159,9 @@ function durationClarification(intent: AiIntent): AiIntentClarification | null {
 }
 
 function genreClarification(intent: AiIntent): AiIntentClarification | null {
-  const { unknown, ambiguous } = resolveCuratedGenreSeeds(intent.genres);
+  const { unknown, ambiguous, conflictingRegions } = resolveAiGenreSeeds(
+    intent.genres,
+  );
 
   if (unknown.length > 0) {
     return clarify('unknown_genres', { seedType: 'genre', names: unknown });
@@ -169,6 +171,12 @@ function genreClarification(intent: AiIntent): AiIntentClarification | null {
       seedType: 'genre',
       limit: MAX_GENRES,
       names: ambiguous,
+    });
+  }
+  if (conflictingRegions.length > 0) {
+    return clarify('conflicting_regions', {
+      seedType: 'genre',
+      names: conflictingRegions,
     });
   }
   return null;

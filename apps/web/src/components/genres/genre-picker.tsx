@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, RefreshCw, Sparkles } from 'lucide-react'
-import { api, type CuratedGenre } from '@/lib/api'
+import { api, type Genre } from '@/lib/api'
 import { GenreIcon } from '@/components/genres/genre-icon'
+import { useGenreLabel } from '@/components/genres/genre-labels'
 import {
   RemovableChip,
   SeedChip,
@@ -18,9 +19,9 @@ import { cn, focusRing } from '@/lib/utils'
 const EXPLORE_PAGE_SIZE = 8
 
 type GenrePickerProps = Readonly<{
-  selected: CuratedGenre[]
+  selected: Genre[]
   max: number
-  onToggle: (genre: CuratedGenre) => void
+  onToggle: (genre: Genre) => void
   onRemove: (id: string) => void
   className?: string
 }>
@@ -30,11 +31,12 @@ function SelectedGenres({
   seedId,
   onRemove,
 }: Readonly<{
-  selected: CuratedGenre[]
+  selected: Genre[]
   seedId: string | undefined
   onRemove: (id: string) => void
 }>) {
   const t = useT()
+  const label = useGenreLabel()
   if (selected.length === 0) {
     return null
   }
@@ -44,11 +46,11 @@ function SelectedGenres({
         {selected.map((genre) => (
           <RemovableChip
             key={genre.id}
-            label={genre.name}
+            label={label(genre)}
             highlighted={seedId === genre.id}
             leading={<GenreIcon name={genre.name} id={genre.id} />}
             onRemove={() => onRemove(genre.id)}
-            removeLabel={t('genre.remove', { name: genre.name })}
+            removeLabel={t('genre.remove', { name: label(genre) })}
           />
         ))}
       </ul>
@@ -65,14 +67,15 @@ function GenreCatalogResults({
   onSelect,
 }: Readonly<{
   searching: boolean
-  visible: CuratedGenre[]
+  visible: Genre[]
   selectedIds: Set<string>
   atLimit: boolean
   searchFetching: boolean
   searchEmpty: boolean
-  onSelect: (genre: CuratedGenre) => void
+  onSelect: (genre: Genre) => void
 }>) {
   const t = useT()
+  const label = useGenreLabel()
   return (
     <div className="space-y-2">
       <h3 className="font-sans text-sm font-medium text-cream-300">
@@ -88,7 +91,7 @@ function GenreCatalogResults({
               disabled={!isSelected && atLimit}
               onClick={() => onSelect(genre)}
             >
-              {genre.name}
+              {label(genre)}
             </SelectableChip>
           )
         })}
@@ -113,19 +116,20 @@ function GenreExploreSection({
   onSelect,
   onLoadMore,
 }: Readonly<{
-  seed: CuratedGenre
-  selected: CuratedGenre[]
-  explore: CuratedGenre[]
+  seed: Genre
+  selected: Genre[]
+  explore: Genre[]
   explorePage: number
   exploreLoading: boolean
   exploreFetching: boolean
   exploreHasMore: boolean
   atLimit: boolean
   onSetSeedId: (id: string) => void
-  onSelect: (genre: CuratedGenre) => void
+  onSelect: (genre: Genre) => void
   onLoadMore: () => void
 }>) {
   const t = useT()
+  const label = useGenreLabel()
   const showLoadMore = exploreHasMore || explore.length > 0
   const emptyLabel =
     explorePage > 0 ? t('genre.exploreExhausted') : t('genre.exploreEmpty')
@@ -137,7 +141,7 @@ function GenreExploreSection({
           <Sparkles aria-hidden className="size-4 shrink-0 text-accent-fg" />
           {selected.length > 1
             ? t('create.suggestions')
-            : t('create.suggestionsFor', { name: seed.name })}
+            : t('create.suggestionsFor', { name: label(seed) })}
         </h3>
         <p className="text-sm leading-relaxed text-cream-400">
           {t('create.suggestionsHint')}
@@ -155,7 +159,7 @@ function GenreExploreSection({
               active={genre.id === seed.id}
               onClick={() => onSetSeedId(genre.id)}
             >
-              {genre.name}
+              {label(genre)}
             </SeedChip>
           ))}
         </div>
@@ -180,7 +184,7 @@ function GenreExploreSection({
                 type="button"
                 disabled={atLimit}
                 onClick={() => onSelect(genre)}
-                aria-label={t('create.addSuggestion', { name: genre.name })}
+                aria-label={t('create.addSuggestion', { name: label(genre) })}
                 className={cn(
                   'group inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-divider bg-field px-3.5 py-1.5 text-left text-sm text-cream-100 transition-colors',
                   'hover:border-control-hover hover:bg-hover hover:text-cream-50',
@@ -189,7 +193,7 @@ function GenreExploreSection({
                 )}
               >
                 <span className="truncate font-medium tracking-tight">
-                  {genre.name}
+                  {label(genre)}
                 </span>
                 <Plus aria-hidden className="size-3.5 shrink-0 text-accent-fg" />
               </button>
@@ -223,11 +227,11 @@ function GenreExploreSection({
 }
 
 function mergeExploreBatch(
-  prev: CuratedGenre[],
-  batch: CuratedGenre[],
+  prev: Genre[],
+  batch: Genre[],
   selectedIds: Set<string>,
   explorePage: number,
-): CuratedGenre[] {
+): Genre[] {
   const nextBatch = batch.filter((g) => !selectedIds.has(g.id))
   if (explorePage === 0) {
     return nextBatch
@@ -247,7 +251,7 @@ export function GenrePicker({
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
   const [explorePage, setExplorePage] = useState(0)
-  const [exploreItems, setExploreItems] = useState<CuratedGenre[]>([])
+  const [exploreItems, setExploreItems] = useState<Genre[]>([])
   const { seed, setSeedId } = useSuggestionSeed(selected)
 
   useEffect(() => {
@@ -321,7 +325,7 @@ export function GenrePicker({
   const showExplore =
     selected.length > 0 && !atLimit && !searching && Boolean(seed)
 
-  function selectGenre(genre: CuratedGenre) {
+  function selectGenre(genre: Genre) {
     onToggle(genre)
     setQuery('')
     setDebounced('')

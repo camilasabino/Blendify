@@ -1,6 +1,8 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MixPlaylistForm } from '@/components/playlist/mix-playlist-form'
+import { messages } from '@/i18n/messages'
+import { useLocaleStore } from '@/i18n/use-locale'
 import { renderPlaylistCoverBase64 } from '@/lib/playlist-cover'
 import { usePlaylistRunStore } from '@/stores/playlist-run-store'
 import {
@@ -55,6 +57,49 @@ function generationCalls(calls: FetchCall[]) {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('MixPlaylistForm genre region', () => {
+  afterEach(() => {
+    useLocaleStore.getState().setLocale('en')
+  })
+
+  it('shows localized genre labels and submits canonical genre and region values', async () => {
+    const es = messages.es
+    setAuthState(null)
+    const { calls } = stubApi({
+      'GET /api/genres': () =>
+        jsonResponse({
+          genres: [
+            {
+              id: 'korean ballad',
+              name: 'Korean Ballad',
+            },
+          ],
+        }),
+      'POST /api/generate/mix': () =>
+        ndjsonResponse(progress, { type: 'result', playlist: guestPlaylist }),
+    })
+    renderWithProviders(<MixPlaylistForm />)
+    act(() => useLocaleStore.getState().setLocale('es'))
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('radio', { name: es['create.modeGenres'] }))
+    const region = screen.getByRole('button', { name: new RegExp(es['create.region']) })
+    expect(region).toHaveTextContent(es['create.regionAny'])
+    await user.click(await screen.findByRole('button', { name: 'Balada coreana' }))
+    await user.click(region)
+    await user.click(await screen.findByRole('option', { name: es['region.brazilian'] }))
+    await user.click(screen.getByRole('button', { name: es['create.generateGuest'] }))
+    await vi.waitFor(() => {
+      expect(generationCalls(calls)).toHaveLength(1)
+    })
+    expect(generationCalls(calls)[0].body).toMatchObject({
+      kind: 'genre_mix',
+      genreIds: ['korean ballad'],
+      region: 'brazilian',
+    })
+  })
 })
 
 describe('MixPlaylistForm generation modes', () => {

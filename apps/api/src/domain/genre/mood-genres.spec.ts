@@ -1,10 +1,10 @@
 import { AI_MOODS } from '@blendify/contracts';
 import { MAX_GENRES } from '@/domain/constants';
-import { CURATED_GENRES } from './curated-genres';
+import { GENRE_CATALOG } from './genre-catalog';
 import moodGenreMap from './data/mood-genre-map.json';
 import { moodGenreIds } from './mood-genres';
 
-const CATALOG_IDS = new Set(CURATED_GENRES.map((genre) => genre.id));
+const CATALOG_IDS = new Set(GENRE_CATALOG.map((genre) => genre.id));
 const ACTIVITIES = [
   'focus',
   'workout',
@@ -38,12 +38,9 @@ describe('curated mood → genre mapping', () => {
     expect(new Set(genreIds).size).toBe(genreIds.length);
   });
 
-  it.each(AI_MOODS)(
-    'maps %s only to Blendify genre ids in the curated catalog',
-    (mood) => {
-      const unknown = moodGenreIds(mood).filter((id) => !CATALOG_IDS.has(id));
+  it.each(AI_MOODS)('maps %s only to canonical MusicBrainz genres', (mood) => {
+    const unknown = moodGenreIds(mood).filter((id) => !CATALOG_IDS.has(id));
 
-      expect(unknown).toEqual([]);
-    },
-  );
+    expect(unknown).toEqual([]);
+  });
 });

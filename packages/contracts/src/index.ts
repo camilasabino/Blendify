@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export * from './genre-labels';
+export * from './genre-lookup-key';
+
 export const MAX_ARTISTS = 12;
 export const MAX_GENRES = 5;
 export const PLAYLIST_NAME_MAX_LENGTH = 100;
@@ -32,6 +35,21 @@ export const PLAYLIST_KINDS = [
 ] as const;
 export const PLAYLIST_STATUSES = ['PENDING', 'COMPLETED', 'FAILED'] as const;
 export const BULK_LIBRARY_ACTIONS = ['purge_active', 'clear_library'] as const;
+export const GENRE_REGIONS = [
+  'latin',
+  'american',
+  'british',
+  'argentina',
+  'brazilian',
+  'uruguay',
+  'colombia',
+  'mexico',
+  'chile',
+  'peru',
+  'venezuela',
+  'spanish',
+] as const;
+export const GENRE_LABEL_LOCALES = ['en', 'es', 'pt'] as const;
 
 export const PopularityModeSchema = z.enum(POPULARITY_MODES);
 export const TrackOrderModeSchema = z.enum(TRACK_ORDER_MODES);
@@ -43,6 +61,7 @@ export const DiscoverTrackTargetSchema = z
   .min(MIN_DISCOVER_TRACKS)
   .max(MAX_TRACKS);
 export const BulkLibraryActionSchema = z.enum(BULK_LIBRARY_ACTIONS);
+export const GenreRegionSchema = z.enum(GENRE_REGIONS);
 
 export type PopularityMode = z.infer<typeof PopularityModeSchema>;
 export type TrackOrderMode = z.infer<typeof TrackOrderModeSchema>;
@@ -50,6 +69,8 @@ export type PlaylistKind = z.infer<typeof PlaylistKindSchema>;
 export type PlaylistStatus = z.infer<typeof PlaylistStatusSchema>;
 export type DiscoverTrackTarget = z.infer<typeof DiscoverTrackTargetSchema>;
 export type BulkLibraryAction = z.infer<typeof BulkLibraryActionSchema>;
+export type GenreRegion = z.infer<typeof GenreRegionSchema>;
+export type GenreLabelLocale = (typeof GENRE_LABEL_LOCALES)[number];
 
 export const ArtistSchema = z.object({
   id: z.string().min(1),
@@ -105,7 +126,9 @@ export const TrackSeedSchema = TrackSchema.pick({
 export const GenreSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(200),
-  parentId: z.string().nullable().optional(),
+  labels: z
+    .partialRecord(z.enum(GENRE_LABEL_LOCALES), z.string().min(1).max(200))
+    .optional(),
 });
 
 export const PlaylistSeedSchema = z.discriminatedUnion('type', [
@@ -137,6 +160,7 @@ export const PlaylistGenerationSchema = z.discriminatedUnion('kind', [
       .array(GenreSchema.pick({ id: true, name: true }))
       .min(1)
       .max(10),
+    region: GenreRegionSchema.optional(),
   }),
   GenerationSettingsSchema.extend({
     kind: z.literal('discover_artist'),
@@ -169,6 +193,7 @@ export const ArtistMixRequestSchema = PlaylistMetadataSchema.extend({
 export const GenreMixRequestSchema = PlaylistMetadataSchema.extend({
   kind: z.literal('genre_mix'),
   genreIds: z.array(z.string().min(1)).min(1).max(MAX_GENRES),
+  region: GenreRegionSchema.optional(),
   tracksPerSeed: z.number().int().min(1).max(MAX_TRACKS),
   popularity: PopularityModeSchema,
   orderMode: TrackOrderModeSchema.default('random'),
@@ -496,6 +521,7 @@ export const AI_CLARIFICATION_REASONS = [
   'unsupported_ordering',
   'unknown_genres',
   'ambiguous_genres',
+  'conflicting_regions',
 ] as const;
 
 export const AiUnsupportedConstraintCategorySchema = z.enum(
@@ -518,6 +544,7 @@ export const AiIntentSummarySchema = z.strictObject({
   kind: PlaylistKindSchema,
   artists: z.array(z.string().min(1).max(200)),
   genres: z.array(z.string().min(1).max(200)),
+  region: GenreRegionSchema.nullable(),
   seedTrack: AiTrackReferenceSchema.nullable(),
   targetTrackCount: z.number().int().min(1).max(MAX_TRACKS).nullable(),
   targetDurationMinutes: z.number().int().positive().nullable(),
@@ -590,6 +617,7 @@ export const AI_REFINEMENT_CLARIFICATION_REASONS = [
   'unsupported_ordering',
   'unknown_genres',
   'ambiguous_genres',
+  'conflicting_regions',
   'conflicting_changes',
   'preserved_track_out_of_range',
   'preserved_artist_not_found',
@@ -747,6 +775,11 @@ export const AiIntentChangeSchema = z.discriminatedUnion('field', [
   }),
   z.strictObject({ field: z.literal('artists'), ...AiNameListChangeShape }),
   z.strictObject({ field: z.literal('genres'), ...AiNameListChangeShape }),
+  z.strictObject({
+    field: z.literal('region'),
+    from: GenreRegionSchema.nullable(),
+    to: GenreRegionSchema.nullable(),
+  }),
   z.strictObject({ field: z.literal('seedTracks'), ...AiTrackListChangeShape }),
   z.strictObject({
     field: z.literal('targetTrackCount'),

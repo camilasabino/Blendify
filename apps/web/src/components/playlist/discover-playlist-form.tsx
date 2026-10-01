@@ -43,6 +43,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { FormSection } from '@/components/ui/form-section'
 import { RangeSlider } from '@/components/ui/range-slider'
 import { SegmentedControl } from '@/components/ui/segmented-control'
+import { useGenreLabel } from '@/components/genres/genre-labels'
 import { useT } from '@/i18n/use-t'
 import { readPersistToLibraryPreference } from '@/lib/persist-to-library-preference'
 import { cn, focusRing, formatCreditedArtists } from '@/lib/utils'
@@ -184,6 +185,7 @@ function DiscoverSeedField({
 
 export function DiscoverPlaylistForm() {
   const t = useT()
+  const genreLabel = useGenreLabel()
   const capabilities = useCapabilities()
   const playlistRun = usePlaylistRun('discover')
   const [seedMode, setSeedMode] = useState<SeedMode>('artist')
@@ -391,7 +393,7 @@ export function DiscoverPlaylistForm() {
   const seedName = seedMode === 'artist' ? artist?.name : track?.name
   const targetTrackCount = form.watch('targetTrackCount')
   const settingsSummary = result
-    ? buildRecipeSummary(result.playlist.generation, outcomeTrackCount(result), t)
+    ? buildRecipeSummary(result.playlist.generation, outcomeTrackCount(result), t, genreLabel)
     : buildGenerationSummary(
         {
           seedNames: seedName ? [seedName] : [],

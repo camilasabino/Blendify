@@ -95,6 +95,9 @@ function generationRequest(
         ...settings,
         kind: 'genre_mix',
         genreIds,
+        ...(seeds.genres.length > 0 && seeds.region
+          ? { region: seeds.region }
+          : {}),
         tracksPerSeed: tracksPerSeed(
           genreIds.length,
           candidateCount,

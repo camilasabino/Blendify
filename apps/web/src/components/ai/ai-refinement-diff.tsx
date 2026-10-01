@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { ArrowRight, ArrowUpDown, Minus, Plus } from 'lucide-react'
 import type { AiRefinementDiffDto, TrackDto } from '@blendify/contracts'
+import { useGenreLabel } from '@/components/genres/genre-labels'
 import { useT } from '@/i18n/use-t'
 import { formatCreditedArtists, formatListeningTime } from '@/lib/utils'
 import { AiRefinementBadge } from './ai-refinement-badge'
@@ -23,7 +24,8 @@ function durationLabel(durationMs: number): string {
 
 export function AiRefinementDiff({ diff, currentTracks, proposedTracks }: AiRefinementDiffProps) {
   const t = useT()
-  const intentChanges = diff.intent.map((change) => intentChangeView(change, t))
+  const genreLabel = useGenreLabel()
+  const intentChanges = diff.intent.map((change) => intentChangeView(change, t, genreLabel))
   const { tracks } = diff
   const current = tracksById(currentTracks)
   const proposed = tracksById(proposedTracks)

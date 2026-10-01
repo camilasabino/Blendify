@@ -4,7 +4,7 @@ import {
   normalizeArtistName,
   pickStrictArtistMatch,
 } from '@/domain/artist/artist-name-match';
-import { resolveCuratedGenreSeeds } from '@/domain/ai/ai-genre-seeds';
+import { resolveAiGenreSeeds } from '@/domain/ai/ai-genre-seeds';
 import type { AiIntent, AiTrackReference } from '@/domain/ai/ai-intent';
 import type {
   ResolvedAiSeed,
@@ -51,12 +51,29 @@ export class AiIntentResolver {
   }
 
   private resolveGenres(names: string[]): AiIntentResolution {
-    const { genres, unknown, ambiguous } = resolveCuratedGenreSeeds(names);
+    const { genres, region, unknown, ambiguous, conflictingRegions } =
+      resolveAiGenreSeeds(names);
 
-    if (unknown.length > 0 || ambiguous.length > 0) {
-      return notFound('genre', [...unknown, ...ambiguous]);
+    if (
+      unknown.length > 0 ||
+      ambiguous.length > 0 ||
+      conflictingRegions.length > 0
+    ) {
+      return notFound('genre', [
+        ...unknown,
+        ...ambiguous,
+        ...conflictingRegions,
+      ]);
     }
-    return { status: 'resolved', seeds: { artists: [], genres, track: null } };
+    return {
+      status: 'resolved',
+      seeds: {
+        artists: [],
+        genres,
+        ...(region ? { region } : {}),
+        track: null,
+      },
+    };
   }
 
   private async resolveArtists(

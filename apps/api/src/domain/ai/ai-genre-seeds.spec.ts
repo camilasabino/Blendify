@@ -1,125 +1,98 @@
 import { MAX_GENRES } from '@/domain/constants';
-import { aiGenreKey, resolveCuratedGenreSeeds } from './ai-genre-seeds';
+import { aiGenreKey, resolveAiGenreSeeds } from './ai-genre-seeds';
 
-describe('resolveCuratedGenreSeeds', () => {
-  it('resolves semantic genre expressions to canonical curated seeds', () => {
-    expect(
-      resolveCuratedGenreSeeds(['argentine rock', 'acoustic guitar']),
-    ).toEqual({
+describe('resolveAiGenreSeeds', () => {
+  it('resolves semantic genre expressions to canonical MusicBrainz seeds', () => {
+    expect(resolveAiGenreSeeds(['alternative rock', 'chamber'])).toEqual({
       genres: [
-        { id: 'argentine-rock', name: 'Argentine Rock' },
-        { id: 'acoustic-guitar-cover', name: 'Acoustic Guitar Cover' },
-        {
-          id: 'instrumental-acoustic-guitar',
-          name: 'Instrumental Acoustic Guitar',
-        },
+        { id: 'alternative rock', name: 'Alternative Rock' },
+        { id: 'chamber folk', name: 'Chamber Folk' },
+        { id: 'chamber pop', name: 'Chamber Pop' },
       ],
+      region: null,
       unknown: [],
       ambiguous: [],
+      conflictingRegions: [],
+    });
+  });
+
+  it.each([
+    ['rock argentino', 'rock', 'argentina'],
+    ['Brazilian pop', 'pop', 'brazilian'],
+    ['baladas latino-americanas', 'ballad', 'latin'],
+    ['rock britânico', 'rock', 'british'],
+  ])('resolves %p to genre %p and region %p', (expression, genre, region) => {
+    expect(resolveAiGenreSeeds([expression])).toMatchObject({
+      genres: [{ id: genre }],
+      region,
+    });
+  });
+
+  it('applies one shared region to every genre of the request', () => {
+    expect(
+      resolveAiGenreSeeds(['argentine rock', 'pop argentino', 'jazz']),
+    ).toMatchObject({
+      genres: [{ id: 'rock' }, { id: 'pop' }, { id: 'jazz' }],
+      region: 'argentina',
+      conflictingRegions: [],
+    });
+  });
+
+  it('reports regional expressions that ask for different regions', () => {
+    expect(
+      resolveAiGenreSeeds(['rock argentino', 'jazz', 'pop brasileiro']),
+    ).toMatchObject({
+      region: null,
+      conflictingRegions: ['rock argentino', 'pop brasileiro'],
     });
   });
 
   it('removes duplicate canonical genres reached by different expressions', () => {
     expect(
-      resolveCuratedGenreSeeds([
-        'instrumental acoustic guitar',
-        'acoustic guitar',
-      ]).genres.map((genre) => genre.id),
-    ).toEqual(['instrumental-acoustic-guitar', 'acoustic-guitar-cover']);
+      resolveAiGenreSeeds(['rock alternativo', 'Alternative Rock']).genres,
+    ).toEqual([{ id: 'alternative rock', name: 'Alternative Rock' }]);
   });
 
   it('separates unknown and ambiguous expressions from executable ones', () => {
-    expect(
-      resolveCuratedGenreSeeds(['rock', 'instrumental', 'zorblax wave']),
-    ).toEqual({
+    expect(resolveAiGenreSeeds(['rock', 'dark', 'zorblax wave'])).toEqual({
       genres: [{ id: 'rock', name: 'Rock' }],
+      region: null,
       unknown: ['zorblax wave'],
-      ambiguous: ['instrumental'],
+      ambiguous: ['dark'],
+      conflictingRegions: [],
     });
   });
 
-  it('resolves instrumental alone to its curated representative genres', () => {
-    expect(resolveCuratedGenreSeeds(['instrumental'])).toEqual({
-      genres: [
-        { id: 'instrumental-hip-hop', name: 'Instrumental Hip Hop' },
-        { id: 'instrumental-rock', name: 'Instrumental Rock' },
-        { id: 'instrumental-funk', name: 'Instrumental Funk' },
-        { id: 'instrumental-soul', name: 'Instrumental Soul' },
-        {
-          id: 'instrumental-acoustic-guitar',
-          name: 'Instrumental Acoustic Guitar',
-        },
-      ],
-      unknown: [],
-      ambiguous: [],
-    });
-  });
-
-  it('resolves an English form and its local genre name to one seed', () => {
-    expect(
-      resolveCuratedGenreSeeds(['argentine pop', 'pop argentino']),
-    ).toEqual({
-      genres: [{ id: 'pop-argentino', name: 'Pop Argentino' }],
-      unknown: [],
-      ambiguous: [],
-    });
-  });
-
-  it('resolves local-language genre expressions to their English-named catalog seeds', () => {
-    expect(
-      resolveCuratedGenreSeeds(['rock argentino', 'jazz brasileiro']),
-    ).toEqual({
-      genres: [
-        { id: 'argentine-rock', name: 'Argentine Rock' },
-        { id: 'brazilian-jazz', name: 'Brazilian Jazz' },
-      ],
-      unknown: [],
-      ambiguous: [],
-    });
-  });
-
-  it('resolves a local-language form and its English catalog name to one seed', () => {
-    expect(
-      resolveCuratedGenreSeeds(['argentine rock', 'rock argentino']),
-    ).toEqual({
-      genres: [{ id: 'argentine-rock', name: 'Argentine Rock' }],
-      unknown: [],
-      ambiguous: [],
-    });
-  });
-
-  it('never accepts custom genre ids through the AI path', () => {
-    expect(resolveCuratedGenreSeeds(['custom:acid%20jazz'])).toEqual({
+  it('never accepts a region alone', () => {
+    expect(resolveAiGenreSeeds(['argentina'])).toEqual({
       genres: [],
-      unknown: ['custom:acid%20jazz'],
+      region: null,
+      unknown: ['argentina'],
       ambiguous: [],
+      conflictingRegions: [],
     });
   });
 
   it('reports an expansion as ambiguous when it would exceed MAX_GENRES in total', () => {
     const exact = ['rock', 'pop', 'jazz', 'blues'];
 
-    const seeds = resolveCuratedGenreSeeds([...exact, 'acoustic guitar']);
+    const seeds = resolveAiGenreSeeds([...exact, 'chamber']);
 
     expect(exact.length + 2).toBeGreaterThan(MAX_GENRES);
     expect(seeds.genres.map((genre) => genre.id)).toEqual(exact);
-    expect(seeds.ambiguous).toEqual(['acoustic guitar']);
+    expect(seeds.ambiguous).toEqual(['chamber']);
     expect(seeds.unknown).toEqual([]);
   });
 });
 
 describe('aiGenreKey', () => {
-  it('compares resolvable genres by their canonical curated ids', () => {
-    expect(aiGenreKey('Argentine Rock')).toBe(aiGenreKey('argentine-rock'));
-    expect(aiGenreKey('Acoustic Guitar')).toBe(aiGenreKey('acoustic guitar'));
-    expect(aiGenreKey('indie rock')).not.toBe(aiGenreKey('rock'));
-    expect(aiGenreKey('Argentine pop')).toBe(aiGenreKey('pop argentino'));
+  it('compares resolvable genres by canonical genre and region', () => {
+    expect(aiGenreKey('Rock Alternativo')).toBe(aiGenreKey('alternative-rock'));
     expect(aiGenreKey('brazilian popular music')).toBe(aiGenreKey('MPB'));
     expect(aiGenreKey('rock argentino')).toBe(aiGenreKey('Argentine Rock'));
-    expect(aiGenreKey('jazz brasileiro')).toBe(aiGenreKey('brazilian jazz'));
-    expect(aiGenreKey('instrumental')).not.toBe(
-      aiGenreKey('instrumental rock'),
-    );
+    expect(aiGenreKey('rock argentino')).not.toBe(aiGenreKey('rock'));
+    expect(aiGenreKey('rock argentino')).not.toBe(aiGenreKey('British rock'));
+    expect(aiGenreKey('indie rock')).not.toBe(aiGenreKey('rock'));
   });
 
   it('falls back to the normalized name for unresolved expressions', () => {

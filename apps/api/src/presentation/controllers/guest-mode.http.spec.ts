@@ -492,7 +492,7 @@ describe('Guest Mode HTTP boundary', () => {
       '/api/genres',
       '/api/genres/search?q=jazz',
       '/api/genres/explore?ids=jazz',
-    ])('serves curated genres at %s without a session', async (path) => {
+    ])('serves catalog genres at %s without a session', async (path) => {
       const response = await request(httpServer()).get(path).expect(200);
 
       expect(Array.isArray((response.body as { genres: unknown }).genres)).toBe(
@@ -982,7 +982,7 @@ describe('Guest Mode HTTP boundary', () => {
       expect(limited.headers['retry-after']).toBeDefined();
     });
 
-    it('leaves curated genres outside the rate limiter', async () => {
+    it('leaves catalog genres outside the rate limiter', async () => {
       await start({
         rateLimits: {
           ...DEFAULT_RATE_LIMITS,

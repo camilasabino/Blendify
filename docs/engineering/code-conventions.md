@@ -200,10 +200,6 @@ code without it?* If no, don't add it. This codebase already does this well —
 the audit that produced this document found only one comment across the
 entire API and web source trees that was pure restatement (a `// fall
 through` next to an already-obvious empty `catch`), and it has been removed.
-Grouping comments inside large literals (e.g. `// Latin & Caribbean` inside
-`curated-genres.ts`'s genre list) are borderline under the strict policy but
-were kept — they document curation categories, not code behavior, and removing
-them would only make the data harder to navigate for no benefit.
 
 ## Contracts and types
 

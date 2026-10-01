@@ -25,6 +25,11 @@ export type CatalogTrackCandidate = {
   rank?: number;
 };
 
+export type ArtistTagCandidate = {
+  name: string;
+  count: number;
+};
+
 export interface DiscoveryCatalogPort {
   isConfigured(): boolean;
   getSimilarArtists(
@@ -39,6 +44,7 @@ export interface DiscoveryCatalogPort {
   getTopArtistsForTag(
     tag: string,
     limit?: number,
+    page?: number,
   ): Promise<SimilarArtistCandidate[]>;
   getTopTracksForTag(
     tag: string,
@@ -49,4 +55,5 @@ export interface DiscoveryCatalogPort {
     artist: string,
     limit?: number,
   ): Promise<CatalogTrackCandidate[]>;
+  getTopTagsForArtist(artist: string): Promise<ArtistTagCandidate[]>;
 }

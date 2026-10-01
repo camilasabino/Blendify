@@ -175,7 +175,7 @@ describe('refinementStrategy', () => {
 
     it.each<[string, Partial<AiIntent>, AiRefinementStrategy['kind']]>([
       [
-        'a genre alias for the same curated genre',
+        'a genre alias for the same catalog genre',
         { genres: ['Rock'] },
         'transform',
       ],

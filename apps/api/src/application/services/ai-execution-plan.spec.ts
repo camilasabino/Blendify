@@ -123,6 +123,25 @@ describe('buildAiExecutionPlan', () => {
     });
   });
 
+  it('carries the resolved region into the existing genre mix request', () => {
+    const plan = buildAiExecutionPlan(
+      intent({ kind: 'genre_mix', genres: ['rock argentino'] }),
+      seeds({ genres: [{ id: 'rock', name: 'Rock' }], region: 'argentina' }),
+    );
+
+    expect(plan.request).toMatchObject({
+      kind: 'genre_mix',
+      genreIds: ['rock'],
+      region: 'argentina',
+    });
+    expect(
+      buildAiExecutionPlan(
+        intent({ kind: 'genre_mix', genres: ['Pop'] }),
+        seeds({ genres: [{ id: 'pop', name: 'Pop' }] }),
+      ).request,
+    ).not.toHaveProperty('region');
+  });
+
   it('keeps an artist seed authoritative and reports the mood as not applied', () => {
     const plan = buildAiExecutionPlan(
       intent({ kind: 'discover_artist', artists: ['Radiohead'], mood: 'sad' }),

@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from 'react'
 import type { AiIntentSummary as AiIntentSummaryDto } from '@blendify/contracts'
+import { REGION_LABEL_KEYS, useGenreLabel } from '@/components/genres/genre-labels'
 import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
 import {
@@ -23,6 +24,7 @@ export function AiIntentSummary({
   footer,
 }: AiIntentSummaryProps) {
   const t = useT()
+  const genreLabel = useGenreLabel()
   const isContext = variant === 'context'
   const excludedTracks = intent.excludeTracks.map((track) =>
     track.artist ? t('ai.summary.trackBy', { title: track.title, artist: track.artist }) : track.title,
@@ -70,7 +72,12 @@ export function AiIntentSummary({
           <SummaryItem label={t('ai.summary.basedOn')}>{basedOn}</SummaryItem>
         ) : null}
         {intent.genres.length > 0 ? (
-          <SummaryItem label={t('ai.summary.genres')}>{intent.genres.join(' · ')}</SummaryItem>
+          <SummaryItem label={t('ai.summary.genres')}>{intent.genres.map((name) => genreLabel({ name })).join(' · ')}</SummaryItem>
+        ) : null}
+        {intent.region ? (
+          <SummaryItem label={t('ai.summary.region')}>
+            {t(REGION_LABEL_KEYS[intent.region])}
+          </SummaryItem>
         ) : null}
         {intent.mood ? (
           <SummaryItem label={t('ai.summary.mood')}>{t(MOOD_LABEL_KEYS[intent.mood])}</SummaryItem>

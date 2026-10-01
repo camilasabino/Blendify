@@ -2,7 +2,7 @@ import type {
   AiIntentChangeDto,
   AiRefinementTrackDiffDto,
 } from '@blendify/contracts';
-import { resolveCuratedGenreSeeds } from './ai-genre-seeds';
+import { resolveAiGenreSeeds } from './ai-genre-seeds';
 import type { AiIntent, AiTrackReference } from './ai-intent';
 import { aiNameKey, aiTrackKey } from './ai-intent-rules';
 
@@ -75,6 +75,11 @@ export function diffIntents(
   );
   if (genres) {
     changes.push({ field: 'genres', ...genres });
+  }
+  const currentRegion = resolveAiGenreSeeds(current.genres).region;
+  const proposedRegion = resolveAiGenreSeeds(proposed.genres).region;
+  if (currentRegion !== proposedRegion) {
+    changes.push({ field: 'region', from: currentRegion, to: proposedRegion });
   }
   const seedTracks = trackChanges(current.seedTracks, proposed.seedTracks);
   if (seedTracks) {
@@ -157,9 +162,7 @@ function trackChanges(
 }
 
 function genreNames(intent: AiIntent): string[] {
-  return resolveCuratedGenreSeeds(intent.genres).genres.map(
-    (genre) => genre.name,
-  );
+  return resolveAiGenreSeeds(intent.genres).genres.map((genre) => genre.name);
 }
 
 function positionsById(tracks: readonly DiffTrack[]): Map<string, number> {

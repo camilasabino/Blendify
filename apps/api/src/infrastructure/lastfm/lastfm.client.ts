@@ -4,6 +4,7 @@ import { AxiosInstance } from 'axios';
 import { createOutboundHttp } from '@/infrastructure/http/outbound-http.logging';
 import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import type {
+  ArtistTagCandidate,
   CatalogTrackCandidate,
   DiscoveryCatalogPort,
   SimilarArtistCandidate,
@@ -78,6 +79,19 @@ type LastFmTagTopTracksResponse = {
 type LastFmTagTopArtistsResponse = {
   topartists?: {
     artist?: LastFmArtistNode | LastFmArtistNode[];
+  };
+  error?: number;
+  message?: string;
+};
+
+type LastFmTagNode = {
+  name?: string;
+  count?: string | number;
+};
+
+type LastFmArtistTopTagsResponse = {
+  toptags?: {
+    tag?: LastFmTagNode | LastFmTagNode[];
   };
   error?: number;
   message?: string;
@@ -280,6 +294,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
   async getTopArtistsForTag(
     tag: string,
     limit = 20,
+    page = 1,
   ): Promise<SimilarArtistCandidate[]> {
     if (!this.apiKey) {
       throw new Error('LASTFM_API_KEY is not configured');
@@ -294,7 +309,13 @@ export class LastFmClient implements DiscoveryCatalogPort {
       Math.max(limit, 1),
       LASTFM_TAG_ARTISTS_MAX_LIMIT,
     );
-    const cacheKey = this.key('tag-artists', `${name}|${safeLimit}`);
+    const safePage = Math.max(1, Math.floor(page));
+    const cacheKey = this.key(
+      'tag-artists',
+      safePage === 1
+        ? `${name}|${safeLimit}`
+        : `${name}|${safeLimit}|p${safePage}`,
+    );
 
     return this.withCache(
       cacheKey,
@@ -304,6 +325,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
             method: 'tag.getTopArtists',
             tag: name,
             limit: safeLimit,
+            page: safePage,
             api_key: this.apiKey,
             format: 'json',
           },
@@ -416,6 +438,9 @@ export class LastFmClient implements DiscoveryCatalogPort {
           },
         );
 
+        if (data.error === 6) {
+          return [];
+        }
         this.assertNoError(data);
 
         const tracks = normalizeTagTrackList(data.toptracks?.track)
@@ -425,7 +450,50 @@ export class LastFmClient implements DiscoveryCatalogPort {
         this.logger.debug(`Last.fm artist tracks: ${tracks.length} track(s)`);
         return tracks;
       },
-      () => LASTFM_CACHE_TTL_MS,
+      (tracks) =>
+        tracks.length > 0 ? LASTFM_CACHE_TTL_MS : LASTFM_EMPTY_CACHE_TTL_MS,
+    );
+  }
+
+  async getTopTagsForArtist(artist: string): Promise<ArtistTagCandidate[]> {
+    if (!this.apiKey) {
+      throw new Error('LASTFM_API_KEY is not configured');
+    }
+
+    const name = artist.trim();
+    if (!name) {
+      return [];
+    }
+
+    const cacheKey = this.key('artist-tags', name.toLowerCase());
+
+    return this.withCache(
+      cacheKey,
+      async () => {
+        const { data } = await this.http.get<LastFmArtistTopTagsResponse>('', {
+          params: {
+            method: 'artist.getTopTags',
+            artist: encodeLastFmParam(name),
+            autocorrect: 1,
+            api_key: this.apiKey,
+            format: 'json',
+          },
+        });
+
+        if (data.error === 6) {
+          return [];
+        }
+        this.assertNoError(data);
+
+        const tags = normalizeTagList(data.toptags?.tag)
+          .map(mapArtistTag)
+          .filter((tag): tag is ArtistTagCandidate => Boolean(tag));
+
+        this.logger.debug(`Last.fm artist tags: ${tags.length} tag(s)`);
+        return tags;
+      },
+      (tags) =>
+        tags.length > 0 ? LASTFM_CACHE_TTL_MS : LASTFM_EMPTY_CACHE_TTL_MS,
     );
   }
 
@@ -468,6 +536,15 @@ function normalizeArtistList(
 function normalizeTagTrackList(
   value: LastFmTagTrackNode | LastFmTagTrackNode[] | undefined,
 ): LastFmTagTrackNode[] {
+  if (!value) {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
+}
+
+function normalizeTagList(
+  value: LastFmTagNode | LastFmTagNode[] | undefined,
+): LastFmTagNode[] {
   if (!value) {
     return [];
   }
@@ -518,6 +595,14 @@ function mapSimilarArtist(
     url: node.url?.trim() || undefined,
     imageUrl: pickImageUrl(node.image),
   };
+}
+
+function mapArtistTag(node: LastFmTagNode): ArtistTagCandidate | null {
+  const name = node.name?.trim();
+  if (!name) {
+    return null;
+  }
+  return { name, count: parsePlaycount(node.count) ?? 0 };
 }
 
 function mapSimilarTrack(

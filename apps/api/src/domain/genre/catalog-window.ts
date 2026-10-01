@@ -191,3 +191,26 @@ export function sliceCatalogWindow<T>(
   }
   return shuffleCopy(pool, random).slice(0, Math.min(pool.length, budget));
 }
+
+export function interleaveArtistCatalogWindows<T>(
+  charts: T[][],
+  mode: PopularityModeValue,
+  perArtist: number,
+  random: () => number = Math.random,
+): T[] {
+  const windows = charts.map((chart) =>
+    sliceCatalogWindow(chart, mode, perArtist, random).slice(0, perArtist),
+  );
+  const merged: T[] = [];
+
+  for (let round = 0; round < perArtist; round += 1) {
+    for (const window of windows) {
+      const entry = window[round];
+      if (entry !== undefined) {
+        merged.push(entry);
+      }
+    }
+  }
+
+  return merged;
+}

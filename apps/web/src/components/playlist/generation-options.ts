@@ -8,10 +8,12 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type {
+  GenreRegion,
   PlaylistGeneration,
   PopularityMode,
   TrackOrderMode,
 } from '@blendify/contracts'
+import { REGION_LABEL_KEYS, type GenreLabelSource } from '@/components/genres/genre-labels'
 import type { MessageKey } from '@/i18n/messages'
 import type { useT } from '@/i18n/use-t'
 import type { AppMode } from '@/lib/capabilities'
@@ -72,11 +74,13 @@ const SUMMARY_SEED_LIMIT = 3
 export function buildGenerationSummary(
   {
     seedNames,
+    region,
     popularity,
     orderMode,
     trackCount,
   }: Readonly<{
     seedNames: string[]
+    region?: GenreRegion | null
     popularity: PopularityMode
     orderMode: TrackOrderMode
     trackCount: number
@@ -96,14 +100,21 @@ export function buildGenerationSummary(
 
   return [
     seeds,
+    region ? t(REGION_LABEL_KEYS[region]) : null,
     popularityOption ? t(popularityOption.labelKey) : null,
     orderOption ? t(orderOption.labelKey) : null,
     trackCount > 0 ? formatSongCount(trackCount, t) : null,
   ].filter((item): item is string => Boolean(item))
 }
 
-export function generationSeedNames(generation: PlaylistGeneration): string[] {
-  if (generation.kind === 'artist_mix' || generation.kind === 'genre_mix') {
+export function generationSeedNames(
+  generation: PlaylistGeneration,
+  genreLabel: (genre: GenreLabelSource) => string,
+): string[] {
+  if (generation.kind === 'genre_mix') {
+    return generation.seeds.map(genreLabel)
+  }
+  if (generation.kind === 'artist_mix') {
     return generation.seeds.map((seed) => seed.name)
   }
   return [generation.seed.name]
@@ -113,10 +124,12 @@ export function buildRecipeSummary(
   generation: PlaylistGeneration,
   trackCount: number,
   t: ReturnType<typeof useT>,
+  genreLabel: (genre: GenreLabelSource) => string,
 ): string[] {
   return buildGenerationSummary(
     {
-      seedNames: generationSeedNames(generation),
+      seedNames: generationSeedNames(generation, genreLabel),
+      region: generation.kind === 'genre_mix' ? generation.region : null,
       popularity: generation.popularity,
       orderMode: generation.orderMode,
       trackCount,

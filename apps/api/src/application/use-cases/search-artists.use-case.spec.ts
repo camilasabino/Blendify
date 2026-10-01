@@ -21,6 +21,7 @@ describe('SearchArtistsUseCase', () => {
     getTopArtistsForTag: jest.fn(),
     getTopTracksForTag: jest.fn(),
     getTopTracksForArtist: jest.fn(),
+    getTopTagsForArtist: jest.fn(),
   };
 
   let searchArtists: jest.Mock;
