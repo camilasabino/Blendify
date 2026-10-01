@@ -4,6 +4,7 @@ import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { catalogCandidateBudget } from '@/domain/genre/catalog-window';
 import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
 import type {
+  DiscoveryArtistIdentity,
   DiscoveryCatalogPort,
   SimilarTrackCandidate,
 } from '@/domain/repositories/discovery-catalog.port';
@@ -469,7 +470,10 @@ describe('GenerateDiscoverPlaylistUseCase discover_artist similarity depth', () 
     return rank <= 25 ? 'middle' : 'tail';
   }
 
-  function setupArtistDiscover(misses: Set<string> = new Set()) {
+  function setupArtistDiscover(
+    misses: Set<string> = new Set(),
+    homonyms: Set<string> = new Set(),
+  ) {
     const artistMix = { execute: jest.fn().mockResolvedValue({ kept: true }) };
     const catalog = {
       getArtistsByIds: jest
@@ -477,13 +481,24 @@ describe('GenerateDiscoverPlaylistUseCase discover_artist similarity depth', () 
         .mockResolvedValue([
           Artist.create({ id: ArtistId.create('sade'), name: 'Sade' }),
         ]),
-      searchArtists: jest.fn((name: string) =>
-        Promise.resolve(
-          misses.has(name)
-            ? []
-            : [Artist.create({ id: ArtistId.create(slug(name)), name })],
-        ),
-      ),
+      searchArtists: jest.fn((name: string) => {
+        if (misses.has(name)) {
+          return Promise.resolve([]);
+        }
+        if (homonyms.has(name)) {
+          return Promise.resolve(
+            ['a', 'b'].map((suffix) =>
+              Artist.create({
+                id: ArtistId.create(`${slug(name)}-${suffix}`),
+                name,
+              }),
+            ),
+          );
+        }
+        return Promise.resolve([
+          Artist.create({ id: ArtistId.create(slug(name)), name }),
+        ]);
+      }),
     };
     const discovery = {
       isConfigured: () => true,
@@ -552,6 +567,18 @@ describe('GenerateDiscoverPlaylistUseCase discover_artist similarity depth', () 
     expect(new Set(context.searched().map(band))).toEqual(
       new Set(['head', 'middle', 'tail']),
     );
+  });
+
+  it('skips a similar artist with several exact Spotify homonyms', async () => {
+    const homonyms = new Set(['Similar 1', 'Similar 11', 'Similar 26']);
+    const context = setupArtistDiscover(new Set(), homonyms);
+
+    const mixInput = await context.run();
+
+    const names = mixInput.artists.map((artist) => artist.name);
+    expect(names).toHaveLength(MAX_ARTISTS);
+    expect(names.some((name) => homonyms.has(name))).toBe(false);
+    expect(context.searched()).toHaveLength(MAX_ARTISTS + homonyms.size);
   });
 
   it('keeps the same artists for every popularity mode and passes it to the mix', async () => {
@@ -651,17 +678,18 @@ describe('GenerateDiscoverPlaylistUseCase seed artist share', () => {
           : makeTrack(artistName, trackName),
       ),
     );
-    const getTopTracksForArtist = jest.fn((artistName: string) =>
-      Promise.resolve(
-        Array.from(
-          { length: fixture.topTracks?.[artistName] ?? 0 },
-          (_, index) => ({
-            artistName,
-            trackName: `${artistName} Hit ${index}`,
-            playcount: 50_000 - index * 1_000,
-          }),
+    const getTopTracksForArtist = jest.fn(
+      ({ name: artistName }: DiscoveryArtistIdentity) =>
+        Promise.resolve(
+          Array.from(
+            { length: fixture.topTracks?.[artistName] ?? 0 },
+            (_, index) => ({
+              artistName,
+              trackName: `${artistName} Hit ${index}`,
+              playcount: 50_000 - index * 1_000,
+            }),
+          ),
         ),
-      ),
     );
     const getSimilarArtists = jest
       .fn()
@@ -755,7 +783,7 @@ describe('GenerateDiscoverPlaylistUseCase seed artist share', () => {
       new Set(playlist.tracks.map((track) => track.artistId.getValue())).size,
     ).toBeGreaterThan(1);
     expect(context.getTopTracksForArtist).not.toHaveBeenCalledWith(
-      'Adrián Berra',
+      { name: 'Adrián Berra' },
       expect.any(Number),
     );
   });

@@ -67,3 +67,36 @@ export function pickStrictArtistMatch(
     return name.startsWith(q) || q.startsWith(name);
   });
 }
+
+export function pickUniqueArtistMatch(
+  query: string,
+  candidates: Artist[],
+): Artist | undefined {
+  const q = normalizeArtistName(query);
+  if (!q) {
+    return undefined;
+  }
+
+  const exact = distinctArtists(
+    candidates.filter((candidate) => normalizeArtistName(candidate.name) === q),
+  );
+  if (exact.length > 0) {
+    return exact.length === 1 ? exact[0] : undefined;
+  }
+
+  const compatible = distinctArtists(
+    candidates.filter((candidate) => {
+      const name = normalizeArtistName(candidate.name);
+      return name.startsWith(q) || q.startsWith(name);
+    }),
+  );
+  return compatible.length === 1 ? compatible[0] : undefined;
+}
+
+function distinctArtists(artists: Artist[]): Artist[] {
+  const byId = new Map<string, Artist>();
+  for (const artist of artists) {
+    byId.set(artist.id.getValue(), byId.get(artist.id.getValue()) ?? artist);
+  }
+  return [...byId.values()];
+}

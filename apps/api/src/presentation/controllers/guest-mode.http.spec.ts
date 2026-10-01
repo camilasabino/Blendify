@@ -40,7 +40,10 @@ import { TransferError } from '@/domain/errors/transfer.error';
 import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
 import type { Playlist } from '@/domain/playlist/playlist.entity';
 import { CATALOG_PROVIDER_FACTORY } from '@/domain/repositories/catalog-provider.port';
-import { DISCOVERY_CATALOG } from '@/domain/repositories/discovery-catalog.port';
+import {
+  DISCOVERY_CATALOG,
+  type DiscoveryArtistIdentity,
+} from '@/domain/repositories/discovery-catalog.port';
 import { MUSIC_PROVIDER_FACTORY } from '@/domain/repositories/music-provider.factory.port';
 import { PLAYLIST_REPOSITORY } from '@/domain/repositories/playlist.repository.port';
 import { PLAYLIST_TRANSFER_GATEWAY } from '@/domain/repositories/playlist-transfer.gateway.port';
@@ -143,14 +146,15 @@ function createWorld() {
 
   const discovery = {
     isConfigured: jest.fn(() => true),
-    getTopTracksForArtist: jest.fn((artist: string) =>
-      Promise.resolve(
-        Array.from({ length: 20 }, (_, index) => ({
-          artistName: artist,
-          trackName: `${artist} Song ${index + 1}`,
-          rank: index + 1,
-        })),
-      ),
+    getTopTracksForArtist: jest.fn(
+      ({ name: artist }: DiscoveryArtistIdentity) =>
+        Promise.resolve(
+          Array.from({ length: 20 }, (_, index) => ({
+            artistName: artist,
+            trackName: `${artist} Song ${index + 1}`,
+            rank: index + 1,
+          })),
+        ),
     ),
     getSimilarArtists: jest.fn((name: string) =>
       Promise.resolve([
@@ -1031,7 +1035,7 @@ describe('Guest Mode HTTP boundary', () => {
       });
       let release: () => void = () => undefined;
       world.discovery.getTopTracksForArtist.mockImplementationOnce(
-        (artist: string) =>
+        ({ name: artist }: DiscoveryArtistIdentity) =>
           new Promise((resolve) => {
             release = () =>
               resolve(

@@ -27,7 +27,10 @@ import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-un
 import { SpotifyProviderError } from '@/domain/errors/spotify-provider.error';
 import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import type { Playlist } from '@/domain/playlist/playlist.entity';
-import { DISCOVERY_CATALOG } from '@/domain/repositories/discovery-catalog.port';
+import {
+  DISCOVERY_CATALOG,
+  type DiscoveryArtistIdentity,
+} from '@/domain/repositories/discovery-catalog.port';
 import { MUSIC_PROVIDER_FACTORY } from '@/domain/repositories/music-provider.factory.port';
 import {
   CATALOG_PROVIDER_FACTORY,
@@ -137,8 +140,8 @@ function createWorld() {
 
   const discovery = {
     isConfigured: jest.fn(() => true),
-    getTopTracksForArtist: jest.fn((artist: string) =>
-      Promise.resolve(chartFor(artist)),
+    getTopTracksForArtist: jest.fn((artist: DiscoveryArtistIdentity) =>
+      Promise.resolve(chartFor(artist.name)),
     ),
     getSimilarArtists: jest.fn((name: string) =>
       Promise.resolve([
@@ -170,8 +173,9 @@ function createWorld() {
       (_tag: string): Promise<Array<{ name: string }>> => Promise.resolve([]),
     ),
     getTopTagsForArtist: jest.fn(
-      (_artist: string): Promise<Array<{ name: string; count: number }>> =>
-        Promise.resolve([]),
+      (
+        _artist: DiscoveryArtistIdentity,
+      ): Promise<Array<{ name: string; count: number }>> => Promise.resolve([]),
     ),
   };
 
@@ -628,7 +632,7 @@ describe('Spotify Mode generation characterization', () => {
       );
       world.discovery.getTopTagsForArtist.mockImplementation((artist) =>
         Promise.resolve([
-          { name: artist.split(' ')[0], count: 100 },
+          { name: artist.name.split(' ')[0], count: 100 },
           { name: 'argentina', count: 80 },
         ]),
       );

@@ -6,6 +6,7 @@ import { RedisCacheService } from '@/infrastructure/cache/redis-cache.service';
 import type {
   ArtistTagCandidate,
   CatalogTrackCandidate,
+  DiscoveryArtistIdentity,
   DiscoveryCatalogPort,
   SimilarArtistCandidate,
   SimilarTrackCandidate,
@@ -95,6 +96,11 @@ type LastFmArtistTopTagsResponse = {
   };
   error?: number;
   message?: string;
+};
+
+type LastFmArtistLookup = {
+  cacheId: string;
+  params: Record<string, string | number>;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -403,22 +409,23 @@ export class LastFmClient implements DiscoveryCatalogPort {
    * get real deep cuts without relying on thin Spotify search pages.
    */
   async getTopTracksForArtist(
-    artist: string,
+    artist: DiscoveryArtistIdentity,
     limit = 50,
   ): Promise<CatalogTrackCandidate[]> {
     if (!this.apiKey) {
       throw new Error('LASTFM_API_KEY is not configured');
     }
 
-    const name = artist.trim();
-    if (!name) {
+    const lookup = artistLookup(artist);
+    if (!lookup) {
       return [];
     }
 
+    const name = artist.name.trim();
     const safeLimit = Math.min(Math.max(limit, 1), LASTFM_MAX_LIMIT);
     const cacheKey = this.key(
       'artist-tracks',
-      `${name.toLowerCase()}|${safeLimit}`,
+      `${lookup.cacheId}|${safeLimit}`,
     );
 
     return this.withCache(
@@ -429,8 +436,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
           {
             params: {
               method: 'artist.getTopTracks',
-              artist: encodeLastFmParam(name),
-              autocorrect: 1,
+              ...lookup.params,
               limit: safeLimit,
               api_key: this.apiKey,
               format: 'json',
@@ -455,17 +461,19 @@ export class LastFmClient implements DiscoveryCatalogPort {
     );
   }
 
-  async getTopTagsForArtist(artist: string): Promise<ArtistTagCandidate[]> {
+  async getTopTagsForArtist(
+    artist: DiscoveryArtistIdentity,
+  ): Promise<ArtistTagCandidate[]> {
     if (!this.apiKey) {
       throw new Error('LASTFM_API_KEY is not configured');
     }
 
-    const name = artist.trim();
-    if (!name) {
+    const lookup = artistLookup(artist);
+    if (!lookup) {
       return [];
     }
 
-    const cacheKey = this.key('artist-tags', name.toLowerCase());
+    const cacheKey = this.key('artist-tags', lookup.cacheId);
 
     return this.withCache(
       cacheKey,
@@ -473,8 +481,7 @@ export class LastFmClient implements DiscoveryCatalogPort {
         const { data } = await this.http.get<LastFmArtistTopTagsResponse>('', {
           params: {
             method: 'artist.getTopTags',
-            artist: encodeLastFmParam(name),
-            autocorrect: 1,
+            ...lookup.params,
             api_key: this.apiKey,
             format: 'json',
           },
@@ -522,6 +529,24 @@ export class LastFmClient implements DiscoveryCatalogPort {
       );
     }
   }
+}
+
+function artistLookup(
+  artist: DiscoveryArtistIdentity,
+): LastFmArtistLookup | null {
+  const mbid = artist.mbid?.trim();
+  if (mbid) {
+    return { cacheId: `mbid:${mbid.toLowerCase()}`, params: { mbid } };
+  }
+
+  const name = artist.name.trim();
+  if (!name) {
+    return null;
+  }
+  return {
+    cacheId: `name:${name.toLowerCase()}`,
+    params: { artist: encodeLastFmParam(name), autocorrect: 1 },
+  };
 }
 
 function normalizeArtistList(

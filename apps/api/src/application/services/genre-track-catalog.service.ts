@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { GenreRegion, PopularityMode } from '@blendify/contracts';
-import { pickStrictArtistMatch } from '@/domain/artist/artist-name-match';
+import { pickUniqueArtistMatch } from '@/domain/artist/artist-name-match';
 import { Artist } from '@/domain/artist/artist.entity';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
@@ -46,7 +46,7 @@ const MAX_SEED_ARTIST_FALLBACK_LIMIT = 8;
 const SEED_ARTIST_CANDIDATE_BUFFER = 4;
 const MIN_SEED_ARTIST_CANDIDATE_LIMIT = 10;
 const MAX_SEED_ARTIST_CANDIDATE_LIMIT = 16;
-const ARTIST_NAME_MATCH_CANDIDATE_LIMIT = 3;
+const ARTIST_NAME_MATCH_CANDIDATE_LIMIT = 10;
 const ARTIST_CHART_TRACK_LIMIT = 50;
 const ARTIST_CHART_LOOKUP_CONCURRENCY = 4;
 
@@ -278,7 +278,7 @@ export class GenreTrackCatalogService {
       );
       charts.push(
         ...(await Promise.all(
-          batch.map((artist) => this.loadArtistChart(artist.name)),
+          batch.map((artist) => this.loadArtistChart(artist)),
         )),
       );
     }
@@ -286,11 +286,11 @@ export class GenreTrackCatalogService {
   }
 
   private async loadArtistChart(
-    artistName: string,
+    artist: SimilarArtistCandidate,
   ): Promise<CatalogTrackCandidate[]> {
     try {
       return await this.discoveryCatalog.getTopTracksForArtist(
-        artistName,
+        artist,
         ARTIST_CHART_TRACK_LIMIT,
       );
     } catch (error) {
@@ -513,7 +513,7 @@ export class GenreTrackCatalogService {
         candidateName,
         ARTIST_NAME_MATCH_CANDIDATE_LIMIT,
       );
-      const match = pickStrictArtistMatch(
+      const match = pickUniqueArtistMatch(
         candidateName,
         artists.filter((artist) => !this.isJunkArtist(artist)),
       );

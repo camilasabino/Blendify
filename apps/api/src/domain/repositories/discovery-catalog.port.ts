@@ -1,5 +1,10 @@
 export const DISCOVERY_CATALOG = 'DISCOVERY_CATALOG' as const;
 
+export type DiscoveryArtistIdentity = {
+  name: string;
+  mbid?: string;
+};
+
 export type SimilarArtistCandidate = {
   name: string;
   mbid?: string;
@@ -52,8 +57,10 @@ export interface DiscoveryCatalogPort {
     page?: number,
   ): Promise<CatalogTrackCandidate[]>;
   getTopTracksForArtist(
-    artist: string,
+    artist: DiscoveryArtistIdentity,
     limit?: number,
   ): Promise<CatalogTrackCandidate[]>;
-  getTopTagsForArtist(artist: string): Promise<ArtistTagCandidate[]>;
+  getTopTagsForArtist(
+    artist: DiscoveryArtistIdentity,
+  ): Promise<ArtistTagCandidate[]>;
 }

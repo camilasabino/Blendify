@@ -17,6 +17,7 @@ import {
 import {
   normalizeArtistName,
   pickStrictArtistMatch,
+  pickUniqueArtistMatch,
 } from '@/domain/artist/artist-name-match';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
 import { readTrackPopularity } from '@/domain/track/track-popularity';
@@ -62,6 +63,8 @@ import {
   monotonicProgressReporter,
   type ProgressReporter,
 } from '@/application/services/generation-progress.tracker';
+
+const SEED_ARTIST_MATCH_CANDIDATES = 10;
 
 type DiscoverInput = z.output<typeof GenerateDiscoverPlaylistSchema>;
 type ArtistDiscoverInput = Extract<DiscoverInput, { kind: 'discover_artist' }>;
@@ -540,8 +543,11 @@ export class GenerateDiscoverPlaylistUseCase {
       if (resolved.length >= limit) {
         break;
       }
-      const matches = await catalog.searchArtists(name, 3);
-      const best = pickStrictArtistMatch(name, matches);
+      const matches = await catalog.searchArtists(
+        name,
+        SEED_ARTIST_MATCH_CANDIDATES,
+      );
+      const best = pickUniqueArtistMatch(name, matches);
       if (!best) {
         tracker?.report('resolving_seeds', resolved.length, Math.max(1, limit));
         continue;
@@ -620,7 +626,7 @@ export class GenerateDiscoverPlaylistUseCase {
           break;
         }
         const top = await this.discoveryCatalog.getTopTracksForArtist(
-          artist.name,
+          artist,
           8,
         );
         push(
@@ -638,7 +644,7 @@ export class GenerateDiscoverPlaylistUseCase {
         `Discover track fallback: seed artist top tracks (have ${relatedCount} related)`,
       );
       const top = await this.discoveryCatalog.getTopTracksForArtist(
-        seedArtist,
+        { name: seedArtist },
         Math.min(
           DISCOVER_FALLBACK_TOP_TRACKS_MAX,
           Math.max(limit, DISCOVER_FALLBACK_TOP_TRACKS_MIN),

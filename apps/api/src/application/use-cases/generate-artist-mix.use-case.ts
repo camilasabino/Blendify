@@ -408,7 +408,7 @@ export class GenerateArtistMixUseCase {
 
     try {
       const chart = await this.discoveryCatalog.getTopTracksForArtist(
-        artist.name,
+        { name: artist.name },
         50,
       );
       if (chart.length === 0) {

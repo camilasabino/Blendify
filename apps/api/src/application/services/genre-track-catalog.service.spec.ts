@@ -5,6 +5,7 @@ import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider
 import type {
   ArtistTagCandidate,
   CatalogTrackCandidate,
+  DiscoveryArtistIdentity,
   DiscoveryCatalogPort,
   SimilarArtistCandidate,
 } from '@/domain/repositories/discovery-catalog.port';
@@ -49,10 +50,20 @@ function track(artistName: string, title: string): Track {
   });
 }
 
+function artistWithId(id: string, name: string): Artist {
+  return Artist.create({ id: ArtistId.create(id), name });
+}
+
+function identityKey(artist: DiscoveryArtistIdentity): string {
+  return artist.mbid ?? artist.name;
+}
+
 function createWorld(input: {
   charts?: Record<string, CatalogTrackCandidate[]>;
+  artistCharts?: Record<string, CatalogTrackCandidate[]>;
   tagArtists?: Record<string, SimilarArtistCandidate[]>;
   artistTags?: Record<string, ArtistTagCandidate[]>;
+  artistSearch?: Record<string, Artist[]>;
 }) {
   const discovery = {
     isConfigured: () => true,
@@ -66,17 +77,18 @@ function createWorld(input: {
     ),
     getSimilarArtists: jest.fn(),
     getSimilarTracks: jest.fn(),
-    getTopTracksForArtist: jest.fn((artistName: string) =>
+    getTopTracksForArtist: jest.fn((artist: DiscoveryArtistIdentity) =>
       Promise.resolve(
-        [1, 2, 3].map((rank) => ({
-          artistName,
-          trackName: `${artistName} hit ${rank}`,
-          rank,
-        })),
+        input.artistCharts?.[identityKey(artist)] ??
+          [1, 2, 3].map((rank) => ({
+            artistName: artist.name,
+            trackName: `${artist.name} hit ${rank}`,
+            rank,
+          })),
       ),
     ),
-    getTopTagsForArtist: jest.fn((artistName: string) =>
-      Promise.resolve(input.artistTags?.[artistName] ?? []),
+    getTopTagsForArtist: jest.fn((artist: DiscoveryArtistIdentity) =>
+      Promise.resolve(input.artistTags?.[identityKey(artist)] ?? []),
     ),
   } satisfies DiscoveryCatalogPort;
   const provider = {
@@ -84,9 +96,11 @@ function createWorld(input: {
       Promise.resolve(track(artistName, trackName)),
     ),
     searchArtists: jest.fn((name: string) =>
-      Promise.resolve([
-        Artist.create({ id: ArtistId.create(slug(name)), name }),
-      ]),
+      Promise.resolve(
+        input.artistSearch?.[name] ?? [
+          Artist.create({ id: ArtistId.create(slug(name)), name }),
+        ],
+      ),
     ),
     searchTracks: jest.fn((query: string) => {
       const artistName = query.replace(/^artist:"(.*)"$/, '$1');
@@ -130,7 +144,9 @@ function requestedTags(world: ReturnType<typeof createWorld>): string[] {
 }
 
 function taggedArtistNames(world: ReturnType<typeof createWorld>): string[] {
-  return world.discovery.getTopTagsForArtist.mock.calls.map(([name]) => name);
+  return world.discovery.getTopTagsForArtist.mock.calls.map(
+    ([artist]) => artist.name,
+  );
 }
 
 function artistNames(tracks: Track[] | undefined): Set<string> {
@@ -284,12 +300,148 @@ describe('GenreTrackCatalogService regions', () => {
     const { tracksByGenre } = await resolve(world, ['rock'], 'argentina');
 
     const charted = world.discovery.getTopTracksForArtist.mock.calls.map(
-      ([name]) => name,
+      ([artist]) => artist.name,
     );
     expect(charted).toEqual(['Charly García', 'Spinetta']);
     expect(artistNames(tracksByGenre.get('genre:rock'))).toEqual(
       new Set(['Charly García', 'Spinetta']),
     );
+  });
+
+  it('keeps the regional MBID through tag qualification and the artist chart', async () => {
+    const argentine = { name: 'Sui Generis', mbid: 'mbid-argentine-band' };
+    const homonym = { name: 'Sui Generis', mbid: 'mbid-other-artist' };
+    const world = createWorld({
+      tagArtists: { argentina: [homonym, argentine] },
+      artistTags: { [argentine.mbid]: tagged('rock') },
+      artistCharts: {
+        [argentine.mbid]: [
+          { artistName: 'Sui Generis', trackName: 'Botas Locas' },
+        ],
+        [homonym.mbid]: [
+          { artistName: 'Sui Generis', trackName: 'Introducció' },
+        ],
+      },
+    });
+
+    await resolve(world, ['rock'], 'argentina');
+
+    expect(world.discovery.getTopTagsForArtist.mock.calls).toEqual([
+      [homonym],
+      [argentine],
+    ]);
+    expect(world.discovery.getTopTracksForArtist.mock.calls).toEqual([
+      [argentine, expect.any(Number)],
+    ]);
+    expect(world.provider.resolveTrack).toHaveBeenCalledWith(
+      'Sui Generis',
+      'Botas Locas',
+      expect.anything(),
+    );
+    expect(world.provider.resolveTrack).not.toHaveBeenCalledWith(
+      'Sui Generis',
+      'Introducció',
+      expect.anything(),
+    );
+  });
+
+  it('qualifies homonymous regional artists with different MBIDs separately', async () => {
+    const first = { name: 'Sui Generis', mbid: 'mbid-argentine-band' };
+    const second = { name: 'Sui Generis', mbid: 'mbid-other-artist' };
+    const world = createWorld({
+      tagArtists: { argentina: [first, second] },
+      artistTags: {
+        [first.mbid]: tagged('rock'),
+        [second.mbid]: tagged('rock'),
+      },
+    });
+
+    await resolve(world, ['rock'], 'argentina');
+
+    expect(
+      world.discovery.getTopTracksForArtist.mock.calls.map(([a]) => a),
+    ).toEqual([first, second]);
+  });
+
+  it('keeps qualifying regional artists without an MBID by name', async () => {
+    const world = createWorld({
+      tagArtists: { argentina: artists('Spinetta') },
+      artistTags: { Spinetta: tagged('rock') },
+    });
+
+    const { tracksByGenre } = await resolve(world, ['rock'], 'argentina');
+
+    expect(world.discovery.getTopTagsForArtist).toHaveBeenCalledWith({
+      name: 'Spinetta',
+    });
+    expect(world.discovery.getTopTracksForArtist).toHaveBeenCalledWith(
+      { name: 'Spinetta' },
+      expect.any(Number),
+    );
+    expect(artistNames(tracksByGenre.get('genre:rock'))).toEqual(
+      new Set(['Spinetta']),
+    );
+  });
+
+  it('skips an ambiguous homonymous seed artist in the regional fallback', async () => {
+    const suiGeneris = { name: 'Sui Generis', mbid: 'mbid-a' };
+    const world = createWorld({
+      tagArtists: { argentina: [suiGeneris, { name: 'Spinetta' }] },
+      artistTags: { 'mbid-a': tagged('rock'), Spinetta: tagged('rock') },
+      artistCharts: { 'mbid-a': [], Spinetta: [] },
+      artistSearch: {
+        'Sui Generis': [
+          artistWithId('wrong-id', 'Sui Generis'),
+          artistWithId('correct-id', 'Sui Generis'),
+        ],
+      },
+    });
+
+    const { tracksByGenre } = await resolve(world, ['rock'], 'argentina');
+
+    const searchedQueries = world.provider.searchTracks.mock.calls.map(
+      ([query]) => query,
+    );
+    expect(searchedQueries).toEqual(['artist:"Spinetta"']);
+    expect(artistNames(tracksByGenre.get('genre:rock'))).toEqual(
+      new Set(['Spinetta']),
+    );
+  });
+
+  it('uses a unique exact seed artist match in the regional fallback', async () => {
+    const world = createWorld({
+      tagArtists: { argentina: [{ name: 'Sui Generis', mbid: 'mbid-a' }] },
+      artistTags: { 'mbid-a': tagged('rock') },
+      artistCharts: { 'mbid-a': [] },
+      artistSearch: {
+        'Sui Generis': [
+          artistWithId('other-id', 'Other Artist'),
+          artistWithId('sui-generis', 'Sui Generis'),
+        ],
+      },
+    });
+
+    const { tracksByGenre } = await resolve(world, ['rock'], 'argentina');
+
+    expect(world.provider.searchTracks).toHaveBeenCalledWith(
+      'artist:"Sui Generis"',
+      expect.anything(),
+    );
+    expect(artistNames(tracksByGenre.get('genre:rock'))).toEqual(
+      new Set(['Sui Generis']),
+    );
+  });
+
+  it('requests a bounded window of artist matches per seed artist', async () => {
+    const world = createWorld({
+      tagArtists: { argentina: [{ name: 'Spinetta' }] },
+      artistTags: { Spinetta: tagged('rock') },
+      artistCharts: { Spinetta: [] },
+    });
+
+    await resolve(world, ['rock'], 'argentina');
+
+    expect(world.provider.searchArtists).toHaveBeenCalledWith('Spinetta', 10);
   });
 
   it('reports the genre lookup as unavailable when every tag lookup fails', async () => {

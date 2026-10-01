@@ -4,6 +4,7 @@ import {
   normalizeArtistName,
   pickBestArtistMatch,
   pickStrictArtistMatch,
+  pickUniqueArtistMatch,
 } from './artist-name-match';
 
 function artist(id: string, name: string): Artist {
@@ -77,5 +78,85 @@ describe('pickStrictArtistMatch', () => {
     expect(pickStrictArtistMatch('radiohead', candidates)?.id.getValue()).toBe(
       '1',
     );
+  });
+});
+
+describe('pickUniqueArtistMatch', () => {
+  it('returns the unique exact match', () => {
+    const candidates = [artist('1', 'Sui Generis')];
+    expect(
+      pickUniqueArtistMatch('Sui Generis', candidates)?.id.getValue(),
+    ).toBe('1');
+  });
+
+  it('returns undefined for multiple exact homonyms in any order', () => {
+    const a = artist('a', 'Sui Generis');
+    const b = artist('b', 'Sui Generis');
+    expect(pickUniqueArtistMatch('Sui Generis', [a, b])).toBeUndefined();
+    expect(pickUniqueArtistMatch('Sui Generis', [b, a])).toBeUndefined();
+  });
+
+  it('ignores unrelated candidates around a unique exact match', () => {
+    const candidates = [
+      artist('1', 'Other Artist'),
+      artist('2', 'Sui Generis'),
+      artist('3', 'Another Artist'),
+    ];
+    expect(
+      pickUniqueArtistMatch('Sui Generis', candidates)?.id.getValue(),
+    ).toBe('2');
+  });
+
+  it('matches normalized case, accents and punctuation', () => {
+    const candidates = [artist('1', 'Café Tacvba'), artist('2', 'Other')];
+    expect(
+      pickUniqueArtistMatch('cafe  tacvba!', candidates)?.id.getValue(),
+    ).toBe('1');
+  });
+
+  it('prefers a unique exact match over several prefix matches', () => {
+    const candidates = [
+      artist('1', 'Radiohead Tribute'),
+      artist('2', 'Radiohead'),
+      artist('3', 'Radiohead Tribute Band'),
+    ];
+    expect(pickUniqueArtistMatch('radiohead', candidates)?.id.getValue()).toBe(
+      '2',
+    );
+  });
+
+  it('matches via prefix only when a single candidate is compatible', () => {
+    const candidates = [
+      artist('1', 'Radiohead Tribute Band'),
+      artist('2', 'Unrelated'),
+    ];
+    expect(pickUniqueArtistMatch('radiohead', candidates)?.id.getValue()).toBe(
+      '1',
+    );
+  });
+
+  it('returns undefined for multiple prefix-compatible candidates', () => {
+    const candidates = [
+      artist('1', 'Radiohead Tribute Band'),
+      artist('2', 'Radiohead Revival'),
+    ];
+    expect(pickUniqueArtistMatch('radiohead', candidates)).toBeUndefined();
+  });
+
+  it('does not treat the same artist repeated in the results as ambiguous', () => {
+    const candidates = [artist('1', 'Sui Generis'), artist('1', 'Sui Generis')];
+    expect(
+      pickUniqueArtistMatch('Sui Generis', candidates)?.id.getValue(),
+    ).toBe('1');
+  });
+
+  it('returns undefined for unrelated candidates, no candidates or an empty query', () => {
+    expect(
+      pickUniqueArtistMatch('Al Green', [artist('1', 'Soul Asylum')]),
+    ).toBeUndefined();
+    expect(pickUniqueArtistMatch('anything', [])).toBeUndefined();
+    expect(
+      pickUniqueArtistMatch('!!!', [artist('1', 'Al Green')]),
+    ).toBeUndefined();
   });
 });

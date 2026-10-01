@@ -117,7 +117,7 @@ export class RegionalGenreArtistPool {
     }
 
     const lookup = this.discoveryCatalog
-      .getTopTagsForArtist(artist.name)
+      .getTopTagsForArtist(artist)
       .catch((error: unknown) => {
         this.logger.warn(`Artist tag lookup failed: ${errorMessage(error)}`);
         return null;
