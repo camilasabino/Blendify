@@ -29,6 +29,8 @@ HISTORICAL_V2_CASE_COUNT = 63
 HISTORICAL_V2_DATASET_SHA256 = "e48d430825cf60d4cf1142f5c9e32206b2415269ce9df5189b2682e411201d68"
 HISTORICAL_V3_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v3.json"
 HISTORICAL_V3_DATASET_SHA256 = "6ef41274bf59d7be2d750c48a9cb2242037899e4e68f8af1c9d1881029e583dc"
+HISTORICAL_V4_DATASET_PATH = DATASET_PATH.parent / "intent-eval-v4.json"
+HISTORICAL_V4_DATASET_SHA256 = "e8be2837489f0dca04912cb2cf336e37fa3f5fe9e72d4dd98083e534e4456312"
 DATASET_VERSION, CASES = load_dataset()
 ALL_DATASET_CASES = [
     case
@@ -36,6 +38,7 @@ ALL_DATASET_CASES = [
         HISTORICAL_V1_DATASET_PATH,
         HISTORICAL_V2_DATASET_PATH,
         HISTORICAL_V3_DATASET_PATH,
+        HISTORICAL_V4_DATASET_PATH,
         DATASET_PATH,
     )
     for case in load_dataset(path)[1]
@@ -50,7 +53,7 @@ PROVIDER_CONTENT_PATTERN = re.compile(r"spotify:|open\.spotify|https?://|\b[0-9A
 def test_dataset_is_versioned_with_unique_case_ids() -> None:
     ids = [case.id for case in CASES]
 
-    assert DATASET_VERSION == "intent-eval-v4"
+    assert DATASET_VERSION == "intent-eval-v5"
     assert len(ids) == len(set(ids))
 
 
@@ -72,6 +75,50 @@ def test_historical_v2_dataset_is_preserved_for_baseline_comparison() -> None:
     assert version == "intent-eval-v2"
     assert DATASET_PATH != HISTORICAL_V2_DATASET_PATH
     assert len(cases) == HISTORICAL_V2_CASE_COUNT
+
+
+def test_historical_v4_dataset_stays_frozen_and_inside_v5() -> None:
+    digest = hashlib.sha256(HISTORICAL_V4_DATASET_PATH.read_bytes()).hexdigest()
+    version, cases = load_dataset(HISTORICAL_V4_DATASET_PATH)
+    current = {case.id: case for case in CASES}
+
+    assert digest == HISTORICAL_V4_DATASET_SHA256
+    assert version == "intent-eval-v4"
+    for case in cases:
+        assert current[case.id] == case
+
+
+REGION_COVERAGE = {
+    "es": ["es-region-discover-artist", "es-region-discover-track", "es-region-artist-mix"],
+    "en": ["en-region-discover-artist", "en-region-discover-track"],
+    "pt": ["pt-region-discover-artist", "pt-region-discover-track"],
+}
+
+
+@pytest.mark.parametrize("language", sorted(REGION_COVERAGE))
+def test_dataset_covers_region_filters_in_each_language(language: str) -> None:
+    by_id = {case.id: case for case in CASES}
+
+    for case_id in REGION_COVERAGE[language]:
+        case = by_id[case_id]
+        assert case.language == language
+        assert case.expect["region"]
+
+
+def test_region_expectation_accepts_any_listed_form_and_requires_none_when_null() -> None:
+    discover = interpretation(
+        kind="discover_artist", artists=["Radiohead"], filters={"region": "Argentine"}
+    )
+    plain = interpretation(kind="discover_artist", artists=["Radiohead"])
+
+    assert check_case({"outcome": "interpreted", "region": ["argentine"]}, discover) == []
+    assert check_case({"outcome": "interpreted", "region": ["Brasil"]}, discover) == [
+        "region: expected one of ['Brasil'], got Argentine"
+    ]
+    assert check_case({"outcome": "interpreted", "region": None}, plain) == []
+    assert check_case({"outcome": "interpreted", "region": None}, discover) == [
+        "region: expected none, got Argentine"
+    ]
 
 
 def test_historical_v3_dataset_stays_frozen_and_inside_v4() -> None:

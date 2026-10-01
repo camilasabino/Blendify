@@ -1,5 +1,10 @@
-import { PopularityMode, TrackOrderMode } from '@blendify/contracts';
+import {
+  PlaylistDetailSchema,
+  PopularityMode,
+  TrackOrderMode,
+} from '@blendify/contracts';
 import type { Playlist as PlaylistModel } from '@prisma/client';
+import { toPlaylistDetail } from '@/application/dto/playlist-response.dto';
 import { Playlist } from '@/domain/playlist/playlist.entity';
 import { Track } from '@/domain/track/track.entity';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
@@ -217,5 +222,69 @@ describe('PrismaPlaylistRepository.deleteMany', () => {
     await repository.deleteMany('user-1', []);
 
     expect(prisma.playlist.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrismaPlaylistRepository legacy Genre Mix region', () => {
+  const legacyGenreMixRow = (): PlaylistModel => ({
+    ...row([legacyTrack]),
+    kind: 'genre_mix',
+    seeds: [{ type: 'genre', id: 'rock', name: 'Rock' }],
+    generation: {
+      kind: 'genre_mix',
+      version: 1,
+      popularity: PopularityMode.BALANCED,
+      orderMode: TrackOrderMode.RANDOM,
+      tracksPerSeed: 10,
+      seeds: [{ id: 'rock', name: 'Rock' }],
+      region: 'argentina',
+    },
+  });
+
+  it('reads the legacy region only as filters.region', async () => {
+    const { prisma, repository } = createRepository();
+    prisma.playlist.findUnique.mockResolvedValue(legacyGenreMixRow());
+
+    const playlist = await repository.findById('playlist-1');
+
+    expect(playlist?.generation).toMatchObject({
+      kind: 'genre_mix',
+      filters: { region: 'argentina' },
+    });
+    expect(playlist?.generation).not.toHaveProperty('region');
+  });
+
+  it('keeps the region in the playlist detail summary', async () => {
+    const { prisma, repository } = createRepository();
+    prisma.playlist.findUnique.mockResolvedValue(legacyGenreMixRow());
+
+    const playlist = await repository.findById('playlist-1');
+    const detail = PlaylistDetailSchema.parse(toPlaylistDetail(playlist!));
+
+    expect(detail.generation).toMatchObject({
+      filters: { region: 'argentina' },
+    });
+    expect(detail.generation).not.toHaveProperty('region');
+  });
+
+  it('re-serializes a recreated legacy recipe with only filters.region', async () => {
+    const { prisma, repository } = createRepository();
+    prisma.playlist.findUnique.mockResolvedValue(legacyGenreMixRow());
+    prisma.playlist.upsert.mockImplementation(
+      (args: { create: Omit<PlaylistModel, 'id'> }) =>
+        Promise.resolve({ ...args.create, id: 'playlist-1' }),
+    );
+
+    const playlist = await repository.findById('playlist-1');
+    playlist!.rename('Renamed mix');
+    const saved = await repository.save(playlist!);
+    const stored = prisma.playlist.upsert.mock.calls[0][0].create
+      .generation as Record<string, unknown>;
+
+    expect(stored).toMatchObject({ filters: { region: 'argentina' } });
+    expect(stored).not.toHaveProperty('region');
+    expect(saved.generation).toMatchObject({
+      filters: { region: 'argentina' },
+    });
   });
 });

@@ -98,8 +98,77 @@ describe('MixPlaylistForm genre region', () => {
       kind: 'genre_mix',
       name: 'Blendify · Mezcla · Balada coreana · Brasil',
       genreIds: ['korean ballad'],
-      region: 'brazilian',
+      filters: { region: 'brazilian' },
     })
+  })
+
+  it('shows Region under Refine results only for genre mixes', async () => {
+    setAuthState(null)
+    stubGeneration()
+    renderWithProviders(<MixPlaylistForm />)
+    const user = userEvent.setup()
+
+    expect(
+      screen.queryByRole('heading', { name: 'Refine results' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /Region/ }),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('radio', { name: 'Genres' }))
+
+    const section = screen
+      .getByRole('heading', { name: 'Refine results' })
+      .closest('section')
+    expect(section).not.toBeNull()
+    expect(
+      within(section!).getByRole('button', { name: /Region/ }),
+    ).toHaveAttribute('aria-haspopup', 'listbox')
+    const source = screen
+      .getByRole('heading', { name: 'Artists or genres' })
+      .closest('section')
+    expect(
+      within(source!).queryByRole('button', { name: /Region/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('never sends a region selected for genres with an artist mix', async () => {
+    setAuthState(null)
+    const { calls } = stubApi({
+      'GET /api/genres': () =>
+        jsonResponse({ genres: [{ id: 'jazz', name: 'Jazz' }] }),
+      'GET /api/artists/search': () =>
+        jsonResponse({
+          artists: [{ id: 'artist-1', name: 'Radiohead', imageUrl: null }],
+        }),
+      'POST /api/generate/mix': () =>
+        ndjsonResponse(progress, { type: 'result', playlist: guestPlaylist }),
+    })
+    renderWithProviders(<MixPlaylistForm />)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('radio', { name: 'Genres' }))
+    await user.click(screen.getByRole('button', { name: /Region/ }))
+    await user.click(await screen.findByRole('option', { name: 'Argentina' }))
+    await user.click(screen.getByRole('radio', { name: 'Artists' }))
+    await user.type(screen.getByRole('combobox'), 'Radiohead')
+    await user.click(
+      await screen.findByRole('option', { name: /Radiohead/ }, { timeout: 3_000 }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Generate playlist' }))
+
+    await vi.waitFor(() => {
+      expect(generationCalls(calls)).toHaveLength(1)
+    })
+    const [request] = generationCalls(calls)
+    expect(request.body).toMatchObject({ kind: 'artist_mix' })
+    expect(request.body).not.toHaveProperty('filters')
+    expect(request.body).not.toHaveProperty('region')
+
+    await user.click(screen.getByRole('radio', { name: 'Genres', hidden: true }))
+    expect(
+      screen.getByRole('button', { name: /Region/, hidden: true }),
+    ).toHaveTextContent('Argentina')
   })
 })
 

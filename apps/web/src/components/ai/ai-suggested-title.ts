@@ -11,5 +11,5 @@ export function useAiSuggestedTitle(
   if (intent.kind !== 'genre_mix' || genres.length === 0) {
     return playlist.name
   }
-  return genreMixPlaylistName(genres, intent.region)
+  return genreMixPlaylistName(genres, intent.filters.region)
 }

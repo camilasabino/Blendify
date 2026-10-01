@@ -1,5 +1,3 @@
-import type { GenreRegion } from '@blendify/contracts';
-
 export interface ResolvedAiSeed {
   id: string;
   name: string;
@@ -17,6 +15,5 @@ export interface ResolvedAiTrackSeed extends ResolvedAiSeed {
 export interface ResolvedAiSeeds {
   artists: ResolvedAiSeed[];
   genres: ResolvedAiSeed[];
-  region?: GenreRegion;
   track: ResolvedAiTrackSeed | null;
 }

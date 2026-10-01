@@ -1,6 +1,6 @@
 import {
   GENRE_LABELS,
-  GENRE_REGIONS,
+  MUSIC_REGIONS,
   genreLookupKey,
 } from '@blendify/contracts';
 import genreSearchAliases from './data/genre-search-aliases.json';
@@ -15,7 +15,7 @@ import {
   toGenreDto,
 } from './genre-catalog';
 import { searchGenres } from './genre-search';
-import { splitRegionalGenreExpression } from './genre-regions';
+import { splitRegionalGenreExpression } from '@/domain/region/music-region-aliases';
 
 const CANONICAL_KEYS = new Set(GENRE_CATALOG.map((g) => genreLookupKey(g.id)));
 
@@ -179,6 +179,6 @@ describe('genre localizations', () => {
         owners.set(key, genre.id);
       }
     }
-    expect(GENRE_REGIONS.length).toBe(12);
+    expect(MUSIC_REGIONS.length).toBe(12);
   });
 });

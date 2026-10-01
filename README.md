@@ -33,14 +33,15 @@ Blendify builds a playlist from music you already know and previews it before
 anything is saved. It combines the Spotify catalog with Last.fm discovery data,
 in three ways to start:
 
-- **Mix** — blend up to 12 artists, or up to 5 MusicBrainz genres with an
-  optional region.
+- **Mix** — blend up to 12 artists, or up to 5 MusicBrainz genres.
 - **Discover** — branch out from one artist or one song.
+- Genre Mix and Discover results can be refined to one region (a musical scene
+  identified through Last.fm tags); artists you choose yourself are never filtered.
 - **Create with AI** — describe the playlist in natural language, review what
   Blendify understood, then create it.
 
-Every generation is a typed, versioned recipe (seeds, popularity preference,
-order, track budget), so a result can be reproduced and reviewed later.
+Every generation is a typed, versioned recipe (seeds, result filters,
+popularity preference, order, track budget), so a result can be reproduced and reviewed later.
 
 ### Guest Mode and Spotify Mode
 

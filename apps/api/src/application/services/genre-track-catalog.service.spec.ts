@@ -1,4 +1,4 @@
-import type { GenreRegion } from '@blendify/contracts';
+import type { MusicRegion } from '@blendify/contracts';
 import { Artist } from '@/domain/artist/artist.entity';
 import { findGenre, type CatalogGenre } from '@/domain/genre/genre-catalog';
 import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
@@ -124,7 +124,7 @@ function genres(...ids: string[]): CatalogGenre[] {
 async function resolve(
   world: ReturnType<typeof createWorld>,
   genreIds: string[],
-  region?: GenreRegion,
+  region?: MusicRegion,
   tracksPerSeed = TRACKS_PER_SEED,
 ) {
   return world.service.resolve(
@@ -132,7 +132,7 @@ async function resolve(
     genres(...genreIds),
     'balanced',
     tracksPerSeed,
-    region ? { region } : undefined,
+    region ? { filters: { region } } : undefined,
   );
 }
 

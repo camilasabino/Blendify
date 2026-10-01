@@ -531,7 +531,7 @@ describe('Create with AI refinement', () => {
       kind: 'genre_mix' as const,
       artists: [],
       genres: ['Rock'],
-      region: 'british' as const,
+      filters: { region: 'british' as const },
       excludeArtists: [],
       unmetConstraints: [],
     }

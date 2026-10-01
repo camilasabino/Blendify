@@ -75,7 +75,7 @@ export class GenerateGenreMixUseCase {
       input.name.trim() ||
       buildDefaultPlaylistName({
         names: seedNames,
-        region: input.region,
+        region: input.filters.region,
       });
     const playlistDescription =
       input.description.trim() ||
@@ -93,7 +93,7 @@ export class GenerateGenreMixUseCase {
         input.popularity,
         input.tracksPerSeed,
         {
-          region: input.region,
+          filters: input.filters,
           acceptTrack: options?.acceptTrack,
           onMatched: (matched) => {
             tracker.report(
@@ -133,7 +133,7 @@ export class GenerateGenreMixUseCase {
         kind: 'genre_mix',
         tracksPerSeed: input.tracksPerSeed,
         seeds: genres.map(({ id, name }) => ({ id, name })),
-        ...(input.region ? { region: input.region } : {}),
+        filters: input.filters,
         popularity: input.popularity,
         orderMode: input.orderMode,
       },

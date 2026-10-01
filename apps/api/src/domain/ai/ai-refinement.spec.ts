@@ -18,6 +18,7 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
+    filters: { region: null },
     targetTrackCount: 30,
     targetDurationMinutes: null,
     mood: null,
@@ -53,6 +54,7 @@ function interpreted(
       artists: NO_NAMES,
       genres: NO_NAMES,
       seedTracks: NO_NAMES,
+      filters: { region: null },
       targetTrackCount: null,
       targetDurationMinutes: null,
       mood: null,
@@ -360,7 +362,10 @@ describe('genre refinement through the deterministic canonical genre resolver', 
       ),
     ).toMatchObject({
       status: 'proposed',
-      intent: { genres: ['indie rock', 'argentine rock'] },
+      intent: {
+        genres: ['indie rock', 'rock'],
+        filters: { region: 'argentina' },
+      },
     });
   });
 
@@ -381,7 +386,7 @@ describe('genre refinement through the deterministic canonical genre resolver', 
       ),
     ).toMatchObject({
       status: 'proposed',
-      intent: { genres: ['argentine rock'] },
+      intent: { genres: ['rock'], filters: { region: 'argentina' } },
     });
   });
 
@@ -398,13 +403,15 @@ describe('genre refinement through the deterministic canonical genre resolver', 
 
     expect(result).toMatchObject({
       status: 'proposed',
-      intent: { genres: ['pop de UK', 'rock de UK', 'r&b de UK'] },
+      intent: {
+        genres: ['pop', 'rock', 'r&b'],
+        filters: { region: 'british' },
+      },
     });
     expect(
       result.status === 'proposed' && resolveAiGenreSeeds(result.intent.genres),
     ).toMatchObject({
       genres: [{ id: 'pop' }, { id: 'rock' }, { id: 'r&b' }],
-      region: 'british',
     });
   });
 
@@ -416,13 +423,15 @@ describe('genre refinement through the deterministic canonical genre resolver', 
 
     expect(result).toMatchObject({
       status: 'proposed',
-      intent: { genres: ['corrido tumbado', 'rancheras mexicanas'] },
+      intent: {
+        genres: ['corrido tumbado', 'rancheras'],
+        filters: { region: 'mexico' },
+      },
     });
     expect(
       result.status === 'proposed' && resolveAiGenreSeeds(result.intent.genres),
     ).toMatchObject({
       genres: [{ id: 'corrido tumbado' }, { id: 'ranchera' }],
-      region: 'mexico',
     });
   });
 
@@ -473,7 +482,10 @@ describe('genre refinement through the deterministic canonical genre resolver', 
       ),
     ).toMatchObject({
       status: 'proposed',
-      intent: { genres: ['indie rock', 'rock argentino'] },
+      intent: {
+        genres: ['indie rock', 'rock'],
+        filters: { region: 'argentina' },
+      },
     });
     expect(
       evaluate(
@@ -482,7 +494,10 @@ describe('genre refinement through the deterministic canonical genre resolver', 
       ),
     ).toMatchObject({
       status: 'proposed',
-      intent: { genres: ['indie rock', 'jazz brasileiro'] },
+      intent: {
+        genres: ['indie rock', 'jazz'],
+        filters: { region: 'brazilian' },
+      },
     });
   });
 
@@ -873,5 +888,106 @@ describe('effective state comparison', () => {
         preservation,
       ),
     ).toEqual({ status: 'unchanged' });
+  });
+});
+
+describe('region filter refinement', () => {
+  const setRegion = (value: string) =>
+    interpreted({ filters: { region: { operation: 'set', value } } });
+  const clearRegion = interpreted({
+    filters: { region: { operation: 'clear' } },
+  });
+  const regional = (seeds: Partial<AiIntent>, region: string | null) =>
+    intent({ artists: [], ...seeds, filters: { region } });
+
+  describe.each<[string, Partial<AiIntent>]>([
+    ['genre_mix', { kind: 'genre_mix', genres: ['rock'] }],
+    ['discover_artist', { kind: 'discover_artist', artists: ['Radiohead'] }],
+    [
+      'discover_track',
+      {
+        kind: 'discover_track',
+        seedTracks: [{ title: 'Creep', artist: 'Radiohead' }],
+      },
+    ],
+  ])('on a %s', (_kind, seeds) => {
+    it('sets a region from user-language text', () => {
+      expect(
+        evaluate(setRegion('argentina'), regional(seeds, null)),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { ...seeds, filters: { region: 'argentina' } },
+      });
+    });
+
+    it('replaces the current region', () => {
+      expect(
+        evaluate(setRegion('Brasil'), regional(seeds, 'argentina')),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { filters: { region: 'brazilian' } },
+      });
+      expect(
+        evaluate(setRegion('UK'), regional(seeds, 'brazilian')),
+      ).toMatchObject({
+        status: 'proposed',
+        intent: { filters: { region: 'british' } },
+      });
+    });
+
+    it('clears the region', () => {
+      expect(evaluate(clearRegion, regional(seeds, 'argentina'))).toMatchObject(
+        { status: 'proposed', intent: { filters: { region: null } } },
+      );
+    });
+
+    it('treats the same region in other words as unchanged', () => {
+      expect(
+        evaluate(setRegion('argentino'), regional(seeds, 'argentina')),
+      ).toEqual({ status: 'unchanged' });
+    });
+
+    it('asks for another region when the requested one is not curated', () => {
+      expect(
+        clarificationReason(
+          evaluate(setRegion('japonés'), regional(seeds, null)),
+        ),
+      ).toBe('unknown_region');
+    });
+  });
+
+  it('replaces the region of a genre mix whose region came from its genres', () => {
+    expect(
+      evaluate(
+        setRegion('Brasil'),
+        intent({ kind: 'genre_mix', artists: [], genres: ['rock argentino'] }),
+      ),
+    ).toMatchObject({
+      status: 'proposed',
+      intent: { genres: ['rock'], filters: { region: 'brazilian' } },
+    });
+  });
+
+  it('never applies a region refinement to an artist mix', () => {
+    expect(
+      evaluate(setRegion('Argentina'), intent({ kind: 'artist_mix' })),
+    ).toMatchObject({
+      status: 'needs_clarification',
+      clarification: { reason: 'region_not_supported', names: ['argentina'] },
+    });
+  });
+
+  it('never keeps a region when the refinement turns the playlist into an artist mix', () => {
+    expect(
+      clarificationReason(
+        evaluate(
+          interpreted({ kind: { operation: 'set', value: 'artist_mix' } }),
+          regional(
+            { kind: 'discover_artist', artists: ['Radiohead'] },
+            'argentina',
+          ),
+        ),
+      ),
+    ).toBe('region_not_supported');
   });
 });

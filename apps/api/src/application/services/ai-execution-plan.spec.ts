@@ -10,6 +10,7 @@ function intent(overrides: Partial<AiIntent>): AiIntent {
     artists: [],
     genres: [],
     seedTracks: [],
+    filters: { region: null },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,
@@ -119,20 +120,46 @@ describe('buildAiExecutionPlan', () => {
   it('carries the resolved region into the existing genre mix request', () => {
     const plan = buildAiExecutionPlan(
       intent({ kind: 'genre_mix', genres: ['rock argentino'] }),
-      seeds({ genres: [{ id: 'rock', name: 'Rock' }], region: 'argentina' }),
+      seeds({ genres: [{ id: 'rock', name: 'Rock' }] }),
     );
 
     expect(plan.request).toMatchObject({
       kind: 'genre_mix',
       genreIds: ['rock'],
-      region: 'argentina',
+      filters: { region: 'argentina' },
     });
     expect(
       buildAiExecutionPlan(
         intent({ kind: 'genre_mix', genres: ['Pop'] }),
         seeds({ genres: [{ id: 'pop', name: 'Pop' }] }),
       ).request,
-    ).not.toHaveProperty('region');
+    ).toMatchObject({ filters: { region: null } });
+  });
+
+  it('carries the region filter into discover requests and never into artist mixes', () => {
+    const radiohead = seeds({
+      artists: [{ id: 'radiohead-id', name: 'Radiohead' }],
+    });
+
+    expect(
+      buildAiExecutionPlan(
+        intent({
+          kind: 'discover_artist',
+          artists: ['Radiohead'],
+          filters: { region: 'argentina' },
+        }),
+        radiohead,
+      ).request,
+    ).toMatchObject({
+      kind: 'discover_artist',
+      filters: { region: 'argentina' },
+    });
+    expect(
+      buildAiExecutionPlan(
+        intent({ kind: 'artist_mix', artists: ['Radiohead'] }),
+        radiohead,
+      ).request,
+    ).not.toHaveProperty('filters');
   });
 
   it('keeps an artist seed authoritative over the mood', () => {
@@ -154,6 +181,7 @@ describe('buildAiExecutionPlan', () => {
       intent({
         kind: 'discover_track',
         seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
+        filters: { region: null },
         targetTrackCount: 20,
       }),
       seeds({

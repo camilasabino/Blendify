@@ -12,11 +12,13 @@ from app.prompts.refinement import (
 )
 from app.prompts.refinement_v1 import REFINEMENT_V1_PROMPT_VERSION, REFINEMENT_V1_SYSTEM_PROMPT
 from app.prompts.refinement_v2 import REFINEMENT_V2_PROMPT_VERSION, REFINEMENT_V2_SYSTEM_PROMPT
+from app.prompts.refinement_v3 import REFINEMENT_V3_PROMPT_VERSION, REFINEMENT_V3_SYSTEM_PROMPT
 from tests.fakes import current_intent, empty_preservation
 
 INTENT_V3_BASELINE_SHA256 = "4a523cd6a58f3ef21e0812fa209e4466289dc768eb682358474ac1bde7d8cf8f"
 REFINEMENT_V1_BASELINE_SHA256 = "6772d9e633197be47590eeea6503892a2f10e3f97b648696007f831d93a20bf7"
 REFINEMENT_V2_BASELINE_SHA256 = "19c932bed0036dd81b3ba8286e1d0c97b39db52d7bb2815897b56e8132c023f8"
+REFINEMENT_V3_BASELINE_SHA256 = "b677ca5d0b5f386c321c8dfb0b35c043f2e373bc4fe7163e2d550579f8526b99"
 
 
 def plan_request(refinement: str) -> PlanRefinementRequest:
@@ -28,7 +30,7 @@ def plan_request(refinement: str) -> PlanRefinementRequest:
 def test_refinement_has_its_own_prompt_version() -> None:
     request = build_refinement_model_request(plan_request("Remove Coldplay"))
 
-    assert REFINEMENT_PROMPT_VERSION == "refinement-v3"
+    assert REFINEMENT_PROMPT_VERSION == "refinement-v4"
     assert request.prompt_version == REFINEMENT_PROMPT_VERSION
     assert request.system_prompt == REFINEMENT_SYSTEM_PROMPT
     assert REFINEMENT_SYSTEM_PROMPT != INTENT_SYSTEM_PROMPT
@@ -55,6 +57,24 @@ def test_refinement_v2_stays_frozen_for_the_accepted_baseline() -> None:
     assert REFINEMENT_V2_PROMPT_VERSION == "refinement-v2"
     assert digest == REFINEMENT_V2_BASELINE_SHA256
     assert REFINEMENT_V2_SYSTEM_PROMPT != REFINEMENT_SYSTEM_PROMPT
+
+
+def test_refinement_v3_stays_frozen_for_the_accepted_baseline() -> None:
+    digest = hashlib.sha256(REFINEMENT_V3_SYSTEM_PROMPT.encode()).hexdigest()
+
+    assert REFINEMENT_V3_PROMPT_VERSION == "refinement-v3"
+    assert digest == REFINEMENT_V3_BASELINE_SHA256
+    assert REFINEMENT_V3_SYSTEM_PROMPT != REFINEMENT_SYSTEM_PROMPT
+
+
+def test_changes_the_region_filter_without_touching_the_genres() -> None:
+    prompt = " ".join(REFINEMENT_SYSTEM_PROMPT.split())
+
+    assert "filters.region: set it when the refinement asks for the results" in prompt
+    assert "Clear it when the user drops the region" in prompt
+    assert "Never express a region through genres" in prompt
+    assert "Blendify decides whether the region can apply" in prompt
+    assert "Argentina variants" not in prompt
 
 
 def test_normalizes_added_genres_like_the_first_turn() -> None:

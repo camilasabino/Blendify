@@ -11,6 +11,7 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
+    filters: { region: null },
     targetTrackCount: 30,
     targetDurationMinutes: null,
     mood: 'calm',
@@ -191,6 +192,7 @@ describe('diffIntents', () => {
           kind: 'discover_track',
           artists: [],
           seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
+          filters: { region: null },
         }),
       ),
     ).toEqual([

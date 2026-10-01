@@ -12,7 +12,9 @@ import {
 } from '@/domain/repositories/provider-quota.port';
 import {
   DISCOVERY_CATALOG,
+  type DiscoveryArtistIdentity,
   type DiscoveryCatalogPort,
+  type SimilarArtistCandidate,
 } from '@/domain/repositories/discovery-catalog.port';
 import {
   normalizeArtistName,
@@ -66,13 +68,22 @@ import {
   monotonicProgressReporter,
   type ProgressReporter,
 } from '@/application/services/generation-progress.tracker';
+import {
+  REGION_QUALIFICATION_CONCURRENCY,
+  RegionArtistQualifier,
+} from '@/application/services/region-artist-qualifier';
 
 const SEED_ARTIST_MATCH_CANDIDATES = 10;
 
 type DiscoverInput = z.output<typeof GenerateDiscoverPlaylistSchema>;
 type ArtistDiscoverInput = Extract<DiscoverInput, { kind: 'discover_artist' }>;
 type TrackDiscoverInput = Extract<DiscoverInput, { kind: 'discover_track' }>;
-type SimilarTrackRef = { name: string; artistName: string; playcount?: number };
+type SimilarTrackRef = {
+  name: string;
+  artistName: string;
+  playcount?: number;
+  artist?: DiscoveryArtistIdentity;
+};
 
 @Injectable()
 export class GenerateDiscoverPlaylistUseCase {
@@ -118,16 +129,16 @@ export class GenerateDiscoverPlaylistUseCase {
     const seed = await this.resolveSeedArtist(catalog, input);
     tracker.report('resolving_seeds', 1, 1);
 
-    let similarNames: string[];
+    let similarArtists: SimilarArtistCandidate[];
     try {
       const similar = await this.discoveryCatalog.getSimilarArtists(
         seed.name,
         DISCOVER_SIMILAR_FETCH,
       );
       const seedKey = normalizeArtistName(seed.name);
-      similarNames = orderBySimilarityRankingBands(similar)
-        .map((a) => a.name.trim())
-        .filter((name) => name && normalizeArtistName(name) !== seedKey);
+      similarArtists = orderBySimilarityRankingBands(similar)
+        .map((a) => ({ ...a, name: a.name.trim() }))
+        .filter((a) => a.name && normalizeArtistName(a.name) !== seedKey);
     } catch (error) {
       this.logger.warn(
         `Last.fm similar failed for discover: ${
@@ -140,24 +151,27 @@ export class GenerateDiscoverPlaylistUseCase {
       );
     }
 
-    if (similarNames.length < DISCOVER_MIN_SIMILAR) {
+    if (similarArtists.length < DISCOVER_MIN_SIMILAR) {
       throw new BusinessRuleError(
         'Not enough similar artists to build a Discover mix. Try another seed.',
         'DISCOVER_NOT_ENOUGH_SIMILAR',
-        { seed: seed.name, found: similarNames.length },
+        { seed: seed.name, found: similarArtists.length },
       );
     }
 
     const similarTarget = discoverSimilarTargetForTracks(
       input.targetTrackCount,
     );
+    const regionQualifier = this.regionQualifier(input);
     const resolvedSimilar = await this.resolveSimilarArtists(
       catalog,
-      similarNames,
+      similarArtists,
       seed.id.getValue(),
       similarTarget,
       tracker,
+      regionQualifier,
     );
+    regionQualifier?.assertEnforceable();
 
     if (resolvedSimilar.length < DISCOVER_MIN_SIMILAR) {
       throw new BusinessRuleError(
@@ -217,6 +231,7 @@ export class GenerateDiscoverPlaylistUseCase {
             name: seed.name,
             imageUrl: seed.imageUrl ?? null,
           },
+          filters: input.filters,
           popularity: input.popularity,
           orderMode: input.orderMode,
         },
@@ -257,13 +272,13 @@ export class GenerateDiscoverPlaylistUseCase {
       );
     }
 
+    const regionQualifier = this.regionQualifier(input);
     const selected = await this.selectDiverseTracks(
       catalog,
       seedTrack,
       similarRaw,
       input,
-      tracker,
-      acceptTrack,
+      { tracker, acceptTrack, regionQualifier },
     );
 
     const tracksByArtist = groupTracksByArtist(selected);
@@ -324,6 +339,7 @@ export class GenerateDiscoverPlaylistUseCase {
           durationMs: seedTrack.durationMs,
           popularity: seedTrack.popularity,
         },
+        filters: input.filters,
         popularity: input.popularity,
         orderMode: input.orderMode,
       },
@@ -338,8 +354,7 @@ export class GenerateDiscoverPlaylistUseCase {
     seedTrack: Track,
     candidateList: SimilarTrackCandidateList,
     input: TrackDiscoverInput,
-    tracker: GenerationProgressTracker,
-    acceptTrack?: TrackAcceptance,
+    context: TrackSelectionContext,
   ): Promise<Track[]> {
     const target = input.targetTrackCount;
     const minimumTracks = minimumResolvedDiscoverTracks(target);
@@ -372,9 +387,9 @@ export class GenerateDiscoverPlaylistUseCase {
       { related: relatedCandidates, seedArtist: seedArtistCandidates },
       candidateList,
       input,
-      tracker,
-      acceptTrack,
+      context,
     );
+    context.regionQualifier?.assertEnforceable();
     const allowance = seedArtistTrackAllowance(relatedTracks.length, target);
     const keptSeedArtistTracks = seedArtistTracks.slice(0, allowance);
     const selected = [...relatedTracks, ...keptSeedArtistTracks];
@@ -408,9 +423,9 @@ export class GenerateDiscoverPlaylistUseCase {
     candidates: { related: SimilarTrackRef[]; seedArtist: SimilarTrackRef[] },
     candidateList: SimilarTrackCandidateList,
     input: TrackDiscoverInput,
-    tracker: GenerationProgressTracker,
-    acceptTrack?: TrackAcceptance,
+    context: TrackSelectionContext,
   ): Promise<{ relatedTracks: Track[]; seedArtistTracks: Track[] }> {
+    const { tracker, acceptTrack, regionQualifier } = context;
     const target = input.targetTrackCount;
     const seedArtistId = seedTrack.artistId.getValue();
     const isRelated = (track: Track) => !isSeedArtistTrack(track, seedArtistId);
@@ -433,6 +448,7 @@ export class GenerateDiscoverPlaylistUseCase {
         onMatched: reportMatched,
         countsTowardLimit: isRelated,
         acceptTrack,
+        regionQualifier,
       },
     );
     const resolved = [
@@ -448,6 +464,7 @@ export class GenerateDiscoverPlaylistUseCase {
           isRelated,
           reportMatched,
           acceptTrack,
+          regionQualifier,
         },
       )),
     ];
@@ -474,6 +491,7 @@ export class GenerateDiscoverPlaylistUseCase {
           maxAttempts: seedResolveAttemptLimit(missing),
           onMatched: (matched) => reportMatched(relatedTracks.length + matched),
           acceptTrack,
+          regionQualifier,
         },
       );
       seedArtistTracks.push(...extra.tracks);
@@ -493,6 +511,7 @@ export class GenerateDiscoverPlaylistUseCase {
       isRelated: (track: Track) => boolean;
       reportMatched: (matched: number) => void;
       acceptTrack?: TrackAcceptance;
+      regionQualifier: RegionArtistQualifier | null;
     },
   ): Promise<Track[]> {
     const found = state.resolved.filter(state.isRelated).length;
@@ -524,9 +543,17 @@ export class GenerateDiscoverPlaylistUseCase {
         onMatched: (matched) => state.reportMatched(found + matched),
         countsTowardLimit: state.isRelated,
         acceptTrack: state.acceptTrack,
+        regionQualifier: state.regionQualifier,
       },
     );
     return more.tracks;
+  }
+
+  private regionQualifier(input: DiscoverInput): RegionArtistQualifier | null {
+    const { region } = input.filters;
+    return region
+      ? new RegionArtistQualifier(this.discoveryCatalog, region, this.logger)
+      : null;
   }
 
   private async resolveSeedArtist(
@@ -610,10 +637,11 @@ export class GenerateDiscoverPlaylistUseCase {
 
   private async resolveSimilarArtists(
     catalog: CatalogProviderPort,
-    names: string[],
+    candidates: SimilarArtistCandidate[],
     seedId: string,
     limit: number,
     tracker?: GenerationProgressTracker,
+    regionQualifier?: RegionArtistQualifier | null,
   ): Promise<Array<{ id: string; name: string; imageUrl?: string | null }>> {
     const resolved: Array<{
       id: string;
@@ -623,10 +651,17 @@ export class GenerateDiscoverPlaylistUseCase {
     const seen = new Set<string>([seedId]);
     tracker?.report('resolving_seeds', 0, Math.max(1, limit));
 
-    for (const name of names) {
+    for (const [index, candidate] of candidates.entries()) {
       if (resolved.length >= limit) {
         break;
       }
+      if (
+        regionQualifier &&
+        !(await qualifiesInOrder(regionQualifier, candidates, index, (c) => c))
+      ) {
+        continue;
+      }
+      const name = candidate.name;
       const matches = await catalog.searchArtists(
         name,
         SEED_ARTIST_MATCH_CANDIDATES,
@@ -749,6 +784,7 @@ export class GenerateDiscoverPlaylistUseCase {
             name: t.trackName,
             artistName: t.artistName || artist.name,
             playcount: t.playcount,
+            artist: { name: artist.name, mbid: artist.mbid },
           })),
         ),
       );
@@ -766,6 +802,7 @@ export class GenerateDiscoverPlaylistUseCase {
       onMatched?: (matched: number) => void;
       countsTowardLimit?: (track: Track) => boolean;
       acceptTrack?: TrackAcceptance;
+      regionQualifier?: RegionArtistQualifier | null;
     },
   ): Promise<{ tracks: Track[]; attempted: number }> {
     const resolved: Track[] = [];
@@ -774,9 +811,20 @@ export class GenerateDiscoverPlaylistUseCase {
     let counted = 0;
     let attempted = 0;
 
-    for (const candidate of candidates) {
+    for (const [index, candidate] of candidates.entries()) {
       if (counted >= options.limit || attempted >= options.maxAttempts) {
         break;
+      }
+      if (
+        options.regionQualifier &&
+        !(await qualifiesInOrder(
+          options.regionQualifier,
+          candidates,
+          index,
+          candidateArtist,
+        ))
+      ) {
+        continue;
       }
       attempted += 1;
       const track = await catalog.resolveTrack(
@@ -839,7 +887,12 @@ class SimilarTrackCandidateList {
         continue;
       }
       this.seen.add(key);
-      const candidate = { name, artistName, playcount: item.playcount };
+      const candidate = {
+        name,
+        artistName,
+        playcount: item.playcount,
+        artist: item.artist,
+      };
       this.items.push(candidate);
       added.push(candidate);
       if (!isSeedArtistCandidate(artistName, this.seedArtist)) {
@@ -848,6 +901,34 @@ class SimilarTrackCandidateList {
     }
     return added;
   }
+}
+
+type TrackSelectionContext = {
+  tracker: GenerationProgressTracker;
+  acceptTrack?: TrackAcceptance;
+  regionQualifier: RegionArtistQualifier | null;
+};
+
+function candidateArtist(candidate: SimilarTrackRef): DiscoveryArtistIdentity {
+  return (
+    candidate.artist ?? {
+      name: primaryArtistName(candidate.artistName) || candidate.artistName,
+    }
+  );
+}
+
+async function qualifiesInOrder<T>(
+  qualifier: RegionArtistQualifier,
+  candidates: readonly T[],
+  index: number,
+  identityOf: (candidate: T) => DiscoveryArtistIdentity,
+): Promise<boolean> {
+  await qualifier.prefetch(
+    candidates
+      .slice(index, index + REGION_QUALIFICATION_CONCURRENCY)
+      .map(identityOf),
+  );
+  return qualifier.qualifies(identityOf(candidates[index]));
 }
 
 function seedArtistName(seedTrack: Track): string {

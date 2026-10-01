@@ -1,7 +1,7 @@
 from app.models.intent import IntentInterpretation
 from app.providers.model_provider import ModelIntentRequest, ModelOutputSpec
 
-INTENT_PROMPT_VERSION = "intent-v4"
+INTENT_PROMPT_VERSION = "intent-v5"
 INTENT_MODEL_OUTPUT = ModelOutputSpec(
     name="playlist_intent_interpretation", result_type=IntentInterpretation
 )
@@ -102,18 +102,29 @@ Fields
   explicit mix of both; otherwise null.
 - orderMode: "artist" for grouped or ordered by artist; "title" for alphabetical or by
   song title; "random" for shuffled or random order; otherwise null.
+- filters.region: the country, region or regional scene the user wants the resulting
+  music to come from, copied as the user wrote it ("Argentina", "argentino",
+  "brasileras", "UK"); otherwise null. Use it when the user restricts music similar to
+  an artist or song to a place ("something like Radiohead but Argentine", "canciones
+  parecidas a Creep pero brasileras", "algo como Radiohead, mas brasileiro") or restricts
+  the songs of named artists to a place ("10 canciones de Radiohead argentinas");
+  Blendify decides whether the region can apply. In a genre request, follow the Genres
+  rules instead: a place that describes the style stays in the genre and filters.region
+  stays null. Keep only the first region the user names and report any other under
+  unsupportedConstraints as other. A place never adds an artist, song or genre by itself.
 - excludeArtists / excludeTracks: artists or songs the user wants left out.
 - unsupportedConstraints: every other requirement, each with the closest category:
   duration (a playlist length with no amount of time, such as "a long playlist"), era
   (decades, years, release dates), energy, mood (a feeling outside the mood list), activity
   (running, studying, parties, dancing), tempo (speed, BPM), progression (how the playlist
   should change from start to end), artist_attribute (gender, nationality, age or any other
-  fact about artists), other (anything else, such as a limit of songs per artist, lyrics
-  language or a musical characteristic). userText is a short quote of the user's own
-  words. Never drop such a requirement and never express it through another field.
-  Genres are not constraints: words written into a genre (its style, place or
-  characteristic) are never reported again under unsupportedConstraints. Plain
-  descriptive words that ask for nothing are not requirements.
+  fact about artists, except a region written in filters.region), other (anything else,
+  such as a limit of songs per artist, lyrics language or a musical characteristic).
+  userText is a short quote of the user's own words. Never drop such a requirement and
+  never express it through another field. Genres and regions are not constraints: words
+  written into a genre (its style, place or characteristic) or into filters.region are
+  never reported again under unsupportedConstraints. Plain descriptive words that ask for
+  nothing are not requirements.
 
 Language
 - Requests may be in English, Spanish or Brazilian Portuguese, or mix them. Interpret

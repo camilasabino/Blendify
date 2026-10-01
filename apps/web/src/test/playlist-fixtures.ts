@@ -12,6 +12,7 @@ export const jazzGeneration: PlaylistDetail['generation'] = {
   kind: 'genre_mix',
   tracksPerSeed: 1,
   seeds: [{ id: 'jazz', name: 'Jazz' }],
+  filters: { region: null },
   popularity: 'balanced',
   orderMode: 'random',
 }

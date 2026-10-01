@@ -1,5 +1,6 @@
 import {
   TRACK_ORDER_MODES,
+  supportsSelectionFilter,
   type AiClarificationReason,
   type AiSeedType,
   type PlaylistKind,
@@ -15,6 +16,7 @@ import type {
   AiIntentClarification,
   AiTrackReference,
 } from './ai-intent';
+import { resolveAiRegion, withCanonicalRegion } from './ai-selection-filters';
 import {
   kindForSeedType,
   presentSeedTypes,
@@ -28,13 +30,14 @@ export const MIN_TARGET_DURATION_MINUTES = 1;
 const MOOD_ONLY_KIND: PlaylistKind = 'genre_mix';
 
 export function normalizeAiIntent(intent: AiIntent): AiIntent {
+  const regional = withCanonicalRegion(intent);
   const normalized: AiIntent = {
-    ...intent,
-    artists: uniqueNames(intent.artists),
-    genres: uniqueByKey(intent.genres, aiGenreKey),
-    seedTracks: uniqueTracks(intent.seedTracks),
-    excludeArtists: uniqueNames(intent.excludeArtists),
-    excludeTracks: uniqueTracks(intent.excludeTracks),
+    ...regional,
+    artists: uniqueNames(regional.artists),
+    genres: uniqueByKey(regional.genres, aiGenreKey),
+    seedTracks: uniqueTracks(regional.seedTracks),
+    excludeArtists: uniqueNames(regional.excludeArtists),
+    excludeTracks: uniqueTracks(regional.excludeTracks),
   };
   const seedTypes = presentSeedTypes(normalized);
 
@@ -87,7 +90,8 @@ export function findIntentClarification(
     trackCountClarification(intent) ??
     durationClarification(intent) ??
     orderingClarification(intent) ??
-    genreClarification(intent)
+    genreClarification(intent) ??
+    regionClarification(intent)
   );
 }
 
@@ -159,9 +163,7 @@ function durationClarification(intent: AiIntent): AiIntentClarification | null {
 }
 
 function genreClarification(intent: AiIntent): AiIntentClarification | null {
-  const { unknown, ambiguous, conflictingRegions } = resolveAiGenreSeeds(
-    intent.genres,
-  );
+  const { unknown, ambiguous } = resolveAiGenreSeeds(intent.genres);
 
   if (unknown.length > 0) {
     return clarify('unknown_genres', { seedType: 'genre', names: unknown });
@@ -173,13 +175,30 @@ function genreClarification(intent: AiIntent): AiIntentClarification | null {
       names: ambiguous,
     });
   }
-  if (conflictingRegions.length > 0) {
-    return clarify('conflicting_regions', {
-      seedType: 'genre',
-      names: conflictingRegions,
-    });
-  }
   return null;
+}
+
+function regionClarification(intent: AiIntent): AiIntentClarification | null {
+  const { region, unknown, conflicting } = resolveAiRegion(intent);
+
+  if (unknown !== null) {
+    return clarify('unknown_region', { names: [unknown] });
+  }
+  if (conflicting.length > 0) {
+    return clarify('conflicting_regions', { names: conflicting });
+  }
+  if (region === null || supportsSelectionFilter(intent.kind, 'region')) {
+    return null;
+  }
+
+  const discoverOption: AiClarificationOption[] =
+    intent.artists.length === 1
+      ? [{ type: 'set_kind', kind: 'discover_artist' }]
+      : [];
+  return clarify('region_not_supported', {
+    names: [region],
+    options: discoverOption,
+  });
 }
 
 function orderingClarification(intent: AiIntent): AiIntentClarification | null {

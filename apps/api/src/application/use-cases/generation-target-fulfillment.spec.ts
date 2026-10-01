@@ -1,4 +1,4 @@
-import { PopularityMode } from '@blendify/contracts';
+import { PopularityMode, type MusicRegion } from '@blendify/contracts';
 import { Artist } from '@/domain/artist/artist.entity';
 import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
 import type {
@@ -54,7 +54,8 @@ type WorldInput = {
   tagCharts?: Record<string, CatalogTrackCandidate[]>;
   tagArtists?: Record<string, SimilarArtistCandidate[]>;
   artistTags?: Record<string, ArtistTagCandidate[]>;
-  similarArtists?: string[];
+  failingTagLookups?: Set<string>;
+  similarArtists?: Array<string | SimilarArtistCandidate>;
   similarTracks?: SimilarTrackCandidate[];
   searchTracks?: Record<string, string[]>;
 };
@@ -65,7 +66,9 @@ function createWorld(input: WorldInput) {
     isConfigured: () => true,
     getSimilarArtists: jest.fn(() =>
       Promise.resolve(
-        (input.similarArtists ?? []).map((name) => ({ name, match: 1 })),
+        (input.similarArtists ?? []).map((artist) =>
+          typeof artist === 'string' ? { name: artist, match: 1 } : artist,
+        ),
       ),
     ),
     getSimilarTracks: jest.fn(() => Promise.resolve(input.similarTracks ?? [])),
@@ -91,7 +94,13 @@ function createWorld(input: WorldInput) {
         ),
     ),
     getTopTagsForArtist: jest.fn((artist: DiscoveryArtistIdentity) =>
-      Promise.resolve(input.artistTags?.[artist.name] ?? []),
+      input.failingTagLookups?.has(artist.name)
+        ? Promise.reject(new Error('Last.fm unavailable'))
+        : Promise.resolve(
+            input.artistTags?.[artist.mbid ?? artist.name] ??
+              input.artistTags?.[artist.name] ??
+              [],
+          ),
     ),
   } satisfies DiscoveryCatalogPort;
   const resolveTrack = jest.fn((artistName: string, title: string) =>
@@ -292,7 +301,7 @@ describe('generation target fulfillment', () => {
       const playlist = await world.genreMix.execute({
         kind: 'genre_mix',
         genreIds: ['rock'],
-        region: 'argentina',
+        filters: { region: 'argentina' },
         tracksPerSeed: 10,
         popularity: PopularityMode.BALANCED,
       });
@@ -318,7 +327,7 @@ describe('generation target fulfillment', () => {
       const playlist = await world.genreMix.execute({
         kind: 'genre_mix',
         genreIds: ['rock'],
-        region: 'argentina',
+        filters: { region: 'argentina' },
         tracksPerSeed: 10,
         popularity: PopularityMode.BALANCED,
       });
@@ -346,7 +355,7 @@ describe('generation target fulfillment', () => {
       const playlist = await world.genreMix.execute({
         kind: 'genre_mix',
         genreIds: ['rock'],
-        region: 'argentina',
+        filters: { region: 'argentina' },
         tracksPerSeed: 10,
         popularity: PopularityMode.BALANCED,
       });
@@ -503,6 +512,368 @@ describe('generation target fulfillment', () => {
       expect(playlist.tracks.some((track) => rejected.has(track.name))).toBe(
         false,
       );
+    });
+  });
+  describe('Region filter', () => {
+    const ARGENTINA_TAGS = [
+      { name: 'rock', count: 100 },
+      { name: 'argentina', count: 70 },
+    ];
+    const ELSEWHERE_TAGS = [
+      { name: 'rock', count: 100 },
+      { name: 'british', count: 70 },
+    ];
+
+    function regionTags(
+      ...names: string[]
+    ): Record<string, ArtistTagCandidate[]> {
+      return Object.fromEntries(
+        names.map((name) => [
+          name,
+          name.startsWith('Arg') ? ARGENTINA_TAGS : ELSEWHERE_TAGS,
+        ]),
+      );
+    }
+
+    function isArgentine(track: Track): boolean {
+      return track.artistName.startsWith('Arg');
+    }
+
+    describe('Discover Artist', () => {
+      function discoverArtist(
+        world: ReturnType<typeof createWorld>,
+        targetTrackCount: number,
+        region: MusicRegion | null = 'argentina',
+      ) {
+        return world.discover.execute({
+          kind: 'discover_artist',
+          artistId: 'radiohead',
+          artist: { id: 'radiohead', name: 'Radiohead' },
+          targetTrackCount,
+          popularity: PopularityMode.POPULAR,
+          orderMode: 'random',
+          filters: { region },
+        });
+      }
+
+      it('only lets discovered artists of the region contribute tracks', async () => {
+        const world = createWorld({
+          similarArtists: ['Arg A', 'Other B', 'Arg C'],
+          artistTags: regionTags('Arg A', 'Other B', 'Arg C'),
+          artistCharts: {
+            'Arg A': titles('Arg A', 10),
+            'Other B': titles('Other B', 10),
+            'Arg C': titles('Arg C', 10),
+          },
+        });
+
+        const playlist = await discoverArtist(world, 6);
+
+        expect(playlist.tracks).toHaveLength(6);
+        expect(playlist.tracks.every(isArgentine)).toBe(true);
+        expect(world.catalog.searchArtists).not.toHaveBeenCalledWith(
+          'Other B',
+          expect.anything(),
+        );
+        expect(playlist.generation).toMatchObject({
+          kind: 'discover_artist',
+          filters: { region: 'argentina' },
+        });
+      });
+
+      it('keeps exploring later similar artists until the region target is met', async () => {
+        const similar = ['Arg 1', 'Non 1', 'Non 2', 'Arg 2', 'Non 3', 'Arg 3'];
+        const world = createWorld({
+          similarArtists: similar,
+          artistTags: regionTags(...similar),
+          artistCharts: {
+            'Arg 1': titles('Arg 1', 3),
+            'Arg 2': titles('Arg 2', 3),
+            'Arg 3': titles('Arg 3', 10),
+            'Non 1': titles('Non 1', 10),
+            'Non 2': titles('Non 2', 10),
+            'Non 3': titles('Non 3', 10),
+          },
+        });
+
+        const playlist = await discoverArtist(world, 10);
+
+        expect(playlist.tracks).toHaveLength(10);
+        expect(playlist.tracks.every(isArgentine)).toBe(true);
+      });
+
+      it('never requires the seed artist itself to belong to the region', async () => {
+        const world = createWorld({
+          similarArtists: ['Arg 1', 'Arg 2'],
+          artistTags: {
+            ...regionTags('Arg 1', 'Arg 2'),
+            radiohead: ELSEWHERE_TAGS,
+          },
+          artistCharts: {
+            'Arg 1': titles('Arg 1', 5),
+            'Arg 2': titles('Arg 2', 5),
+          },
+        });
+
+        const playlist = await discoverArtist(world, 8);
+
+        expect(playlist.tracks).toHaveLength(8);
+        expect(world.discovery.getTopTagsForArtist).not.toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'radiohead' }),
+        );
+      });
+
+      it('returns only regional tracks when the similar artists are exhausted', async () => {
+        const similar = ['Arg 1', 'Non 1', 'Arg 2', 'Non 2', 'Non 3'];
+        const world = createWorld({
+          similarArtists: similar,
+          artistTags: regionTags(...similar),
+          artistCharts: {
+            'Arg 1': titles('Arg 1', 3),
+            'Arg 2': titles('Arg 2', 4),
+            'Non 1': titles('Non 1', 10),
+            'Non 2': titles('Non 2', 10),
+            'Non 3': titles('Non 3', 10),
+          },
+        });
+
+        const playlist = await discoverArtist(world, 10);
+
+        expect(playlist.tracks).toHaveLength(7);
+        expect(playlist.tracks.every(isArgentine)).toBe(true);
+      });
+
+      it('qualifies the Last.fm artist identity by MBID when Last.fm provides one', async () => {
+        const world = createWorld({
+          similarArtists: [
+            { name: 'Arg Homonym', mbid: 'mbid-arg' },
+            { name: 'Arg 2' },
+          ],
+          artistTags: {
+            'mbid-arg': ARGENTINA_TAGS,
+            'Arg Homonym': ELSEWHERE_TAGS,
+            'Arg 2': ARGENTINA_TAGS,
+          },
+          artistCharts: {
+            'Arg Homonym': titles('Arg Homonym', 4),
+            'Arg 2': titles('Arg 2', 4),
+          },
+        });
+
+        const playlist = await discoverArtist(world, 8);
+
+        expect(playlist.tracks).toHaveLength(8);
+        expect(world.discovery.getTopTagsForArtist).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Arg Homonym', mbid: 'mbid-arg' }),
+        );
+      });
+
+      it('skips artists whose region lookup failed and keeps the constraint', async () => {
+        const similar = ['Arg 1', 'Arg 2', 'Arg 3'];
+        const world = createWorld({
+          similarArtists: similar,
+          artistTags: regionTags(...similar),
+          failingTagLookups: new Set(['Arg 1']),
+          artistCharts: Object.fromEntries(
+            similar.map((name) => [name, titles(name, 5)]),
+          ),
+        });
+
+        const playlist = await discoverArtist(world, 6);
+
+        expect(playlist.tracks).toHaveLength(6);
+        expect(
+          playlist.tracks.some((track) => track.artistName === 'Arg 1'),
+        ).toBe(false);
+      });
+
+      it('fails as unavailable instead of dropping the region when every lookup fails', async () => {
+        const similar = ['Arg 1', 'Arg 2', 'Arg 3'];
+        const world = createWorld({
+          similarArtists: similar,
+          failingTagLookups: new Set(similar),
+          artistCharts: Object.fromEntries(
+            similar.map((name) => [name, titles(name, 5)]),
+          ),
+        });
+
+        await expect(discoverArtist(world, 6)).rejects.toMatchObject({
+          code: 'REGION_LOOKUP_UNAVAILABLE',
+        });
+        expect(world.resolveTrack).not.toHaveBeenCalled();
+      });
+
+      it('skips region lookups entirely without a region', async () => {
+        const world = createWorld({
+          similarArtists: ['Non 1', 'Non 2'],
+          artistCharts: {
+            'Non 1': titles('Non 1', 5),
+            'Non 2': titles('Non 2', 5),
+          },
+        });
+
+        const playlist = await discoverArtist(world, 6, null);
+
+        expect(playlist.tracks).toHaveLength(6);
+        expect(world.discovery.getTopTagsForArtist).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('Discover Track', () => {
+      const SEED = makeTrack('Sade', 'Smooth Operator');
+
+      function discoverTrack(
+        world: ReturnType<typeof createWorld>,
+        targetTrackCount: number,
+      ) {
+        world.catalog.searchTracks.mockResolvedValue([SEED]);
+        return world.discover.execute({
+          kind: 'discover_track',
+          trackId: SEED.id.getValue(),
+          track: {
+            id: SEED.id.getValue(),
+            name: SEED.name,
+            artistId: SEED.artistId.getValue(),
+            artistName: SEED.artistName,
+          },
+          targetTrackCount,
+          popularity: PopularityMode.POPULAR,
+          orderMode: 'random',
+          filters: { region: 'argentina' },
+        });
+      }
+
+      function candidates(
+        artists: string[],
+        perArtist = 1,
+      ): SimilarTrackCandidate[] {
+        return artists.flatMap((artistName, index) =>
+          Array.from({ length: perArtist }, (_, take) => ({
+            name: `${artistName} Tune ${take + 1}`,
+            artistName,
+            playcount: 100_000 - index * perArtist - take,
+          })),
+        );
+      }
+
+      it('filters result artists by region before they count toward the target', async () => {
+        const artists = Array.from({ length: 40 }, (_, index) =>
+          index % 2 === 0 ? `Arg ${index}` : `Non ${index}`,
+        );
+        const world = createWorld({
+          similarTracks: candidates(artists),
+          artistTags: regionTags(...artists, 'Sade'),
+        });
+
+        const playlist = await discoverTrack(world, 10);
+
+        expect(playlist.tracks).toHaveLength(10);
+        expect(playlist.tracks.every(isArgentine)).toBe(true);
+        expect(
+          world.resolveTrack.mock.calls.every(([artistName]) =>
+            artistName.startsWith('Arg'),
+          ),
+        ).toBe(true);
+        expect(playlist.generation).toMatchObject({
+          kind: 'discover_track',
+          filters: { region: 'argentina' },
+        });
+      });
+
+      it('looks up the region of each result artist once per request', async () => {
+        const artists = ['Arg A', 'Arg B', 'Non C'];
+        const world = createWorld({
+          similarTracks: candidates(artists, 6),
+          artistTags: regionTags(...artists),
+        });
+
+        const playlist = await discoverTrack(world, 10);
+        const lookups = world.discovery.getTopTagsForArtist.mock.calls.map(
+          ([artist]) => artist.name,
+        );
+
+        expect(playlist.tracks).toHaveLength(10);
+        expect(lookups.sort()).toEqual(['Arg A', 'Arg B', 'Non C']);
+        expect(lookups).not.toContain('Sade');
+      });
+
+      it('continues into the similar-artist candidates when the region thins the similar tracks', async () => {
+        const artists = [
+          ...Array.from({ length: 4 }, (_, index) => `Arg ${index}`),
+          ...Array.from({ length: 30 }, (_, index) => `Non ${index}`),
+        ];
+        const world = createWorld({
+          similarTracks: candidates(artists),
+          similarArtists: ['Non Fallback', 'Arg Fallback'],
+          artistTags: regionTags(...artists, 'Non Fallback', 'Arg Fallback'),
+          artistCharts: {
+            'Non Fallback': titles('Non Fallback', 8),
+            'Arg Fallback': titles('Arg Fallback', 8),
+          },
+        });
+
+        const playlist = await discoverTrack(world, 10);
+
+        expect(playlist.tracks).toHaveLength(10);
+        expect(playlist.tracks.every(isArgentine)).toBe(true);
+        expect(
+          playlist.tracks.some((track) => track.artistName === 'Arg Fallback'),
+        ).toBe(true);
+      });
+
+      it('returns the regional shortfall instead of relaxing the region', async () => {
+        const artists = [
+          ...Array.from({ length: 6 }, (_, index) => `Arg ${index}`),
+          ...Array.from({ length: 30 }, (_, index) => `Non ${index}`),
+        ];
+        const world = createWorld({
+          similarTracks: candidates(artists),
+          artistTags: regionTags(...artists),
+        });
+
+        const playlist = await discoverTrack(world, 10);
+
+        expect(playlist.tracks).toHaveLength(6);
+        expect(playlist.tracks.every(isArgentine)).toBe(true);
+      });
+
+      it('qualifies a collaboration by its primary credited artist', async () => {
+        const world = createWorld({
+          similarTracks: [
+            ...candidates(['Arg Lead feat. Non Guest']),
+            ...candidates(['Arg 1', 'Arg 2', 'Arg 3', 'Non 4']),
+          ],
+          artistTags: regionTags(
+            'Arg Lead',
+            'Arg 1',
+            'Arg 2',
+            'Arg 3',
+            'Non 4',
+          ),
+        });
+
+        const playlist = await discoverTrack(world, 4);
+
+        expect(playlist.tracks.map((track) => track.artistName).sort()).toEqual(
+          ['Arg 1', 'Arg 2', 'Arg 3', 'Arg Lead feat. Non Guest'],
+        );
+        expect(world.discovery.getTopTagsForArtist).toHaveBeenCalledWith({
+          name: 'Arg Lead',
+        });
+      });
+
+      it('fails as unavailable instead of dropping the region when every lookup fails', async () => {
+        const artists = ['Arg 1', 'Arg 2', 'Arg 3', 'Arg 4', 'Arg 5'];
+        const world = createWorld({
+          similarTracks: candidates(artists),
+          failingTagLookups: new Set(artists),
+        });
+
+        await expect(discoverTrack(world, 4)).rejects.toMatchObject({
+          code: 'REGION_LOOKUP_UNAVAILABLE',
+        });
+        expect(world.resolveTrack).not.toHaveBeenCalled();
+      });
     });
   });
 });

@@ -646,7 +646,7 @@ describe('Spotify Mode generation characterization', () => {
         .send({
           kind: 'genre_mix',
           genreIds: ['jazz'],
-          region: 'argentina',
+          filters: { region: 'argentina' },
           tracksPerSeed: 4,
           popularity: 'balanced',
         })
@@ -657,7 +657,7 @@ describe('Spotify Mode generation characterization', () => {
       expect(playlist.generation).toMatchObject({
         kind: 'genre_mix',
         seeds: [{ id: 'jazz', name: 'Jazz' }],
-        region: 'argentina',
+        filters: { region: 'argentina' },
       });
       expect(new Set(playlist.tracks.map((track) => track.artistName))).toEqual(
         new Set(['jazz Artist 1', 'jazz Artist 2']),
@@ -677,13 +677,43 @@ describe('Spotify Mode generation characterization', () => {
           kind: 'genre_mix',
           name: 'Ruta 40',
           genreIds: ['jazz'],
-          region: 'argentina',
+          filters: { region: 'argentina' },
           tracksPerSeed: 4,
           popularity: 'balanced',
         })
         .expect(201);
 
       expect(PlaylistDetailSchema.parse(response.body).name).toBe('Ruta 40');
+    });
+
+    it('rejects the former top-level region field instead of ignoring it', async () => {
+      await request(httpServer())
+        .post('/api/playlists/mix')
+        .send({
+          kind: 'genre_mix',
+          genreIds: ['jazz'],
+          region: 'argentina',
+          tracksPerSeed: 4,
+          popularity: 'balanced',
+        })
+        .expect(400);
+
+      expect(world.provider.createPlaylist).not.toHaveBeenCalled();
+    });
+
+    it('rejects a region on an artist mix instead of ignoring it', async () => {
+      await request(httpServer())
+        .post('/api/playlists/mix')
+        .send({
+          kind: 'artist_mix',
+          artistIds: ['artist-1'],
+          filters: { region: 'argentina' },
+          tracksPerSeed: 4,
+          popularity: 'balanced',
+        })
+        .expect(400);
+
+      expect(world.provider.createPlaylist).not.toHaveBeenCalled();
     });
   });
 

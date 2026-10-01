@@ -1,16 +1,16 @@
 import {
   buildMixPlaylistName,
-  GENRE_REGION_NAMES,
-  type GenreRegion,
+  MUSIC_REGION_NAMES,
+  type MusicRegion,
 } from '@blendify/contracts';
 
 export function buildDefaultPlaylistName(input: {
   names: string[];
-  region?: GenreRegion;
+  region?: MusicRegion | null;
 }): string {
   return buildMixPlaylistName({
     seedNames: input.names,
-    regionLabel: input.region ? GENRE_REGION_NAMES[input.region] : null,
+    regionLabel: input.region ? MUSIC_REGION_NAMES[input.region] : null,
   });
 }
 

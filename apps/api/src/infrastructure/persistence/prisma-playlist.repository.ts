@@ -4,11 +4,7 @@ import {
   PlaylistStatus as PrismaStatus,
   Prisma,
 } from '@prisma/client';
-import {
-  PlaylistGenerationSchema,
-  PlaylistSeedSchema,
-  type PlaylistSeedDto,
-} from '@blendify/contracts';
+import { PlaylistSeedSchema, type PlaylistSeedDto } from '@blendify/contracts';
 import { Playlist } from '@/domain/playlist/playlist.entity';
 import { PlaylistName } from '@/domain/value-objects/playlist-name.vo';
 import { readTrackPopularity } from '@/domain/track/track-popularity';
@@ -19,6 +15,7 @@ import {
   PlaylistRepositoryPort,
   type PlaylistLibraryFilter,
 } from '@/domain/repositories/playlist.repository.port';
+import { parsePersistedGeneration } from './persisted-playlist-generation';
 import { PrismaService } from './prisma.service';
 
 interface TrackJson {
@@ -157,7 +154,7 @@ export class PrismaPlaylistRepository implements PlaylistRepositoryPort {
 
   private toDomain(row: PlaylistModel): Playlist {
     const seeds = parseSeeds(row.seeds);
-    const generation = PlaylistGenerationSchema.parse(row.generation);
+    const generation = parsePersistedGeneration(row.generation);
     const tracks = row.tracks as unknown as TrackJson[];
     return Playlist.rehydrate({
       id: row.id,

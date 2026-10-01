@@ -1,18 +1,20 @@
 import { useEffect, useId, type KeyboardEvent } from 'react'
 import { Check, ChevronDown, Globe } from 'lucide-react'
-import { GENRE_REGIONS, type GenreRegion } from '@blendify/contracts'
+import { MUSIC_REGIONS, type MusicRegion } from '@blendify/contracts'
 import { REGION_LABEL_KEYS } from '@/components/genres/genre-labels'
+import type { MessageKey } from '@/i18n/messages'
 import { Label } from '@/components/ui/label'
 import { popoverSurfaceClass, usePopover } from '@/hooks/use-popover'
 import { useT } from '@/i18n/use-t'
 import { cn, focusRing } from '@/lib/utils'
 
 type RegionSelectProps = Readonly<{
-  value: GenreRegion | null
-  onChange: (region: GenreRegion | null) => void
+  value: MusicRegion | null
+  hintKey: MessageKey
+  onChange: (region: MusicRegion | null) => void
 }>
 
-export function RegionSelect({ value, onChange }: RegionSelectProps) {
+export function RegionSelect({ value, hintKey, onChange }: RegionSelectProps) {
   const t = useT()
   const baseId = useId()
   const triggerId = `${baseId}-trigger`
@@ -27,9 +29,9 @@ export function RegionSelect({ value, onChange }: RegionSelectProps) {
     }
   }, [open, focusItem])
 
-  const options: ReadonlyArray<{ id: GenreRegion | null; label: string }> = [
+  const options: ReadonlyArray<{ id: MusicRegion | null; label: string }> = [
     { id: null, label: t('create.regionAny') },
-    ...GENRE_REGIONS.map((region) => ({
+    ...MUSIC_REGIONS.map((region) => ({
       id: region,
       label: t(REGION_LABEL_KEYS[region]),
     })),
@@ -48,7 +50,7 @@ export function RegionSelect({ value, onChange }: RegionSelectProps) {
     }
   }
 
-  function select(region: GenreRegion | null) {
+  function select(region: MusicRegion | null) {
     onChange(region)
     popover.close(true)
   }
@@ -127,7 +129,7 @@ export function RegionSelect({ value, onChange }: RegionSelectProps) {
         ) : null}
       </div>
       <p id={hintId} className="text-sm text-cream-400">
-        {t('create.regionHint')}
+        {t(hintKey)}
       </p>
     </div>
   )

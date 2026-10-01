@@ -28,6 +28,7 @@ function intent(overrides: Partial<AiIntent>): AiIntent {
     artists: [],
     genres: [],
     seedTracks: [],
+    filters: { region: null },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,
@@ -135,7 +136,6 @@ describe('AiIntentResolver', () => {
           { id: 'chamber folk', name: 'Chamber Folk' },
           { id: 'chamber pop', name: 'Chamber Pop' },
         ],
-        region: 'argentina',
         track: null,
       },
     });
@@ -161,7 +161,6 @@ describe('AiIntentResolver', () => {
           { id: 'rock', name: 'Rock' },
           { id: 'ballad', name: 'Ballad' },
         ],
-        region: 'argentina',
         track: null,
       },
     });
@@ -189,7 +188,6 @@ describe('AiIntentResolver', () => {
             { id: 'rock', name: 'Rock' },
             { id: 'r&b', name: 'R&B' },
           ],
-          region: 'british',
           track: null,
         },
       });
@@ -295,6 +293,7 @@ describe('AiIntentResolver', () => {
       intent({
         kind: 'discover_track',
         seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
+        filters: { region: null },
       }),
     );
 
@@ -326,6 +325,7 @@ describe('AiIntentResolver', () => {
       intent({
         kind: 'discover_track',
         seedTracks: [{ title: 'Enjoy the Silence', artist: null }],
+        filters: { region: null },
       }),
     );
 
@@ -344,6 +344,7 @@ describe('AiIntentResolver', () => {
     const request = intent({
       kind: 'discover_track',
       seedTracks: [{ title: 'Enjoy the Silence', artist: null }],
+      filters: { region: null },
     });
 
     await expect(resolver.resolve(request)).resolves.toMatchObject({
@@ -365,6 +366,7 @@ describe('AiIntentResolver', () => {
       intent({
         kind: 'discover_track',
         seedTracks: [{ title: 'Imaginary Song', artist: 'Nobody Known' }],
+        filters: { region: null },
       }),
     );
 

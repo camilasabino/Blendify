@@ -1,6 +1,6 @@
-import type { GenreRegion } from './index';
+import type { MusicRegion } from './index';
 
-export const GENRE_REGION_NAMES: Readonly<Record<GenreRegion, string>> = {
+export const MUSIC_REGION_NAMES: Readonly<Record<MusicRegion, string>> = {
   latin: 'Latin America',
   american: 'United States',
   british: 'United Kingdom',

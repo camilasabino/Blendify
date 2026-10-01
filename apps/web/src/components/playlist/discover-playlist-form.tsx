@@ -10,7 +10,10 @@ import {
 import {
   MAX_TRACKS,
   MIN_DISCOVER_TRACKS,
+  SELECTION_FILTER_SUPPORT,
   DiscoverTrackTargetSchema,
+  emptySelectionFilters,
+  type SelectionFilters,
   type TrackDto,
 } from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
@@ -31,6 +34,7 @@ import {
   runFailureView,
 } from '@/components/playlist/generation-result-helpers'
 import { PLAYLIST_RUN_COPY } from '@/components/playlist/playlist-run-copy'
+import { ResultFiltersSection } from '@/components/playlist/result-filters-section'
 import {
   buildGenerationSummary,
   buildRecipeSummary,
@@ -191,6 +195,7 @@ export function DiscoverPlaylistForm() {
   const [seedMode, setSeedMode] = useState<SeedMode>('artist')
   const [artist, setArtist] = useState<Artist | null>(null)
   const [track, setTrack] = useState<TrackDto | null>(null)
+  const [filters, setFilters] = useState<SelectionFilters>(emptySelectionFilters)
   const [preparingMode, setPreparingMode] = useState<AppMode>(capabilities.mode)
   const [isPreparing, setIsPreparing] = useState(false)
   const copiedLink = useCopiedLink()
@@ -279,6 +284,7 @@ export function DiscoverPlaylistForm() {
   async function startDiscover(values: FormValues, generationMode: AppMode) {
     const sharedBase = {
       targetTrackCount: values.targetTrackCount,
+      filters,
       popularity: values.popularity,
       orderMode: values.orderMode,
     }
@@ -375,6 +381,7 @@ export function DiscoverPlaylistForm() {
     setSeedMode('artist')
     setArtist(null)
     setTrack(null)
+    setFilters(emptySelectionFilters())
     playlistRun.dismiss()
     copiedLink.reset()
     form.reset(DEFAULT_VALUES)
@@ -382,6 +389,7 @@ export function DiscoverPlaylistForm() {
   }
 
   const formCopy = generationFormCopy(capabilities.mode, 'discover')
+  const discoverKind = seedMode === 'artist' ? 'discover_artist' : 'discover_track'
   const { result, progress, failure } = playlistRun
   const submittedMode = playlistRun.run?.spec.mode ?? preparingMode
   const workingCopy = generationFormCopy(submittedMode, 'discover')
@@ -397,6 +405,7 @@ export function DiscoverPlaylistForm() {
     : buildGenerationSummary(
         {
           seedNames: seedName ? [seedName] : [],
+          region: filters.region,
           popularity: form.watch('popularity'),
           orderMode: form.watch('orderMode'),
           trackCount: targetTrackCount,
@@ -522,7 +531,15 @@ export function DiscoverPlaylistForm() {
 
             <PopularityModeSection control={form.control} step={2} />
 
-            <FormSection step={3} title={t(formCopy.detailsTitle)}>
+            <ResultFiltersSection
+              step={3}
+              supported={SELECTION_FILTER_SUPPORT[discoverKind]}
+              filters={filters}
+              onChange={setFilters}
+              regionHintKey="discover.regionHint"
+            />
+
+            <FormSection step={4} title={t(formCopy.detailsTitle)}>
               <div className="divide-y divide-divider">
                 <Controller
                   control={form.control}
@@ -563,7 +580,7 @@ export function DiscoverPlaylistForm() {
               </div>
             </FormSection>
 
-            <OrderModeSection control={form.control} step={4} />
+            <OrderModeSection control={form.control} step={5} />
           </fieldset>
 
           <GenerationSubmitBar

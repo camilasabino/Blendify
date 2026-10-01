@@ -15,6 +15,7 @@ import {
 } from './ai-intent';
 import { aiNameKey, aiTrackKey } from './ai-intent-rules';
 import { seedTypeOfKind } from './ai-seeds';
+import { aiSelectionFilters } from './ai-selection-filters';
 import {
   candidateTrackCountForDuration,
   isDurationBelowTolerance,
@@ -243,7 +244,7 @@ function generationBasis(intent: AiIntent): string {
   return JSON.stringify({
     kind: intent.kind,
     seeds: basisSeeds(intent),
-    region: resolveAiGenreSeeds(intent.genres).region,
+    filters: aiSelectionFilters(intent),
     popularity: intent.popularity ?? AI_DEFAULT_POPULARITY,
   });
 }

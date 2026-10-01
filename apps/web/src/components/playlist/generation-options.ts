@@ -8,7 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type {
-  GenreRegion,
+  MusicRegion,
   PlaylistGeneration,
   PopularityMode,
   TrackOrderMode,
@@ -80,7 +80,7 @@ export function buildGenerationSummary(
     trackCount,
   }: Readonly<{
     seedNames: string[]
-    region?: GenreRegion | null
+    region?: MusicRegion | null
     popularity: PopularityMode
     orderMode: TrackOrderMode
     trackCount: number
@@ -129,7 +129,7 @@ export function buildRecipeSummary(
   return buildGenerationSummary(
     {
       seedNames: generationSeedNames(generation, genreLabel),
-      region: generation.kind === 'genre_mix' ? generation.region : null,
+      region: 'filters' in generation ? generation.filters.region : null,
       popularity: generation.popularity,
       orderMode: generation.orderMode,
       trackCount,

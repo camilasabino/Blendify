@@ -34,7 +34,7 @@ const READY_SESSION = {
     kind: 'artist_mix',
     artists: ['Radiohead', 'Interpol'],
     genres: [],
-    region: null,
+    filters: { region: null },
     seedTrack: null,
     targetTrackCount: 30,
     targetDurationMinutes: null,
@@ -110,15 +110,17 @@ describe('AI session contracts', () => {
     expect(AiSessionSchema.parse(moodOnly)).toEqual(moodOnly);
   });
 
-  it('carries a canonical region beside canonical genres', () => {
+  it.each([
+    ['genre_mix', { artists: [], genres: ['Rock'] }],
+    ['discover_artist', { artists: ['Radiohead'], genres: [] }],
+  ])('carries a canonical region filter on a %s summary', (kind, seeds) => {
     const regional = {
       ...READY_SESSION,
       intent: {
         ...READY_SESSION.intent,
-        kind: 'genre_mix',
-        artists: [],
-        genres: ['Rock'],
-        region: 'argentina',
+        ...seeds,
+        kind,
+        filters: { region: 'argentina' },
       },
     };
 
@@ -126,7 +128,13 @@ describe('AI session contracts', () => {
     expect(
       AiSessionSchema.safeParse({
         ...regional,
-        intent: { ...regional.intent, region: 'Argentina' },
+        intent: { ...regional.intent, filters: { region: 'Argentina' } },
+      }).success,
+    ).toBe(false);
+    expect(
+      AiSessionSchema.safeParse({
+        ...regional,
+        intent: { ...regional.intent, region: 'argentina' },
       }).success,
     ).toBe(false);
   });

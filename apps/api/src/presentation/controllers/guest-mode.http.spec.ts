@@ -682,6 +682,18 @@ describe('Guest Mode HTTP boundary', () => {
       },
     );
 
+    it('rejects a legacy top-level region on a Genre Mix request', async () => {
+      const response = await request(httpServer())
+        .post('/api/generate/mix')
+        .set('Origin', FRONTEND)
+        .send({ ...genreMixBody, region: 'argentina' })
+        .expect(400);
+
+      expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+      expect(world.discovery.getTopTracksForArtist).not.toHaveBeenCalled();
+      expectNoSpotifySideEffects();
+    });
+
     it('keeps the existing generation validation', async () => {
       await request(httpServer())
         .post('/api/generate/mix')

@@ -63,6 +63,7 @@
               { "title": "Teardrop", "artist": "Massive Attack" },
               { "title": "Enjoy the Silence", "artist": null }
             ],
+            "filters": { "region": null },
             "targetTrackCount": 30,
             "targetDurationMinutes": null,
             "mood": null,
@@ -93,6 +94,7 @@
             "artists": [],
             "genres": ["classic rock"],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -139,6 +141,7 @@
             "artistIds": ["4Z8W4fKeB5YxbusRsdQVPb"],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -170,6 +173,7 @@
                 "uri": "spotify:track:67Hna13dNDkZvBpTXRIaOJ"
               }
             ],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -195,6 +199,7 @@
             "artists": [],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -220,6 +225,7 @@
             "artists": [],
             "genres": ["jazz"],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -245,6 +251,7 @@
             "artists": [],
             "genres": ["jazz"],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": 0,
             "targetDurationMinutes": null,
             "mood": null,
@@ -270,6 +277,7 @@
             "artists": [],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": 60,
             "mood": "happy",
@@ -297,6 +305,7 @@
             "artists": [],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": 0,
             "mood": null,
@@ -324,6 +333,7 @@
             "artists": [],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": -30,
             "mood": null,
@@ -351,6 +361,7 @@
             "artists": [],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": 90.5,
             "mood": null,
@@ -378,6 +389,7 @@
             "artists": [],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": 10081,
             "mood": null,
@@ -405,6 +417,7 @@
             "artists": [],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": "groovy",
@@ -432,6 +445,7 @@
             "artists": [],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": "party",
@@ -459,6 +473,7 @@
             "artists": [],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "popularity": null,
@@ -485,6 +500,7 @@
             "artists": [],
             "genres": ["jazz"],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -561,6 +577,7 @@
           ],
           "genres": [],
           "seedTracks": [],
+          "filters": { "region": null },
           "targetTrackCount": 30,
           "targetDurationMinutes": null,
           "mood": null,
@@ -603,6 +620,7 @@
           ],
           "genres": [],
           "seedTracks": [],
+          "filters": { "region": null },
           "targetTrackCount": 30,
           "targetDurationMinutes": null,
           "mood": null,
@@ -640,6 +658,7 @@
           ],
           "genres": [],
           "seedTracks": [],
+          "filters": { "region": null },
           "targetTrackCount": 30,
           "targetDurationMinutes": null,
           "mood": null,
@@ -672,6 +691,7 @@
           ],
           "genres": [],
           "seedTracks": [],
+          "filters": { "region": null },
           "targetTrackCount": 30,
           "targetDurationMinutes": null,
           "mood": null,
@@ -721,6 +741,7 @@
           ],
           "genres": [],
           "seedTracks": [],
+          "filters": { "region": null },
           "targetTrackCount": 30,
           "targetDurationMinutes": null,
           "mood": null,
@@ -761,6 +782,7 @@
           ],
           "genres": [],
           "seedTracks": [],
+          "filters": { "region": null },
           "targetTrackCount": 30,
           "targetDurationMinutes": null,
           "mood": null,
@@ -800,6 +822,7 @@
           ],
           "genres": [],
           "seedTracks": [],
+          "filters": { "region": null },
           "targetTrackCount": 30,
           "targetDurationMinutes": null,
           "mood": null,
@@ -841,6 +864,7 @@
           ],
           "genres": [],
           "seedTracks": [],
+          "filters": { "region": null },
           "targetTrackCount": 30,
           "targetDurationMinutes": null,
           "mood": null,
@@ -897,6 +921,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": {
@@ -968,6 +993,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1039,6 +1065,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "popularity": null,
@@ -1086,6 +1113,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1131,6 +1159,7 @@
             ],
             "genres": [],
             "seedTracks": [],
+            "filters": { "region": null },
             "targetTrackCount": 30,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1184,6 +1213,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1239,6 +1269,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1290,6 +1321,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": {
               "operation": "decrease",
               "value": 5
@@ -1344,6 +1376,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1399,6 +1432,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1460,6 +1494,7 @@
               ],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1511,6 +1546,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": {
               "operation": "adjust",
@@ -1565,6 +1601,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": {
               "operation": "adjust",
@@ -1619,6 +1656,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": {
               "operation": "adjust"
@@ -1672,6 +1710,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": {
               "operation": "adjust",
@@ -1726,6 +1765,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": {
               "operation": "adjust",
@@ -1780,6 +1820,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": {
               "operation": "adjust",
@@ -1834,6 +1875,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1890,6 +1932,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1943,6 +1986,7 @@
               "add": [],
               "remove": []
             },
+            "filters": { "region": null },
             "targetTrackCount": null,
             "targetDurationMinutes": null,
             "mood": null,
@@ -1974,6 +2018,13 @@
           "unsupportedConstraints": []
         }
       }
-    }
+    },
+    {"name": "interpreted discover intent restricted to a region", "schema": "InterpretIntentResponse", "valid": true, "payload": {"promptVersion": "intent-v0", "result": {"outcome": "interpreted", "intent": {"kind": "discover_artist", "artists": ["Radiohead"], "genres": [], "seedTracks": [], "filters": {"region": "Argentina"}, "targetTrackCount": 30, "targetDurationMinutes": null, "mood": null, "popularity": "rarities", "orderMode": "random", "excludeArtists": ["Coldplay"], "excludeTracks": [{"title": "Creep", "artist": "Radiohead"}], "unsupportedConstraints": [{"category": "energy", "userText": "more energetic over time"}]}}}},
+    {"name": "interpreted intent with a blank region", "schema": "InterpretIntentResponse", "valid": false, "payload": {"promptVersion": "intent-v0", "result": {"outcome": "interpreted", "intent": {"kind": "discover_artist", "artists": ["Radiohead"], "genres": [], "seedTracks": [], "filters": {"region": ""}, "targetTrackCount": 30, "targetDurationMinutes": null, "mood": null, "popularity": "rarities", "orderMode": "random", "excludeArtists": ["Coldplay"], "excludeTracks": [{"title": "Creep", "artist": "Radiohead"}], "unsupportedConstraints": [{"category": "energy", "userText": "more energetic over time"}]}}}},
+    {"name": "interpreted intent with an unknown filter", "schema": "InterpretIntentResponse", "valid": false, "payload": {"promptVersion": "intent-v0", "result": {"outcome": "interpreted", "intent": {"kind": "discover_artist", "artists": ["Radiohead"], "genres": [], "seedTracks": [], "filters": {"region": "Argentina", "mood": "calm"}, "targetTrackCount": 30, "targetDurationMinutes": null, "mood": null, "popularity": "rarities", "orderMode": "random", "excludeArtists": ["Coldplay"], "excludeTracks": [{"title": "Creep", "artist": "Radiohead"}], "unsupportedConstraints": [{"category": "energy", "userText": "more energetic over time"}]}}}},
+    {"name": "interpreted intent without filters", "schema": "InterpretIntentResponse", "valid": false, "payload": {"promptVersion": "intent-v0", "result": {"outcome": "interpreted", "intent": {"kind": "discover_artist", "artists": ["Radiohead"], "genres": [], "seedTracks": [], "targetTrackCount": 30, "targetDurationMinutes": null, "mood": null, "popularity": "rarities", "orderMode": "random", "excludeArtists": ["Coldplay"], "excludeTracks": [{"title": "Creep", "artist": "Radiohead"}], "unsupportedConstraints": [{"category": "energy", "userText": "more energetic over time"}]}}}},
+    {"name": "refinement that sets the region filter", "schema": "PlanRefinementResponse", "valid": true, "payload": {"promptVersion": "refinement-v0", "result": {"outcome": "interpreted", "patch": {"kind": null, "artists": {"add": ["Portishead"], "remove": ["Interpol"]}, "genres": {"add": [], "remove": []}, "seedTracks": {"add": [], "remove": []}, "filters": {"region": {"operation": "set", "value": "Brasil"}}, "targetTrackCount": null, "targetDurationMinutes": null, "mood": {"operation": "clear"}, "popularity": {"operation": "set", "value": "rarities"}, "orderMode": null, "excludeArtists": {"add": [], "remove": []}, "excludeTracks": {"add": [{"title": "Creep", "artist": "Radiohead"}], "remove": []}}, "preservation": {"firstTracks": {"operation": "set", "value": 5}, "positions": {"add": [8], "remove": []}, "artists": {"add": [], "remove": []}}, "unsupportedConstraints": [{"category": "energy", "userText": "build up the energy"}]}}},
+    {"name": "refinement that clears the region filter", "schema": "PlanRefinementResponse", "valid": true, "payload": {"promptVersion": "refinement-v0", "result": {"outcome": "interpreted", "patch": {"kind": null, "artists": {"add": ["Portishead"], "remove": ["Interpol"]}, "genres": {"add": [], "remove": []}, "seedTracks": {"add": [], "remove": []}, "filters": {"region": {"operation": "clear"}}, "targetTrackCount": null, "targetDurationMinutes": null, "mood": {"operation": "clear"}, "popularity": {"operation": "set", "value": "rarities"}, "orderMode": null, "excludeArtists": {"add": [], "remove": []}, "excludeTracks": {"add": [{"title": "Creep", "artist": "Radiohead"}], "remove": []}}, "preservation": {"firstTracks": {"operation": "set", "value": 5}, "positions": {"add": [8], "remove": []}, "artists": {"add": [], "remove": []}}, "unsupportedConstraints": [{"category": "energy", "userText": "build up the energy"}]}}},
+    {"name": "refinement that adjusts the region filter", "schema": "PlanRefinementResponse", "valid": false, "payload": {"promptVersion": "refinement-v0", "result": {"outcome": "interpreted", "patch": {"kind": null, "artists": {"add": ["Portishead"], "remove": ["Interpol"]}, "genres": {"add": [], "remove": []}, "seedTracks": {"add": [], "remove": []}, "filters": {"region": {"operation": "adjust", "deltaMinutes": 5}}, "targetTrackCount": null, "targetDurationMinutes": null, "mood": {"operation": "clear"}, "popularity": {"operation": "set", "value": "rarities"}, "orderMode": null, "excludeArtists": {"add": [], "remove": []}, "excludeTracks": {"add": [{"title": "Creep", "artist": "Radiohead"}], "remove": []}}, "preservation": {"firstTracks": {"operation": "set", "value": 5}, "positions": {"add": [8], "remove": []}, "artists": {"add": [], "remove": []}}, "unsupportedConstraints": [{"category": "energy", "userText": "build up the energy"}]}}}
   ]
 }

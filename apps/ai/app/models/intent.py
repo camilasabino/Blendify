@@ -68,11 +68,16 @@ class UnsupportedConstraint(WireModel):
     user_text: UserText
 
 
+class IntentFilters(WireModel):
+    region: IntentName | None
+
+
 class PlaylistIntent(WireModel):
     kind: PlaylistKind
     artists: Annotated[list[IntentName], Field(max_length=AI_INTENT_LIST_MAX_ITEMS)]
     genres: Annotated[list[IntentName], Field(max_length=AI_INTENT_LIST_MAX_ITEMS)]
     seed_tracks: Annotated[list[IntentTrackReference], Field(max_length=AI_INTENT_LIST_MAX_ITEMS)]
+    filters: IntentFilters
     target_track_count: TargetTrackCount | None
     target_duration_minutes: TargetDurationMinutes | None
     mood: Mood | None

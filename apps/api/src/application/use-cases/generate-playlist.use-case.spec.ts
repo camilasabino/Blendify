@@ -40,18 +40,21 @@ const requests: Record<string, PlaylistGenerationRequest> = {
   genre_mix: {
     ...shared,
     kind: 'genre_mix',
+    filters: { region: null },
     genreIds: ['jazz'],
     tracksPerSeed: 1,
   },
   discover_artist: {
     ...shared,
     kind: 'discover_artist',
+    filters: { region: null },
     artistId: 'artist-1',
     targetTrackCount: 15,
   },
   discover_track: {
     ...shared,
     kind: 'discover_track',
+    filters: { region: null },
     trackId: 'track-1',
     track: {
       id: 'track-1',

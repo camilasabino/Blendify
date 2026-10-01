@@ -1,4 +1,4 @@
-import { GENRE_REGION_NAMES } from '@blendify/contracts'
+import { MUSIC_REGION_NAMES } from '@blendify/contracts'
 
 export const en = {
   'brand.tagline': 'Blend the music you love into new playlists.',
@@ -87,21 +87,23 @@ export const en = {
   'create.coverFailed': 'Couldn’t add the cover.',
   'create.artists': 'Artists',
   'create.genres': 'Genres',
+  'create.refineResults': 'Refine results',
   'create.region': 'Region',
   'create.regionAny': 'Any region',
   'create.regionHint': 'Optional · Filters artists by region for all selected genres.',
-  'region.latin': GENRE_REGION_NAMES.latin,
-  'region.american': GENRE_REGION_NAMES.american,
-  'region.british': GENRE_REGION_NAMES.british,
-  'region.argentina': GENRE_REGION_NAMES.argentina,
-  'region.brazilian': GENRE_REGION_NAMES.brazilian,
-  'region.uruguay': GENRE_REGION_NAMES.uruguay,
-  'region.colombia': GENRE_REGION_NAMES.colombia,
-  'region.mexico': GENRE_REGION_NAMES.mexico,
-  'region.chile': GENRE_REGION_NAMES.chile,
-  'region.peru': GENRE_REGION_NAMES.peru,
-  'region.venezuela': GENRE_REGION_NAMES.venezuela,
-  'region.spanish': GENRE_REGION_NAMES.spanish,
+  'discover.regionHint': 'Optional · Limits results to a scene or region.',
+  'region.latin': MUSIC_REGION_NAMES.latin,
+  'region.american': MUSIC_REGION_NAMES.american,
+  'region.british': MUSIC_REGION_NAMES.british,
+  'region.argentina': MUSIC_REGION_NAMES.argentina,
+  'region.brazilian': MUSIC_REGION_NAMES.brazilian,
+  'region.uruguay': MUSIC_REGION_NAMES.uruguay,
+  'region.colombia': MUSIC_REGION_NAMES.colombia,
+  'region.mexico': MUSIC_REGION_NAMES.mexico,
+  'region.chile': MUSIC_REGION_NAMES.chile,
+  'region.peru': MUSIC_REGION_NAMES.peru,
+  'region.venezuela': MUSIC_REGION_NAMES.venezuela,
+  'region.spanish': MUSIC_REGION_NAMES.spanish,
   'create.paste': 'Paste a list of artists',
   'create.pastePlaceholder': 'Radiohead\nTame Impala\n…',
   'create.resolve': 'Add artists',
@@ -215,6 +217,8 @@ export const en = {
     'Related-music suggestions aren’t available right now. Try again later.',
   'errors.lastfmSimilar':
     'Couldn’t load related music right now. Please try again.',
+  'errors.regionLookupUnavailable':
+    'Couldn’t check the region of the results right now. Try again later or remove the region.',
   'errors.genreLookupUnavailable':
     'Couldn’t find enough artists for this genre. Try another genre or try again later.',
   'errors.rateLimited':
@@ -619,7 +623,11 @@ export const en = {
   'ai.clarify.ambiguousGenres':
     'These genres are too broad for one mix: {names}. Name a more specific genre or style.',
   'ai.clarify.conflictingRegions':
-    'A mix can use one region, and your request names more than one: {names}. Edit it to keep one region.',
+    'A playlist can use one region, and your request names more than one: {names}. Edit it to keep one region.',
+  'ai.clarify.unknownRegion':
+    'Blendify can’t limit results to {names}. Edit your request with another region or without one.',
+  'ai.clarify.regionNotSupported':
+    'A region ({names}) only refines artists Blendify discovers, not artists you chose. Ask for music like that artist or remove the region.',
   'ai.clarify.invalidDuration':
     'That duration doesn’t work. Ask for a length of at least one minute.',
   'ai.clarify.optionsLabel': 'Choose an option',
@@ -628,6 +636,7 @@ export const en = {
   'ai.option.useArtists': 'Use only the artists',
   'ai.option.useGenres': 'Use only the genres',
   'ai.option.useSong': 'Use only the song',
+  'ai.option.discoverSimilar': 'Discover similar artists from that region',
   'ai.option.mixArtists': 'Mix these artists instead',
   'ai.option.keepSeed': 'Start from {name}',
   'ai.option.trackCount': 'Use {count} songs',

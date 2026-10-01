@@ -8,7 +8,11 @@ import type {
   PopularityMode,
   TrackOrderMode,
 } from '@blendify/contracts'
-import type { GenreLabelSource } from '@/components/genres/genre-labels'
+import { MusicRegionSchema } from '@blendify/contracts'
+import {
+  REGION_LABEL_KEYS,
+  type GenreLabelSource,
+} from '@/components/genres/genre-labels'
 import type { MessageKey } from '@/i18n/messages'
 import {
   ApiError,
@@ -141,7 +145,18 @@ export function clarificationMessage(clarification: AiClarificationDetails, t: T
       return t('ai.clarify.ambiguousGenres', { names })
     case 'conflicting_regions':
       return t('ai.clarify.conflictingRegions', { names })
+    case 'unknown_region':
+      return t('ai.clarify.unknownRegion', { names })
+    case 'region_not_supported':
+      return t('ai.clarify.regionNotSupported', {
+        names: clarification.names.map((name) => regionName(name, t)).join(', '),
+      })
   }
+}
+
+function regionName(name: string, t: Translate): string {
+  const region = MusicRegionSchema.safeParse(name)
+  return region.success ? t(REGION_LABEL_KEYS[region.data]) : name
 }
 
 function tooManySeedsMessage(clarification: AiClarificationDetails, t: Translate): string {
@@ -171,6 +186,9 @@ export function optionLabel(
     case 'set_kind':
       if (clarification.reason === 'too_many_seeds') {
         return t('ai.option.mixArtists')
+      }
+      if (clarification.reason === 'region_not_supported') {
+        return t('ai.option.discoverSimilar')
       }
       return t(SEED_KIND_OPTION_KEYS[option.kind])
     case 'keep_seed':

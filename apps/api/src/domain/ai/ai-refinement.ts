@@ -23,6 +23,7 @@ import {
   type AiPreservation,
 } from './ai-intent-patch';
 import { findIntentClarification, normalizeAiIntent } from './ai-intent-rules';
+import { withCanonicalPatchRegion } from './ai-selection-filters';
 
 export interface AiRefinementClarification {
   reason: AiRefinementClarificationReason;
@@ -86,7 +87,8 @@ export function evaluateRefinement(
     });
   }
 
-  const duration = resolveRelativeDuration(input.intent, interpretation.patch);
+  const current = normalizeAiIntent(input.intent);
+  const duration = resolveRelativeDuration(current, interpretation.patch);
   if (duration.status === 'no_target') {
     return clarify('ambiguous_request');
   }
@@ -95,7 +97,10 @@ export function evaluateRefinement(
   }
 
   const intent = normalizeAiIntent(
-    applyIntentPatch(input.intent, duration.patch),
+    applyIntentPatch(
+      current,
+      withCanonicalPatchRegion(current, duration.patch),
+    ),
   );
   const intentClarification = findIntentClarification(intent);
   if (intentClarification) {
@@ -115,7 +120,7 @@ export function evaluateRefinement(
   const notApplied = interpretation.unsupportedConstraints;
   const changed = !isSameEffectiveState(
     { intent, preservation },
-    { intent: input.intent, preservation: input.preservation },
+    { intent: current, preservation: input.preservation },
   );
   if (changed) {
     return { status: 'proposed', intent, preservation, notApplied };

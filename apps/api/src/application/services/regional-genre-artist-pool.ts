@@ -1,33 +1,32 @@
 import type { Logger } from '@nestjs/common';
-import type { GenreRegion } from '@blendify/contracts';
-import { normalizeArtistName } from '@/domain/artist/artist-name-match';
+import type { MusicRegion } from '@blendify/contracts';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { artistTagsMatchGenre } from '@/domain/genre/artist-genre-tags';
+import { musicRegionTag } from '@/domain/region/artist-region-tags';
 import type {
-  ArtistTagCandidate,
   DiscoveryCatalogPort,
   SimilarArtistCandidate,
 } from '@/domain/repositories/discovery-catalog.port';
+import { ArtistTagLookup, artistIdentityKey } from './artist-tag-lookup';
+import { REGION_QUALIFICATION_CONCURRENCY } from './region-artist-qualifier';
 
 const REGION_ARTIST_PAGE_SIZE = 50;
 const REGION_ARTIST_MAX_PAGES = 5;
 const TAG_INSPECTIONS_PER_QUALIFIED_ARTIST = 3;
-const TAG_LOOKUP_CONCURRENCY = 4;
 
 export class RegionalGenreArtistPool {
   private readonly artists: SimilarArtistCandidate[] = [];
   private loadedPages = 0;
   private exhausted = false;
-  private readonly tagLookups = new Map<
-    string,
-    Promise<ArtistTagCandidate[] | null>
-  >();
+  private readonly tags: ArtistTagLookup;
 
   constructor(
     private readonly discoveryCatalog: DiscoveryCatalogPort,
-    private readonly region: GenreRegion,
+    private readonly region: MusicRegion,
     private readonly logger: Logger,
-  ) {}
+  ) {
+    this.tags = new ArtistTagLookup(discoveryCatalog, logger);
+  }
 
   async qualifiedArtists(
     genreId: string,
@@ -45,23 +44,24 @@ export class RegionalGenreArtistPool {
     while (qualified.length < target && inspected < inspectionLimit) {
       const batch = await this.artistsAt(
         inspected,
-        Math.min(TAG_LOOKUP_CONCURRENCY, inspectionLimit - inspected),
+        Math.min(REGION_QUALIFICATION_CONCURRENCY, inspectionLimit - inspected),
       );
       if (batch.length === 0) {
         break;
       }
 
       const batchTags = await Promise.all(
-        batch.map((artist) => this.tagsFor(artist)),
+        batch.map((artist) => this.tags.tagsFor(artist)),
       );
       for (const [index, tags] of batchTags.entries()) {
+        const key = artistIdentityKey(batch[index]);
         if (tags === null) {
           failed += 1;
         } else if (
           artistTagsMatchGenre(tags, genreId) &&
-          !qualifiedKeys.has(artistKey(batch[index]))
+          !qualifiedKeys.has(key)
         ) {
-          qualifiedKeys.add(artistKey(batch[index]));
+          qualifiedKeys.add(key);
           qualified.push(batch[index]);
         }
       }
@@ -89,7 +89,7 @@ export class RegionalGenreArtistPool {
     const page = this.loadedPages + 1;
     try {
       const batch = await this.discoveryCatalog.getTopArtistsForTag(
-        this.region,
+        musicRegionTag(this.region),
         REGION_ARTIST_PAGE_SIZE,
         page,
       );
@@ -99,38 +99,15 @@ export class RegionalGenreArtistPool {
         batch.length < REGION_ARTIST_PAGE_SIZE ||
         page >= REGION_ARTIST_MAX_PAGES;
     } catch (error) {
-      this.logger.warn(`Region artist lookup failed: ${errorMessage(error)}`);
+      this.logger.warn(
+        `Region artist lookup failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
       if (this.artists.length === 0) {
         throw BusinessRuleError.genreLookupUnavailable({ reason: 'failed' });
       }
       this.exhausted = true;
     }
   }
-
-  private tagsFor(
-    artist: SimilarArtistCandidate,
-  ): Promise<ArtistTagCandidate[] | null> {
-    const key = artistKey(artist);
-    const known = this.tagLookups.get(key);
-    if (known) {
-      return known;
-    }
-
-    const lookup = this.discoveryCatalog
-      .getTopTagsForArtist(artist)
-      .catch((error: unknown) => {
-        this.logger.warn(`Artist tag lookup failed: ${errorMessage(error)}`);
-        return null;
-      });
-    this.tagLookups.set(key, lookup);
-    return lookup;
-  }
-}
-
-function artistKey(artist: SimilarArtistCandidate): string {
-  return artist.mbid?.trim().toLowerCase() || normalizeArtistName(artist.name);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

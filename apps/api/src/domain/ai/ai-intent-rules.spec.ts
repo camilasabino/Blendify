@@ -14,6 +14,7 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
+    filters: { region: null },
     targetTrackCount: 30,
     targetDurationMinutes: null,
     mood: null,
@@ -60,7 +61,20 @@ describe('normalizeAiIntent', () => {
       }),
     );
 
-    expect(normalized.genres).toEqual(['Argentine Rock', 'acoustic guitar']);
+    expect(normalized.genres).toEqual(['rock', 'acoustic guitar']);
+    expect(normalized.filters).toEqual({ region: 'argentina' });
+  });
+
+  it('stores a user-language region filter as its canonical region', () => {
+    expect(
+      normalizeAiIntent(
+        intent({
+          kind: 'discover_artist',
+          artists: ['Radiohead'],
+          filters: { region: 'argentino' },
+        }),
+      ).filters,
+    ).toEqual({ region: 'argentina' });
   });
 
   it('removes duplicate names without reordering them', () => {
@@ -85,6 +99,7 @@ describe('normalizeAiIntent', () => {
           kind: 'discover_artist',
           artists: [],
           seedTracks: [{ title: 'Teardrop', artist: null }],
+          filters: { region: null },
         }),
       ).kind,
     ).toBe('discover_track');
@@ -128,6 +143,7 @@ describe('normalizeAiIntent', () => {
           kind: 'artist_mix',
           artists: [],
           seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
+          filters: { region: null },
           mood: 'dark',
         }),
       ),
@@ -468,12 +484,109 @@ describe('findIntentClarification', () => {
       ),
     ).toEqual({
       reason: 'conflicting_regions',
-      seedType: 'genre',
+      seedType: null,
       limit: null,
       names: ['British rock', 'pop brasileiro'],
       unsupportedConstraints: [],
       options: [],
     });
+  });
+
+  it('asks which region to use when the region filter contradicts a regional genre', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['rock argentino'],
+          filters: { region: 'Brasil' },
+        }),
+      ),
+    ).toMatchObject({
+      reason: 'conflicting_regions',
+      names: ['Brasil', 'rock argentino'],
+    });
+  });
+
+  it('asks for another region when the requested one is not a curated region', () => {
+    expect(
+      findIntentClarification(
+        intent({
+          kind: 'discover_artist',
+          artists: ['Radiohead'],
+          filters: { region: 'japonés' },
+        }),
+      ),
+    ).toMatchObject({ reason: 'unknown_region', names: ['japonés'] });
+  });
+
+  it.each<[AiIntent['kind'], Partial<AiIntent>]>([
+    ['genre_mix', { artists: [], genres: ['rock'] }],
+    ['discover_artist', { artists: ['Radiohead'] }],
+    [
+      'discover_track',
+      { artists: [], seedTracks: [{ title: 'Creep', artist: 'Radiohead' }] },
+    ],
+  ])('accepts a region filter on %s', (kind, seeds) => {
+    expect(
+      findIntentClarification(
+        normalizeAiIntent(
+          intent({ ...seeds, kind, filters: { region: 'Argentina' } }),
+        ),
+      ),
+    ).toBeNull();
+  });
+
+  it('never applies a region to artists the user named for an artist mix', () => {
+    const clarification = findIntentClarification(
+      normalizeAiIntent(
+        intent({
+          kind: 'artist_mix',
+          artists: ['Radiohead'],
+          filters: { region: 'argentinas' },
+        }),
+      ),
+    );
+
+    expect(clarification).toEqual({
+      reason: 'region_not_supported',
+      seedType: null,
+      limit: null,
+      names: ['argentina'],
+      unsupportedConstraints: [],
+      options: [{ type: 'set_kind', kind: 'discover_artist' }],
+    });
+    expect(
+      findIntentClarification(
+        normalizeAiIntent(
+          intent({ kind: 'artist_mix', filters: { region: 'Brasil' } }),
+        ),
+      ),
+    ).toMatchObject({ reason: 'region_not_supported', options: [] });
+  });
+
+  it('keeps the region when the user turns the artist mix into a discovery', () => {
+    const artistMix = normalizeAiIntent(
+      intent({
+        kind: 'artist_mix',
+        artists: ['Radiohead'],
+        filters: { region: 'Argentina' },
+      }),
+    );
+
+    const discovery = normalizeAiIntent(
+      applyClarificationOption(artistMix, {
+        type: 'set_kind',
+        kind: 'discover_artist',
+      }),
+    );
+
+    expect(discovery).toMatchObject({
+      kind: 'discover_artist',
+      artists: ['Radiohead'],
+      filters: { region: 'argentina' },
+    });
+    expect(findIntentClarification(discovery)).toBeNull();
   });
 
   it('reports unknown genres before ambiguous ones', () => {
@@ -500,6 +613,7 @@ describe('findIntentClarification', () => {
           kind: 'discover_track',
           artists: [],
           seedTracks: [{ title: 'Imaginary Song', artist: 'Nobody Known' }],
+          filters: { region: null },
         }),
       ),
     ).toBeNull();

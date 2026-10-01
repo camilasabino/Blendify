@@ -1,4 +1,4 @@
-import { foldedGenreLookupKey, type GenreRegion } from '@blendify/contracts';
+import { foldedGenreLookupKey, type MusicRegion } from '@blendify/contracts';
 import { MAX_GENRES } from '@/domain/constants';
 import {
   findGenre,
@@ -6,7 +6,7 @@ import {
   GENRE_CATALOG,
   type CatalogGenre,
 } from './genre-catalog';
-import { splitRegionalGenreExpression } from './genre-regions';
+import { splitRegionalGenreExpression } from '@/domain/region/music-region-aliases';
 
 const MIN_STYLE_FAMILY_MEMBERS = 2;
 
@@ -17,7 +17,7 @@ export type GenreExpressionResolution =
       status: 'resolved';
       match: GenreExpressionMatch;
       genres: CatalogGenre[];
-      region?: GenreRegion;
+      region?: MusicRegion;
     }
   | { status: 'ambiguous'; expression: string }
   | { status: 'unknown'; expression: string };

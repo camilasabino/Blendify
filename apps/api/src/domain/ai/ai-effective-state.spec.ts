@@ -7,6 +7,7 @@ const INTENT: AiIntent = {
   artists: ['Radiohead', 'Interpol'],
   genres: [],
   seedTracks: [],
+  filters: { region: null },
   targetTrackCount: 30,
   targetDurationMinutes: null,
   mood: null,

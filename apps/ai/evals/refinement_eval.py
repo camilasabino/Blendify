@@ -22,7 +22,7 @@ from evals.intent_eval import (
     normalize_name,
 )
 
-DATASET_PATH = Path(__file__).resolve().parent / "refinement-eval-v3.json"
+DATASET_PATH = Path(__file__).resolve().parent / "refinement-eval-v4.json"
 
 RefinementResult = InterpretedRefinement | RefinementClarificationNeeded
 ListPatch = NameListPatch | TrackListPatch | PositionListPatch
@@ -36,6 +36,7 @@ SCALAR_PATHS = (
     "mood",
     "popularity",
     "orderMode",
+    "filters.region",
     "preservation.firstTracks",
 )
 LIST_PATHS = (
@@ -48,6 +49,7 @@ LIST_PATHS = (
     "preservation.artists",
 )
 PATCH_PATHS = frozenset({*SCALAR_PATHS, *LIST_PATHS})
+NO_FILTERS = {"region": None}
 EXPECTATION_KEYS = frozenset(
     {
         "outcome",
@@ -55,6 +57,7 @@ EXPECTATION_KEYS = frozenset(
         "changed",
         "changedWithin",
         "set",
+        "setOneOf",
         "setIfChanged",
         "adjust",
         "clear",
@@ -84,7 +87,7 @@ def load_dataset(path: Path = DATASET_PATH) -> tuple[str, list[RefinementEvalCas
             language=case["language"],
             request=PlanRefinementRequest.model_validate(
                 {
-                    "intent": case["intent"],
+                    "intent": {"filters": NO_FILTERS, **case["intent"]},
                     "preservation": case["preservation"],
                     "refinement": case["refinement"],
                 }
@@ -141,6 +144,7 @@ def _scalar_operations(result: InterpretedRefinement) -> dict[str, Any]:
         "mood": patch.mood,
         "popularity": patch.popularity,
         "orderMode": patch.order_mode,
+        "filters.region": patch.filters.region,
         "preservation.firstTracks": result.preservation.first_tracks,
     }
 
@@ -177,6 +181,13 @@ def _check_scalars(expect: dict[str, Any], scalars: dict[str, Any]) -> list[str]
         actual = _set_value(scalars[path])
         if actual != value:
             failures.append(f"set: expected {path} = {value}, got {_describe(scalars[path])}")
+    for path, values in expect.get("setOneOf", {}).items():
+        actual = _set_value(scalars[path])
+        accepted = [normalize_name(str(value)) for value in values]
+        if actual is None or normalize_name(str(actual)) not in accepted:
+            failures.append(
+                f"setOneOf: expected {path} one of {values}, got {_describe(scalars[path])}"
+            )
     for path, value in expect.get("setIfChanged", {}).items():
         operation = scalars[path]
         if operation is not None and _set_value(operation) != value:

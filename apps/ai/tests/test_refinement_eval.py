@@ -31,6 +31,8 @@ HISTORICAL_V1_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v1.json"
 HISTORICAL_V1_DATASET_SHA256 = "05a16b4a7888c4d8a6e1a8b1da08d0d5e9542b78039f9560f066aa5457dccc17"
 HISTORICAL_V2_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v2.json"
 HISTORICAL_V2_DATASET_SHA256 = "6a8432050f65f2a9c92c15e2f46388f56fe29f628fed07386740d1b49626bcd7"
+HISTORICAL_V3_DATASET_PATH = DATASET_PATH.parent / "refinement-eval-v3.json"
+HISTORICAL_V3_DATASET_SHA256 = "d81bc23bd0b373c2745b8cf421743e64f0884ffe3f1e5980da6236c098969752"
 CASES_BY_ID = {case.id: case for case in CASES}
 LOCAL_GENRE_ADDITIONS = ("es-add-genre-place", "en-add-genre-place", "pt-add-genre-place")
 ARGENTINE_ROCK_ADDITION = {"genres": [["argentine rock"], ["rock argentino"]]}
@@ -146,8 +148,8 @@ def parsed(output: dict[str, object]) -> Any:
 def test_dataset_is_a_new_versioned_refinement_dataset_with_unique_ids() -> None:
     ids = [case.id for case in CASES]
 
-    assert DATASET_VERSION == "refinement-eval-v3"
-    assert DATASET_PATH.name == "refinement-eval-v3.json"
+    assert DATASET_VERSION == "refinement-eval-v4"
+    assert DATASET_PATH.name == "refinement-eval-v4.json"
     assert len(ids) == len(set(ids))
 
 
@@ -168,7 +170,7 @@ def test_historical_v1_dataset_stays_frozen_and_inside_the_current_dataset() -> 
         assert current.expect == {**case.expect, "clarificationReason": reason}
 
 
-def test_historical_v2_dataset_stays_frozen_and_inside_v3() -> None:
+def test_historical_v2_dataset_stays_frozen_and_inside_the_current_dataset() -> None:
     digest = hashlib.sha256(HISTORICAL_V2_DATASET_PATH.read_bytes()).hexdigest()
     version, cases = load_dataset(HISTORICAL_V2_DATASET_PATH)
 
@@ -176,6 +178,28 @@ def test_historical_v2_dataset_stays_frozen_and_inside_v3() -> None:
     assert version == "refinement-eval-v2"
     for case in cases:
         assert CASES_BY_ID[case.id] == case
+
+
+def test_historical_v3_dataset_stays_frozen_and_inside_the_current_dataset() -> None:
+    digest = hashlib.sha256(HISTORICAL_V3_DATASET_PATH.read_bytes()).hexdigest()
+    version, cases = load_dataset(HISTORICAL_V3_DATASET_PATH)
+
+    assert digest == HISTORICAL_V3_DATASET_SHA256
+    assert version == "refinement-eval-v3"
+    for case in cases:
+        assert CASES_BY_ID[case.id] == case
+
+
+@pytest.mark.parametrize("kind", ["genre_mix", "discover_artist", "discover_track", "artist_mix"])
+def test_region_refinements_cover_every_playlist_kind(kind: str) -> None:
+    region_cases = [
+        case
+        for case in CASES
+        if "filters.region" in case.expect.get("changed", []) and case.request.intent.kind == kind
+    ]
+
+    assert region_cases
+    assert all(case.expect.get("setOneOf") or case.expect.get("clear") for case in region_cases)
 
 
 def test_genre_refinements_expect_normalized_additions_and_literal_removals() -> None:
@@ -312,6 +336,7 @@ def test_every_expectation_uses_known_keys_paths_and_vocabularies(case: Any) -> 
         *expect.get("changed", []),
         *expect.get("changedWithin", []),
         *expect.get("set", {}),
+        *expect.get("setOneOf", {}),
         *expect.get("setIfChanged", {}),
         *expect.get("clear", []),
         *expect.get("add", {}),
@@ -663,8 +688,8 @@ def test_preflight_states_the_refinement_run_bounds() -> None:
 
     assert plan.request_budget == len(CASES) * MAX_OUTPUT_VALIDATION_ATTEMPTS
     assert "Paid real-model refinement eval" in preflight
-    assert "refinement-v3" in preflight
-    assert "refinement-eval-v3" in preflight
+    assert "refinement-v4" in preflight
+    assert "refinement-eval-v4" in preflight
     assert all(case.request.refinement not in preflight for case in CASES)
 
 
@@ -681,7 +706,7 @@ async def test_fake_refinement_run_reports_failed_output_only_for_failed_cases()
     passed, failed = report["results"]  # type: ignore[misc]
 
     assert report["suite"] == "refinement"
-    assert report["promptVersion"] == "refinement-v3"
+    assert report["promptVersion"] == "refinement-v4"
     assert report["modelRequests"] == 3
     assert report["casesRequiringRetry"] == ["en-less-mainstream"]
     assert report["passed"] == 1

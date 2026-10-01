@@ -74,11 +74,16 @@ export const UnsupportedConstraintSchema = z.strictObject({
   userText: z.string().trim().min(1).max(AI_INTENT_USER_TEXT_MAX_LENGTH),
 });
 
+export const IntentFiltersSchema = z.strictObject({
+  region: IntentNameSchema.nullable(),
+});
+
 export const PlaylistIntentSchema = z.strictObject({
   kind: PlaylistKindSchema,
   artists: IntentNameListSchema,
   genres: IntentNameListSchema,
   seedTracks: z.array(IntentTrackReferenceSchema).max(AI_INTENT_LIST_MAX_ITEMS),
+  filters: IntentFiltersSchema,
   targetTrackCount: TrackCountSchema.nullable(),
   targetDurationMinutes: DurationMinutesSchema.nullable(),
   mood: AiMoodSchema.nullable(),
@@ -157,11 +162,16 @@ export const PositionListPatchSchema = z.strictObject({
     .max(AI_REFINEMENT_PRESERVED_POSITIONS_MAX_ITEMS),
 });
 
+export const IntentFiltersPatchSchema = z.strictObject({
+  region: nullableValuePatch(IntentNameSchema),
+});
+
 export const IntentPatchSchema = z.strictObject({
   kind: setOperation(PlaylistKindSchema).nullable(),
   artists: NameListPatchSchema,
   genres: NameListPatchSchema,
   seedTracks: TrackListPatchSchema,
+  filters: IntentFiltersPatchSchema,
   targetTrackCount: nullableValuePatch(TrackCountSchema),
   targetDurationMinutes: DurationMinutesPatchSchema,
   mood: nullableValuePatch(AiMoodSchema),
@@ -244,6 +254,7 @@ export type UnsupportedConstraint = z.infer<typeof UnsupportedConstraintSchema>;
 export type UnsupportedConstraintCategory =
   (typeof UNSUPPORTED_CONSTRAINT_CATEGORIES)[number];
 export type ClarificationReason = (typeof CLARIFICATION_REASONS)[number];
+export type IntentFilters = z.infer<typeof IntentFiltersSchema>;
 export type PlaylistIntent = z.infer<typeof PlaylistIntentSchema>;
 export type IntentClarification = z.infer<typeof IntentClarificationSchema>;
 export type IntentInterpretation = z.infer<typeof IntentInterpretationSchema>;
@@ -255,6 +266,7 @@ export type NameListPatch = z.infer<typeof NameListPatchSchema>;
 export type TrackListPatch = z.infer<typeof TrackListPatchSchema>;
 export type PositionListPatch = z.infer<typeof PositionListPatchSchema>;
 export type DurationMinutesPatch = z.infer<typeof DurationMinutesPatchSchema>;
+export type IntentFiltersPatch = z.infer<typeof IntentFiltersPatchSchema>;
 export type IntentPatch = z.infer<typeof IntentPatchSchema>;
 export type PreservationConstraints = z.infer<
   typeof PreservationConstraintsSchema

@@ -1,11 +1,11 @@
 import {
   foldedGenreLookupKey,
-  GENRE_REGIONS,
   genreLookupKey,
-  type GenreRegion,
+  MUSIC_REGIONS,
+  type MusicRegion,
 } from '@blendify/contracts';
-import genreRegionAliases from './data/genre-region-aliases.json';
-import { singularTokenForms } from './genre-inflection';
+import { singularTokenForms } from '@/domain/genre/genre-inflection';
+import musicRegionAliases from './data/music-region-aliases.json';
 
 const REGION_CONNECTORS = new Set([
   'de',
@@ -21,16 +21,16 @@ const REGION_CONNECTORS = new Set([
   'the',
 ]);
 
-const REGION_ALIASES: Readonly<Record<GenreRegion, readonly string[]>> =
-  genreRegionAliases;
+const REGION_ALIASES: Readonly<Record<MusicRegion, readonly string[]>> =
+  musicRegionAliases;
 
 interface RegionAlias {
-  region: GenreRegion;
+  region: MusicRegion;
   tokens: string[];
 }
 
-const REGION_BY_KEY = new Map<string, GenreRegion>(
-  GENRE_REGIONS.flatMap((region) =>
+const REGION_BY_KEY = new Map<string, MusicRegion>(
+  MUSIC_REGIONS.flatMap((region) =>
     REGION_ALIASES[region].map(
       (alias) => [foldedGenreLookupKey(alias), region] as const,
     ),
@@ -42,8 +42,24 @@ const ALIASES_LONGEST_FIRST: RegionAlias[] = [...REGION_BY_KEY.entries()]
   .sort((left, right) => right.tokens.length - left.tokens.length);
 
 export interface RegionalGenreExpression {
-  region: GenreRegion;
+  region: MusicRegion;
   genreExpression: string;
+}
+
+export function resolveMusicRegion(text: string): MusicRegion | null {
+  const words = genreLookupKey(text).split(' ').filter(Boolean);
+  const folded = words.map(foldedGenreLookupKey);
+  const { first, last } = withoutConnectors(folded, 0, folded.length);
+  const tokenForms = folded
+    .slice(first, last)
+    .map((token) => [token, ...singularTokenForms(token)]);
+
+  const alias = ALIASES_LONGEST_FIRST.find(
+    (candidate) =>
+      candidate.tokens.length === tokenForms.length &&
+      matchesAliasTokens(tokenForms, candidate.tokens),
+  );
+  return alias?.region ?? null;
 }
 
 export function splitRegionalGenreExpression(
@@ -72,12 +88,21 @@ export function splitRegionalGenreExpression(
 }
 
 function regional(
-  region: GenreRegion,
+  region: MusicRegion,
   words: string[],
   folded: string[],
   start: number,
   end: number,
 ): RegionalGenreExpression {
+  const { first, last } = withoutConnectors(folded, start, end);
+  return { region, genreExpression: words.slice(first, last).join(' ') };
+}
+
+function withoutConnectors(
+  folded: string[],
+  start: number,
+  end: number,
+): { first: number; last: number } {
   let first = start;
   let last = end;
   while (first < last && REGION_CONNECTORS.has(folded[first])) {
@@ -86,7 +111,7 @@ function regional(
   while (last > first && REGION_CONNECTORS.has(folded[last - 1])) {
     last -= 1;
   }
-  return { region, genreExpression: words.slice(first, last).join(' ') };
+  return { first, last };
 }
 
 function matchesAliasTokens(

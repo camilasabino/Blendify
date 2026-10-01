@@ -20,7 +20,7 @@ export const aiIntent: AiIntentSummary = {
   kind: 'artist_mix',
   artists: ['Radiohead', 'Interpol'],
   genres: [],
-  region: null,
+  filters: { region: null },
   seedTrack: null,
   targetTrackCount: 20,
   targetDurationMinutes: null,

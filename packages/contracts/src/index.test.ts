@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MUSIC_REGIONS,
+  MUSIC_REGION_NAMES,
+  SELECTION_FILTER_SUPPORT,
+  SelectionFiltersSchema,
+  supportsSelectionFilter,
+  supportsAnySelectionFilter,
   PlaylistPublishIncompleteDetailsSchema,
   SpotifyFailureDetailsSchema,
   SpotifyThrottleDetailsSchema,
@@ -93,6 +99,7 @@ describe('playlist contracts', () => {
       kind: 'discover_artist',
       targetTrackCount: 30,
       seed: { id: 'artist-1', name: 'Artist' },
+      filters: { region: null },
       popularity: 'rarities',
       orderMode: 'random',
     };
@@ -263,11 +270,29 @@ describe('track contracts', () => {
   });
 });
 
-describe('genre region contracts', () => {
+describe('selection filter contracts', () => {
   const genreMix = {
     kind: 'genre_mix',
     genreIds: ['rock', 'alternative rock'],
     tracksPerSeed: 10,
+    popularity: 'balanced',
+  };
+  const discoverArtist = {
+    kind: 'discover_artist',
+    artistId: 'radiohead',
+    targetTrackCount: 10,
+    popularity: 'balanced',
+  };
+  const discoverTrack = {
+    kind: 'discover_track',
+    trackId: 'creep',
+    track: {
+      id: 'creep',
+      name: 'Creep',
+      artistId: 'radiohead',
+      artistName: 'Radiohead',
+    },
+    targetTrackCount: 10,
     popularity: 'balanced',
   };
   const recipe = {
@@ -279,41 +304,129 @@ describe('genre region contracts', () => {
     orderMode: 'random',
   };
 
-  it('keeps genre mixes without a region valid', () => {
-    expect(GenerateMixRequestSchema.parse(genreMix)).not.toHaveProperty(
-      'region',
-    );
-    expect(PlaylistGenerationSchema.parse(recipe)).not.toHaveProperty('region');
+  it('keeps the curated canonical regions unchanged', () => {
+    expect(MUSIC_REGIONS).toEqual([
+      'latin',
+      'american',
+      'british',
+      'argentina',
+      'brazilian',
+      'uruguay',
+      'colombia',
+      'mexico',
+      'chile',
+      'peru',
+      'venezuela',
+      'spanish',
+    ]);
+    expect(Object.keys(MUSIC_REGION_NAMES)).toEqual([...MUSIC_REGIONS]);
   });
 
-  it('carries one canonical Last.fm region tag', () => {
+  it('defaults to no active region', () => {
+    expect(SelectionFiltersSchema.parse({})).toEqual({ region: null });
+    expect(GenerateMixRequestSchema.parse(genreMix)).toMatchObject({
+      filters: { region: null },
+    });
+    expect(GenerateDiscoverRequestSchema.parse(discoverArtist)).toMatchObject(
+      { filters: { region: null } },
+    );
+    expect(PlaylistGenerationSchema.parse(recipe)).toMatchObject({
+      filters: { region: null },
+    });
+  });
+
+  it('supports the region filter only where Blendify discovers the artists', () => {
+    expect(SELECTION_FILTER_SUPPORT).toEqual({
+      artist_mix: { region: false },
+      genre_mix: { region: true },
+      discover_artist: { region: true },
+      discover_track: { region: true },
+    });
+    expect(supportsSelectionFilter('artist_mix', 'region')).toBe(false);
+    expect(supportsSelectionFilter('discover_track', 'region')).toBe(true);
+    expect(supportsAnySelectionFilter('artist_mix')).toBe(false);
+    expect(supportsAnySelectionFilter('genre_mix')).toBe(true);
+  });
+
+  it('carries one canonical region in genre mix and discover requests', () => {
+    const filters = { region: 'argentina' };
+
     expect(
-      GenerateMixRequestSchema.parse({ ...genreMix, region: 'argentina' }),
-    ).toMatchObject({ region: 'argentina' });
+      GenerateMixRequestSchema.parse({ ...genreMix, filters }),
+    ).toMatchObject({ filters });
     expect(
-      PlaylistGenerationSchema.parse({ ...recipe, region: 'brazilian' }),
-    ).toMatchObject({ region: 'brazilian' });
+      GenerateDiscoverRequestSchema.parse({ ...discoverArtist, filters }),
+    ).toMatchObject({ filters });
+    expect(
+      GenerateDiscoverRequestSchema.parse({ ...discoverTrack, filters }),
+    ).toMatchObject({ filters });
+    expect(
+      PlaylistGenerationSchema.parse({
+        ...recipe,
+        filters: { region: 'brazilian' },
+      }),
+    ).toMatchObject({ filters: { region: 'brazilian' } });
   });
 
   it.each(['Argentina', 'argentinian rock', ['latin', 'british']])(
     'rejects %p as a region',
     (region) => {
       expect(
-        GenerateMixRequestSchema.safeParse({ ...genreMix, region }).success,
+        GenerateMixRequestSchema.safeParse({ ...genreMix, filters: { region } })
+          .success,
+      ).toBe(false);
+      expect(
+        GenerateDiscoverRequestSchema.safeParse({
+          ...discoverArtist,
+          filters: { region },
+        }).success,
       ).toBe(false);
     },
   );
 
-  it('rejects a region on artist mixes', () => {
+  it('rejects unknown filters and the former top-level region field', () => {
     expect(
       GenerateMixRequestSchema.safeParse({
-        kind: 'artist_mix',
-        artistIds: ['artist-1'],
-        tracksPerSeed: 10,
-        popularity: 'balanced',
-        region: 'latin',
+        ...genreMix,
+        filters: { region: 'latin', mood: 'calm' },
       }).success,
     ).toBe(false);
+    expect(
+      GenerateMixRequestSchema.safeParse({ ...genreMix, region: 'latin' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects any filter on artist mixes', () => {
+    const artistMix = {
+      kind: 'artist_mix',
+      artistIds: ['artist-1'],
+      tracksPerSeed: 10,
+      popularity: 'balanced',
+    };
+
+    expect(
+      GenerateMixRequestSchema.safeParse({
+        ...artistMix,
+        filters: { region: 'latin' },
+      }).success,
+    ).toBe(false);
+    expect(
+      GenerateMixRequestSchema.safeParse({ ...artistMix, region: 'latin' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('keeps artist mix recipes free of filters', () => {
+    const parsed = PlaylistGenerationSchema.parse({
+      version: 1,
+      kind: 'artist_mix',
+      tracksPerSeed: 10,
+      seeds: [{ id: 'artist-1', name: 'Radiohead' }],
+      popularity: 'balanced',
+    });
+
+    expect(parsed).not.toHaveProperty('filters');
   });
 });
 
@@ -635,6 +748,7 @@ describe('discover track targets', () => {
         kind: 'discover_artist' as const,
         targetTrackCount,
         seed: { id: 'artist-1', name: 'Sade' },
+        filters: { region: null },
         popularity: 'balanced' as const,
         orderMode: 'random' as const,
       };
@@ -643,6 +757,7 @@ describe('discover track targets', () => {
         kind: 'discover_track' as const,
         targetTrackCount,
         seed: discoverTrack,
+        filters: { region: 'argentina' as const },
         popularity: 'balanced' as const,
         orderMode: 'random' as const,
       };

@@ -89,6 +89,13 @@ export class BusinessRuleError extends DomainError {
     );
   }
 
+  static regionLookupUnavailable(): BusinessRuleError {
+    return new BusinessRuleError(
+      'Could not check which results belong to the selected region right now.',
+      'REGION_LOOKUP_UNAVAILABLE',
+    );
+  }
+
   static trackBudgetExceeded(
     unit: 'artist' | 'genre',
     max: number,

@@ -71,6 +71,11 @@ class AdjustDurationMinutes(WireModel):
     ]
 
 
+class SetRegion(WireModel):
+    operation: Literal["set"]
+    value: IntentName
+
+
 class SetMood(WireModel):
     operation: Literal["set"]
     value: Mood
@@ -95,6 +100,7 @@ TrackCountPatch = Annotated[SetTrackCount | ClearValue, Field(discriminator="ope
 DurationMinutesPatch = Annotated[
     SetDurationMinutes | ClearValue | AdjustDurationMinutes, Field(discriminator="operation")
 ]
+RegionPatch = Annotated[SetRegion | ClearValue, Field(discriminator="operation")]
 MoodPatch = Annotated[SetMood | ClearValue, Field(discriminator="operation")]
 PopularityPatch = Annotated[SetPopularity | ClearValue, Field(discriminator="operation")]
 OrderModePatch = Annotated[SetOrderMode | ClearValue, Field(discriminator="operation")]
@@ -116,11 +122,16 @@ class PositionListPatch(WireModel):
     remove: PositionList
 
 
+class IntentFiltersPatch(WireModel):
+    region: RegionPatch | None
+
+
 class IntentPatch(WireModel):
     kind: SetKind | None
     artists: NameListPatch
     genres: NameListPatch
     seed_tracks: TrackListPatch
+    filters: IntentFiltersPatch
     target_track_count: TrackCountPatch | None
     target_duration_minutes: DurationMinutesPatch | None
     mood: MoodPatch | None

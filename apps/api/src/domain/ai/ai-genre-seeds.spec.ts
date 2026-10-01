@@ -9,43 +9,35 @@ describe('resolveAiGenreSeeds', () => {
         { id: 'chamber folk', name: 'Chamber Folk' },
         { id: 'chamber pop', name: 'Chamber Pop' },
       ],
-      region: null,
       unknown: [],
       ambiguous: [],
-      conflictingRegions: [],
     });
   });
 
   it.each([
-    ['rock argentino', 'rock', 'argentina'],
-    ['Brazilian pop', 'pop', 'brazilian'],
-    ['baladas latino-americanas', 'ballad', 'latin'],
-    ['rock britânico', 'rock', 'british'],
-  ])('resolves %p to genre %p and region %p', (expression, genre, region) => {
+    ['rock argentino', 'rock'],
+    ['Brazilian pop', 'pop'],
+    ['baladas latino-americanas', 'ballad'],
+    ['rock britânico', 'rock'],
+  ])('resolves the regional %p to genre %p', (expression, genre) => {
     expect(resolveAiGenreSeeds([expression])).toMatchObject({
       genres: [{ id: genre }],
-      region,
     });
   });
 
   it.each([
-    ['ranchera mexicana', 'ranchera', 'mexico'],
-    ['rancheras mexicanas', 'ranchera', 'mexico'],
-    ['rock argentinos', 'rock', 'argentina'],
-    ['pop brasileiros', 'pop', 'brazilian'],
-    ['rock británicos', 'rock', 'british'],
-  ])(
-    'resolves the inflected %p to genre %p and region %p',
-    (expression, genre, region) => {
-      expect(resolveAiGenreSeeds([expression])).toMatchObject({
-        genres: [{ id: genre }],
-        region,
-        unknown: [],
-        ambiguous: [],
-        conflictingRegions: [],
-      });
-    },
-  );
+    ['ranchera mexicana', 'ranchera'],
+    ['rancheras mexicanas', 'ranchera'],
+    ['rock argentinos', 'rock'],
+    ['pop brasileiros', 'pop'],
+    ['rock británicos', 'rock'],
+  ])('resolves the inflected regional %p to genre %p', (expression, genre) => {
+    expect(resolveAiGenreSeeds([expression])).toMatchObject({
+      genres: [{ id: genre }],
+      unknown: [],
+      ambiguous: [],
+    });
+  });
 
   it('resolves plural genre names to the same canonical seed', () => {
     expect(
@@ -58,20 +50,8 @@ describe('resolveAiGenreSeeds', () => {
       resolveAiGenreSeeds(['corrdo tumbado', 'alternatve rock', 'kasekòs']),
     ).toEqual({
       genres: [],
-      region: null,
       unknown: ['corrdo tumbado', 'alternatve rock'],
       ambiguous: ['kasekòs'],
-      conflictingRegions: [],
-    });
-  });
-
-  it('applies one shared region to every genre of the request', () => {
-    expect(
-      resolveAiGenreSeeds(['argentine rock', 'pop argentino', 'jazz']),
-    ).toMatchObject({
-      genres: [{ id: 'rock' }, { id: 'pop' }, { id: 'jazz' }],
-      region: 'argentina',
-      conflictingRegions: [],
     });
   });
 
@@ -82,7 +62,7 @@ describe('resolveAiGenreSeeds', () => {
     [['pop from the UK', 'rock', 'r&b']],
     [['pop en UK', 'rock en Reino Unido', 'r&b in the UK']],
   ])(
-    'resolves adjectival and prepositional UK forms of %p to the same British seeds',
+    'resolves adjectival and prepositional UK forms of %p to the same seeds',
     (expressions) => {
       expect(resolveAiGenreSeeds(expressions)).toEqual({
         genres: [
@@ -90,26 +70,11 @@ describe('resolveAiGenreSeeds', () => {
           { id: 'rock', name: 'Rock' },
           { id: 'r&b', name: 'R&B' },
         ],
-        region: 'british',
         unknown: [],
         ambiguous: [],
-        conflictingRegions: [],
       });
     },
   );
-
-  it('reports regional expressions that ask for different regions', () => {
-    expect(
-      resolveAiGenreSeeds(['rock argentino', 'jazz', 'pop brasileiro']),
-    ).toMatchObject({
-      region: null,
-      conflictingRegions: ['rock argentino', 'pop brasileiro'],
-    });
-    expect(resolveAiGenreSeeds(['rock de UK', 'pop do Brasil'])).toMatchObject({
-      region: null,
-      conflictingRegions: ['rock de UK', 'pop do Brasil'],
-    });
-  });
 
   it('removes duplicate canonical genres reached by different expressions', () => {
     expect(
@@ -120,20 +85,16 @@ describe('resolveAiGenreSeeds', () => {
   it('separates unknown and ambiguous expressions from executable ones', () => {
     expect(resolveAiGenreSeeds(['rock', 'dark', 'zorblax wave'])).toEqual({
       genres: [{ id: 'rock', name: 'Rock' }],
-      region: null,
       unknown: ['zorblax wave'],
       ambiguous: ['dark'],
-      conflictingRegions: [],
     });
   });
 
   it('never accepts a region alone', () => {
     expect(resolveAiGenreSeeds(['argentina', 'de UK'])).toEqual({
       genres: [],
-      region: null,
       unknown: ['argentina', 'de UK'],
       ambiguous: [],
-      conflictingRegions: [],
     });
   });
 

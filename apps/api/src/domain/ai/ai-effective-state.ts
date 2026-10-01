@@ -6,6 +6,7 @@ import {
 } from './ai-intent';
 import type { AiPreservation } from './ai-intent-patch';
 import { aiNameKey, aiTrackKey } from './ai-intent-rules';
+import { aiSelectionFilters } from './ai-selection-filters';
 
 export interface AiEffectiveState {
   intent: AiIntent;
@@ -25,6 +26,7 @@ function canonicalState({ intent, preservation }: AiEffectiveState): string {
     artists: sortedKeys(intent.artists, aiNameKey),
     genres: sortedKeys(intent.genres, aiGenreKey),
     seedTracks: sortedKeys(intent.seedTracks, aiTrackKey),
+    filters: aiSelectionFilters(intent),
     targetTrackCount: intent.targetTrackCount,
     targetDurationMinutes: intent.targetDurationMinutes,
     mood: intent.mood,

@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import type { GenreRegion } from '@blendify/contracts'
+import type { MusicRegion } from '@blendify/contracts'
 import {
   REGION_LABEL_KEYS,
   useGenreLabel,
@@ -10,7 +10,7 @@ import { buildDefaultPlaylistName } from '@/lib/playlist-name'
 
 export function useGenreMixPlaylistName(): (
   genres: readonly GenreLabelSource[],
-  region: GenreRegion | null,
+  region: MusicRegion | null,
 ) => string {
   const t = useT()
   const genreLabel = useGenreLabel()

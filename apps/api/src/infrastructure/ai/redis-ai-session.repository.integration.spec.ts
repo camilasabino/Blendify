@@ -89,6 +89,7 @@ function withPendingCandidate(base: AiSession): AiSession {
           artists: ['Radiohead'],
           genres: [],
           seedTracks: [],
+          filters: { region: null },
           targetTrackCount: null,
           targetDurationMinutes: null,
           mood: null,

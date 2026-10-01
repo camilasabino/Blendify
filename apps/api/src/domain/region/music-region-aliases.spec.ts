@@ -1,6 +1,9 @@
-import { GENRE_REGIONS } from '@blendify/contracts';
-import genreRegionAliases from './data/genre-region-aliases.json';
-import { splitRegionalGenreExpression } from './genre-regions';
+import { MUSIC_REGIONS } from '@blendify/contracts';
+import musicRegionAliases from './data/music-region-aliases.json';
+import {
+  resolveMusicRegion,
+  splitRegionalGenreExpression,
+} from './music-region-aliases';
 
 describe('splitRegionalGenreExpression', () => {
   it.each([
@@ -30,10 +33,10 @@ describe('splitRegionalGenreExpression', () => {
 
   it('keeps every canonical tag resolvable to itself', () => {
     expect(
-      GENRE_REGIONS.map(
+      MUSIC_REGIONS.map(
         (region) => splitRegionalGenreExpression(`pop ${region}`)?.region,
       ),
-    ).toEqual([...GENRE_REGIONS]);
+    ).toEqual([...MUSIC_REGIONS]);
   });
 
   it.each([
@@ -57,8 +60,8 @@ describe('splitRegionalGenreExpression', () => {
   });
 
   it('resolves the plural of every region alias to the same region', () => {
-    const strays = GENRE_REGIONS.flatMap((region) =>
-      genreRegionAliases[region]
+    const strays = MUSIC_REGIONS.flatMap((region) =>
+      musicRegionAliases[region]
         .filter((alias) => /[aeo]$/.test(alias))
         .map((alias) => [
           alias,
@@ -117,4 +120,32 @@ describe('splitRegionalGenreExpression', () => {
   ])('returns null without a regional modifier in %p', (expression) => {
     expect(splitRegionalGenreExpression(expression)).toBeNull();
   });
+});
+
+describe('resolveMusicRegion', () => {
+  it.each([
+    ['Argentina', 'argentina'],
+    ['argentinos', 'argentina'],
+    ['brasileras', 'brazilian'],
+    ['Brasil', 'brazilian'],
+    ['de Brasil', 'brazilian'],
+    ['the UK', 'british'],
+    ['Reino Unido', 'british'],
+    ['británica', 'british'],
+    ['Great Britain', 'british'],
+    ['latinoamericanas', 'latin'],
+  ])('resolves the whole text %p to %p', (text, region) => {
+    expect(resolveMusicRegion(text)).toBe(region);
+  });
+
+  it('keeps every canonical region resolvable to itself', () => {
+    expect(MUSIC_REGIONS.map(resolveMusicRegion)).toEqual([...MUSIC_REGIONS]);
+  });
+
+  it.each(['rock argentino', 'japonés', 'south america', '', 'de'])(
+    'does not resolve %p as a region',
+    (text) => {
+      expect(resolveMusicRegion(text)).toBeNull();
+    },
+  );
 });

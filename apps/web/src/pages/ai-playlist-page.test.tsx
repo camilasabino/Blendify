@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AiSessionDto } from '@blendify/contracts'
+import type { AiSessionDto, PlaylistKind } from '@blendify/contracts'
 import { useLocaleStore } from '@/i18n/use-locale'
 import { jsonResponse, renderWithProviders, stubApi, type FetchCall } from '@/test/app-harness'
 import { AiPlaylistPage } from './ai-playlist-page'
@@ -20,7 +20,7 @@ const READY_SESSION: AiSessionDto = {
     kind: 'artist_mix',
     artists: ['Radiohead', 'Interpol'],
     genres: [],
-    region: null,
+    filters: { region: null },
     seedTrack: null,
     targetTrackCount: 30,
     targetDurationMinutes: null,
@@ -269,7 +269,7 @@ describe('Create with AI page', () => {
               kind: 'genre_mix',
               artists: [],
               genres: ['Rock'],
-              region: 'british',
+              filters: { region: 'british' },
               targetTrackCount: null,
               targetDurationMinutes: 30,
               mood: 'energetic',
@@ -710,7 +710,7 @@ describe('Create with AI page', () => {
         kind: 'genre_mix',
         artists: [],
         genres: ['Ballad'],
-        region: 'latin',
+        filters: { region: 'latin' },
         excludeArtists: [],
       },
     }
@@ -730,6 +730,40 @@ describe('Create with AI page', () => {
     const region = screen.getByText('Región').parentElement as HTMLElement
     expect(within(region).getByText('Latinoamérica')).toBeVisible()
   })
+
+  it.each<[PlaylistKind, boolean]>([
+    ['discover_artist', true],
+    ['artist_mix', false],
+  ])(
+    'shows the region filter of a %s request only where it applies',
+    async (kind, shown) => {
+      const user = userEvent.setup()
+      const session: AiSessionDto = {
+        ...READY_SESSION,
+        intent: {
+          ...READY_SESSION.intent!,
+          artists: ['Radiohead'],
+          kind,
+          genres: [],
+          filters: { region: 'argentina' },
+          excludeArtists: [],
+        },
+      }
+      stubApi({ 'POST /api/ai/sessions': () => jsonResponse(createdSession(session), 201) })
+      renderPage()
+
+      await user.type(screen.getByRole('textbox'), 'something like Radiohead but Argentine')
+      await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+      await screen.findByText('Based on')
+      if (shown) {
+        const region = screen.getByText('Region').parentElement as HTMLElement
+        expect(within(region).getByText('Argentina')).toBeVisible()
+      } else {
+        expect(screen.queryByText('Region')).not.toBeInTheDocument()
+      }
+    },
+  )
 
   it('keeps the compact request card usable in a translated locale', async () => {
     const user = userEvent.setup()

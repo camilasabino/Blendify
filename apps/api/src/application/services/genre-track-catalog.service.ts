@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { GenreRegion, PopularityMode } from '@blendify/contracts';
+import type { PopularityMode, SelectionFilters } from '@blendify/contracts';
 import { pickUniqueArtistMatch } from '@/domain/artist/artist-name-match';
 import { Artist } from '@/domain/artist/artist.entity';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
@@ -83,7 +83,7 @@ export class GenreTrackCatalogService {
     popularity: PopularityMode,
     tracksPerSeed: number,
     options?: {
-      region?: GenreRegion;
+      filters?: SelectionFilters;
       onMatched?: (matched: number) => void;
       acceptTrack?: TrackAcceptance;
     },
@@ -95,12 +95,9 @@ export class GenreTrackCatalogService {
       });
     }
 
-    const regionalPool = options?.region
-      ? new RegionalGenreArtistPool(
-          this.discoveryCatalog,
-          options.region,
-          this.logger,
-        )
+    const region = options?.filters?.region ?? null;
+    const regionalPool = region
+      ? new RegionalGenreArtistPool(this.discoveryCatalog, region, this.logger)
       : null;
 
     const tracksByGenre = new Map<string, Track[]>();

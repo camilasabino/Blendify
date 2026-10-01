@@ -88,9 +88,11 @@ export const es: Record<MessageKey, string> = {
   'create.coverFailed': 'No se pudo agregar la portada.',
   'create.artists': 'Artistas',
   'create.genres': 'Géneros',
+  'create.refineResults': 'Refinar resultados',
   'create.region': 'Región',
   'create.regionAny': 'Cualquier región',
   'create.regionHint': 'Opcional · Filtra los artistas por región para todos los géneros seleccionados.',
+  'discover.regionHint': 'Opcional · Limita los resultados a una escena o región.',
   'region.latin': 'Latinoamérica',
   'region.american': 'Estados Unidos',
   'region.british': 'Reino Unido',
@@ -253,6 +255,8 @@ export const es: Record<MessageKey, string> = {
     'Las recomendaciones de música relacionada no están disponibles. Intenta más tarde.',
   'errors.lastfmSimilar':
     'No se pudo cargar música relacionada. Intenta de nuevo.',
+  'errors.regionLookupUnavailable':
+    'No pudimos comprobar la región de los resultados. Intenta más tarde o quita la región.',
   'errors.genreLookupUnavailable':
     'No encontramos suficientes artistas para este género. Prueba con otro género o intenta más tarde.',
   'errors.artistResolve':
@@ -629,7 +633,11 @@ export const es: Record<MessageKey, string> = {
   'ai.clarify.ambiguousGenres':
     'Estos géneros son demasiado amplios para una sola mezcla: {names}. Nombra un género o estilo más específico.',
   'ai.clarify.conflictingRegions':
-    'Una mezcla puede usar una sola región y tu pedido nombra más de una: {names}. Edítalo para quedarte con una región.',
+    'Una playlist puede usar una sola región y tu pedido nombra más de una: {names}. Edítalo para quedarte con una región.',
+  'ai.clarify.unknownRegion':
+    'Blendify no puede limitar los resultados a {names}. Edita tu pedido con otra región o sin región.',
+  'ai.clarify.regionNotSupported':
+    'Una región ({names}) solo refina los artistas que descubre Blendify, no los que elegiste. Pide música parecida a ese artista o quita la región.',
   'ai.clarify.invalidDuration':
     'Esa duración no sirve. Pide una duración de al menos un minuto.',
   'ai.clarify.optionsLabel': 'Elige una opción',
@@ -638,6 +646,7 @@ export const es: Record<MessageKey, string> = {
   'ai.option.useArtists': 'Usar solo los artistas',
   'ai.option.useGenres': 'Usar solo los géneros',
   'ai.option.useSong': 'Usar solo la canción',
+  'ai.option.discoverSimilar': 'Descubrir artistas parecidos en esa región',
   'ai.option.mixArtists': 'Mezclar estos artistas',
   'ai.option.keepSeed': 'Empezar desde {name}',
   'ai.option.trackCount': 'Usar {count} canciones',

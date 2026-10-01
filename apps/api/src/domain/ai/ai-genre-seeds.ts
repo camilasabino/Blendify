@@ -1,4 +1,3 @@
-import type { GenreRegion } from '@blendify/contracts';
 import { normalizeArtistName } from '@/domain/artist/artist-name-match';
 import { MAX_GENRES } from '@/domain/constants';
 import type { CatalogGenre } from '@/domain/genre/genre-catalog';
@@ -15,17 +14,14 @@ const EXPANDED_MATCHES: ReadonlySet<GenreExpressionMatch> = new Set([
 
 export interface AiGenreSeeds {
   genres: ResolvedAiSeed[];
-  region: GenreRegion | null;
   unknown: string[];
   ambiguous: string[];
-  conflictingRegions: string[];
 }
 
 interface ResolvedExpression {
   expression: string;
   isExpansion: boolean;
   genres: CatalogGenre[];
-  region?: GenreRegion;
 }
 
 export function resolveAiGenreSeeds(expressions: string[]): AiGenreSeeds {
@@ -42,7 +38,6 @@ export function resolveAiGenreSeeds(expressions: string[]): AiGenreSeeds {
           expression,
           isExpansion: EXPANDED_MATCHES.has(resolution.match),
           genres: resolution.genres,
-          region: resolution.region,
         });
         break;
       case 'ambiguous':
@@ -62,17 +57,10 @@ export function resolveAiGenreSeeds(expressions: string[]): AiGenreSeeds {
       .forEach((entry) => ambiguous.add(entry.expression));
   }
 
-  const regional = executable.filter((entry) => entry.region !== undefined);
-  const regions = new Set(regional.map((entry) => entry.region));
-  const [region = null] = regions.size === 1 ? [...regions] : [];
-
   return {
     genres: uniqueSeeds(executable),
-    region,
     unknown,
     ambiguous: expressions.filter((expression) => ambiguous.has(expression)),
-    conflictingRegions:
-      regions.size > 1 ? regional.map((entry) => entry.expression) : [],
   };
 }
 

@@ -43,6 +43,7 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
+    filters: { region: null },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,
@@ -322,6 +323,7 @@ describe('GenerateAiPlaylistUseCase', () => {
     expect(world.catalogs.forMarket).not.toHaveBeenCalled();
     expect(world.generator.execute.mock.calls[0][0]).toMatchObject({
       kind: 'genre_mix',
+      filters: { region: null },
       genreIds: ['shoegaze'],
     });
   });
@@ -340,6 +342,7 @@ describe('GenerateAiPlaylistUseCase', () => {
 
     expect(world.generator.execute.mock.calls[0][0]).toMatchObject({
       kind: 'genre_mix',
+      filters: { region: null },
       genreIds: [...moodGenreIds('dark')],
     });
     expect(result.execution).toMatchObject({
@@ -373,6 +376,7 @@ describe('GenerateAiPlaylistUseCase', () => {
             kind: 'discover_track',
             artists: [],
             seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
+            filters: { region: null },
           }),
           preservation: EMPTY_AI_PRESERVATION,
         },
@@ -959,6 +963,7 @@ describe('GenerateAiPlaylistUseCase', () => {
         aiSafe: {
           intent: intent({
             kind: 'discover_artist',
+            filters: { region: null },
             artists: ['Radiohead'],
             targetTrackCount: 20,
           }),
@@ -975,6 +980,7 @@ describe('GenerateAiPlaylistUseCase', () => {
         generation: {
           version: 1,
           kind: 'discover_artist',
+          filters: { region: null },
           targetTrackCount: 30,
           seed: { id: 'radiohead-id', name: 'Radiohead' },
           popularity: 'balanced',
@@ -995,6 +1001,7 @@ describe('GenerateAiPlaylistUseCase', () => {
 
     expect(world.generator.execute.mock.calls[0][0]).toMatchObject({
       kind: 'discover_artist',
+      filters: { region: null },
       targetTrackCount: 30,
     });
     expect(response.intent.targetTrackCount).toBe(20);

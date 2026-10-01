@@ -32,6 +32,7 @@ function intent(overrides: Partial<AiIntent> = {}): AiIntent {
     artists: ['Radiohead', 'Interpol'],
     genres: [],
     seedTracks: [],
+    filters: { region: null },
     targetTrackCount: null,
     targetDurationMinutes: null,
     mood: null,

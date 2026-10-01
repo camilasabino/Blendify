@@ -25,6 +25,7 @@ const BASE_INTENT: AiIntent = {
   artists: ['Ed Sheeran'],
   genres: [],
   seedTracks: [],
+  filters: { region: null },
   targetTrackCount: null,
   targetDurationMinutes: TARGET_MINUTES,
   mood: null,

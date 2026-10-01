@@ -83,6 +83,10 @@ export function applyIntentPatch(
     artists: applyNames(intent.artists, patch.artists),
     genres: applyNames(intent.genres, patch.genres, aiGenreKey),
     seedTracks: applyTracks(intent.seedTracks, patch.seedTracks),
+    filters: {
+      ...intent.filters,
+      region: applyValue(intent.filters.region, patch.filters.region),
+    },
     targetTrackCount: applyValue(
       intent.targetTrackCount,
       patch.targetTrackCount,

@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
-import { getGenreDisplayLabel, type GenreRegion } from '@blendify/contracts'
+import { getGenreDisplayLabel, type MusicRegion } from '@blendify/contracts'
 import type { Locale, MessageKey } from '@/i18n/messages'
 import { useLocaleStore } from '@/i18n/use-locale'
 
-export const REGION_LABEL_KEYS: Record<GenreRegion, MessageKey> = {
+export const REGION_LABEL_KEYS: Record<MusicRegion, MessageKey> = {
   latin: 'region.latin',
   american: 'region.american',
   british: 'region.british',

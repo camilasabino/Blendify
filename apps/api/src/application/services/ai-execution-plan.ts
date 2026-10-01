@@ -4,6 +4,7 @@ import {
   type AiIntent,
 } from '@/domain/ai/ai-intent';
 import type { ResolvedAiSeeds } from '@/domain/ai/ai-resolved-seeds';
+import { aiSelectionFilters } from '@/domain/ai/ai-selection-filters';
 import { candidateTrackCountForDuration } from '@/domain/ai/ai-target-duration';
 import type { AiExclusions } from '@/domain/ai/ai-track-selection';
 import { maxTracksPerSeedForCount } from '@/domain/constants';
@@ -83,9 +84,7 @@ function generationRequest(
         ...settings,
         kind: 'genre_mix',
         genreIds,
-        ...(seeds.genres.length > 0 && seeds.region
-          ? { region: seeds.region }
-          : {}),
+        filters: aiSelectionFilters(intent),
         tracksPerSeed: tracksPerSeed(
           genreIds.length,
           candidateCount,
@@ -105,6 +104,7 @@ function generationRequest(
           imageUrl: artist.imageUrl ?? null,
         },
         targetTrackCount: discoverTarget(candidateCount),
+        filters: aiSelectionFilters(intent),
       };
     }
     case 'discover_track': {
@@ -124,6 +124,7 @@ function generationRequest(
           popularity: track.popularity,
         },
         targetTrackCount: discoverTarget(candidateCount),
+        filters: aiSelectionFilters(intent),
       };
     }
   }

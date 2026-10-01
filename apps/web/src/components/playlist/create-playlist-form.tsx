@@ -14,15 +14,17 @@ import {
 import {
   MAX_ARTISTS,
   MAX_GENRES,
-  type GenreRegion,
+  SELECTION_FILTER_SUPPORT,
+  emptySelectionFilters,
+  supportsAnySelectionFilter,
   type PopularityMode,
+  type SelectionFilters,
 } from '@blendify/contracts'
 import { ArtistSearch } from '@/components/artists/artist-search'
 import { ArtistChipList } from '@/components/artists/artist-chip-list'
 import { ArtistSimilarSuggestions } from '@/components/artists/artist-similar'
 import { useGenreLabel } from '@/components/genres/genre-labels'
 import { GenrePicker } from '@/components/genres/genre-picker'
-import { RegionSelect } from '@/components/genres/region-select'
 import { useGenreMixPlaylistName } from '@/components/playlist/genre-mix-playlist-name'
 import { GenerationResultPanel } from '@/components/playlist/generation-result-panel'
 import {
@@ -39,6 +41,7 @@ import {
   runFailureView,
 } from '@/components/playlist/generation-result-helpers'
 import { PLAYLIST_RUN_COPY } from '@/components/playlist/playlist-run-copy'
+import { ResultFiltersSection } from '@/components/playlist/result-filters-section'
 import {
   buildGenerationSummary,
   buildRecipeSummary,
@@ -297,19 +300,15 @@ function MixArtistSource({
 
 function MixGenreSource({
   genres,
-  region,
   onToggleGenre,
   onRemoveGenre,
   onClearGenres,
-  onRegionChange,
   t,
 }: Readonly<{
   genres: Genre[]
-  region: GenreRegion | null
   onToggleGenre: (genre: Genre) => void
   onRemoveGenre: (id: string) => void
   onClearGenres: () => void
-  onRegionChange: (region: GenreRegion | null) => void
   t: ReturnType<typeof useT>
 }>) {
   return (
@@ -327,7 +326,6 @@ function MixGenreSource({
         onToggle={onToggleGenre}
         onRemove={onRemoveGenre}
       />
-      <RegionSelect value={region} onChange={onRegionChange} />
     </div>
   )
 }
@@ -339,7 +337,9 @@ export function MixPlaylistForm() {
   const [mode, setMode] = useState<MixSeedMode>('artists')
   const [artists, setArtists] = useState<Artist[]>([])
   const [genres, setGenres] = useState<Genre[]>([])
-  const [region, setRegion] = useState<GenreRegion | null>(null)
+  const [genreFilters, setGenreFilters] = useState<SelectionFilters>(
+    emptySelectionFilters,
+  )
   const genreLabel = useGenreLabel()
   const genreMixPlaylistName = useGenreMixPlaylistName()
   const [pasteList, setPasteList] = useState('')
@@ -388,8 +388,8 @@ export function MixPlaylistForm() {
         translate: t,
       })
     }
-    return genreMixPlaylistName(genres, region)
-  }, [mode, artists, genres, region, genreMixPlaylistName, t])
+    return genreMixPlaylistName(genres, genreFilters.region)
+  }, [mode, artists, genres, genreFilters, genreMixPlaylistName, t])
 
   useLayoutEffect(() => {
     const next = clampedTrackCount(
@@ -586,7 +586,7 @@ export function MixPlaylistForm() {
               name,
               description,
               genreIds: genres.map((g) => g.id),
-              ...(region ? { region } : {}),
+              filters: genreFilters,
               popularity: values.popularity,
               tracksPerSeed: values.tracksPerGenre,
               orderMode: values.orderMode,
@@ -622,7 +622,7 @@ export function MixPlaylistForm() {
     setMode('artists')
     setArtists([])
     setGenres([])
-    setRegion(null)
+    setGenreFilters(emptySelectionFilters())
     setPasteList('')
     setPasteOpen(false)
     setResolveError(null)
@@ -636,6 +636,8 @@ export function MixPlaylistForm() {
   }
 
   const formCopy = generationFormCopy(capabilities.mode, 'mix')
+  const mixKind = mode === 'artists' ? 'artist_mix' : 'genre_mix'
+  const detailsStep = supportsAnySelectionFilter(mixKind) ? 4 : 3
   const { result, progress, failure } = playlistRun
   const submittedMode = playlistRun.run?.spec.mode ?? preparingMode
   const workingCopy = generationFormCopy(submittedMode, 'mix')
@@ -652,7 +654,7 @@ export function MixPlaylistForm() {
             mode === 'artists'
               ? artists.map((a) => a.name)
               : genres.map(genreLabel),
-          region: mode === 'genres' ? region : null,
+          region: mode === 'genres' ? genreFilters.region : null,
           popularity,
           orderMode,
           trackCount: estimate.total,
@@ -779,11 +781,9 @@ export function MixPlaylistForm() {
               ) : (
                 <MixGenreSource
                   genres={genres}
-                  region={region}
                   onToggleGenre={toggleGenre}
                   onRemoveGenre={removeGenre}
                   onClearGenres={() => setGenres([])}
-                  onRegionChange={setRegion}
                   t={t}
                 />
               )}
@@ -791,7 +791,15 @@ export function MixPlaylistForm() {
 
             <PopularityModeSection control={form.control} step={2} />
 
-            <FormSection step={3} title={t(formCopy.detailsTitle)}>
+            <ResultFiltersSection
+              step={3}
+              supported={SELECTION_FILTER_SUPPORT[mixKind]}
+              filters={genreFilters}
+              onChange={setGenreFilters}
+              regionHintKey="create.regionHint"
+            />
+
+            <FormSection step={detailsStep} title={t(formCopy.detailsTitle)}>
               <div className="divide-y divide-divider">
                 {mode === 'artists' ? (
                   <TracksPerSeedField
@@ -841,7 +849,7 @@ export function MixPlaylistForm() {
               </div>
             </FormSection>
 
-            <OrderModeSection control={form.control} step={4} />
+            <OrderModeSection control={form.control} step={detailsStep + 1} />
           </fieldset>
 
           <GenerationSubmitBar

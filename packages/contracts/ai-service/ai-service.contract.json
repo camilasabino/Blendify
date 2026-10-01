@@ -196,6 +196,27 @@
                       ]
                     }
                   },
+                  "filters": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "region": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "region"
+                    ]
+                  },
                   "genres": {
                     "type": "array",
                     "maxItems": 25,
@@ -359,6 +380,7 @@
                   "artists",
                   "excludeArtists",
                   "excludeTracks",
+                  "filters",
                   "genres",
                   "kind",
                   "mood",
@@ -444,6 +466,27 @@
                 "title"
               ]
             }
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "region": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                ]
+              }
+            },
+            "required": [
+              "region"
+            ]
           },
           "genres": {
             "type": "array",
@@ -608,6 +651,7 @@
           "artists",
           "excludeArtists",
           "excludeTracks",
+          "filters",
           "genres",
           "kind",
           "mood",
@@ -887,6 +931,58 @@
                     "required": [
                       "add",
                       "remove"
+                    ]
+                  },
+                  "filters": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "region": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "operation": {
+                                    "type": "string",
+                                    "const": "clear"
+                                  }
+                                },
+                                "required": [
+                                  "operation"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "operation": {
+                                    "type": "string",
+                                    "const": "set"
+                                  },
+                                  "value": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  }
+                                },
+                                "required": [
+                                  "operation",
+                                  "value"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "region"
                     ]
                   },
                   "genres": {
@@ -1273,6 +1369,7 @@
                   "artists",
                   "excludeArtists",
                   "excludeTracks",
+                  "filters",
                   "genres",
                   "kind",
                   "mood",

@@ -5,6 +5,7 @@ import type {
 import { resolveAiGenreSeeds } from './ai-genre-seeds';
 import type { AiIntent, AiTrackReference } from './ai-intent';
 import { aiNameKey, aiTrackKey } from './ai-intent-rules';
+import { aiSelectionFilters } from './ai-selection-filters';
 
 export type AiRefinementTrackDiff = AiRefinementTrackDiffDto;
 export type AiIntentChange = AiIntentChangeDto;
@@ -76,8 +77,8 @@ export function diffIntents(
   if (genres) {
     changes.push({ field: 'genres', ...genres });
   }
-  const currentRegion = resolveAiGenreSeeds(current.genres).region;
-  const proposedRegion = resolveAiGenreSeeds(proposed.genres).region;
+  const currentRegion = aiSelectionFilters(current).region;
+  const proposedRegion = aiSelectionFilters(proposed).region;
   if (currentRegion !== proposedRegion) {
     changes.push({ field: 'region', from: currentRegion, to: proposedRegion });
   }

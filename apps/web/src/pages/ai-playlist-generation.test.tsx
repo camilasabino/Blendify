@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AiGenerationFailureDto, GenreRegion } from '@blendify/contracts'
+import type { AiGenerationFailureDto, MusicRegion } from '@blendify/contracts'
 import { useLocaleStore } from '@/i18n/use-locale'
 import {
   jsonResponse,
@@ -666,9 +666,9 @@ describe('Create with AI session restore', () => {
 describe('Create with AI playlist title', () => {
   const SUGGESTED = 'Blendify · Mix · Radiohead + Interpol'
 
-  function genreMixSession(region: GenreRegion | null) {
+  function genreMixSession(region: MusicRegion | null) {
     const generation = aiGeneration({
-      intent: { ...aiIntent, kind: 'genre_mix', artists: [], genres: ['Rock'], region },
+      intent: { ...aiIntent, kind: 'genre_mix', artists: [], genres: ['Rock'], filters: { region } },
     })
     return generatedAiSessionState({
       ...generation,

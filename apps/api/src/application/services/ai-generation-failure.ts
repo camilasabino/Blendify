@@ -18,6 +18,7 @@ const PROVIDER_UNAVAILABLE_CODES = new Set([
   'LASTFM_NOT_CONFIGURED',
   'LASTFM_SIMILAR_FAILED',
   'GENRE_LOOKUP_UNAVAILABLE',
+  'REGION_LOOKUP_UNAVAILABLE',
 ]);
 
 export function describeAiGenerationFailure(

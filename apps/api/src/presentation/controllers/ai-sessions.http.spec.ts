@@ -110,6 +110,7 @@ function interpreted(
         artists: ['Radiohead', 'Interpol'],
         genres: [],
         seedTracks: [],
+        filters: { region: null },
         targetTrackCount: 30,
         targetDurationMinutes: null,
         mood: null,
@@ -157,6 +158,7 @@ function lessMainstreamPlan(): PlanRefinementResponse {
       artists: { add: [], remove: ['Interpol'] },
       genres: unchangedNames,
       seedTracks: unchangedNames,
+      filters: { region: null },
       targetTrackCount: null,
       targetDurationMinutes: null,
       mood: null,
@@ -186,6 +188,7 @@ function popularPlan(
       artists: unchangedNames,
       genres: unchangedNames,
       seedTracks: unchangedNames,
+      filters: { region: null },
       targetTrackCount: null,
       targetDurationMinutes: null,
       mood: null,
@@ -618,6 +621,7 @@ describe('Create with AI sessions over HTTP', () => {
         kind: 'discover_track',
         artists: [],
         seedTracks: [{ title: 'Teardrop', artist: 'Massive Attack' }],
+        filters: { region: null },
         unsupportedConstraints: [],
       }),
     );
@@ -809,7 +813,7 @@ describe('Create with AI sessions over HTTP', () => {
       status: 'ready',
       intent: {
         genres: ['Rock'],
-        region: 'argentina',
+        filters: { region: 'argentina' },
         targetDurationMinutes: 60,
         unmetConstraints: [],
       },
@@ -838,7 +842,7 @@ describe('Create with AI sessions over HTTP', () => {
       clarification: null,
       intent: {
         genres: ['Instrumental'],
-        region: null,
+        filters: { region: null },
         mood: 'calm',
         unmetConstraints: [],
       },
@@ -863,7 +867,67 @@ describe('Create with AI sessions over HTTP', () => {
 
     expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
-      intent: { genres: ['Ballad'], region: 'latin', unmetConstraints: [] },
+      intent: {
+        genres: ['Ballad'],
+        filters: { region: 'latin' },
+        unmetConstraints: [],
+      },
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('reviews a discovery restricted to a region without treating the seed as regional', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'discover_artist',
+        artists: ['Radiohead'],
+        genres: [],
+        filters: { region: 'argentino' },
+        excludeArtists: [],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession({
+      prompt: 'algo parecido a Radiohead pero argentino',
+    }).expect(201);
+
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
+      status: 'ready',
+      intent: {
+        kind: 'discover_artist',
+        artists: ['Radiohead'],
+        filters: { region: 'argentina' },
+        unmetConstraints: [],
+      },
+    });
+    expectNoProviderCalls(world);
+  });
+
+  it('asks before applying a region to artists the user named', async () => {
+    world.interpreter.interpretIntent.mockResolvedValue(
+      interpreted({
+        kind: 'artist_mix',
+        artists: ['Radiohead'],
+        genres: [],
+        filters: { region: 'argentinas' },
+        excludeArtists: [],
+        unsupportedConstraints: [],
+      }),
+    );
+
+    const response = await createSession({
+      prompt: '10 canciones de Radiohead argentinas',
+    }).expect(201);
+
+    expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
+      status: 'needs_clarification',
+      intent: null,
+      clarification: {
+        reason: 'region_not_supported',
+        names: ['argentina'],
+        options: [{ type: 'set_kind', kind: 'discover_artist' }],
+      },
     });
     expectNoProviderCalls(world);
   });
@@ -2204,6 +2268,7 @@ describe('Create with AI sessions over HTTP', () => {
         artists: unchangedNames,
         genres: unchangedNames,
         seedTracks: unchangedNames,
+        filters: { region: null },
         targetTrackCount: null,
         targetDurationMinutes: null,
         mood: null,
@@ -2255,7 +2320,7 @@ describe('Create with AI sessions over HTTP', () => {
         status: 'candidate_ready',
         intent: {
           genres: ['Rock'],
-          region: 'british',
+          filters: { region: 'british' },
           mood: 'energetic',
           moodNotAppliedReason: 'explicit_genre_precedence',
         },
@@ -3121,6 +3186,7 @@ describe('Create with AI sessions over HTTP', () => {
             artists: NO_NAMES,
             genres: NO_NAMES,
             seedTracks: NO_NAMES,
+            filters: { region: null },
             targetTrackCount: null,
             targetDurationMinutes: null,
             mood: null,

@@ -15,5 +15,8 @@ describe('BusinessRuleError', () => {
     expect(BusinessRuleError.genreLookupUnavailable().code).toBe(
       'GENRE_LOOKUP_UNAVAILABLE',
     );
+    expect(BusinessRuleError.regionLookupUnavailable().code).toBe(
+      'REGION_LOOKUP_UNAVAILABLE',
+    );
   });
 });

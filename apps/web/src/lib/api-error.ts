@@ -261,6 +261,7 @@ const STATIC_ERROR_MESSAGES: Record<string, MessageKey> = {
   DISCOVER_NOT_ENOUGH_SIMILAR: 'discover.notEnoughSimilar',
   DISCOVER_RESOLVE_FAILED: 'discover.resolveFailed',
   GENRE_LOOKUP_UNAVAILABLE: 'errors.genreLookupUnavailable',
+  REGION_LOOKUP_UNAVAILABLE: 'errors.regionLookupUnavailable',
   EMPTY_ARTIST_SELECTION: 'create.addArtist',
   EMPTY_GENRE_SELECTION: 'create.addGenre',
   NO_TRACKS_FOUND: 'create.noTracksFound',

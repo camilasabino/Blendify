@@ -73,6 +73,7 @@ const artistMixRequest: SpotifyPlaylistRequest = {
 
 const discoverTrackRequest: SpotifyPlaylistRequest = {
   kind: 'discover_track',
+  filters: { region: null },
   name: '',
   description: '',
   trackId: 'track-1',
@@ -222,6 +223,7 @@ describe('CreateSpotifyPlaylistUseCase', () => {
         {
           version: 1,
           kind: 'genre_mix',
+          filters: { region: null },
           tracksPerSeed: 1,
           seeds: [{ id: 'jazz', name: 'Jazz' }],
           popularity: 'balanced',
@@ -235,6 +237,7 @@ describe('CreateSpotifyPlaylistUseCase', () => {
       userId: 'user-1',
       request: {
         kind: 'genre_mix',
+        filters: { region: null },
         name: '',
         description: '',
         genreIds: ['jazz'],
@@ -261,6 +264,7 @@ describe('CreateSpotifyPlaylistUseCase', () => {
         {
           version: 1,
           kind: 'discover_artist',
+          filters: { region: null },
           targetTrackCount: 15,
           seed: { id: 'artist-1', name: 'Sade', imageUrl: null },
           popularity: 'balanced',
@@ -274,6 +278,7 @@ describe('CreateSpotifyPlaylistUseCase', () => {
       userId: 'user-1',
       request: {
         kind: 'discover_artist',
+        filters: { region: null },
         name: '',
         description: '',
         artistId: 'artist-1',
@@ -300,6 +305,7 @@ describe('CreateSpotifyPlaylistUseCase', () => {
         {
           version: 1,
           kind: 'discover_track',
+          filters: { region: null },
           targetTrackCount: 15,
           seed: {
             id: 'track-1',

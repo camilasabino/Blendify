@@ -13,6 +13,7 @@ import {
   type AiIntentClarification,
 } from '@/domain/ai/ai-intent';
 import { resolveAiGenreSeeds } from '@/domain/ai/ai-genre-seeds';
+import { aiSelectionFilters } from '@/domain/ai/ai-selection-filters';
 import { moodNotAppliedReason } from '@/domain/ai/ai-mood-execution';
 import type { AiGenerationResult, AiSession } from '@/domain/ai/ai-session';
 import { aiSessionId } from '@/application/services/ai-session-credential';
@@ -49,7 +50,7 @@ export function toIntentSummary(intent: AiIntent): AiIntentSummary {
     kind: intent.kind,
     artists: intent.artists,
     genres: genreSeeds.genres.map((genre) => genre.name),
-    region: genreSeeds.region,
+    filters: aiSelectionFilters(intent),
     seedTrack: intent.seedTracks[0] ?? null,
     targetTrackCount: intent.targetTrackCount,
     targetDurationMinutes: intent.targetDurationMinutes,

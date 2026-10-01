@@ -34,6 +34,25 @@ function clarification(reason: AiClarification['reason']): AiClarification {
 describe.each(LOCALES)('Create with AI clarification copy (%s)', (locale) => {
   const t = translator(locale)
 
+  it('names a region incompatible with an artist mix by its localized label', () => {
+    const text = clarificationMessage(
+      { ...clarification('region_not_supported'), seedType: null, names: ['brazilian'] },
+      t,
+    )
+
+    expect(text).toContain(messages[locale]['region.brazilian'])
+    expect(text).not.toContain('brazilian')
+  })
+
+  it('quotes a region outside the curated list as the user wrote it', () => {
+    const text = clarificationMessage(
+      { ...clarification('unknown_region'), seedType: null, names: ['japonés'] },
+      t,
+    )
+
+    expect(text).toContain('japonés')
+  })
+
   it.each(AI_CLARIFICATION_REASONS)('renders readable fixed copy for %s', (reason) => {
     const text = clarificationMessage(clarification(reason), t)
 

@@ -1,5 +1,8 @@
 import type { ReactNode, RefObject } from 'react'
-import type { AiIntentSummary as AiIntentSummaryDto } from '@blendify/contracts'
+import {
+  supportsSelectionFilter,
+  type AiIntentSummary as AiIntentSummaryDto,
+} from '@blendify/contracts'
 import { REGION_LABEL_KEYS, useGenreLabel } from '@/components/genres/genre-labels'
 import { useT } from '@/i18n/use-t'
 import { cn } from '@/lib/utils'
@@ -31,6 +34,9 @@ export function AiIntentSummary({
     track.artist ? t('ai.summary.trackBy', { title: track.title, artist: track.artist }) : track.title,
   )
   const avoiding = [...intent.excludeArtists, ...excludedTracks]
+  const region = supportsSelectionFilter(intent.kind, 'region')
+    ? intent.filters.region
+    : null
   const basedOn =
     intent.artists.length > 0
       ? intent.artists.join(' · ')
@@ -75,9 +81,9 @@ export function AiIntentSummary({
         {intent.genres.length > 0 ? (
           <SummaryItem label={t('ai.summary.genres')}>{intent.genres.map((name) => genreLabel({ name })).join(' · ')}</SummaryItem>
         ) : null}
-        {intent.region ? (
+        {region ? (
           <SummaryItem label={t('ai.summary.region')}>
-            {t(REGION_LABEL_KEYS[intent.region])}
+            {t(REGION_LABEL_KEYS[region])}
           </SummaryItem>
         ) : null}
         {intent.mood && !intent.moodNotAppliedReason ? (
