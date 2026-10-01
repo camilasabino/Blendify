@@ -78,7 +78,6 @@ function resultOf(
     unmetConstraints: unmetGenerationConstraints({
       targetTrackCount: intent.targetTrackCount,
       targetDurationMinutes: intent.targetDurationMinutes,
-      mood: null,
       trackCount: playlistTracks.length,
       durationMs,
     }),

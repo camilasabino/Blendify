@@ -25,6 +25,7 @@ export const aiIntent: AiIntentSummary = {
   targetTrackCount: 20,
   targetDurationMinutes: null,
   mood: null,
+  moodNotAppliedReason: null,
   popularity: 'rarities',
   orderMode: null,
   excludeArtists: ['Coldplay'],

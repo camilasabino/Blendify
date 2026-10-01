@@ -685,8 +685,11 @@ export const pt: Record<MessageKey, string> = {
   'ai.unmet.title': 'Algumas preferências não puderam ser aplicadas por completo',
   'ai.unmet.trackCount': 'Você pediu {requested} músicas; esta playlist tem {actual}.',
   'ai.unmet.duration': 'Você pediu cerca de {requested} min; esta playlist dura {actual}.',
-  'ai.unmet.moodSeed': 'O Blendify montou esta playlist a partir dos artistas ou da música que você citou, então não conseguiu garantir esse clima.',
-  'ai.unmet.moodGenres': 'O Blendify usou os gêneros que você citou do jeito que são, então não conseguiu garantir esse clima.',
+  'ai.moodNotApplied.title': 'Não aplicado',
+  'ai.moodNotApplied.seed':
+    'Esta playlist é montada a partir dos artistas ou da música que você citou. Por enquanto, o clima só é usado para escolher gêneros quando nenhum gênero é informado.',
+  'ai.moodNotApplied.explicitGenre':
+    'Você especificou um gênero. Por enquanto, o clima só é usado para escolher gêneros quando nenhum gênero é informado.',
   'ai.generationError.title': 'Não foi possível criar sua playlist',
   'ai.generationError.seedNotFound': 'O Blendify não encontrou {names} no Spotify.',
   'ai.generationError.seedNotFoundGeneric': 'O Blendify não encontrou no Spotify um dos artistas ou músicas que você citou.',
@@ -770,6 +773,8 @@ export const pt: Record<MessageKey, string> = {
     'Mudanças propostas',
   'ai.refine.review.settingsOnlySubtitle':
     'Nenhuma música mudaria. Aplique para salvar estes ajustes e o Blendify vai respeitá-los nas próximas mudanças.',
+  'ai.refine.review.unappliedMoodSubtitle':
+    'Nenhuma música mudaria, porque esse clima não é usado para escolher músicas. Aplique para mantê-lo no seu pedido.',
   'ai.refine.review.subtitle':
     'Nada mudou ainda. Aplique as mudanças para atualizar sua playlist ou cancele para ficar com a atual.',
   'ai.refine.review.apply':

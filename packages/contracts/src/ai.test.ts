@@ -39,6 +39,7 @@ const READY_SESSION = {
     targetTrackCount: 30,
     targetDurationMinutes: null,
     mood: null,
+    moodNotAppliedReason: null,
     popularity: 'rarities',
     orderMode: null,
     excludeArtists: ['Coldplay'],
@@ -188,6 +189,28 @@ describe('AI session contracts', () => {
     },
   );
 
+  it('states when a recognized mood is not applied, with a closed reason', () => {
+    const genreWithMood = {
+      ...READY_SESSION,
+      intent: {
+        ...READY_SESSION.intent,
+        kind: 'genre_mix',
+        artists: [],
+        genres: ['Rock'],
+        mood: 'energetic',
+        moodNotAppliedReason: 'explicit_genre_precedence',
+      },
+    };
+
+    expect(AiSessionSchema.parse(genreWithMood)).toEqual(genreWithMood);
+    expect(
+      AiSessionSchema.safeParse({
+        ...genreWithMood,
+        intent: { ...genreWithMood.intent, moodNotAppliedReason: 'model_said_so' },
+      }).success,
+    ).toBe(false);
+  });
+
   it.each([0, -30, 45.5])('rejects a summarized target duration of %s', (minutes) => {
     const result = AiSessionSchema.safeParse({
       ...READY_SESSION,
@@ -273,7 +296,6 @@ const GENERATION = {
   unmetConstraints: [
     { type: 'track_count', requested: 30, actual: 1 },
     { type: 'duration', requestedMinutes: 60, actualDurationMs: 290_000 },
-    { type: 'mood', mood: 'calm', reason: 'seed_not_mood_based' },
   ],
   transferAvailable: true,
 };
@@ -313,8 +335,7 @@ describe('AI generation contracts', () => {
 
   it('rejects unmet constraints outside the deterministic vocabulary', () => {
     for (const unmet of [
-      { type: 'mood', mood: 'calm', reason: 'model_said_so' },
-      { type: 'mood', mood: 'happy', reason: 'genres_outside_mood' },
+      { type: 'mood', mood: 'calm', reason: 'seed_not_mood_based' },
       { type: 'duration', requestedMinutes: 0, actualDurationMs: 1 },
       { type: 'track_count', requested: MAX_TRACKS + 1, actual: 1 },
       { type: 'activity', userText: 'running' },

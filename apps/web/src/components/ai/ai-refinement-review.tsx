@@ -5,11 +5,13 @@ import { SpotifyLimitExplanation } from '@/components/brand/spotify-limit-explan
 import { GeneratedTrackList } from '@/components/playlist/generated-track-list'
 import { Button } from '@/components/ui/button'
 import type { AiRefinementActivity } from '@/hooks/use-ai-session'
+import type { MessageKey } from '@/i18n/messages'
 import { useT } from '@/i18n/use-t'
 import { formatSongCount } from '@/lib/song-count'
 import { formatListeningTime } from '@/lib/utils'
 import { CATEGORY_LABEL_KEYS } from './ai-copy'
 import { generationFailureView } from './ai-generation-copy'
+import { AiMoodNotApplied } from './ai-mood-not-applied'
 import { AiRefinementBadge } from './ai-refinement-badge'
 import { refinementClarificationMessage } from './ai-refinement-copy'
 import { AiRefinementDiff } from './ai-refinement-diff'
@@ -93,6 +95,22 @@ function Actions({ children }: Readonly<{ children: ReactNode }>) {
   return <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">{children}</div>
 }
 
+function reviewSubtitleKey(
+  { intent, diff }: Extract<AiRefinementDto, { status: 'candidate_ready' }>,
+  songsChange: boolean,
+): MessageKey {
+  if (songsChange) {
+    return 'ai.refine.review.subtitle'
+  }
+  const changesOnlyUnappliedMood =
+    intent.moodNotAppliedReason !== null &&
+    diff.intent.length > 0 &&
+    diff.intent.every((change) => change.field === 'mood')
+  return changesOnlyUnappliedMood
+    ? 'ai.refine.review.unappliedMoodSubtitle'
+    : 'ai.refine.review.settingsOnlySubtitle'
+}
+
 function CandidateReview({
   refinement,
   currentTracks,
@@ -105,7 +123,7 @@ function CandidateReview({
   refinement: Extract<AiRefinementDto, { status: 'candidate_ready' }>
 }) {
   const t = useT()
-  const { candidate, diff } = refinement
+  const { candidate, diff, intent } = refinement
   const tracks = candidate.playlist.tracks
   const added = new Set(diff.tracks.added.map((item) => item.position))
   const moved = new Set(diff.tracks.moved.map((item) => item.to))
@@ -147,10 +165,24 @@ function CandidateReview({
   return (
     <ReviewPanel title={t('ai.refine.review.title')} headingRef={headingRef} tone="proposed">
       <p className="text-sm leading-relaxed text-cream-300">
-        {songsChange ? t('ai.refine.review.subtitle') : t('ai.refine.review.settingsOnlySubtitle')}
+        {t(reviewSubtitleKey(refinement, songsChange))}
       </p>
 
-      <AiRefinementDiff diff={diff} currentTracks={currentTracks} proposedTracks={tracks} />
+      <AiRefinementDiff
+        diff={diff}
+        currentTracks={currentTracks}
+        proposedTracks={tracks}
+        isMoodNotApplied={intent.moodNotAppliedReason !== null}
+      />
+
+      {intent.mood && intent.moodNotAppliedReason ? (
+        <AiMoodNotApplied
+          mood={intent.mood}
+          reason={intent.moodNotAppliedReason}
+          heading="h4"
+          className="rounded-control p-3"
+        />
+      ) : null}
 
       {refinement.notApplied.length > 0 ? (
         <div className="space-y-1.5 rounded-control border border-divider p-3">

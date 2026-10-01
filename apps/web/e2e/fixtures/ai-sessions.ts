@@ -39,6 +39,7 @@ export const reviewIntent: AiIntentSummary = {
   targetTrackCount: 30,
   targetDurationMinutes: 60,
   mood: 'happy',
+  moodNotAppliedReason: 'seed_not_mood_based',
   popularity: 'rarities',
   orderMode: null,
   excludeArtists: ['Coldplay'],

@@ -678,8 +678,11 @@ export const en = {
   'ai.unmet.title': 'Some preferences couldn’t be fully applied',
   'ai.unmet.trackCount': 'You asked for {requested} songs; this playlist has {actual}.',
   'ai.unmet.duration': 'You asked for about {requested} min; this playlist runs {actual}.',
-  'ai.unmet.moodSeed': 'Blendify built this playlist from the artists or song you named, so it couldn’t guarantee this mood.',
-  'ai.unmet.moodGenres': 'Blendify used the genres you named as they are, so it couldn’t guarantee this mood.',
+  'ai.moodNotApplied.title': 'Not applied',
+  'ai.moodNotApplied.seed':
+    'This playlist is built from the artists or song you named. Mood is currently used only to choose genres when no genre is specified.',
+  'ai.moodNotApplied.explicitGenre':
+    'You specified a genre. Mood is currently used only to choose genres when no genre is specified.',
   'ai.generationError.title': 'Couldn’t create your playlist',
   'ai.generationError.seedNotFound': 'Blendify couldn’t find {names} on Spotify.',
   'ai.generationError.seedNotFoundGeneric': 'Blendify couldn’t find one of the artists or songs you named on Spotify.',
@@ -762,6 +765,8 @@ export const en = {
     'Proposed changes',
   'ai.refine.review.settingsOnlySubtitle':
     'No songs would change. Apply to save these settings, and Blendify will follow them in your next changes.',
+  'ai.refine.review.unappliedMoodSubtitle':
+    'No songs would change, because this mood isn’t used to choose songs. Apply to keep it in your request.',
   'ai.refine.review.subtitle':
     'Nothing has changed yet. Apply the changes to update your playlist, or cancel to keep the current one.',
   'ai.refine.review.apply':

@@ -1,11 +1,9 @@
 import type { AiGenerationUnmetConstraint } from '@blendify/contracts';
-import type { AiMoodExecution } from './ai-mood-execution';
 import { isDurationWithinTolerance } from './ai-target-duration';
 
 export function unmetGenerationConstraints(input: {
   targetTrackCount: number | null;
   targetDurationMinutes: number | null;
-  mood: AiMoodExecution | null;
   trackCount: number;
   durationMs: number;
 }): AiGenerationUnmetConstraint[] {
@@ -29,13 +27,6 @@ export function unmetGenerationConstraints(input: {
       type: 'duration',
       requestedMinutes: input.targetDurationMinutes,
       actualDurationMs: input.durationMs,
-    });
-  }
-  if (input.mood && !input.mood.applied) {
-    unmet.push({
-      type: 'mood',
-      mood: input.mood.mood,
-      reason: input.mood.reason,
     });
   }
   return unmet;

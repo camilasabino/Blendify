@@ -535,6 +535,11 @@ export const AiTrackReferenceSchema = z.strictObject({
   artist: z.string().min(1).max(200).nullable(),
 });
 
+export const AI_MOOD_NOT_APPLIED_REASONS = [
+  'seed_not_mood_based',
+  'explicit_genre_precedence',
+] as const;
+
 export const AiUnmetConstraintSchema = z.strictObject({
   category: AiUnsupportedConstraintCategorySchema,
   userText: z.string().min(1).max(300),
@@ -549,6 +554,7 @@ export const AiIntentSummarySchema = z.strictObject({
   targetTrackCount: z.number().int().min(1).max(MAX_TRACKS).nullable(),
   targetDurationMinutes: z.number().int().positive().nullable(),
   mood: AiMoodSchema.nullable(),
+  moodNotAppliedReason: z.enum(AI_MOOD_NOT_APPLIED_REASONS).nullable(),
   popularity: PopularityModeSchema.nullable(),
   orderMode: TrackOrderModeSchema.nullable(),
   excludeArtists: z.array(z.string().min(1).max(200)),
@@ -637,11 +643,6 @@ export const AiRefinementClarificationSchema = z.strictObject({
   unsupportedConstraints: z.array(AiUnmetConstraintSchema),
 });
 
-export const AI_MOOD_UNMET_REASONS = [
-  'seed_not_mood_based',
-  'mood_not_enforced_for_explicit_genres',
-] as const;
-
 export const AI_GENERATION_FAILURE_CATEGORIES = [
   'seed_not_found',
   'provider_rate_limited',
@@ -665,11 +666,6 @@ export const AiGenerationUnmetConstraintSchema = z.discriminatedUnion('type', [
     type: z.literal('duration'),
     requestedMinutes: z.number().int().positive(),
     actualDurationMs: z.number().int().nonnegative(),
-  }),
-  z.strictObject({
-    type: z.literal('mood'),
-    mood: AiMoodSchema,
-    reason: z.enum(AI_MOOD_UNMET_REASONS),
   }),
 ]);
 
@@ -1041,7 +1037,8 @@ export type AiRefinementResultDto = z.infer<typeof AiRefinementResultSchema>;
 export type CreateAiRefinementRequest = z.infer<
   typeof CreateAiRefinementRequestSchema
 >;
-export type AiMoodUnmetReason = (typeof AI_MOOD_UNMET_REASONS)[number];
+export type AiMoodNotAppliedReason =
+  (typeof AI_MOOD_NOT_APPLIED_REASONS)[number];
 export type AiGeneratedPlaylist = z.infer<typeof AiGeneratedPlaylistSchema>;
 export type AiGenerationUnmetConstraint = z.infer<
   typeof AiGenerationUnmetConstraintSchema

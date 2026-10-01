@@ -12,6 +12,7 @@ type AiRefinementDiffProps = Readonly<{
   diff: AiRefinementDiffDto
   currentTracks: readonly TrackDto[]
   proposedTracks: readonly TrackDto[]
+  isMoodNotApplied: boolean
 }>
 
 function tracksById(tracks: readonly TrackDto[]): Map<string, TrackDto> {
@@ -22,10 +23,20 @@ function durationLabel(durationMs: number): string {
   return durationMs > 0 ? formatListeningTime(durationMs) : '—'
 }
 
-export function AiRefinementDiff({ diff, currentTracks, proposedTracks }: AiRefinementDiffProps) {
+export function AiRefinementDiff({
+  diff,
+  currentTracks,
+  proposedTracks,
+  isMoodNotApplied,
+}: AiRefinementDiffProps) {
   const t = useT()
   const genreLabel = useGenreLabel()
-  const intentChanges = diff.intent.map((change) => intentChangeView(change, t, genreLabel))
+  const intentChanges = diff.intent.map((change) => {
+    const view = intentChangeView(change, t, genreLabel)
+    return change.field === 'mood' && change.to !== null && isMoodNotApplied && view.type === 'value'
+      ? { ...view, to: `${view.to} · ${t('ai.moodNotApplied.title')}` }
+      : view
+  })
   const { tracks } = diff
   const current = tracksById(currentTracks)
   const proposed = tracksById(proposedTracks)

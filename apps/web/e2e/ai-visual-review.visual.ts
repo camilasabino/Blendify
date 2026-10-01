@@ -177,15 +177,10 @@ test.describe('Create with AI visual review', () => {
     await capture(page, '08-unmet-track-count')
   })
 
-  test('09 generated, mood unmet', async ({ page }) => {
-    await openRestored(
-      page,
-      generatedState({
-        unmetConstraints: [{ type: 'mood', mood: 'happy', reason: 'seed_not_mood_based' }],
-      }),
-    )
-    await expect(page.getByText('Some preferences couldn’t be fully applied')).toBeVisible()
-    await capture(page, '09-unmet-mood')
+  test('09 generated, mood not applied', async ({ page }) => {
+    await openRestored(page, generatedState())
+    await expect(page.getByText('Not applied')).toBeVisible()
+    await capture(page, '09-mood-not-applied')
   })
 
   test('10 generated, multiple unmet', async ({ page }) => {
@@ -199,7 +194,6 @@ test.describe('Create with AI visual review', () => {
         unmetConstraints: [
           { type: 'track_count', requested: 30, actual: 16 },
           { type: 'duration', requestedMinutes: 60, actualDurationMs: tracksDurationMs(base) },
-          { type: 'mood', mood: 'happy', reason: 'seed_not_mood_based' },
         ],
       }),
     )

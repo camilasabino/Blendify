@@ -9,6 +9,7 @@ import {
   ORDER_LABEL_KEYS,
   POPULARITY_LABEL_KEYS,
 } from './ai-copy'
+import { AiMoodNotApplied } from './ai-mood-not-applied'
 
 type AiIntentSummaryProps = Readonly<{
   intent: AiIntentSummaryDto
@@ -79,7 +80,7 @@ export function AiIntentSummary({
             {t(REGION_LABEL_KEYS[intent.region])}
           </SummaryItem>
         ) : null}
-        {intent.mood ? (
+        {intent.mood && !intent.moodNotAppliedReason ? (
           <SummaryItem label={t('ai.summary.mood')}>{t(MOOD_LABEL_KEYS[intent.mood])}</SummaryItem>
         ) : null}
         {intent.targetTrackCount !== null ? (
@@ -102,6 +103,10 @@ export function AiIntentSummary({
           <SummaryItem label={t('ai.summary.avoiding')}>{avoiding.join(' · ')}</SummaryItem>
         ) : null}
       </dl>
+
+      {intent.mood && intent.moodNotAppliedReason ? (
+        <AiMoodNotApplied mood={intent.mood} reason={intent.moodNotAppliedReason} />
+      ) : null}
 
       {intent.unmetConstraints.length > 0 ? (
         <div className="space-y-2 rounded-card border border-divider p-4">

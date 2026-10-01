@@ -209,7 +209,6 @@ export class GenerateAiPlaylistUseCase {
       unmetConstraints: unmetGenerationConstraints({
         targetTrackCount: plan.targetTrackCount,
         targetDurationMinutes: plan.targetDurationMinutes,
-        mood: plan.mood,
         trackCount: playlist.tracks.length,
         durationMs,
       }),

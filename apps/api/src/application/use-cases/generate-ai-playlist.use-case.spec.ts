@@ -863,7 +863,7 @@ describe('GenerateAiPlaylistUseCase', () => {
     expect(world.generator.execute).toHaveBeenCalledTimes(1);
   });
 
-  it('returns a partial result with explicit unmet count and mood', async () => {
+  it('returns a partial result with an explicit unmet count and no mood warning', async () => {
     const world = createWorld(
       session({
         aiSafe: {
@@ -877,10 +877,7 @@ describe('GenerateAiPlaylistUseCase', () => {
 
     expect(result.execution).toMatchObject({
       result: {
-        unmetConstraints: [
-          { type: 'track_count', requested: 3, actual: 2 },
-          { type: 'mood', mood: 'happy', reason: 'seed_not_mood_based' },
-        ],
+        unmetConstraints: [{ type: 'track_count', requested: 3, actual: 2 }],
       },
     });
   });

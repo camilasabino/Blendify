@@ -2,6 +2,7 @@ import type {
   AiClarification,
   AiClarificationOption,
   AiMood,
+  AiMoodNotAppliedReason,
   AiUnsupportedConstraintCategory,
   PlaylistKind,
   PopularityMode,
@@ -35,6 +36,11 @@ export const MOOD_LABEL_KEYS: Record<AiMood, MessageKey> = {
   dark: 'ai.mood.dark',
   nostalgic: 'ai.mood.nostalgic',
   dreamy: 'ai.mood.dreamy',
+}
+
+export const MOOD_NOT_APPLIED_REASON_KEYS: Record<AiMoodNotAppliedReason, MessageKey> = {
+  seed_not_mood_based: 'ai.moodNotApplied.seed',
+  explicit_genre_precedence: 'ai.moodNotApplied.explicitGenre',
 }
 
 export const CATEGORY_LABEL_KEYS: Record<AiUnsupportedConstraintCategory, MessageKey> = {

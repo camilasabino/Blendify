@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { resolveAiGenreSeeds } from '@/domain/ai/ai-genre-seeds';
 import { AI_DEFAULT_ORDER_MODE, type AiIntent } from '@/domain/ai/ai-intent';
 import type { AiPreservation } from '@/domain/ai/ai-intent-patch';
-import { moodExecutionFor } from '@/domain/ai/ai-mood-execution';
 import type { AiRefinementClarification } from '@/domain/ai/ai-refinement';
 import {
   assembleRefinementCandidate,
@@ -245,13 +243,6 @@ export class AiRefinementCandidateBuilder {
       unmetConstraints: unmetGenerationConstraints({
         targetTrackCount: proposed.targetTrackCount,
         targetDurationMinutes: proposed.targetDurationMinutes,
-        mood: moodExecutionFor({
-          kind: proposed.kind,
-          mood: proposed.mood,
-          explicitGenreIds: resolveAiGenreSeeds(proposed.genres).genres.map(
-            (genre) => genre.id,
-          ),
-        }),
         trackCount: playlist.tracks.length,
         durationMs,
       }),

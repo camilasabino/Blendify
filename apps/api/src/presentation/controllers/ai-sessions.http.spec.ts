@@ -665,6 +665,7 @@ describe('Create with AI sessions over HTTP', () => {
         kind: 'genre_mix',
         genres: [],
         mood: 'happy',
+        moodNotAppliedReason: null,
         unmetConstraints: [
           { category: 'activity', userText: 'to dance at a party' },
         ],
@@ -725,12 +726,17 @@ describe('Create with AI sessions over HTTP', () => {
 
     expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
-      intent: { genres: ['Pop'], targetDurationMinutes: 60, mood: null },
+      intent: {
+        genres: ['Pop'],
+        targetDurationMinutes: 60,
+        mood: null,
+        moodNotAppliedReason: null,
+      },
     });
     expectNoProviderCalls(world);
   });
 
-  it('reviews explicit genres and a mood without merging them', async () => {
+  it('reviews explicit genres and a recognized mood that is not applied', async () => {
     world.interpreter.interpretIntent.mockResolvedValue(
       interpreted({
         kind: 'genre_mix',
@@ -748,7 +754,11 @@ describe('Create with AI sessions over HTTP', () => {
 
     expect(AiSessionCreatedSchema.parse(response.body)).toMatchObject({
       status: 'ready',
-      intent: { genres: ['Pop'], mood: 'happy' },
+      intent: {
+        genres: ['Pop'],
+        mood: 'happy',
+        moodNotAppliedReason: 'explicit_genre_precedence',
+      },
     });
     expect([...world.stored.values()][0].aiSafe.intent).toMatchObject({
       genres: ['pop'],
@@ -2185,6 +2195,94 @@ describe('Create with AI sessions over HTTP', () => {
       expectNoDestinationCalls();
       expect(world.usageStats.recordMix).not.toHaveBeenCalled();
       expect(world.sessions.acquireDestinationClaim).not.toHaveBeenCalled();
+    });
+
+    it('keeps a refined mood recognized but not applied while an explicit genre remains', async () => {
+      const unchangedNames = { add: [], remove: [] };
+      const patch = {
+        kind: null,
+        artists: unchangedNames,
+        genres: unchangedNames,
+        seedTracks: unchangedNames,
+        targetTrackCount: null,
+        targetDurationMinutes: null,
+        mood: null,
+        popularity: null,
+        orderMode: null,
+        excludeArtists: unchangedNames,
+        excludeTracks: unchangedNames,
+      };
+      const preservation = {
+        firstTracks: null,
+        positions: { add: [], remove: [] },
+        artists: unchangedNames,
+      };
+      useWorkingProviders();
+      world.interpreter.interpretIntent.mockResolvedValue(
+        interpreted({
+          kind: 'genre_mix',
+          artists: [],
+          genres: ['rock británico'],
+          targetTrackCount: null,
+          popularity: 'popular',
+          excludeArtists: [],
+          unsupportedConstraints: [],
+        }),
+      );
+      const created = await createSession({
+        prompt: 'rock británico conocido',
+      }).expect(201);
+      const sessionKey = (created.body as AiSessionCreatedDto).accessKey;
+      await generate(sessionKey).expect(200);
+
+      world.planner.planRefinement.mockResolvedValueOnce(
+        refinementPlan({
+          outcome: 'interpreted',
+          patch: { ...patch, mood: { operation: 'set', value: 'energetic' } },
+          preservation,
+          unsupportedConstraints: [],
+        }),
+      );
+      const moodRefinement = AiRefinementResultSchema.parse(
+        (
+          await refine(sessionKey, { refinement: 'hacela más movida' }).expect(
+            200,
+          )
+        ).body,
+      ).refinement;
+
+      expect(moodRefinement).toMatchObject({
+        status: 'candidate_ready',
+        intent: {
+          genres: ['Rock'],
+          region: 'british',
+          mood: 'energetic',
+          moodNotAppliedReason: 'explicit_genre_precedence',
+        },
+        candidate: { unmetConstraints: [] },
+      });
+      await settle('apply', sessionKey, moodRefinement.id).expect(200);
+
+      world.planner.planRefinement.mockResolvedValueOnce(
+        refinementPlan({
+          outcome: 'interpreted',
+          patch: {
+            ...patch,
+            genres: { add: [], remove: ['rock británico'] },
+          },
+          preservation,
+          unsupportedConstraints: [],
+        }),
+      );
+      const genreRemoval = AiRefinementResultSchema.parse(
+        (await refine(sessionKey, { refinement: 'sacá el rock' }).expect(200))
+          .body,
+      ).refinement;
+
+      expect(genreRemoval).toMatchObject({
+        status: 'candidate_ready',
+        intent: { genres: [], mood: 'energetic', moodNotAppliedReason: null },
+      });
     });
 
     it('refuses destinations while a refinement clarification is pending', async () => {

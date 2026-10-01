@@ -14,7 +14,6 @@ export function unsatisfiedRefinementConstraints(input: {
   return unmetGenerationConstraints({
     targetTrackCount: intent.targetTrackCount,
     targetDurationMinutes: intent.targetDurationMinutes,
-    mood: null,
     trackCount: candidate.playlist.tracks.length,
     durationMs: candidate.durationMs,
   }).filter((unmet) => !isInherited(unmet, current.unmetConstraints));

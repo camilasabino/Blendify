@@ -54,7 +54,6 @@ describe('buildAiExecutionPlan', () => {
       orderMode: 'random',
     });
     expect(plan.targetTrackCount).toBeNull();
-    expect(plan.mood).toBeNull();
   });
 
   it('spreads an explicit count across seeds and keeps familiarity and ordering unchanged', () => {
@@ -103,7 +102,6 @@ describe('buildAiExecutionPlan', () => {
       genreIds: [...moodGenreIds('calm')],
       tracksPerSeed: 10,
     });
-    expect(plan.mood).toEqual({ mood: 'calm', applied: true });
   });
 
   it('keeps explicit genres authoritative and does not add mood genres', () => {
@@ -115,11 +113,6 @@ describe('buildAiExecutionPlan', () => {
     expect(plan.request).toMatchObject({
       genreIds: ['pop'],
       tracksPerSeed: 25,
-    });
-    expect(plan.mood).toEqual({
-      mood: 'happy',
-      applied: false,
-      reason: 'mood_not_enforced_for_explicit_genres',
     });
   });
 
@@ -142,7 +135,7 @@ describe('buildAiExecutionPlan', () => {
     ).not.toHaveProperty('region');
   });
 
-  it('keeps an artist seed authoritative and reports the mood as not applied', () => {
+  it('keeps an artist seed authoritative over the mood', () => {
     const plan = buildAiExecutionPlan(
       intent({ kind: 'discover_artist', artists: ['Radiohead'], mood: 'sad' }),
       seeds({ artists: [{ id: 'radiohead-id', name: 'Radiohead' }] }),
@@ -153,11 +146,6 @@ describe('buildAiExecutionPlan', () => {
       artistId: 'radiohead-id',
       artist: { id: 'radiohead-id', name: 'Radiohead', imageUrl: null },
       targetTrackCount: 30,
-    });
-    expect(plan.mood).toEqual({
-      mood: 'sad',
-      applied: false,
-      reason: 'seed_not_mood_based',
     });
   });
 

@@ -54,7 +54,6 @@ function fit(input: {
     unmet: unmetGenerationConstraints({
       targetTrackCount: input.targetTrackCount ?? null,
       targetDurationMinutes: input.targetDurationMinutes,
-      mood: null,
       trackCount: tracks.length,
       durationMs,
     }),

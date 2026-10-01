@@ -35,7 +35,7 @@ const SESSION_ROUTE = `GET /api/ai/sessions/${AI_SESSION_ID}`
 const RAW_IDENTIFIERS = [
   'track_count',
   'seed_not_mood_based',
-  'mood_not_enforced_for_explicit_genres',
+  'explicit_genre_precedence',
   'provider_rate_limited',
   'provider_unavailable',
   'seed_not_found',
@@ -239,7 +239,13 @@ describe('Create with AI generation', () => {
 
   it('reports unmet constraints separately from unsupported details, without raw enums', async () => {
     const user = userEvent.setup()
-    const intent = { ...aiIntent, targetTrackCount: 30, targetDurationMinutes: 60, mood: 'happy' as const }
+    const intent = {
+      ...aiIntent,
+      targetTrackCount: 30,
+      targetDurationMinutes: 60,
+      mood: 'happy' as const,
+      moodNotAppliedReason: 'seed_not_mood_based' as const,
+    }
     stubApi({
       [CREATE_ROUTE]: () => jsonResponse(createdAiSession(intent), 201),
       [GENERATE_ROUTE]: () =>
@@ -251,7 +257,6 @@ describe('Create with AI generation', () => {
             unmetConstraints: [
               { type: 'track_count', requested: 30, actual: 16 },
               { type: 'duration', requestedMinutes: 60, actualDurationMs: 2_880_000 },
-              { type: 'mood', mood: 'happy', reason: 'seed_not_mood_based' },
             ],
           }),
         }),
@@ -264,19 +269,20 @@ describe('Create with AI generation', () => {
       await screen.findByRole('heading', { name: 'Some preferences couldn’t be fully applied' })
     ).closest('section') as HTMLElement
     const items = within(unmet).getAllByRole('listitem')
-    expect(items).toHaveLength(3)
+    expect(items).toHaveLength(2)
     expect(items[0]).toHaveTextContent('Songs: You asked for 30 songs; this playlist has 16.')
     expect(items[1]).toHaveTextContent('Length: You asked for about 60 min; this playlist runs 48 min.')
-    expect(items[2]).toHaveTextContent(
-      'Mood · Happy: Blendify built this playlist from the artists or song you named, so it couldn’t guarantee this mood.',
-    )
+    expect(unmet.textContent).not.toContain('Happy')
     expect(unmet.textContent).not.toContain('for a long run')
+    expect(
+      screen.getByRole('heading', { name: 'Not applied' }).closest('div')?.textContent,
+    ).toContain('Mood: Happy')
     expect(screen.getByText('Not used').closest('div')?.textContent).toContain('for a long run')
     expect(screen.queryByText(/min requested/)).toBeNull()
     expectNoRawIdentifiers()
   })
 
-  it('explains an unenforced mood for explicit genres and a satisfied duration', async () => {
+  it('shows a mood an explicit genre overrides as not applied, without a warning', async () => {
     const user = userEvent.setup()
     const intent = {
       ...aiIntent,
@@ -286,31 +292,31 @@ describe('Create with AI generation', () => {
       targetTrackCount: null,
       targetDurationMinutes: 60,
       mood: 'happy' as const,
+      moodNotAppliedReason: 'explicit_genre_precedence' as const,
     }
     stubApi({
       [CREATE_ROUTE]: () => jsonResponse(createdAiSession(intent), 201),
       [GENERATE_ROUTE]: () =>
         ndjsonResponse({
           type: 'result',
-          playlist: aiGeneration({
-            intent,
-            unmetConstraints: [
-              { type: 'mood', mood: 'happy', reason: 'mood_not_enforced_for_explicit_genres' },
-            ],
-          }),
+          playlist: aiGeneration({ intent }),
         }),
     })
     renderPage()
     await reviewRequest(user)
     await user.click(createButton())
 
-    await screen.findByRole('heading', { name: 'Some preferences couldn’t be fully applied' })
-    expect(screen.getByText('20 songs · 1 h')).toBeVisible()
+    expect(await screen.findByText('20 songs · 1 h')).toBeVisible()
     expect(screen.getByText(/about 60 min requested/)).toBeVisible()
     expect(
-      screen.getByText('Blendify used the genres you named as they are, so it couldn’t guarantee this mood.'),
+      screen.queryByRole('heading', { name: 'Some preferences couldn’t be fully applied' }),
+    ).toBeNull()
+    expect(
+      screen.getByText(
+        'You specified a genre. Mood is currently used only to choose genres when no genre is specified.',
+      ),
     ).toBeVisible()
-    expect(document.body.textContent).not.toMatch(/not happy|outside/i)
+    expect(document.body.textContent).not.toMatch(/not happy|outside|couldn’t guarantee/i)
     expectNoRawIdentifiers()
   })
 

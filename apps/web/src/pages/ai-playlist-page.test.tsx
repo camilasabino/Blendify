@@ -25,6 +25,7 @@ const READY_SESSION: AiSessionDto = {
     targetTrackCount: 30,
     targetDurationMinutes: null,
     mood: null,
+    moodNotAppliedReason: null,
     popularity: 'rarities',
     orderMode: null,
     excludeArtists: ['Coldplay'],
@@ -254,6 +255,54 @@ describe('Create with AI page', () => {
     const summary = heading.closest('section') as HTMLElement
     expect(within(summary).getByText(label)).toBeVisible()
     expect(within(summary).queryByText(mood)).toBeNull()
+  })
+
+  it('shows a recognized mood as not applied when an explicit genre takes precedence', async () => {
+    const user = userEvent.setup()
+    stubApi({
+      'POST /api/ai/sessions': () =>
+        jsonResponse(
+          {
+            ...createdSession(READY_SESSION),
+            intent: {
+              ...READY_SESSION.intent,
+              kind: 'genre_mix',
+              artists: [],
+              genres: ['Rock'],
+              region: 'british',
+              targetTrackCount: null,
+              targetDurationMinutes: 30,
+              mood: 'energetic',
+              moodNotAppliedReason: 'explicit_genre_precedence',
+              popularity: 'popular',
+              excludeArtists: [],
+              unmetConstraints: [],
+            },
+          },
+          201,
+        ),
+    })
+    renderPage()
+
+    await user.type(promptField(), 'media hora de rock británico movido conocido')
+    await user.click(screen.getByRole('button', { name: 'Review request' }))
+
+    const heading = await screen.findByRole('heading', {
+      name: 'Here’s what Blendify understood',
+    })
+    const summary = heading.closest('section') as HTMLElement
+    const applied = summary.querySelector('dl') as HTMLElement
+    expect(within(applied).getByText('Rock')).toBeVisible()
+    expect(within(applied).getByText('About 30 min')).toBeVisible()
+    expect(within(applied).queryByText('Energetic')).toBeNull()
+    const notApplied = within(summary)
+      .getByRole('heading', { name: 'Not applied' })
+      .closest('div') as HTMLElement
+    expect(notApplied).toHaveTextContent('Mood: Energetic')
+    expect(notApplied).toHaveTextContent(
+      'You specified a genre. Mood is currently used only to choose genres when no genre is specified.',
+    )
+    expect(document.body.textContent).not.toMatch(/couldn’t|guarantee|partially/i)
   })
 
   it('submits with Ctrl+Enter but keeps Enter for new lines', async () => {

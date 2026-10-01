@@ -17,7 +17,7 @@ import { unsatisfiedRefinementConstraints } from './ai-refinement-constraints';
 import type { AiRefinementClarification } from './ai-refinement';
 import type { AiRefinementDiff } from './ai-refinement-diff';
 
-export const AI_SESSION_RECORD_VERSION = 8;
+export const AI_SESSION_RECORD_VERSION = 9;
 export const AI_GENERATION_INTERRUPTED_CODE = 'AI_GENERATION_INTERRUPTED';
 
 export interface AiGenerationFailure {

@@ -3,10 +3,6 @@ import {
   AI_DEFAULT_POPULARITY,
   type AiIntent,
 } from '@/domain/ai/ai-intent';
-import {
-  moodExecutionFor,
-  type AiMoodExecution,
-} from '@/domain/ai/ai-mood-execution';
 import type { ResolvedAiSeeds } from '@/domain/ai/ai-resolved-seeds';
 import { candidateTrackCountForDuration } from '@/domain/ai/ai-target-duration';
 import type { AiExclusions } from '@/domain/ai/ai-track-selection';
@@ -24,7 +20,6 @@ export interface AiExecutionPlan {
   targetTrackCount: number | null;
   targetDurationMinutes: number | null;
   exclusions: AiExclusions;
-  mood: AiMoodExecution | null;
 }
 
 export function buildAiExecutionPlan(
@@ -32,8 +27,6 @@ export function buildAiExecutionPlan(
   seeds: ResolvedAiSeeds,
   candidateCount: number | null = candidateTrackCount(intent),
 ): AiExecutionPlan {
-  const explicitGenreIds = seeds.genres.map((genre) => genre.id);
-
   return {
     request: generationRequest(intent, seeds, candidateCount),
     targetTrackCount: intent.targetTrackCount,
@@ -42,11 +35,6 @@ export function buildAiExecutionPlan(
       artists: intent.excludeArtists,
       tracks: intent.excludeTracks,
     },
-    mood: moodExecutionFor({
-      kind: intent.kind,
-      mood: intent.mood,
-      explicitGenreIds,
-    }),
   };
 }
 

@@ -461,6 +461,48 @@ describe('Create with AI refinement', () => {
     expect(calls.filter((call) => call.url.endsWith('/apply'))).toHaveLength(1)
   })
 
+  it('marks a refined mood as not applied while an explicit genre remains', async () => {
+    const settingsOnly = settingsOnlyRefinement()
+    const genreIntent = {
+      ...settingsOnly.intent,
+      kind: 'genre_mix' as const,
+      artists: [],
+      genres: ['Rock'],
+      region: 'british' as const,
+      excludeArtists: [],
+      unmetConstraints: [],
+    }
+    const moodRefinement = {
+      ...settingsOnly,
+      intent: {
+        ...genreIntent,
+        mood: 'energetic' as const,
+        moodNotAppliedReason: 'explicit_genre_precedence' as const,
+      },
+      diff: {
+        ...settingsOnly.diff,
+        intent: [{ field: 'mood' as const, from: null, to: 'energetic' as const }],
+      },
+    }
+    await renderPage({}, { state: pendingAiSessionState(moodRefinement) })
+
+    const review = screen.getByRole('heading', { name: 'Proposed changes' }).closest(
+      'section',
+    ) as HTMLElement
+    expect(
+      within(review).getByText(
+        'No songs would change, because this mood isn’t used to choose songs. Apply to keep it in your request.',
+      ),
+    ).toBeInTheDocument()
+    expect(within(review).getByText('Energetic · Not applied')).toBeInTheDocument()
+    const notApplied = within(review)
+      .getByRole('heading', { name: 'Not applied' })
+      .closest('div') as HTMLElement
+    expect(notApplied).toHaveTextContent('Mood: Energetic')
+    expect(notApplied).toHaveTextContent('You specified a genre.')
+    expect(review.textContent).not.toMatch(/Blendify will follow them|couldn’t/)
+  })
+
   it('does not present a proposal that changes songs as settings-only', async () => {
     await renderPage({}, { state: pendingAiSessionState(candidateReadyRefinement()) })
 

@@ -690,8 +690,11 @@ export const es: Record<MessageKey, string> = {
   'ai.unmet.title': 'Algunas preferencias no se pudieron aplicar del todo',
   'ai.unmet.trackCount': 'Pediste {requested} canciones; esta playlist tiene {actual}.',
   'ai.unmet.duration': 'Pediste unos {requested} min; esta playlist dura {actual}.',
-  'ai.unmet.moodSeed': 'Blendify armó esta playlist a partir de los artistas o la canción que nombraste, así que no pudo garantizar este estado de ánimo.',
-  'ai.unmet.moodGenres': 'Blendify usó los géneros que nombraste tal como son, así que no pudo garantizar este estado de ánimo.',
+  'ai.moodNotApplied.title': 'No aplicado',
+  'ai.moodNotApplied.seed':
+    'Esta playlist se arma a partir de los artistas o la canción que nombraste. Por ahora, el estado de ánimo solo se usa para elegir géneros cuando no indicas uno.',
+  'ai.moodNotApplied.explicitGenre':
+    'Especificaste un género. Por ahora, el estado de ánimo solo se usa para elegir géneros cuando no indicas uno.',
   'ai.generationError.title': 'No se pudo crear tu playlist',
   'ai.generationError.seedNotFound': 'Blendify no encontró {names} en Spotify.',
   'ai.generationError.seedNotFoundGeneric': 'Blendify no encontró en Spotify uno de los artistas o canciones que nombraste.',
@@ -775,6 +778,8 @@ export const es: Record<MessageKey, string> = {
     'Cambios propuestos',
   'ai.refine.review.settingsOnlySubtitle':
     'No cambiaría ninguna canción. Aplica para guardar estos ajustes y Blendify los tendrá en cuenta en tus próximos cambios.',
+  'ai.refine.review.unappliedMoodSubtitle':
+    'No cambiaría ninguna canción, porque este estado de ánimo no se usa para elegir canciones. Aplica para conservarlo en tu pedido.',
   'ai.refine.review.subtitle':
     'Todavía no cambió nada. Aplica los cambios para actualizar tu playlist o cancela para quedarte con la actual.',
   'ai.refine.review.apply':

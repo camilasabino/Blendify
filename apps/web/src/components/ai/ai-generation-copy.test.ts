@@ -1,10 +1,10 @@
 import {
   AI_GENERATION_FAILURE_CATEGORIES,
-  AI_MOOD_UNMET_REASONS,
-  AI_MOODS,
+  AI_MOOD_NOT_APPLIED_REASONS,
   type AiGenerationUnmetConstraint,
 } from '@blendify/contracts'
 import { LOCALES, messages, type Locale, type MessageKey } from '@/i18n/messages'
+import { MOOD_NOT_APPLIED_REASON_KEYS } from './ai-copy'
 import { generationFailureView, unmetConstraintView } from './ai-generation-copy'
 
 function translator(locale: Locale) {
@@ -17,14 +17,11 @@ function translator(locale: Locale) {
 const UNMET_CONSTRAINTS: AiGenerationUnmetConstraint[] = [
   { type: 'track_count', requested: 30, actual: 27 },
   { type: 'duration', requestedMinutes: 60, actualDurationMs: 2_880_000 },
-  ...AI_MOODS.flatMap((mood) =>
-    AI_MOOD_UNMET_REASONS.map((reason) => ({ type: 'mood' as const, mood, reason })),
-  ),
 ]
 
 const RAW_TOKENS = [
   ...AI_GENERATION_FAILURE_CATEGORIES,
-  ...AI_MOOD_UNMET_REASONS,
+  ...AI_MOOD_NOT_APPLIED_REASONS,
   'track_count',
   'AI_',
   'SPOTIFY_',
@@ -46,6 +43,12 @@ describe.each(LOCALES)('Create with AI generation copy (%s)', (locale) => {
       expectReadable(`${view.label} ${view.message}`)
       expect(view.message.length).toBeGreaterThan(0)
     }
+  })
+
+  it.each(AI_MOOD_NOT_APPLIED_REASONS)('explains a %s mood as not applied, not as a failure', (reason) => {
+    const message = t(MOOD_NOT_APPLIED_REASON_KEYS[reason])
+    expectReadable(message)
+    expect(message).not.toMatch(/couldn’t|guarantee|no pudo|garantizar|não conseguiu|garantir/i)
   })
 
   it.each(AI_GENERATION_FAILURE_CATEGORIES)('describes a %s failure', (category) => {

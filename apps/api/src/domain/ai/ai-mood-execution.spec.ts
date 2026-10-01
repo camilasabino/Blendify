@@ -1,60 +1,64 @@
 import { moodGenreIds } from '@/domain/genre/mood-genres';
-import { moodExecutionFor } from './ai-mood-execution';
+import { moodNotAppliedReason } from './ai-mood-execution';
 import { unmetGenerationConstraints } from './ai-unmet-constraints';
 
-describe('AI mood execution', () => {
-  it('is absent without a mood, including activity-only requests', () => {
+describe('AI mood application', () => {
+  it('is absent without a mood, including explicit-genre requests', () => {
     expect(
-      moodExecutionFor({ kind: 'genre_mix', mood: null, explicitGenreIds: [] }),
+      moodNotAppliedReason({ kind: 'genre_mix', mood: null, genres: [] }),
+    ).toBeNull();
+    expect(
+      moodNotAppliedReason({
+        kind: 'genre_mix',
+        mood: null,
+        genres: ['rock británico'],
+      }),
     ).toBeNull();
   });
 
-  it('applies a mood-only request through the curated mapping', () => {
+  it('applies a mood-only request through the curated genre mapping', () => {
     expect(
-      moodExecutionFor({
+      moodNotAppliedReason({
         kind: 'genre_mix',
-        mood: 'calm',
-        explicitGenreIds: [],
+        mood: 'energetic',
+        genres: [],
       }),
-    ).toEqual({ mood: 'calm', applied: true });
+    ).toBeNull();
   });
 
-  it('treats explicit genres that all belong to the mood mapping as satisfying it', () => {
-    const [first, second] = moodGenreIds('dreamy');
-
-    expect(
-      moodExecutionFor({
-        kind: 'genre_mix',
-        mood: 'dreamy',
-        explicitGenreIds: [first, second],
-      }),
-    ).toEqual({ mood: 'dreamy', applied: true });
-  });
-
-  it('does not claim the mood was enforced when an explicit genre is outside the curated mapping', () => {
-    const [mapped] = moodGenreIds('happy');
-
-    for (const explicitGenreIds of [['pop'], [mapped, 'pop']]) {
+  it('recognizes the mood but does not apply it when an explicit genre takes precedence', () => {
+    for (const genres of [['rock británico'], ['pop'], ['hard rock', 'pop']]) {
       expect(
-        moodExecutionFor({
-          kind: 'genre_mix',
-          mood: 'happy',
-          explicitGenreIds,
-        }),
-      ).toEqual({
-        mood: 'happy',
-        applied: false,
-        reason: 'mood_not_enforced_for_explicit_genres',
-      });
+        moodNotAppliedReason({ kind: 'genre_mix', mood: 'energetic', genres }),
+      ).toBe('explicit_genre_precedence');
     }
   });
 
+  it('does not apply the mood even when every explicit genre belongs to its mapping', () => {
+    const [first, second] = moodGenreIds('dreamy');
+
+    expect(
+      moodNotAppliedReason({
+        kind: 'genre_mix',
+        mood: 'energetic',
+        genres: ['hard rock'],
+      }),
+    ).toBe('explicit_genre_precedence');
+    expect(
+      moodNotAppliedReason({
+        kind: 'genre_mix',
+        mood: 'dreamy',
+        genres: [first, second],
+      }),
+    ).toBe('explicit_genre_precedence');
+  });
+
   it.each(['artist_mix', 'discover_artist', 'discover_track'] as const)(
-    'never claims the mood for %s',
+    'never applies the mood to %s',
     (kind) => {
-      expect(
-        moodExecutionFor({ kind, mood: 'sad', explicitGenreIds: [] }),
-      ).toEqual({ mood: 'sad', applied: false, reason: 'seed_not_mood_based' });
+      expect(moodNotAppliedReason({ kind, mood: 'sad', genres: [] })).toBe(
+        'seed_not_mood_based',
+      );
     },
   );
 });
@@ -65,19 +69,17 @@ describe('AI unmet generation constraints', () => {
       unmetGenerationConstraints({
         targetTrackCount: 20,
         targetDurationMinutes: 80,
-        mood: { mood: 'calm', applied: true },
         trackCount: 20,
         durationMs: 78 * 60_000,
       }),
     ).toEqual([]);
   });
 
-  it('reports count, duration and mood deterministically and in a stable order', () => {
+  it('reports count and duration deterministically and in a stable order', () => {
     expect(
       unmetGenerationConstraints({
         targetTrackCount: 30,
         targetDurationMinutes: 120,
-        mood: { mood: 'sad', applied: false, reason: 'seed_not_mood_based' },
         trackCount: 28,
         durationMs: 100 * 60_000,
       }),
@@ -88,7 +90,6 @@ describe('AI unmet generation constraints', () => {
         requestedMinutes: 120,
         actualDurationMs: 100 * 60_000,
       },
-      { type: 'mood', mood: 'sad', reason: 'seed_not_mood_based' },
     ]);
   });
 
@@ -97,7 +98,6 @@ describe('AI unmet generation constraints', () => {
       unmetGenerationConstraints({
         targetTrackCount: null,
         targetDurationMinutes: null,
-        mood: null,
         trackCount: 3,
         durationMs: 60_000,
       }),

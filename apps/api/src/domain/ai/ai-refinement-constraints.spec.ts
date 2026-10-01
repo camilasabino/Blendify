@@ -106,18 +106,12 @@ describe('unsatisfiedRefinementConstraints', () => {
     ).toEqual(['track_count', 'duration']);
   });
 
-  it('never blocks on a mood that could not be applied', () => {
+  it('never blocks on a mood that is not applied', () => {
     expect(
       unsatisfiedRefinementConstraints({
         intent: { ...INTENT, mood: 'calm' },
         current: SATISFIED,
-        candidate: result({
-          trackCount: 10,
-          minutes: 30,
-          unmet: [
-            { type: 'mood', mood: 'calm', reason: 'seed_not_mood_based' },
-          ],
-        }),
+        candidate: result({ trackCount: 10, minutes: 30 }),
       }),
     ).toEqual([]);
   });
