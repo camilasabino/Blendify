@@ -53,6 +53,45 @@ describe('buildDefaultPlaylistName', () => {
   })
 })
 
+describe('buildDefaultPlaylistName with a region', () => {
+  const translate = (key: string, vars?: Record<string, string | number>) =>
+    key === 'playlist.name.mixEmpty'
+      ? 'Blendify · Mezcla'
+      : `Blendify · Mezcla · ${vars?.seeds ?? ''}`
+
+  it('appends the region label after the seed summary', () => {
+    expect(
+      buildDefaultPlaylistName({ names: ['Rock'], regionLabel: 'Argentina' }),
+    ).toBe('Blendify · Mix · Rock · Argentina')
+    expect(
+      buildDefaultPlaylistName({
+        names: ['Rock', 'Pop'],
+        regionLabel: 'Reino Unido',
+        translate,
+      }),
+    ).toBe('Blendify · Mezcla · Rock + Pop · Reino Unido')
+    expect(
+      buildDefaultPlaylistName({
+        names: ['Rock', 'Pop', 'Indie'],
+        regionLabel: 'Reino Unido',
+        translate,
+      }),
+    ).toBe('Blendify · Mezcla · Rock + 2 · Reino Unido')
+  })
+
+  it('keeps the region when a long localized summary is truncated', () => {
+    const name = buildDefaultPlaylistName({
+      names: ['X'.repeat(120), 'Pop'],
+      regionLabel: 'Reino Unido',
+      translate,
+    })
+
+    expect(name).toHaveLength(100)
+    expect(name.startsWith('Blendify · Mezcla · XXX')).toBe(true)
+    expect(name.endsWith('… · Reino Unido')).toBe(true)
+  })
+})
+
 describe('buildDiscoverPlaylistName', () => {
   it('includes the seed and falls back for blank seeds', () => {
     expect(buildDiscoverPlaylistName('Cher')).toBe(

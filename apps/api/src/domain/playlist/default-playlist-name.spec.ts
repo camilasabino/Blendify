@@ -36,6 +36,30 @@ describe('buildDefaultPlaylistName', () => {
     ).toBe('Blendify · Mix · A + 2');
   });
 
+  it('appends the English region name after the seed summary', () => {
+    expect(
+      buildDefaultPlaylistName({ names: ['Rock'], region: 'argentina' }),
+    ).toBe('Blendify · Mix · Rock · Argentina');
+    expect(
+      buildDefaultPlaylistName({ names: ['Rock', 'Pop'], region: 'british' }),
+    ).toBe('Blendify · Mix · Rock + Pop · United Kingdom');
+    expect(
+      buildDefaultPlaylistName({
+        names: ['Rock', 'Pop', 'Indie'],
+        region: 'british',
+      }),
+    ).toBe('Blendify · Mix · Rock + 2 · United Kingdom');
+  });
+
+  it('keeps the region when a long seed summary is truncated', () => {
+    const name = buildDefaultPlaylistName({
+      names: ['X'.repeat(120), 'Pop'],
+      region: 'british',
+    });
+    expect(name.length).toBeLessThanOrEqual(100);
+    expect(name.endsWith('… · United Kingdom')).toBe(true);
+  });
+
   it('truncates very long names', () => {
     const long = 'X'.repeat(120);
     const name = buildDefaultPlaylistName({ names: [long] });

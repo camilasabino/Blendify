@@ -1,16 +1,17 @@
-export function buildDefaultPlaylistName(input: { names: string[] }): string {
-  const names = input.names.map((n) => n.trim()).filter(Boolean);
+import {
+  buildMixPlaylistName,
+  GENRE_REGION_NAMES,
+  type GenreRegion,
+} from '@blendify/contracts';
 
-  if (names.length === 0) {
-    return 'Blendify · Mix';
-  }
-  if (names.length === 1) {
-    return truncate(`Blendify · Mix · ${names[0]}`);
-  }
-  if (names.length === 2) {
-    return truncate(`Blendify · Mix · ${names[0]} + ${names[1]}`);
-  }
-  return truncate(`Blendify · Mix · ${names[0]} + ${names.length - 1}`);
+export function buildDefaultPlaylistName(input: {
+  names: string[];
+  region?: GenreRegion;
+}): string {
+  return buildMixPlaylistName({
+    seedNames: input.names,
+    regionLabel: input.region ? GENRE_REGION_NAMES[input.region] : null,
+  });
 }
 
 export function buildDefaultPlaylistDescription(input: {

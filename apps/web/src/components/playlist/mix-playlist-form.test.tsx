@@ -96,6 +96,7 @@ describe('MixPlaylistForm genre region', () => {
     })
     expect(generationCalls(calls)[0].body).toMatchObject({
       kind: 'genre_mix',
+      name: 'Blendify · Mezcla · Balada coreana · Brasil',
       genreIds: ['korean ballad'],
       region: 'brazilian',
     })

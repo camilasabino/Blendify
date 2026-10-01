@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export * from './genre-labels';
 export * from './genre-lookup-key';
+export * from './genre-region-names';
+export * from './mix-playlist-name';
 
 export const MAX_ARTISTS = 12;
 export const MAX_GENRES = 5;

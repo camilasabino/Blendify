@@ -19,6 +19,7 @@ type AiGeneratedPlaylistProps = Readonly<{
   intent: AiIntentSummary
   result: AiGeneratedExecution
   title: string | null
+  suggestedTitle: string
   onTitleChange: (title: string | null) => void
   isTitleLocked: boolean
   destination: AiSessionDestinationDto | null
@@ -33,6 +34,7 @@ export function AiGeneratedPlaylist({
   intent,
   result,
   title,
+  suggestedTitle,
   onTitleChange,
   isTitleLocked,
   destination,
@@ -75,7 +77,7 @@ export function AiGeneratedPlaylist({
           <AiPlaylistTitle
             titleId={titleId}
             title={title}
-            suggestedTitle={playlist.name}
+            suggestedTitle={suggestedTitle}
             onTitleChange={onTitleChange}
             isLocked={isTitleLocked}
             headingRef={headingRef}

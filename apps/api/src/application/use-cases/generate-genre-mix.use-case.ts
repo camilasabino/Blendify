@@ -74,6 +74,7 @@ export class GenerateGenreMixUseCase {
       input.name.trim() ||
       buildDefaultPlaylistName({
         names: seedNames,
+        region: input.region,
       });
     const playlistDescription =
       input.description.trim() ||

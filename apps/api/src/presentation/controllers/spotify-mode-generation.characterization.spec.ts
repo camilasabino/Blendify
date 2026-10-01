@@ -618,7 +618,7 @@ describe('Spotify Mode generation characterization', () => {
   });
 
   describe('genre mix with a region', () => {
-    it('filters the genre by region and records the region in the recipe', async () => {
+    function mockArgentinianJazz() {
       world.discovery.getTopArtistsForTag.mockImplementation((tag) =>
         Promise.resolve(
           tag === 'argentina'
@@ -636,6 +636,10 @@ describe('Spotify Mode generation characterization', () => {
           { name: 'argentina', count: 80 },
         ]),
       );
+    }
+
+    it('filters the genre by region and records the region in the recipe', async () => {
+      mockArgentinianJazz();
 
       const response = await request(httpServer())
         .post('/api/playlists/mix')
@@ -649,6 +653,7 @@ describe('Spotify Mode generation characterization', () => {
         .expect(201);
 
       const playlist = PlaylistDetailSchema.parse(response.body);
+      expect(playlist.name).toBe('Blendify · Mix · Jazz · Argentina');
       expect(playlist.generation).toMatchObject({
         kind: 'genre_mix',
         seeds: [{ id: 'jazz', name: 'Jazz' }],
@@ -661,6 +666,24 @@ describe('Spotify Mode generation characterization', () => {
       expect(
         world.discovery.getTopArtistsForTag.mock.calls.map(([tag]) => tag),
       ).toEqual(['argentina']);
+    });
+
+    it('keeps an explicit playlist name without appending the region', async () => {
+      mockArgentinianJazz();
+
+      const response = await request(httpServer())
+        .post('/api/playlists/mix')
+        .send({
+          kind: 'genre_mix',
+          name: 'Ruta 40',
+          genreIds: ['jazz'],
+          region: 'argentina',
+          tracksPerSeed: 4,
+          popularity: 'balanced',
+        })
+        .expect(201);
+
+      expect(PlaylistDetailSchema.parse(response.body).name).toBe('Ruta 40');
     });
   });
 

@@ -23,6 +23,7 @@ import { ArtistSimilarSuggestions } from '@/components/artists/artist-similar'
 import { useGenreLabel } from '@/components/genres/genre-labels'
 import { GenrePicker } from '@/components/genres/genre-picker'
 import { RegionSelect } from '@/components/genres/region-select'
+import { useGenreMixPlaylistName } from '@/components/playlist/genre-mix-playlist-name'
 import { GenerationResultPanel } from '@/components/playlist/generation-result-panel'
 import {
   CoverToggle,
@@ -340,6 +341,7 @@ export function MixPlaylistForm() {
   const [genres, setGenres] = useState<Genre[]>([])
   const [region, setRegion] = useState<GenreRegion | null>(null)
   const genreLabel = useGenreLabel()
+  const genreMixPlaylistName = useGenreMixPlaylistName()
   const [pasteList, setPasteList] = useState('')
   const [pasteOpen, setPasteOpen] = useState(false)
   const [resolveError, setResolveError] = useState<string | null>(null)
@@ -386,11 +388,8 @@ export function MixPlaylistForm() {
         translate: t,
       })
     }
-    return buildDefaultPlaylistName({
-      names: genres.map(genreLabel),
-      translate: t,
-    })
-  }, [mode, artists, genres, genreLabel, t])
+    return genreMixPlaylistName(genres, region)
+  }, [mode, artists, genres, region, genreMixPlaylistName, t])
 
   useLayoutEffect(() => {
     const next = clampedTrackCount(
@@ -550,12 +549,7 @@ export function MixPlaylistForm() {
     setPreparingMode(generationMode)
 
     try {
-      const name =
-        playlistName ||
-        buildDefaultPlaylistName({
-          names: seedNames,
-          translate: t,
-        })
+      const name = playlistName
       const description = buildDefaultPlaylistDescription(seedNames, t)
 
       let coverImageBase64: string | undefined

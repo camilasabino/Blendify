@@ -23,6 +23,7 @@ import { AiRefinementBadge } from './ai-refinement-badge'
 import { AiRefinementComposer } from './ai-refinement-composer'
 import { refinementErrorMessage } from './ai-refinement-copy'
 import { AiRefinementReview } from './ai-refinement-review'
+import { useAiSuggestedTitle } from './ai-suggested-title'
 
 type AiGeneratedFlow = Extract<AiFlowState, { phase: 'generated' }>
 
@@ -78,6 +79,7 @@ export function AiGeneratedView({
   onClearRefinementError,
 }: AiGeneratedViewProps) {
   const t = useT()
+  const suggestedTitle = useAiSuggestedTitle(flow.intent, flow.result.playlist)
   const draft = useAiRefinementDraft(flow.preservation)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const refineButtonRef = useRef<HTMLButtonElement>(null)
@@ -218,6 +220,7 @@ export function AiGeneratedView({
       intent={flow.intent}
       result={flow.result}
       title={playlistTitle}
+      suggestedTitle={suggestedTitle}
       onTitleChange={onTitleChange}
       isTitleLocked={flow.destination !== null || flow.isPublishing}
       destination={flow.destination}
@@ -313,7 +316,7 @@ export function AiGeneratedView({
         <AiPlaylistDestination
           mode={mode}
           intentKind={flow.intent.kind}
-          title={playlistTitle?.trim() || flow.result.playlist.name}
+          title={playlistTitle?.trim() || suggestedTitle}
           destination={flow.destination}
           transferAvailable={flow.result.transferAvailable}
           isPublishing={flow.isPublishing}

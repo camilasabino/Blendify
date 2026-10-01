@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AiGenerationFailureDto } from '@blendify/contracts'
+import type { AiGenerationFailureDto, GenreRegion } from '@blendify/contracts'
 import { useLocaleStore } from '@/i18n/use-locale'
 import {
   jsonResponse,
@@ -665,6 +665,52 @@ describe('Create with AI session restore', () => {
 
 describe('Create with AI playlist title', () => {
   const SUGGESTED = 'Blendify · Mix · Radiohead + Interpol'
+
+  function genreMixSession(region: GenreRegion | null) {
+    const generation = aiGeneration({
+      intent: { ...aiIntent, kind: 'genre_mix', artists: [], genres: ['Rock'], region },
+    })
+    return generatedAiSessionState({
+      ...generation,
+      playlist: {
+        ...generation.playlist,
+        name: 'Blendify · Mix · Rock',
+        seeds: [{ type: 'genre', id: 'rock', name: 'Rock' }],
+      },
+    })
+  }
+
+  afterEach(() => {
+    useLocaleStore.getState().setLocale('en')
+  })
+
+  it.each([
+    { locale: 'en', region: 'british', title: 'Blendify · Mix · Rock · United Kingdom' },
+    { locale: 'es', region: 'british', title: 'Blendify · Mezcla · Rock · Reino Unido' },
+    { locale: 'pt', region: 'british', title: 'Blendify · Mistura · Rock · Reino Unido' },
+    { locale: 'en', region: 'argentina', title: 'Blendify · Mix · Rock · Argentina' },
+    { locale: 'en', region: null, title: 'Blendify · Mix · Rock' },
+  ] as const)(
+    'suggests the $locale Genre Mix title for region $region',
+    async ({ locale, region, title }) => {
+      storeAiSession()
+      stubApi({ [SESSION_ROUTE]: () => jsonResponse(genreMixSession(region)) })
+      renderPage()
+      act(() => {
+        useLocaleStore.getState().setLocale(locale)
+      })
+
+      expect(await screen.findByRole('heading', { name: title })).toBeVisible()
+    },
+  )
+
+  it('keeps a custom title for a regional Genre Mix', async () => {
+    storeAiSession(AI_PROMPT, 'Ruta 40')
+    stubApi({ [SESSION_ROUTE]: () => jsonResponse(genreMixSession('argentina')) })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Ruta 40' })).toBeVisible()
+  })
 
   function titleField() {
     return screen.getByRole('textbox', { name: 'Playlist title' })

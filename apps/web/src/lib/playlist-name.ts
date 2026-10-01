@@ -1,3 +1,5 @@
+import { buildMixPlaylistName } from '@blendify/contracts'
+
 type DescriptionKey =
   | 'playlist.description.empty'
   | 'playlist.description.one'
@@ -24,29 +26,20 @@ export const GENERATED_NAME_PREFIX = 'Blendify · '
 
 export function buildDefaultPlaylistName(input: {
   names: string[]
+  regionLabel?: string | null
   translate?: NameTranslate
 }): string {
-  const names = input.names.map((n) => n.trim()).filter(Boolean)
-  if (names.length === 0) {
-    return input.translate
-      ? truncate(input.translate('playlist.name.mixEmpty'))
-      : `${GENERATED_NAME_PREFIX}Mix`
-  }
-
-  let seeds: string
-  if (names.length === 1) {
-    seeds = names[0]
-  } else if (names.length === 2) {
-    seeds = `${names[0]} + ${names[1]}`
-  } else {
-    seeds = `${names[0]} + ${names.length - 1}`
-  }
-
-  return truncate(
-    input.translate
-      ? input.translate('playlist.name.mix', { seeds })
-      : `${GENERATED_NAME_PREFIX}Mix · ${seeds}`,
-  )
+  const { translate } = input
+  return buildMixPlaylistName({
+    seedNames: input.names,
+    regionLabel: input.regionLabel,
+    ...(translate
+      ? {
+          format: (seeds) => translate('playlist.name.mix', { seeds }),
+          emptyName: translate('playlist.name.mixEmpty'),
+        }
+      : {}),
+  })
 }
 
 export function buildDiscoverPlaylistName(
