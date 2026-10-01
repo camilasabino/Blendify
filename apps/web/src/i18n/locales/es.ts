@@ -781,7 +781,7 @@ export const es: Record<MessageKey, string> = {
   'ai.refine.review.unappliedMoodSubtitle':
     'No cambiaría ninguna canción, porque este estado de ánimo no se usa para elegir canciones. Aplica para conservarlo en tu pedido.',
   'ai.refine.review.subtitle':
-    'Todavía no cambió nada. Aplica los cambios para actualizar tu playlist o cancela para quedarte con la actual.',
+    'Todavía no se aplicó ningún cambio. Aplica los cambios para actualizar tu playlist o cancela para conservar la playlist actual.',
   'ai.refine.review.apply':
     'Aplicar cambios',
   'ai.refine.review.applying':

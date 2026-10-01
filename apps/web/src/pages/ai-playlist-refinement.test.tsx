@@ -202,6 +202,12 @@ describe('Create with AI refinement', () => {
     const review = (await screen.findByRole('heading', { name: 'Proposed changes' })).closest(
       'section',
     ) as HTMLElement
+    expect(
+      within(review).getByText(
+        'Nothing has changed yet. Apply these changes to update your playlist, or cancel to keep your existing playlist.',
+      ),
+    ).toBeInTheDocument()
+    expect(within(review).queryByText(/current one/i)).toBeNull()
     expect(within(review).getByText('Familiarity')).toBeInTheDocument()
     expect(within(review).getByText('Lesser-known')).toBeInTheDocument()
     expect(within(review).getByText('Popular')).toBeInTheDocument()

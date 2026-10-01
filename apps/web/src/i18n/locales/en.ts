@@ -768,7 +768,7 @@ export const en = {
   'ai.refine.review.unappliedMoodSubtitle':
     'No songs would change, because this mood isn’t used to choose songs. Apply to keep it in your request.',
   'ai.refine.review.subtitle':
-    'Nothing has changed yet. Apply the changes to update your playlist, or cancel to keep the current one.',
+    'Nothing has changed yet. Apply these changes to update your playlist, or cancel to keep your existing playlist.',
   'ai.refine.review.apply':
     'Apply changes',
   'ai.refine.review.applying':

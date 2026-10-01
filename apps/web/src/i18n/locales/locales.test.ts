@@ -85,4 +85,14 @@ describe('locale contracts', () => {
     expect(es['spotifyAccess.otherAccount']).not.toMatch(/solicitud|invitación/i)
     expect(pt['spotifyAccess.otherAccount']).not.toMatch(/solicit|convite/i)
   })
+
+  it('names the existing playlist explicitly in the refinement review', () => {
+    expect(en['ai.refine.review.subtitle']).toMatch(/keep your existing playlist\.$/)
+    expect(es['ai.refine.review.subtitle']).toMatch(/conservar la playlist actual\.$/)
+    expect(pt['ai.refine.review.subtitle']).toMatch(/manter a playlist atual\.$/)
+
+    for (const locale of [en, es, pt]) {
+      expect(locale['ai.refine.review.subtitle']).not.toMatch(/current one|previous|anterior|la actual\.|a atual\./i)
+    }
+  })
 })
