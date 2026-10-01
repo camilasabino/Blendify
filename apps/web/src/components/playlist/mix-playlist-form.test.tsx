@@ -85,6 +85,12 @@ describe('MixPlaylistForm genre region', () => {
     const user = userEvent.setup()
 
     await user.click(screen.getByRole('radio', { name: es['create.modeGenres'] }))
+    expect(
+      screen.getByRole('button', { name: es['create.refineResults'] }),
+    ).toHaveAccessibleDescription(es['create.refineResultsNone'])
+    await user.click(
+      screen.getByRole('button', { name: es['create.refineResults'] }),
+    )
     const region = screen.getByRole('button', { name: new RegExp(es['create.region']) })
     expect(region).toHaveTextContent(es['create.regionAny'])
     await user.click(await screen.findByRole('button', { name: 'Balada coreana' }))
@@ -102,11 +108,44 @@ describe('MixPlaylistForm genre region', () => {
     })
   })
 
+  it('keeps Refine results collapsed until it is opened', async () => {
+    setAuthState(null)
+    stubGeneration()
+    renderWithProviders(<MixPlaylistForm />)
+    const user = userEvent.setup()
+
+    const toggle = screen.getByRole('button', { name: 'Refine results' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByText('Optional · No filters')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Decade/ })).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Exclude live versions' })).toBeNull()
+    expect(
+      screen.getByRole('heading', { name: 'Refine results' }).closest('section'),
+    ).toHaveTextContent('3')
+    expect(
+      screen.getByRole('heading', { name: 'Size' }).closest('section'),
+    ).toHaveTextContent('4')
+
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await user.click(screen.getByRole('switch', { name: 'Exclude live versions' }))
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(toggle)
+    expect(screen.getByText('No live versions')).toBeVisible()
+    await user.click(toggle)
+    expect(
+      screen.getByRole('switch', { name: 'Exclude live versions' }),
+    ).toHaveAttribute('aria-checked', 'true')
+  })
+
   it('shows only the decade and live controls for an artist mix', async () => {
     setAuthState(null)
     stubGeneration()
     renderWithProviders(<MixPlaylistForm />)
+    const user = userEvent.setup()
 
+    await user.click(screen.getByRole('button', { name: 'Refine results' }))
     const section = screen
       .getByRole('heading', { name: 'Refine results' })
       .closest('section')
@@ -133,6 +172,7 @@ describe('MixPlaylistForm genre region', () => {
     const user = userEvent.setup()
 
     await user.click(screen.getByRole('radio', { name: 'Genres' }))
+    await user.click(screen.getByRole('button', { name: 'Refine results' }))
 
     const section = screen
       .getByRole('heading', { name: 'Refine results' })
@@ -172,6 +212,7 @@ describe('MixPlaylistForm genre region', () => {
 
     await user.click(screen.getByRole('radio', { name: 'Genres' }))
     await user.click(await screen.findByRole('button', { name: 'Rock' }))
+    await user.click(screen.getByRole('button', { name: 'Refine results' }))
     await user.click(screen.getByRole('button', { name: /Region/ }))
     await user.click(await screen.findByRole('option', { name: 'Argentina' }))
     await user.click(screen.getByRole('button', { name: /Vocals/ }))
@@ -198,6 +239,64 @@ describe('MixPlaylistForm genre region', () => {
     expect(request.body).not.toHaveProperty('decade')
   })
 
+  describe('current decade', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('submits the current decade ending at the current year', async () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-01T12:00:00Z') })
+      setAuthState(null)
+      const { calls } = stubGeneration()
+      renderWithProviders(<MixPlaylistForm />)
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole('radio', { name: 'Genres' }))
+      await user.click(await screen.findByRole('button', { name: /Jazz/ }))
+      await user.click(screen.getByRole('button', { name: 'Refine results' }))
+      await user.click(screen.getByRole('button', { name: /Decade/ }))
+      await user.click(await screen.findByRole('option', { name: '2020–2026' }))
+      await user.click(screen.getByRole('button', { name: 'Generate playlist' }))
+
+      await vi.waitFor(() => {
+        expect(generationCalls(calls)).toHaveLength(1)
+      })
+      expect(generationCalls(calls)[0].body).toMatchObject({
+        filters: { releaseRange: { fromYear: 2020, toYear: 2026 } },
+      })
+    })
+  })
+
+  it('reopens Refine results with active filters on adjust and collapses it on Create another', async () => {
+    setAuthState(null)
+    stubGeneration()
+    renderWithProviders(<MixPlaylistForm />)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('radio', { name: 'Genres' }))
+    await user.click(await screen.findByRole('button', { name: /Jazz/ }))
+    await user.click(screen.getByRole('button', { name: 'Refine results' }))
+    await user.click(screen.getByRole('switch', { name: 'Exclude live versions' }))
+    await user.click(screen.getByRole('button', { name: 'Refine results' }))
+    await user.click(screen.getByRole('button', { name: 'Generate playlist' }))
+    await screen.findByRole('heading', { name: 'Blendify · Mix · Jazz' })
+
+    await user.click(screen.getByRole('button', { name: 'Try different settings' }))
+    const toggle = screen.getByRole('button', { name: 'Refine results' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(
+      screen.getByRole('switch', { name: 'Exclude live versions' }),
+    ).toHaveAttribute('aria-checked', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Create another' }))
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByText('Optional · No filters')).toBeVisible()
+    await user.click(toggle)
+    expect(
+      screen.getByRole('switch', { name: 'Exclude live versions' }),
+    ).toHaveAttribute('aria-checked', 'false')
+  })
+
   it('never sends artist-level filters chosen for genres with an artist mix', async () => {
     setAuthState(null)
     const { calls } = stubApi({
@@ -214,6 +313,7 @@ describe('MixPlaylistForm genre region', () => {
     const user = userEvent.setup()
 
     await user.click(screen.getByRole('radio', { name: 'Genres' }))
+    await user.click(screen.getByRole('button', { name: 'Refine results' }))
     await user.click(screen.getByRole('button', { name: /Region/ }))
     await user.click(await screen.findByRole('option', { name: 'Argentina' }))
     await user.click(screen.getByRole('button', { name: /Vocals/ }))
@@ -221,6 +321,8 @@ describe('MixPlaylistForm genre region', () => {
     await user.click(screen.getByRole('button', { name: /Decade/ }))
     await user.click(await screen.findByRole('option', { name: '1980–1989' }))
     await user.click(screen.getByRole('radio', { name: 'Artists' }))
+    expect(screen.queryByRole('button', { name: /Region/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Vocals/ })).toBeNull()
     await user.type(screen.getByRole('combobox'), 'Radiohead')
     await user.click(
       await screen.findByRole('option', { name: /Radiohead/ }, { timeout: 3_000 }),

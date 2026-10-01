@@ -88,6 +88,7 @@ export const en = {
   'create.artists': 'Artists',
   'create.genres': 'Genres',
   'create.refineResults': 'Refine results',
+  'create.refineResultsNone': 'Optional · No filters',
   'create.region': 'Region',
   'create.regionAny': 'Any region',
   'create.regionHint': 'Optional · Filters artists by region for all selected genres.',

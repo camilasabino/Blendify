@@ -5,25 +5,43 @@ type Translate = (key: MessageKey, vars?: Record<string, string | number>) => st
 
 const DECADE_YEARS = 10
 
-export const RELEASE_DECADES = [
-  2020, 2010, 2000, 1990, 1980, 1970, 1960, 1950,
-] as const
+const FIRST_RELEASE_DECADE = 1950
 
-export type ReleaseDecade = (typeof RELEASE_DECADES)[number]
+export function releaseDecades(currentYear: number): number[] {
+  const currentDecade = Math.floor(currentYear / DECADE_YEARS) * DECADE_YEARS
+  const decades: number[] = []
+  for (let decade = currentDecade; decade >= FIRST_RELEASE_DECADE; decade -= DECADE_YEARS) {
+    decades.push(decade)
+  }
+  return decades
+}
 
-export function decadeReleaseRange(decade: ReleaseDecade): ReleaseRange {
-  return { fromYear: decade, toYear: decade + DECADE_YEARS - 1 }
+export function decadeReleaseRange(
+  decade: number,
+  currentYear: number,
+): ReleaseRange {
+  return {
+    fromYear: decade,
+    toYear: Math.min(decade + DECADE_YEARS - 1, currentYear),
+  }
 }
 
 export function releaseRangeDecade(
   range: ReleaseRange | null,
-): ReleaseDecade | null {
+  currentYear: number,
+): number | null {
+  if (range === null) {
+    return null
+  }
+
   return (
-    RELEASE_DECADES.find(
-      (decade) =>
-        range?.fromYear === decade &&
-        range.toYear === decade + DECADE_YEARS - 1,
-    ) ?? null
+    releaseDecades(currentYear).find((decade) => {
+      const candidate = decadeReleaseRange(decade, currentYear)
+      return (
+        range.fromYear === candidate.fromYear &&
+        range.toYear === candidate.toYear
+      )
+    }) ?? null
   )
 }
 

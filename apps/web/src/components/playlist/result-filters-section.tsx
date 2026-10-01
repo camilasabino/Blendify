@@ -1,17 +1,20 @@
 import { useId } from 'react'
 import { CalendarRange, MicVocal } from 'lucide-react'
-import type {
-  SelectionFilterName,
-  SelectionFilters,
+import {
+  SELECTION_FILTER_SUPPORT,
+  supportedSelectionFilters,
+  supportsAnySelectionFilter,
+  type PlaylistKind,
+  type SelectionFilters,
 } from '@blendify/contracts'
 import { RegionSelect } from '@/components/genres/region-select'
 import { FilterSelect } from '@/components/playlist/filter-select'
+import { selectionFilterLabels } from '@/components/playlist/generation-options'
 import {
   decadeReleaseRange,
-  RELEASE_DECADES,
+  releaseDecades,
   releaseRangeDecade,
   releaseRangeLabel,
-  type ReleaseDecade,
 } from '@/components/playlist/release-decades'
 import { FormSection } from '@/components/ui/form-section'
 import { Label } from '@/components/ui/label'
@@ -21,27 +24,49 @@ import { useT } from '@/i18n/use-t'
 
 type ResultFiltersSectionProps = Readonly<{
   step: number
-  supported: Readonly<Record<SelectionFilterName, boolean>>
+  kind: PlaylistKind
   filters: SelectionFilters
   onChange: (filters: SelectionFilters) => void
+  expanded: boolean
+  onToggle: () => void
   regionHintKey: MessageKey
 }>
 
 export function ResultFiltersSection({
   step,
-  supported,
+  kind,
   filters,
   onChange,
+  expanded,
+  onToggle,
   regionHintKey,
 }: ResultFiltersSectionProps) {
   const t = useT()
 
-  if (!Object.values(supported).includes(true)) {
+  if (!supportsAnySelectionFilter(kind)) {
     return null
   }
 
+  const supported = SELECTION_FILTER_SUPPORT[kind]
+  const currentYear = new Date().getFullYear()
+  const activeLabels = selectionFilterLabels(
+    supportedSelectionFilters(kind, filters),
+    t,
+  )
+
   return (
-    <FormSection step={step} title={t('create.refineResults')}>
+    <FormSection
+      step={step}
+      title={t('create.refineResults')}
+      disclosure={{
+        expanded,
+        onToggle,
+        summary:
+          activeLabels.length > 0
+            ? activeLabels.join(' · ')
+            : t('create.refineResultsNone'),
+      }}
+    >
       <div className="space-y-5">
         {supported.region ? (
           <RegionSelect
@@ -65,24 +90,28 @@ export function ResultFiltersSection({
           />
         ) : null}
         {supported.releaseRange ? (
-          <FilterSelect<ReleaseDecade | null>
+          <FilterSelect<number | null>
             label={t('create.decade')}
             hint={t('create.decadeHint')}
             icon={CalendarRange}
-            value={releaseRangeDecade(filters.releaseRange)}
+            value={releaseRangeDecade(filters.releaseRange, currentYear)}
             isActive={filters.releaseRange !== null}
             onChange={(decade) =>
               onChange({
                 ...filters,
-                releaseRange: decade === null ? null : decadeReleaseRange(decade),
+                releaseRange:
+                  decade === null ? null : decadeReleaseRange(decade, currentYear),
               })
             }
             options={[
               { id: null, key: 'any', label: t('create.decadeAny') },
-              ...RELEASE_DECADES.map((decade) => ({
+              ...releaseDecades(currentYear).map((decade) => ({
                 id: decade,
                 key: String(decade),
-                label: releaseRangeLabel(decadeReleaseRange(decade), t),
+                label: releaseRangeLabel(
+                  decadeReleaseRange(decade, currentYear),
+                  t,
+                ),
               })),
             ]}
           />

@@ -10,9 +10,10 @@ import {
 import {
   MAX_TRACKS,
   MIN_DISCOVER_TRACKS,
-  SELECTION_FILTER_SUPPORT,
   DiscoverTrackTargetSchema,
+  activeSelectionFilters,
   emptySelectionFilters,
+  supportedSelectionFilters,
   type SelectionFilters,
   type TrackDto,
 } from '@blendify/contracts'
@@ -196,6 +197,7 @@ export function DiscoverPlaylistForm() {
   const [artist, setArtist] = useState<Artist | null>(null)
   const [track, setTrack] = useState<TrackDto | null>(null)
   const [filters, setFilters] = useState<SelectionFilters>(emptySelectionFilters)
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [preparingMode, setPreparingMode] = useState<AppMode>(capabilities.mode)
   const [isPreparing, setIsPreparing] = useState(false)
   const copiedLink = useCopiedLink()
@@ -373,6 +375,12 @@ export function DiscoverPlaylistForm() {
   }
 
   function adjustAndRecreate() {
+    if (
+      activeSelectionFilters(supportedSelectionFilters(discoverKind, filters))
+        .length > 0
+    ) {
+      setFiltersExpanded(true)
+    }
     settingsCollapse.expandSettings()
     focusSettings()
   }
@@ -382,6 +390,7 @@ export function DiscoverPlaylistForm() {
     setArtist(null)
     setTrack(null)
     setFilters(emptySelectionFilters())
+    setFiltersExpanded(false)
     playlistRun.dismiss()
     copiedLink.reset()
     form.reset(DEFAULT_VALUES)
@@ -533,9 +542,11 @@ export function DiscoverPlaylistForm() {
 
             <ResultFiltersSection
               step={3}
-              supported={SELECTION_FILTER_SUPPORT[discoverKind]}
+              kind={discoverKind}
               filters={filters}
               onChange={setFilters}
+              expanded={filtersExpanded}
+              onToggle={() => setFiltersExpanded((expanded) => !expanded)}
               regionHintKey="discover.regionHint"
             />
 

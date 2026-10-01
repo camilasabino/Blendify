@@ -14,7 +14,7 @@ import {
 import {
   MAX_ARTISTS,
   MAX_GENRES,
-  SELECTION_FILTER_SUPPORT,
+  activeSelectionFilters,
   emptySelectionFilters,
   supportedSelectionFilters,
   supportsAnySelectionFilter,
@@ -341,6 +341,7 @@ export function MixPlaylistForm() {
   const [filters, setFilters] = useState<SelectionFilters>(
     emptySelectionFilters,
   )
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
   const genreLabel = useGenreLabel()
   const genreMixPlaylistName = useGenreMixPlaylistName()
   const [pasteList, setPasteList] = useState('')
@@ -616,6 +617,11 @@ export function MixPlaylistForm() {
   }
 
   function adjustAndRecreate() {
+    if (
+      activeSelectionFilters(supportedSelectionFilters(mixKind, filters)).length > 0
+    ) {
+      setFiltersExpanded(true)
+    }
     settingsCollapse.expandSettings()
     focusSettings()
   }
@@ -625,6 +631,7 @@ export function MixPlaylistForm() {
     setArtists([])
     setGenres([])
     setFilters(emptySelectionFilters())
+    setFiltersExpanded(false)
     setPasteList('')
     setPasteOpen(false)
     setResolveError(null)
@@ -795,9 +802,11 @@ export function MixPlaylistForm() {
 
             <ResultFiltersSection
               step={3}
-              supported={SELECTION_FILTER_SUPPORT[mixKind]}
+              kind={mixKind}
               filters={filters}
               onChange={setFilters}
+              expanded={filtersExpanded}
+              onToggle={() => setFiltersExpanded((expanded) => !expanded)}
               regionHintKey="create.regionHint"
             />
 

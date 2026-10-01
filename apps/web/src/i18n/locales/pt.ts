@@ -90,6 +90,7 @@ export const pt: Record<MessageKey, string> = {
   'create.artists': 'Artistas',
   'create.genres': 'Gêneros',
   'create.refineResults': 'Refinar resultados',
+  'create.refineResultsNone': 'Opcional · Sem filtros',
   'create.region': 'Região',
   'create.regionAny': 'Qualquer região',
   'create.regionHint': 'Opcional · Filtra os artistas por região para todos os gêneros selecionados.',

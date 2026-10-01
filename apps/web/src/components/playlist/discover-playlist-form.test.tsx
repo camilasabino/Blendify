@@ -130,6 +130,11 @@ describe('DiscoverPlaylistForm after an unconfirmed Spotify creation', () => {
 describe('DiscoverPlaylistForm region filter', () => {
   beforeEach(() => {
     usePlaylistRunStore.getState().discard()
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-01T12:00:00Z') })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   const stay = {
@@ -168,6 +173,10 @@ describe('DiscoverPlaylistForm region filter', () => {
     const user = userEvent.setup()
     renderWithProviders(<DiscoverPlaylistForm />, { route: '/app/discover' })
 
+    const toggle = screen.getByRole('button', { name: 'Refine results' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: /Region/ })).toBeNull()
+    await user.click(toggle)
     const section = screen
       .getByRole('heading', { name: 'Refine results' })
       .closest('section')!
@@ -191,6 +200,10 @@ describe('DiscoverPlaylistForm region filter', () => {
     expect(screen.getByText(/^Sade · Argentina · /)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Try different settings' }))
+    expect(screen.getByRole('button', { name: 'Refine results' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
     await user.click(screen.getByRole('radio', { name: 'Song' }))
     expect(screen.getByRole('button', { name: /Region/ })).toHaveTextContent(
       'Argentina',
@@ -245,6 +258,7 @@ describe('DiscoverPlaylistForm region filter', () => {
     const user = userEvent.setup()
     renderWithProviders(<DiscoverPlaylistForm />, { route: '/app/discover' })
 
+    await user.click(screen.getByRole('button', { name: 'Refine results' }))
     const section = screen
       .getByRole('heading', { name: 'Refine results' })
       .closest('section')!
@@ -272,7 +286,7 @@ describe('DiscoverPlaylistForm region filter', () => {
     )
     expect(decades).toEqual([
       'Any',
-      '2020–2029',
+      '2020–2026',
       '2010–2019',
       '2000–2009',
       '1990–1999',
