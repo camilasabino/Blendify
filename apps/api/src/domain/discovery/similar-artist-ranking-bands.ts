@@ -19,8 +19,9 @@ export function orderBySimilarityRankingBands<T>(ranked: readonly T[]): T[] {
       band.credit += band.weight;
     }
 
-    const next = open.reduce((best, band) =>
-      band.credit > best.credit ? band : best,
+    const next = open.reduce(
+      (best, band) => (band.credit > best.credit ? band : best),
+      open[0],
     );
     next.credit -= totalWeight;
     ordered.push(next.queue.shift() as T);

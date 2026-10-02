@@ -1,4 +1,5 @@
 import { SpotifyAccountRestrictedError } from '@/infrastructure/spotify/spotify-auth.errors';
+import { stripTrailingSlashes } from './strip-trailing-slashes';
 
 /**
  * Product-level outcomes of a failed Spotify login. They are the only auth
@@ -39,7 +40,7 @@ export function classifyCallbackFailure(error: unknown): AuthCallbackError {
 }
 
 function frontendOrigin(frontendUrl: string): string {
-  return frontendUrl.replace(/\/+$/, '');
+  return stripTrailingSlashes(frontendUrl);
 }
 
 export function postLoginRedirectUrl(frontendUrl: string): string {

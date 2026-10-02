@@ -117,6 +117,7 @@ function SearchComboboxOptions<T extends { id: string }>({
               <div
                 id={optionId(index)}
                 role="option"
+                tabIndex={-1}
                 aria-selected={active}
                 aria-disabled={selected || disabled || undefined}
                 onMouseEnter={() => !selected && onHover(index)}

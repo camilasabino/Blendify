@@ -24,7 +24,7 @@ export function LastFmAttribution({
           focusRing,
         )}
       >
-        Last.fm
+        {'Last.fm'}
         <span className="sr-only"> {t('common.opensNewTab')}</span>
       </a>
     </p>

@@ -8,6 +8,7 @@ import {
   type RequestHandler,
   type Response,
 } from 'express';
+import { stripTrailingSlashes } from './strip-trailing-slashes';
 
 export const BODY_LIMITS = {
   default: '16kb',
@@ -144,6 +145,6 @@ function matchesPath(pattern: string[], segments: string[]): boolean {
 }
 
 function normalizePath(path: string): string {
-  const trimmed = path.replace(/\/+$/, '');
+  const trimmed = stripTrailingSlashes(path);
   return (trimmed || '/').toLowerCase();
 }

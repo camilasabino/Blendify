@@ -114,14 +114,14 @@ export function AppShell() {
     }
     const returnTarget = consumeAppReturnTarget()
     if (returnTarget) {
-      navigate(returnTarget, { replace: true })
+      void navigate(returnTarget, { replace: true })
     }
   }, [location.pathname, navigate])
 
   function forgetUserScopedQueries() {
     clearStoredAiSession()
     for (const queryKey of USER_SCOPED_QUERY_KEYS) {
-      queryClient.cancelQueries({ queryKey })
+      void queryClient.cancelQueries({ queryKey })
       queryClient.removeQueries({ queryKey })
     }
   }
@@ -133,7 +133,7 @@ export function AppShell() {
 
   async function logOut() {
     cancelActiveGenerations()
-    navigate(APP_HOME_PATH, { replace: true, state: null })
+    void navigate(APP_HOME_PATH, { replace: true, state: null })
     try {
       await logout()
     } finally {
@@ -165,7 +165,7 @@ export function AppShell() {
       // Only the deleted session navigates, and only once it is really gone.
       // Navigating before the request and undoing it on failure raced with the
       // route guard's own redirect and could strand the user on the App Home.
-      navigate(APP_HOME_PATH, { replace: true, state: null })
+      void navigate(APP_HOME_PATH, { replace: true, state: null })
       setDeleteOpen(false)
       cancelActiveGenerations()
       forgetUserScopedQueries()
@@ -177,7 +177,7 @@ export function AppShell() {
   }
 
   function dismissSpotifyRequired() {
-    navigate(location.pathname, { replace: true, state: null })
+    void navigate(location.pathname, { replace: true, state: null })
   }
 
   return (

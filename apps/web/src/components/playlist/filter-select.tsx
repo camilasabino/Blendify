@@ -97,6 +97,7 @@ export function FilterSelect<T>({
             ref={popover.panelRef}
             id={listboxId}
             role="listbox"
+            tabIndex={-1}
             aria-labelledby={triggerId}
             data-popover-panel
             data-placement={popover.placement}

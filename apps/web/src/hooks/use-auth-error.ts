@@ -37,7 +37,7 @@ export function useAuthError(): AuthErrorReport {
 
     params.delete(AUTH_ERROR_PARAM)
     const search = params.toString()
-    navigate(
+    void navigate(
       { pathname: location.pathname, search: search ? `?${search}` : '' },
       { replace: true },
     )

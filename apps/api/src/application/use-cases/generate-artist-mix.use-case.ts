@@ -76,6 +76,10 @@ type ArtistSourceAcceptance = {
   exhaustChart: boolean;
 };
 
+const UNFILTERED_ARTIST_SOURCE_ACCEPTANCE: ArtistSourceAcceptance = {
+  exhaustChart: false,
+};
+
 type ArtistTrackSource = {
   artist: Artist;
   exhaustChart: boolean;
@@ -321,7 +325,7 @@ export class GenerateArtistMixUseCase {
     mode: PopularityModeValue,
     tracker?: GenerationProgressTracker,
     maxTracks?: number,
-    acceptance: ArtistSourceAcceptance = { exhaustChart: false },
+    acceptance: ArtistSourceAcceptance = UNFILTERED_ARTIST_SOURCE_ACCEPTANCE,
   ): Promise<Map<string, Track[]>> {
     const totalNeeded = Math.min(
       artists.length * tracksPerSeed,

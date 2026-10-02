@@ -2,7 +2,7 @@ import type { Track } from './track.entity';
 
 const QUALIFIER_SEPARATORS = [' - ', ' – ', ' — '];
 const BRACKETED_QUALIFIER = /[([]([^()[\]]+)[)\]]/g;
-const QUALIFIER_PART_SEPARATOR = /\s*[/,;:|]\s*/;
+const QUALIFIER_PART_SEPARATOR = /[/,;:|]/;
 
 const LIVE_PHRASES = [
   /\blive (at|from|in|on)\b/,
@@ -37,6 +37,7 @@ function isLiveAlbum(albumName: string | undefined): boolean {
 function isLiveQualifier(qualifier: string): boolean {
   return qualifier
     .split(QUALIFIER_PART_SEPARATOR)
+    .map((part) => part.trim())
     .some(
       (part) =>
         LIVE_QUALIFIER.test(part) ||
