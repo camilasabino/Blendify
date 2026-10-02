@@ -4,6 +4,7 @@ import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import type { CatalogProviderPort } from '@/domain/repositories/catalog-provider.port';
 import type { DiscoveryCatalogPort } from '@/domain/repositories/discovery-catalog.port';
 import { ArtistId } from '@/domain/value-objects/artist-id.vo';
+import { seedResolveAttemptLimit } from '@/domain/genre/catalog-resolve';
 import { ARTIST_MIX_WORK_POLICY } from './artist-mix-work-policy';
 import { GenerateDiscoverPlaylistUseCase } from './generate-discover-playlist.use-case';
 import { GeneratePlaylistUseCase } from './generate-playlist.use-case';
@@ -525,7 +526,7 @@ describe('coverage-first-bounded partial semantics', () => {
           !/live/i.test(`${track.name} ${track.albumName ?? ''}`),
       ),
     ).toBe(true);
-    expect(world.catalog.searchTracks).toHaveBeenCalledTimes(4);
+    expect(world.catalog.searchTracks).toHaveBeenCalledTimes(10);
   });
 
   it('keeps NO_TRACKS_FOUND when nothing valid is found', async () => {
@@ -565,9 +566,9 @@ describe('legacy Artist Mix regressions', () => {
     jest.restoreAllMocks();
   });
 
-  it('still walks past the Discover cap to refill a filtered Mix', async () => {
+  it('refills a filtered Mix from the residual chart without exhausting it', async () => {
     const world = filteredWorld({ Sade: titles('Sade', 50) }, (index) =>
-      index >= 40 && index < 45
+      index < 5
         ? { releaseDate: '2023-01-01', releaseDatePrecision: 'day' }
         : { releaseDate: '2015-01-01', releaseDatePrecision: 'day' },
     );
@@ -582,7 +583,13 @@ describe('legacy Artist Mix regressions', () => {
     });
 
     expect(playlist.tracks).toHaveLength(5);
-    expect(world.resolveTrack.mock.calls.length).toBeGreaterThan(40);
+    expect(world.catalog.searchTracks).toHaveBeenCalledWith(
+      'artist:"Sade" year:2020-2026',
+      { limit: 10, offset: 0 },
+    );
+    expect(world.resolveTrack.mock.calls.length).toBeLessThanOrEqual(
+      seedResolveAttemptLimit(5),
+    );
   });
 });
 

@@ -1,8 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  PopularityMode,
   type PlaylistGeneration,
   type PlaylistSeedDto,
   type PopularityMode as PopularityModeValue,
+  type ReleaseRange,
 } from '@blendify/contracts';
 import {
   CATALOG_MATCH_SEARCH_LIMIT,
@@ -76,14 +78,20 @@ import {
 const PER_ARTIST_FETCH_OVER_FETCH = 3;
 const ARTIST_CHART_TRACK_LIMIT = 50;
 
+type ClosedReleaseSpan = {
+  fromYear: number;
+  toYear: number;
+};
+
 type ArtistSourceAcceptance = {
   acceptTrack?: TrackAcceptance;
   /**
-   * Hard track filters reject resolved candidates, so a filtered mix keeps
-   * resolving the already loaded chart (bounded by its length) instead of
-   * stopping at the unfiltered over-fetch budget.
+   * Live-only filtering can walk the loaded chart. A closed release range
+   * does not: Last.fm has no year, so that walk stays inside the normal
+   * attempt limit after the year-aware search.
    */
   exhaustChart: boolean;
+  releaseSpan?: ClosedReleaseSpan | null;
 };
 
 const UNFILTERED_ARTIST_SOURCE_ACCEPTANCE: ArtistSourceAcceptance = {
@@ -101,6 +109,7 @@ type ArtistTrackSource = {
   exhausted: boolean;
   chartExhausted: boolean;
   fallbackPage?: Track[];
+  releaseSpan: ClosedReleaseSpan | null;
 };
 
 function isPendingArtistId(id: string): boolean {
@@ -162,6 +171,7 @@ export class GenerateArtistMixUseCase {
       });
 
     const trackFilters = trackSelectionFilters(input.filters);
+    const releaseSpan = closedReleaseSpan(trackFilters.releaseRange);
     const tracksByArtist = await this.fetchTracksForMix(
       catalog,
       artists,
@@ -174,7 +184,9 @@ export class GenerateArtistMixUseCase {
           trackFilters,
           options?.acceptTrack,
         ),
-        exhaustChart: hasTrackSelectionFilters(trackFilters),
+        exhaustChart:
+          hasTrackSelectionFilters(trackFilters) && releaseSpan === null,
+        releaseSpan,
       },
       options?.workPolicy,
     );
@@ -376,7 +388,9 @@ export class GenerateArtistMixUseCase {
     // Small over-fetch first; a seed that runs dry is topped up below.
     const fetchBudget = Math.min(
       MAX_TRACKS,
-      tracksPerSeed + PER_ARTIST_FETCH_OVER_FETCH,
+      acceptance.releaseSpan
+        ? tracksPerSeed
+        : tracksPerSeed + PER_ARTIST_FETCH_OVER_FETCH,
     );
     for (const source of sources) {
       this.quota.assertAvailable();
@@ -445,6 +459,7 @@ export class GenerateArtistMixUseCase {
       const source = this.createArtistSource(artist, {
         acceptTrack: acceptance.acceptTrack,
         exhaustChart: false,
+        releaseSpan: acceptance.releaseSpan,
       });
       source.pool.growTarget(quotas[index] ?? 0);
       return source;
@@ -458,21 +473,38 @@ export class GenerateArtistMixUseCase {
     };
     reportMatched();
 
+    const chartMode = acceptance.releaseSpan ? PopularityMode.BALANCED : mode;
+    if (acceptance.releaseSpan) {
+      await this.primeClosedReleaseSearches(
+        guarded,
+        sources,
+        quotas,
+        totalNeeded,
+        acceptance.releaseSpan,
+        reportMatched,
+      );
+      if (sumPoolSizes(sources) >= totalNeeded) {
+        return tracksByArtist(sources);
+      }
+    }
+
     await this.coverSourcesRoundRobin(
       guarded,
       sources,
       quotas,
       budget,
-      mode,
+      chartMode,
       reportMatched,
     );
-    await this.fallbackInsufficientSources(
-      guarded,
-      sources,
-      quotas,
-      budget,
-      reportMatched,
-    );
+    if (!acceptance.releaseSpan) {
+      await this.fallbackInsufficientSources(
+        guarded,
+        sources,
+        quotas,
+        budget,
+        reportMatched,
+      );
+    }
     phase.current = 'redistribution';
     await this.expandSourcesRoundRobin(
       guarded,
@@ -480,16 +512,37 @@ export class GenerateArtistMixUseCase {
       quotas,
       totalNeeded,
       budget,
-      mode,
+      chartMode,
       reportMatched,
     );
 
-    return new Map(
-      sources.map((source) => [
-        source.artist.id.getValue(),
-        source.pool.tracks,
-      ]),
-    );
+    return tracksByArtist(sources);
+  }
+
+  private async primeClosedReleaseSearches(
+    catalog: CatalogProviderPort,
+    sources: ArtistTrackSource[],
+    quotas: readonly number[],
+    totalNeeded: number,
+    span: ClosedReleaseSpan,
+    reportMatched: () => void,
+  ): Promise<void> {
+    for (const [index, source] of sources.entries()) {
+      if (sumPoolSizes(sources) >= totalNeeded) {
+        break;
+      }
+      if (source.pool.size >= (quotas[index] ?? 0) || source.searched) {
+        continue;
+      }
+
+      this.quota.assertAvailable();
+      await this.searchAndCacheFallback(
+        catalog,
+        source,
+        artistYearSearchQuery(source.artist.name, span),
+      );
+      drainFallbackPage(source, reportMatched);
+    }
   }
 
   private async coverSourcesRoundRobin(
@@ -654,16 +707,14 @@ export class GenerateArtistMixUseCase {
   private async searchAndCacheFallback(
     catalog: CatalogProviderPort,
     source: ArtistTrackSource,
+    query = `artist:"${source.artist.name}"`,
   ): Promise<void> {
     source.searched = true;
     try {
-      source.fallbackPage = await catalog.searchTracks(
-        `artist:"${source.artist.name}"`,
-        {
-          limit: CATALOG_MATCH_SEARCH_LIMIT,
-          offset: 0,
-        },
-      );
+      source.fallbackPage = await catalog.searchTracks(query, {
+        limit: CATALOG_MATCH_SEARCH_LIMIT,
+        offset: 0,
+      });
     } catch (error) {
       source.fallbackPage = [];
       if (error instanceof CatalogUnavailableError) {
@@ -688,7 +739,7 @@ export class GenerateArtistMixUseCase {
 
   private createArtistSource(
     artist: Artist,
-    { acceptTrack, exhaustChart }: ArtistSourceAcceptance,
+    { acceptTrack, exhaustChart, releaseSpan }: ArtistSourceAcceptance,
   ): ArtistTrackSource {
     return {
       artist,
@@ -703,6 +754,7 @@ export class GenerateArtistMixUseCase {
       searched: false,
       exhausted: false,
       chartExhausted: false,
+      releaseSpan: releaseSpan ?? null,
     };
   }
 
@@ -721,6 +773,12 @@ export class GenerateArtistMixUseCase {
   ): Promise<void> {
     source.pool.growTarget(target);
 
+    if (source.releaseSpan) {
+      await this.fillReleaseRangeSource(catalog, source, onMatched);
+      source.exhausted = !source.pool.isFull;
+      return;
+    }
+
     await this.fillFromLastFm(catalog, source, mode, onMatched);
     if (!source.pool.isFull && !source.searched) {
       this.quota.assertAvailable();
@@ -729,6 +787,36 @@ export class GenerateArtistMixUseCase {
     }
 
     source.exhausted = !source.pool.isFull;
+  }
+
+  private async fillReleaseRangeSource(
+    catalog: CatalogProviderPort,
+    source: ArtistTrackSource,
+    onMatched?: () => void,
+  ): Promise<void> {
+    const span = source.releaseSpan;
+    if (!span) {
+      return;
+    }
+
+    if (!source.searched) {
+      this.quota.assertAvailable();
+      await this.searchAndCacheFallback(
+        catalog,
+        source,
+        artistYearSearchQuery(source.artist.name, span),
+      );
+      drainFallbackPage(source, onMatched);
+    }
+
+    if (!source.pool.isFull) {
+      await this.fillFromLastFm(
+        catalog,
+        source,
+        PopularityMode.BALANCED,
+        onMatched,
+      );
+    }
   }
 
   private async appendArtistSearchFallback(
@@ -833,6 +921,30 @@ export class GenerateArtistMixUseCase {
       track.artistName.trim().toLowerCase() === artist.name.trim().toLowerCase()
     );
   }
+}
+
+function tracksByArtist(
+  sources: readonly ArtistTrackSource[],
+): Map<string, Track[]> {
+  return new Map(
+    sources.map((source) => [source.artist.id.getValue(), source.pool.tracks]),
+  );
+}
+
+function closedReleaseSpan(
+  range: ReleaseRange | null,
+): ClosedReleaseSpan | null {
+  if (range?.fromYear === undefined || range.toYear === undefined) {
+    return null;
+  }
+  return { fromYear: range.fromYear, toYear: range.toYear };
+}
+
+function artistYearSearchQuery(
+  artistName: string,
+  span: ClosedReleaseSpan,
+): string {
+  return `artist:"${artistName}" year:${span.fromYear}-${span.toYear}`;
 }
 
 function sumPoolSizes(sources: readonly ArtistTrackSource[]): number {

@@ -1,4 +1,5 @@
 import { PopularityMode, type SelectionFilters } from '@blendify/contracts';
+import { seedResolveAttemptLimit } from '@/domain/genre/catalog-resolve';
 import type {
   ArtistTagCandidate,
   SimilarTrackCandidate,
@@ -102,7 +103,8 @@ describe('selection filters target fulfillment', () => {
     }
 
     it('keeps exploring the loaded chart until the decade target is met', async () => {
-      const eighties = [0, 3, 7, 12, 18, 25, 33, 38, 41, 47].map(
+      jest.spyOn(Math, 'random').mockReturnValue(0.999);
+      const eighties = [0, 4, 8, 12, 16, 20, 22, 24, 26, 28].map(
         (index) => chart[index],
       );
       const { run } = sodaStereo(
@@ -213,6 +215,7 @@ describe('selection filters target fulfillment', () => {
     });
 
     it('returns the genuine shortfall without relaxing the decade', async () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0.999);
       const { run, world } = sodaStereo(
         yearsOf([
           [chart, 2005],
@@ -225,7 +228,14 @@ describe('selection filters target fulfillment', () => {
       const playlist = await run();
 
       expect(playlist.tracks).toHaveLength(4);
-      expect(world.resolveTrack).toHaveBeenCalledTimes(chart.length);
+      expect(world.resolveTrack.mock.calls.length).toBeLessThanOrEqual(
+        seedResolveAttemptLimit(10),
+      );
+      expect(world.resolveTrack.mock.calls.length).toBeLessThan(chart.length);
+      expect(world.catalog.searchTracks).toHaveBeenCalledWith(
+        'artist:"Soda Stereo" year:1980-1989',
+        { limit: 10, offset: 0 },
+      );
       expect(
         playlist.tracks.every((track) => track.releaseDate === '1987-01-01'),
       ).toBe(true);
@@ -248,12 +258,13 @@ describe('selection filters target fulfillment', () => {
       const inRange = new Set(eighties);
       expect(playlist.tracks).toHaveLength(10);
       expect(resolved.length).toBeLessThan(chart.length);
-      expect(resolved.filter((title) => inRange.has(title))).toHaveLength(
-        ARTIST_FETCH_BUDGET,
-      );
+      expect(resolved.filter((title) => inRange.has(title))).toHaveLength(10);
       expect(inRange.has(resolved[resolved.length - 1])).toBe(true);
       expect(new Set(resolved).size).toBe(resolved.length);
-      expect(world.catalog.searchTracks).not.toHaveBeenCalled();
+      expect(world.catalog.searchTracks).toHaveBeenCalledWith(
+        'artist:"Soda Stereo" year:1980-1989',
+        { limit: 10, offset: 0 },
+      );
     });
 
     it('stops resolving chart entries once the live filter target is fulfilled', async () => {
@@ -328,16 +339,18 @@ describe('selection filters target fulfillment', () => {
       async (filter) => {
         const { world } = sodaStereo({}, {});
 
-        await expect(
-          world.artistMix.execute({
-            kind: 'artist_mix',
-            artistIds: ['soda-stereo'],
-            artists: [artistSnapshot('Soda Stereo')],
-            tracksPerSeed: 5,
-            popularity: PopularityMode.BALANCED,
-            filters: { ...INACTIVE, ...filter },
-          }),
-        ).rejects.toThrow();
+        const pending = world.artistMix.execute({
+          kind: 'artist_mix',
+          artistIds: ['soda-stereo'],
+          artists: [artistSnapshot('Soda Stereo')],
+          tracksPerSeed: 5,
+          popularity: PopularityMode.BALANCED,
+          filters: { ...INACTIVE, ...filter },
+        });
+        // Math.random is pinned to 0 above. Jest's source-map sort calls
+        // Math.random and recurses forever while formatting this rejection.
+        jest.restoreAllMocks();
+        await expect(pending).rejects.toThrow();
         expect(world.resolveTrack).not.toHaveBeenCalled();
       },
     );
