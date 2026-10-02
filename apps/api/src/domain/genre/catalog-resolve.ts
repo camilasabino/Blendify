@@ -4,6 +4,7 @@ import type { AcceptedTrackPool } from '@/domain/services/accepted-track-pool';
 import type { CatalogChartCursor, CatalogTrackRef } from './catalog-window';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import { CatalogWorkBudgetExhaustedError } from '@/domain/errors/catalog-work-budget.error';
 
 /** Serial resolves — Dev Mode cannot sustain parallel search bursts. */
 const DEFAULT_CONCURRENCY = 1;
@@ -98,7 +99,10 @@ export async function resolveCatalogRef(
       artistId,
     });
   } catch (error) {
-    if (isFatalCatalogError(error)) {
+    if (
+      isFatalCatalogError(error) ||
+      error instanceof CatalogWorkBudgetExhaustedError
+    ) {
       throw error;
     }
     return null;

@@ -63,6 +63,7 @@ import {
   GenerateDiscoverPlaylistDto,
   GenerateDiscoverPlaylistSchema,
 } from '@/application/dto/generate-discover-playlist.dto';
+import { ARTIST_MIX_WORK_POLICY } from './artist-mix-work-policy';
 import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import {
   GenerationProgressTracker,
@@ -253,7 +254,11 @@ export class GenerateDiscoverPlaylistUseCase {
           orderMode: input.orderMode,
         },
       },
-      { onProgress, acceptTrack },
+      {
+        onProgress,
+        acceptTrack,
+        workPolicy: ARTIST_MIX_WORK_POLICY.COVERAGE_FIRST_BOUNDED,
+      },
     );
   }
 

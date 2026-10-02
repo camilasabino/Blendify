@@ -34,6 +34,7 @@ import {
 } from '@/domain/services/accepted-track-pool';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import { CatalogWorkBudgetExhaustedError } from '@/domain/errors/catalog-work-budget.error';
 import { MAX_TRACKS, maxTracksPerSeedForCount } from '@/domain/constants';
 import {
   isFatalCatalogError,
@@ -62,6 +63,15 @@ import {
   trackSelectionFilters,
   withTrackSelectionFilters,
 } from '@/domain/selection-filters/track-selection-filters';
+import {
+  ARTIST_MIX_WORK_POLICY,
+  bindCatalogWorkBudget,
+  createCoverageFirstWorkBudget,
+  initialCoverageQuotas,
+  planCoverageFirstBoundedWork,
+  type ArtistMixWorkPolicy,
+  type CoverageFirstResolveTranche,
+} from './artist-mix-work-policy';
 
 const PER_ARTIST_FETCH_OVER_FETCH = 3;
 const ARTIST_CHART_TRACK_LIMIT = 50;
@@ -89,6 +99,8 @@ type ArtistTrackSource = {
   attempted: number;
   searched: boolean;
   exhausted: boolean;
+  chartExhausted: boolean;
+  fallbackPage?: Track[];
 };
 
 function isPendingArtistId(id: string): boolean {
@@ -110,7 +122,11 @@ export class GenerateArtistMixUseCase {
 
   async execute(
     raw: GenerateArtistMixDto,
-    options?: { onProgress?: ProgressReporter; acceptTrack?: TrackAcceptance },
+    options?: {
+      onProgress?: ProgressReporter;
+      acceptTrack?: TrackAcceptance;
+      workPolicy?: ArtistMixWorkPolicy;
+    },
   ): Promise<GeneratedPlaylist> {
     const input = GenerateArtistMixSchema.parse(raw);
     const tracker = new GenerationProgressTracker(options?.onProgress);
@@ -160,6 +176,7 @@ export class GenerateArtistMixUseCase {
         ),
         exhaustChart: hasTrackSelectionFilters(trackFilters),
       },
+      options?.workPolicy,
     );
 
     const { tracks } = this.generation.generate(
@@ -326,7 +343,20 @@ export class GenerateArtistMixUseCase {
     tracker?: GenerationProgressTracker,
     maxTracks?: number,
     acceptance: ArtistSourceAcceptance = UNFILTERED_ARTIST_SOURCE_ACCEPTANCE,
+    workPolicy?: ArtistMixWorkPolicy,
   ): Promise<Map<string, Track[]>> {
+    if (workPolicy === ARTIST_MIX_WORK_POLICY.COVERAGE_FIRST_BOUNDED) {
+      return this.fetchTracksCoverageFirst(
+        catalog,
+        artists,
+        tracksPerSeed,
+        mode,
+        tracker,
+        maxTracks,
+        acceptance,
+      );
+    }
+
     const totalNeeded = Math.min(
       artists.length * tracksPerSeed,
       maxTracks ?? MAX_TRACKS,
@@ -387,6 +417,275 @@ export class GenerateArtistMixUseCase {
     );
   }
 
+  private async fetchTracksCoverageFirst(
+    catalog: CatalogProviderPort,
+    artists: Artist[],
+    tracksPerSeed: number,
+    mode: PopularityModeValue,
+    tracker?: GenerationProgressTracker,
+    maxTracks?: number,
+    acceptance: ArtistSourceAcceptance = UNFILTERED_ARTIST_SOURCE_ACCEPTANCE,
+  ): Promise<Map<string, Track[]>> {
+    const totalNeeded = Math.min(
+      artists.length * tracksPerSeed,
+      maxTracks ?? MAX_TRACKS,
+    );
+    const quotas = initialCoverageQuotas(artists.length, totalNeeded);
+    const budget = createCoverageFirstWorkBudget(
+      planCoverageFirstBoundedWork({
+        totalNeeded,
+        sourceCount: artists.length,
+      }),
+    );
+    const phase: { current: CoverageFirstResolveTranche } = {
+      current: 'coverage',
+    };
+    const guarded = bindCatalogWorkBudget(catalog, budget, () => phase.current);
+    const sources = artists.map((artist, index) => {
+      const source = this.createArtistSource(artist, {
+        acceptTrack: acceptance.acceptTrack,
+        exhaustChart: false,
+      });
+      source.pool.growTarget(quotas[index] ?? 0);
+      return source;
+    });
+    const reportMatched = () => {
+      tracker?.report(
+        'matching_tracks',
+        Math.min(totalNeeded, sumPoolSizes(sources)),
+        Math.max(1, totalNeeded),
+      );
+    };
+    reportMatched();
+
+    await this.coverSourcesRoundRobin(
+      guarded,
+      sources,
+      quotas,
+      budget,
+      mode,
+      reportMatched,
+    );
+    await this.fallbackInsufficientSources(
+      guarded,
+      sources,
+      quotas,
+      budget,
+      reportMatched,
+    );
+    phase.current = 'redistribution';
+    await this.expandSourcesRoundRobin(
+      guarded,
+      sources,
+      quotas,
+      totalNeeded,
+      budget,
+      mode,
+      reportMatched,
+    );
+
+    return new Map(
+      sources.map((source) => [
+        source.artist.id.getValue(),
+        source.pool.tracks,
+      ]),
+    );
+  }
+
+  private async coverSourcesRoundRobin(
+    catalog: CatalogProviderPort,
+    sources: ArtistTrackSource[],
+    quotas: readonly number[],
+    budget: ReturnType<typeof createCoverageFirstWorkBudget>,
+    mode: PopularityModeValue,
+    reportMatched: () => void,
+  ): Promise<void> {
+    let progressed = true;
+    while (progressed && budget.coverageResolvesRemaining > 0) {
+      progressed = false;
+      if (
+        sources.every(
+          (source, index) => source.pool.size >= (quotas[index] ?? 0),
+        )
+      ) {
+        break;
+      }
+
+      for (const [index, source] of sources.entries()) {
+        if (
+          source.pool.size >= (quotas[index] ?? 0) ||
+          source.chart === null ||
+          source.chartExhausted
+        ) {
+          continue;
+        }
+        if (budget.coverageResolvesRemaining <= 0) {
+          break;
+        }
+        this.quota.assertAvailable();
+        const before = source.attempted;
+        await this.resolveOneFromChart(catalog, source, mode, reportMatched);
+        if (source.attempted !== before) {
+          progressed = true;
+        }
+      }
+    }
+  }
+
+  private async fallbackInsufficientSources(
+    catalog: CatalogProviderPort,
+    sources: ArtistTrackSource[],
+    quotas: readonly number[],
+    budget: ReturnType<typeof createCoverageFirstWorkBudget>,
+    reportMatched: () => void,
+  ): Promise<void> {
+    for (const [index, source] of sources.entries()) {
+      if (source.pool.size >= (quotas[index] ?? 0)) {
+        continue;
+      }
+      if (source.fallbackPage) {
+        drainFallbackPage(source, reportMatched);
+        continue;
+      }
+      if (source.searched || budget.searchesRemaining <= 0) {
+        continue;
+      }
+      this.quota.assertAvailable();
+      await this.searchAndCacheFallback(catalog, source);
+      drainFallbackPage(source, reportMatched);
+    }
+  }
+
+  private async expandSourcesRoundRobin(
+    catalog: CatalogProviderPort,
+    sources: ArtistTrackSource[],
+    quotas: readonly number[],
+    totalNeeded: number,
+    budget: ReturnType<typeof createCoverageFirstWorkBudget>,
+    mode: PopularityModeValue,
+    reportMatched: () => void,
+  ): Promise<void> {
+    let progressed = true;
+    while (progressed && sumPoolSizes(sources) < totalNeeded) {
+      progressed = false;
+      const underQuota = sources.filter(
+        (source, index) =>
+          source.pool.size < (quotas[index] ?? 0) && sourceCanGrow(source),
+      );
+      const candidates =
+        underQuota.length > 0
+          ? underQuota
+          : sources.filter((source) => sourceCanGrow(source));
+      if (candidates.length === 0) {
+        break;
+      }
+
+      for (const source of candidates) {
+        if (sumPoolSizes(sources) >= totalNeeded) {
+          break;
+        }
+        if (source.pool.isFull) {
+          source.pool.growTarget(source.pool.size + 1);
+        }
+        if (drainFallbackPage(source, reportMatched)) {
+          progressed = true;
+          continue;
+        }
+        if (budget.redistributionResolvesRemaining <= 0) {
+          continue;
+        }
+        this.quota.assertAvailable();
+        const attemptedBefore = source.attempted;
+        const sizeBefore = source.pool.size;
+        await this.resolveOneFromChart(catalog, source, mode, reportMatched);
+        if (
+          source.attempted !== attemptedBefore ||
+          source.pool.size !== sizeBefore
+        ) {
+          progressed = true;
+        }
+      }
+    }
+  }
+
+  private async resolveOneFromChart(
+    catalog: CatalogProviderPort,
+    source: ArtistTrackSource,
+    mode: PopularityModeValue,
+    onMatched?: () => void,
+  ): Promise<void> {
+    if (!this.discoveryCatalog.isConfigured() || source.chart === null) {
+      return;
+    }
+
+    try {
+      source.chart ??= await this.loadArtistChart(source.artist, mode);
+      if (!source.chart) {
+        return;
+      }
+
+      const added = await resolveChartIntoPool(
+        catalog,
+        source.chart,
+        source.pool,
+        {
+          concurrency: 1,
+          artistId: source.artist.id.getValue(),
+          maxAttempts: 1,
+          onProgress: () => onMatched?.(),
+        },
+      );
+      source.attempted += added;
+      if (added === 0) {
+        source.chartExhausted = true;
+      }
+    } catch (error) {
+      if (error instanceof CatalogWorkBudgetExhaustedError) {
+        return;
+      }
+      if (isFatalCatalogError(error)) {
+        throw error;
+      }
+      this.logger.warn(`Last.fm track fetch failed: ${errorMessage(error)}`);
+      source.chart = null;
+    }
+  }
+
+  private async searchAndCacheFallback(
+    catalog: CatalogProviderPort,
+    source: ArtistTrackSource,
+  ): Promise<void> {
+    source.searched = true;
+    try {
+      source.fallbackPage = await catalog.searchTracks(
+        `artist:"${source.artist.name}"`,
+        {
+          limit: CATALOG_MATCH_SEARCH_LIMIT,
+          offset: 0,
+        },
+      );
+    } catch (error) {
+      source.fallbackPage = [];
+      if (error instanceof CatalogUnavailableError) {
+        throw error;
+      }
+      if (error instanceof CatalogWorkBudgetExhaustedError) {
+        return;
+      }
+      if (isSpotifyQuotaError(error)) {
+        if (source.pool.size === 0) {
+          throw error;
+        }
+        return;
+      }
+      this.logger.warn(
+        `Artist track search fallback failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
   private createArtistSource(
     artist: Artist,
     { acceptTrack, exhaustChart }: ArtistSourceAcceptance,
@@ -403,6 +702,7 @@ export class GenerateArtistMixUseCase {
       attempted: 0,
       searched: false,
       exhausted: false,
+      chartExhausted: false,
     };
   }
 
@@ -537,6 +837,37 @@ export class GenerateArtistMixUseCase {
 
 function sumPoolSizes(sources: readonly ArtistTrackSource[]): number {
   return sources.reduce((total, source) => total + source.pool.size, 0);
+}
+
+function sourceCanGrow(source: ArtistTrackSource): boolean {
+  if (source.fallbackPage && source.fallbackPage.length > 0) {
+    return true;
+  }
+  return source.chart !== null && !source.chartExhausted;
+}
+
+function drainFallbackPage(
+  source: ArtistTrackSource,
+  onMatched?: () => void,
+): boolean {
+  if (!source.fallbackPage || source.fallbackPage.length === 0) {
+    return false;
+  }
+
+  const remaining: Track[] = [];
+  let offered = false;
+  for (const track of source.fallbackPage) {
+    if (source.pool.isFull) {
+      remaining.push(track);
+      continue;
+    }
+    if (source.pool.offer(track)) {
+      offered = true;
+      onMatched?.();
+    }
+  }
+  source.fallbackPage = remaining;
+  return offered;
 }
 
 function errorMessage(error: unknown): string {
