@@ -1,11 +1,13 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AiSessionDto, PlaylistKind } from '@blendify/contracts'
+import { en } from '@/i18n/locales/en'
 import { useLocaleStore } from '@/i18n/use-locale'
 import { jsonResponse, renderWithProviders, stubApi, type FetchCall } from '@/test/app-harness'
 import { AiPlaylistPage } from './ai-playlist-page'
 
 const PROMPT = '30 deep cuts from Radiohead and Interpol, no Coldplay'
+const DISCOVER_EXAMPLE = en['ai.suggestion.discoverArtist']
 const EXPIRES_AT = '2026-09-27T12:30:00.000Z'
 
 function createdSession(session: AiSessionDto) {
@@ -94,7 +96,10 @@ describe('Create with AI page', () => {
     ).toBeVisible()
     expect(promptField()).toHaveValue('')
     expect(screen.getByRole('button', { name: 'Review request' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Music similar to Björk' })).toBeVisible()
+    expect(screen.getByRole('button', { name: en['ai.suggestion.artists'] })).toBeVisible()
+    expect(screen.getByRole('button', { name: en['ai.suggestion.genres'] })).toBeVisible()
+    expect(screen.getByRole('button', { name: DISCOVER_EXAMPLE })).toBeVisible()
+    expect(screen.getByRole('button', { name: en['ai.suggestion.discoverTrack'] })).toBeVisible()
   })
 
   it('fills the prompt from an example without submitting it', async () => {
@@ -102,9 +107,9 @@ describe('Create with AI page', () => {
     const { calls } = stubApi({})
     renderPage()
 
-    await user.click(screen.getByRole('button', { name: 'Music similar to Björk' }))
+    await user.click(screen.getByRole('button', { name: DISCOVER_EXAMPLE }))
 
-    expect(promptField()).toHaveValue('Music similar to Björk')
+    expect(promptField()).toHaveValue(DISCOVER_EXAMPLE)
     expect(promptField()).toHaveFocus()
     expect(sessionCalls(calls)).toEqual([])
   })
@@ -169,12 +174,8 @@ describe('Create with AI page', () => {
     expect(sessionCalls(calls)).toHaveLength(1)
 
     expect(queryPromptField()).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Music similar to Björk' })).toBeNull()
-    expect(
-      screen.queryByText(
-        'Name artists, a song or genres, and add details like size, familiarity or songs to avoid. Blendify shows what it understood before building anything.',
-      ),
-    ).toBeNull()
+    expect(screen.queryByRole('button', { name: DISCOVER_EXAMPLE })).toBeNull()
+    expect(screen.queryByText(en['ai.subtitle'])).toBeNull()
 
     const requestCard = screen
       .getByRole('heading', { name: 'Your request' })
@@ -628,7 +629,7 @@ describe('Create with AI page', () => {
 
     expect(promptField()).toHaveFocus()
     expect(promptField()).toHaveValue(PROMPT)
-    expect(screen.getByRole('button', { name: 'Music similar to Björk' })).toBeVisible()
+    expect(screen.getByRole('button', { name: DISCOVER_EXAMPLE })).toBeVisible()
     expect(screen.queryByRole('heading', { name: 'Here’s what Blendify understood' })).toBeNull()
 
     await user.type(promptField(), ', around 40 songs')
@@ -657,7 +658,7 @@ describe('Create with AI page', () => {
     expect(promptField()).toHaveFocus()
     expect(screen.queryByRole('heading', { name: 'Here’s what Blendify understood' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Edit request' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Music similar to Björk' })).toBeVisible()
+    expect(screen.getByRole('button', { name: DISCOVER_EXAMPLE })).toBeVisible()
   })
 
   it('wraps a long request in the compact card without truncating it', async () => {

@@ -588,18 +588,22 @@ export const es: Record<MessageKey, string> = {
   'ai.eyebrow': 'Crear con IA',
   'ai.title': 'Describe la playlist que quieres',
   'ai.subtitle':
-    'Nombra artistas, una canción o géneros, y agrega detalles como tamaño, familiaridad o canciones a evitar. Blendify te muestra lo que entendió antes de crear nada.',
+    'Nombra artistas, una canción o géneros, y agrega detalles como tamaño, familiaridad, época, región o música a evitar. Blendify te muestra lo que entendió antes de crear nada.',
   'ai.requestTitle': 'Tu pedido',
   'ai.promptLabel': 'Pedido de playlist',
   'ai.promptPlaceholder':
-    'Por ejemplo: 30 canciones menos conocidas de Soda Stereo y Los Fabulosos Cadillacs, nada de Maná',
+    'Por ejemplo: 25 canciones de indie rock británico entre 2000 y 2015, mezcla de éxitos y temas menos conocidos, en orden aleatorio',
   'ai.promptHint': 'Presiona Ctrl+Enter o ⌘+Enter para enviar.',
   'ai.promptRequired': 'Primero describe la playlist que quieres.',
   'ai.suggestionsLabel': 'Prueba un ejemplo',
-  'ai.suggestion.artists': '30 canciones menos conocidas de Radiohead e Interpol',
-  'ai.suggestion.genres': 'Shoegaze y dream pop, unas 40 canciones',
-  'ai.suggestion.discoverArtist': 'Música parecida a Björk',
-  'ai.suggestion.discoverTrack': 'Empezar desde Teardrop de Massive Attack',
+  'ai.suggestion.artists':
+    '30 canciones menos conocidas de Soda Stereo y Los Fabulosos Cadillacs, sin Maná',
+  'ai.suggestion.genres':
+    'Rock argentino de los 80 y 90, voces femeninas, sin versiones en vivo',
+  'ai.suggestion.discoverArtist':
+    'Música parecida a Björk, menos conocida, de los 90 y los 2000',
+  'ai.suggestion.discoverTrack':
+    '20 canciones parecidas a Teardrop de Massive Attack, sin versiones en vivo',
   'ai.submit': 'Revisar pedido',
   'ai.submitting': 'Leyendo tu pedido…',
   'ai.interpreting': 'Leyendo tu pedido…',

@@ -579,18 +579,21 @@ export const en = {
   'ai.eyebrow': 'Create with AI',
   'ai.title': 'Describe the playlist you want',
   'ai.subtitle':
-    'Name artists, a song or genres, and add details like size, familiarity or songs to avoid. Blendify shows what it understood before building anything.',
+    'Name artists, a song or genres, and add details like size, familiarity, era, region, or music to avoid. Blendify shows what it understood before building anything.',
   'ai.requestTitle': 'Your request',
   'ai.promptLabel': 'Playlist request',
   'ai.promptPlaceholder':
-    'For example: 30 deep cuts from Radiohead and Interpol, no Coldplay',
+    'For example: 25 British indie rock tracks from 2000 to 2015, a mix of hits and deep cuts, in shuffled order',
   'ai.promptHint': 'Press Ctrl+Enter or ⌘+Enter to submit.',
   'ai.promptRequired': 'Describe the playlist you want first.',
   'ai.suggestionsLabel': 'Try an example',
-  'ai.suggestion.artists': '30 deep cuts from Radiohead and Interpol',
-  'ai.suggestion.genres': 'Shoegaze and dream pop, around 40 songs',
-  'ai.suggestion.discoverArtist': 'Music similar to Björk',
-  'ai.suggestion.discoverTrack': 'Start from Teardrop by Massive Attack',
+  'ai.suggestion.artists': '30 deep cuts from Radiohead and Interpol, no Coldplay',
+  'ai.suggestion.genres':
+    'Argentine rock from the ’80s and ’90s, female vocals, no live versions',
+  'ai.suggestion.discoverArtist':
+    'Music similar to Björk, lesser-known, from the ’90s and 2000s',
+  'ai.suggestion.discoverTrack':
+    '20 songs similar to Teardrop by Massive Attack, no live versions',
   'ai.submit': 'Review request',
   'ai.submitting': 'Reading your request…',
   'ai.interpreting': 'Reading your request…',
