@@ -2,6 +2,7 @@ import asyncio
 import time
 from typing import Protocol
 
+from opentelemetry.trace import TracerProvider
 from pydantic import ValidationError
 
 from app.errors import AiServiceError
@@ -14,6 +15,12 @@ from app.observability.model_call_log import (
     ModelRequestResult,
     log_model_call,
     log_model_request,
+)
+from app.observability.model_call_tracing import (
+    ModelCallSpan,
+    invocation_span,
+    model_call_tracer,
+    use_case_span,
 )
 from app.providers.model_provider import (
     IntentModelProvider,
@@ -61,17 +68,23 @@ class _ProviderRequestFailedError(Exception):
 
 class _ModelCallTrace:
     def __init__(
-        self, operation: ModelOperation, provider: str, model_request: ModelIntentRequest
+        self,
+        operation: ModelOperation,
+        provider: str,
+        model_request: ModelIntentRequest,
+        span: ModelCallSpan,
     ) -> None:
         self._operation: ModelOperation = operation
         self._provider = provider
         self._prompt_version = model_request.prompt_version
+        self._span = span
         self._started_at = time.monotonic()
         self._requests: list[ModelRequestRecord] = []
         self.model: str | None = None
 
     def record_request(
         self,
+        span: ModelCallSpan,
         attempt: int,
         result: ModelRequestResult,
         started_at: float,
@@ -95,6 +108,7 @@ class _ModelCallTrace:
             configuration_reason=configuration_reason,
         )
         self._requests.append(record)
+        span.record_request(record, response_model=model)
         log_model_request(record)
 
     def completed(self, outcome: str) -> None:
@@ -109,19 +123,19 @@ class _ModelCallTrace:
         outcome: str | None,
         error_code: AiServiceErrorCode | None,
     ) -> None:
-        log_model_call(
-            ModelCallRecord(
-                operation=self._operation,
-                provider=self._provider,
-                model=self.model,
-                prompt_version=self._prompt_version,
-                result=result,
-                outcome=outcome,
-                error_code=error_code,
-                requests=tuple(self._requests),
-                duration_ms=_elapsed_ms(self._started_at),
-            )
+        record = ModelCallRecord(
+            operation=self._operation,
+            provider=self._provider,
+            model=self.model,
+            prompt_version=self._prompt_version,
+            result=result,
+            outcome=outcome,
+            error_code=error_code,
+            requests=tuple(self._requests),
+            duration_ms=_elapsed_ms(self._started_at),
         )
+        self._span.record_call(record)
+        log_model_call(record)
 
 
 class StructuredModelCaller:
@@ -132,11 +146,13 @@ class StructuredModelCaller:
         operation: ModelOperation,
         model_call_timeout_seconds: float,
         max_output_validation_attempts: int,
+        tracer_provider: TracerProvider | None = None,
     ) -> None:
         self._provider = provider
         self._operation: ModelOperation = operation
         self._model_call_timeout_seconds = model_call_timeout_seconds
         self._max_output_validation_attempts = max_output_validation_attempts
+        self._tracer = model_call_tracer(tracer_provider)
 
     @property
     def is_available(self) -> bool:
@@ -147,49 +163,78 @@ class StructuredModelCaller:
         model_request: ModelIntentRequest,
         validator: StructuredResultValidator[ResultT],
     ) -> ResultT:
-        trace = _ModelCallTrace(self._operation, self._provider.name, model_request)
+        prompt_version = model_request.prompt_version
+        with use_case_span(self._tracer, self._operation, prompt_version) as call_span:
+            trace = _ModelCallTrace(self._operation, self._provider.name, model_request, call_span)
 
-        for attempt in range(1, self._max_output_validation_attempts + 1):
-            started_at = time.monotonic()
-            try:
-                generated = await self._generate(model_request)
-            except ModelInvalidOutputError as error:
-                trace.record_request(
-                    attempt, "invalid_output", started_at, model=error.model, usage=error.usage
-                )
-                continue
-            except _ProviderRequestFailedError as error:
-                trace.record_request(
-                    attempt,
-                    error.result,
-                    started_at,
-                    configuration_reason=error.configuration_reason,
-                )
-                error_code = ERROR_CODE_BY_REQUEST_RESULT[error.result]
-                trace.failed(error_code)
-                raise AiServiceError(error_code) from None
+            for attempt in range(1, self._max_output_validation_attempts + 1):
+                try:
+                    with invocation_span(
+                        self._tracer,
+                        self._provider.invocation_metadata,
+                        self._operation,
+                        prompt_version,
+                        attempt,
+                    ) as request_span:
+                        result = await self._attempt(
+                            model_request, validator, trace, request_span, attempt
+                        )
+                except _ProviderRequestFailedError as error:
+                    error_code = ERROR_CODE_BY_REQUEST_RESULT[error.result]
+                    trace.failed(error_code)
+                    raise AiServiceError(error_code) from None
 
-            try:
-                result = validator.validate_python(generated.payload)
-            except ValidationError as error:
-                trace.record_request(
-                    attempt,
-                    "invalid_output",
-                    started_at,
-                    model=generated.model,
-                    usage=generated.usage,
-                    validation_error_count=error.error_count(),
-                )
-                continue
+                if result is not None:
+                    trace.completed(result.outcome)
+                    return result
 
+            trace.failed("INVALID_MODEL_OUTPUT")
+            raise AiServiceError("INVALID_MODEL_OUTPUT")
+
+    async def _attempt[ResultT: StructuredResult](
+        self,
+        model_request: ModelIntentRequest,
+        validator: StructuredResultValidator[ResultT],
+        trace: _ModelCallTrace,
+        span: ModelCallSpan,
+        attempt: int,
+    ) -> ResultT | None:
+        started_at = time.monotonic()
+        try:
+            generated = await self._generate(model_request)
+        except ModelInvalidOutputError as error:
             trace.record_request(
-                attempt, "ok", started_at, model=generated.model, usage=generated.usage
+                span, attempt, "invalid_output", started_at, model=error.model, usage=error.usage
             )
-            trace.completed(result.outcome)
-            return result
+            return None
+        except _ProviderRequestFailedError as error:
+            trace.record_request(
+                span,
+                attempt,
+                error.result,
+                started_at,
+                configuration_reason=error.configuration_reason,
+            )
+            raise
 
-        trace.failed("INVALID_MODEL_OUTPUT")
-        raise AiServiceError("INVALID_MODEL_OUTPUT")
+        try:
+            result = validator.validate_python(generated.payload)
+        except ValidationError as error:
+            trace.record_request(
+                span,
+                attempt,
+                "invalid_output",
+                started_at,
+                model=generated.model,
+                usage=generated.usage,
+                validation_error_count=error.error_count(),
+            )
+            return None
+
+        trace.record_request(
+            span, attempt, "ok", started_at, model=generated.model, usage=generated.usage
+        )
+        return result
 
     async def _generate(self, model_request: ModelIntentRequest) -> ModelIntentResult:
         try:

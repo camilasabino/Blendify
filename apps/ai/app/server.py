@@ -7,6 +7,7 @@ import uvicorn
 APP_FACTORY = "app.main:create_app"
 DUAL_STACK_HOST = "::"
 MAX_PORT = 65535
+REQUEST_DRAIN_TIMEOUT_SECONDS = 25
 
 
 class InvalidServerPortError(Exception):
@@ -39,7 +40,13 @@ def bind_dual_stack_socket(port: int) -> socket.socket:
 
 
 def build_server() -> uvicorn.Server:
-    return uvicorn.Server(uvicorn.Config(APP_FACTORY, factory=True))
+    return uvicorn.Server(
+        uvicorn.Config(
+            APP_FACTORY,
+            factory=True,
+            timeout_graceful_shutdown=REQUEST_DRAIN_TIMEOUT_SECONDS,
+        )
+    )
 
 
 def main() -> None:

@@ -6,6 +6,10 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "fastapi>=0.141.1",
     "openai>=3.19.2",
+    "opentelemetry-api>=1.45.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.45.0",
+    "opentelemetry-instrumentation-fastapi>=0.66b0",
+    "opentelemetry-sdk>=1.45.0",
     "pydantic>=2.13.5",
     "uvicorn>=0.54.0",
 ]

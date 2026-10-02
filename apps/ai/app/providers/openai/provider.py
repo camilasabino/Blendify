@@ -13,6 +13,7 @@ from app.providers.model_provider import (
     ModelIntentRequest,
     ModelIntentResult,
     ModelInvalidOutputError,
+    ModelInvocationMetadata,
     ModelOutputSpec,
     ModelProviderConfig,
     ModelProviderSetupError,
@@ -28,6 +29,8 @@ from app.providers.openai.output_schema import (
 )
 
 OPENAI_PROVIDER_NAME = "openai"
+GEN_AI_PROVIDER_NAME = "openai"
+GEN_AI_OPERATION_NAME = "chat"
 OPENAI_SDK_LOGGER_NAME = "openai"
 MODEL_MAX_OUTPUT_TOKENS = 4_000
 MODEL_SDK_MAX_RETRIES = 0
@@ -56,6 +59,11 @@ class OpenAIIntentModelProvider:
         logging.getLogger(OPENAI_SDK_LOGGER_NAME).setLevel(logging.WARNING)
 
         self._model = model
+        self._invocation_metadata = ModelInvocationMetadata(
+            provider_name=GEN_AI_PROVIDER_NAME,
+            operation_name=GEN_AI_OPERATION_NAME,
+            request_model=model,
+        )
         self._output_schemas: dict[str, JsonSchema] = {}
         self._client = AsyncOpenAI(
             api_key=api_key,
@@ -71,6 +79,10 @@ class OpenAIIntentModelProvider:
     @property
     def is_available(self) -> bool:
         return True
+
+    @property
+    def invocation_metadata(self) -> ModelInvocationMetadata:
+        return self._invocation_metadata
 
     async def generate_intent(self, request: ModelIntentRequest) -> ModelIntentResult:
         try:

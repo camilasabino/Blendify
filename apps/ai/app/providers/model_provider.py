@@ -43,6 +43,13 @@ class ModelIntentResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelInvocationMetadata:
+    provider_name: str
+    operation_name: str
+    request_model: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class ModelProviderConfig:
     model: str | None
     api_key: SecretStr | None
@@ -55,6 +62,9 @@ class IntentModelProvider(Protocol):
 
     @property
     def is_available(self) -> bool: ...
+
+    @property
+    def invocation_metadata(self) -> ModelInvocationMetadata | None: ...
 
     async def generate_intent(self, request: ModelIntentRequest) -> ModelIntentResult: ...
 

@@ -7,6 +7,8 @@ from app.models.interpretation import InterpretIntentRequest, InterpretIntentRes
 from app.models.refinement import PlanRefinementRequest, PlanRefinementResponse
 from app.models.service import AiServiceHealth
 
+HEALTH_PATH = "/health"
+
 router = APIRouter()
 
 
@@ -18,7 +20,7 @@ def _refinement_planner(request: Request) -> RefinementPlanner:
     return request.app.state.refinement_planner
 
 
-@router.get("/health", response_model=AiServiceHealth)
+@router.get(HEALTH_PATH, response_model=AiServiceHealth)
 def health(request: Request) -> AiServiceHealth:
     status = "available" if _interpreter(request).is_available else "unavailable"
 

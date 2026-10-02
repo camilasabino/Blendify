@@ -3,6 +3,8 @@ import logging
 from dataclasses import dataclass
 from typing import Literal
 
+from opentelemetry import trace
+
 from app.models.service import AiServiceErrorCode
 from app.observability.request_correlation import current_request_id
 from app.providers.model_provider import ModelConfigurationReason, ModelTokenUsage
@@ -99,8 +101,28 @@ def _usage_fields(usages: list[ModelTokenUsage | None]) -> dict[str, int | None]
     }
 
 
+def _trace_correlation() -> dict[str, str]:
+    span_context = trace.get_current_span().get_span_context()
+    if not span_context.is_valid:
+        return {}
+    return {
+        "traceId": trace.format_trace_id(span_context.trace_id),
+        "spanId": trace.format_span_id(span_context.span_id),
+    }
+
+
 def _emit(level: int, event: str, fields: dict[str, object]) -> None:
     try:
-        logger.log(level, json.dumps({"event": event, "requestId": current_request_id(), **fields}))
+        logger.log(
+            level,
+            json.dumps(
+                {
+                    "event": event,
+                    "requestId": current_request_id(),
+                    **_trace_correlation(),
+                    **fields,
+                }
+            ),
+        )
     except Exception:
         return

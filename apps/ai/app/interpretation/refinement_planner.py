@@ -1,3 +1,5 @@
+from opentelemetry.trace import TracerProvider
+
 from app.interpretation.structured_model_call import (
     MAX_OUTPUT_VALIDATION_ATTEMPTS,
     MODEL_CALL_TIMEOUT_SECONDS,
@@ -19,12 +21,14 @@ class RefinementPlanner:
         *,
         model_call_timeout_seconds: float = MODEL_CALL_TIMEOUT_SECONDS,
         max_output_validation_attempts: int = MAX_OUTPUT_VALIDATION_ATTEMPTS,
+        tracer_provider: TracerProvider | None = None,
     ) -> None:
         self._caller = StructuredModelCaller(
             provider,
             operation="refinement_interpretation",
             model_call_timeout_seconds=model_call_timeout_seconds,
             max_output_validation_attempts=max_output_validation_attempts,
+            tracer_provider=tracer_provider,
         )
 
     async def plan(self, request: PlanRefinementRequest) -> PlanRefinementResponse:

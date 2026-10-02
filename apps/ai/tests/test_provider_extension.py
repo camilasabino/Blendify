@@ -10,6 +10,7 @@ from app.providers.model_provider import (
     IntentModelProvider,
     ModelIntentRequest,
     ModelIntentResult,
+    ModelInvocationMetadata,
     ModelProviderConfig,
     ModelProviderSetupError,
 )
@@ -52,6 +53,12 @@ class NewVendorProvider:
     @property
     def is_available(self) -> bool:
         return True
+
+    @property
+    def invocation_metadata(self) -> ModelInvocationMetadata | None:
+        return ModelInvocationMetadata(
+            provider_name=NEW_PROVIDER, operation_name="chat", request_model=self.config.model
+        )
 
     async def generate_intent(self, request: ModelIntentRequest) -> ModelIntentResult:
         payload = (

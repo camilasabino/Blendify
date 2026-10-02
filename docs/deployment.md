@@ -1217,12 +1217,12 @@ browser ──► api (NestJS, public) ──► ai (FastAPI, private) ──►
 | Source | `github("camilasabino/blendify", { branch: "main", checkSuites: true })`, root directory `apps/ai` (the runtime needs nothing outside it) |
 | Builder | `RAILPACK`: detects `pyproject.toml` + `uv.lock`, Python from `apps/ai/.python-version` (3.13), installs with `uv sync --locked --no-dev` into `/app/.venv` (on `PATH`) |
 | Watch patterns | `apps/ai/**` |
-| Start | `python -m app.server`: reads `PORT`, binds one socket on `::` with `IPV6_V6ONLY=0` and runs uvicorn with the `app.main:create_app` factory on it. The dual-stack socket is intentional: Railway deployment health checks arrive over IPv4, while the private network may use IPv6. Do not replace it with `uvicorn --host ::`, which asyncio leaves IPv6-only (health checks fail with `service unavailable`), nor with `--host 0.0.0.0`, which drops IPv6. uvicorn handles `SIGTERM` gracefully. No `main.py` exists, so Railpack cannot infer a start command |
+| Start | `python -m app.server`: reads `PORT`, binds one socket on `::` with `IPV6_V6ONLY=0` and runs uvicorn with the `app.main:create_app` factory on it. The dual-stack socket is intentional: Railway deployment health checks arrive over IPv4, while the private network may use IPv6. Do not replace it with `uvicorn --host ::`, which asyncio leaves IPv6-only (health checks fail with `service unavailable`), nor with `--host 0.0.0.0`, which drops IPv6. uvicorn handles `SIGTERM` gracefully: it waits up to 25 s (`timeout_graceful_shutdown`, set in `app/server.py`, so only this start command applies it; `npm run dev:ai` does not) for requests in flight, cancels what is left, then runs the application shutdown (section 19.8). No `main.py` exists, so Railpack cannot infer a start command |
 | `PORT` | `8000`, set explicitly so `AI_SERVICE_URL` and the health check use the same port |
 | Health check | `/health`, no auth, no model call |
 | Replicas | 1; one uvicorn worker (enough for current traffic; the process is stateless, so adding replicas later needs no code change) |
 | Restart | Railway default (`ON_FAILURE`); not declared in IaC, so the plan does not carry a second `null → "ON_FAILURE"` line like `api` |
-| Draining | `drainingSeconds: 30` (Railway defaults to 0 s, which cuts a model call in flight on every redeploy; a call takes at most two 12 s model requests) |
+| Draining | `drainingSeconds: 30` (Railway defaults to 0 s, which cuts a model call in flight on every redeploy; a call takes at most two 12 s model requests). The conditional shutdown budget of section 19.8 depends on it; `npm run test:ai` fails if the budget's sum no longer fits |
 
 Startup fails closed with `AI_SERVICE_ENV=production`: the process exits when
 `AI_SERVICE_TOKEN` is shorter than 32 characters, `AI_PROVIDER` is unset or
@@ -1360,6 +1360,55 @@ Steps 1–6 are complete in production; the web build sets
 the Redis memory-cap removal of section 4.3. Change `ai` explicitly (dashboard
 or CLI), review each change, and keep `.railway/railway.ts` in sync so the
 plan stays at the known drift.
+
+### 19.8 Tracing (OpenTelemetry)
+
+The AI service can export traces (requests, use cases, model invocations;
+metadata only). **It is off in production and no destination exists**: no
+`OTEL_*` variable is set on `ai`, and traces cannot be viewed anywhere until a
+backend is chosen and configured in a separate, authorized change. Variables,
+units, defaults, rejected variables, privacy, failure and shutdown behavior:
+[`apps/ai/README.md`](../apps/ai/README.md), "Tracing (OpenTelemetry)".
+
+Enabling it later (one reviewed, staged change on `ai`, after choosing a
+backend and reviewing its data handling):
+
+| Variable | Secret | Value |
+|---|---|---|
+| `OTEL_SDK_DISABLED` | No | `false` |
+| `OTEL_TRACES_EXPORTER` | No | `otlp` |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | No | Complete `https://…/v1/traces` URL of the backend (no credentials in the URL) |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | Yes, sealed, `preserve()` in IaC | Backend credentials as URL-encoded `name=value` pairs, entered from stdin or the dashboard, never on a command line |
+| `OTEL_TRACES_SAMPLER_ARG` | No | Start at `0.1` and adjust (not a volume cap; see the README) |
+| `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` | No | Unset (2 s) unless the backend needs up to 3 s |
+| `OTEL_RESOURCE_ATTRIBUTES` | No | Optional `service.version=<release>`; `deployment.environment.name` already defaults to `AI_SERVICE_ENV` |
+
+A mistake in these variables (bad URL, malformed headers, an unsupported
+`OTEL_*` variable) stops startup with a message naming the variable, never its
+value; the deploy health check fails and Railway keeps serving the previous
+deployment. After a successful deploy, the only checks are that the backend
+receives traces and that `ai` logs show no export errors; both are
+non-destructive. Export problems after startup never affect responses,
+readiness, or model calls; they only lose traces.
+
+Shutdown against `drainingSeconds: 30`. The application's clean shutdown waits
+up to 25 s for requests in flight (then cancels them; the client gets a 500),
+then allows exports to start for 1 s, each with the export timeout (at most
+3 s). That is a conditional budget of 29.1 s, not a guaranteed maximum. It holds
+only if every export that starts ends within its socket timeout. The queue and
+memory are always bounded, but an export's duration is not: DNS resolution
+and a server that answers very slowly are not covered by the timeout, and a
+started export cannot be cancelled. In that case the SDK waits for it (up to a
+fixed 30 s join, a wait rather than a cancellation), and what ends the process
+is Railway's `SIGKILL` 30 s after `SIGTERM`, not the SDK. Pending spans are
+lost; requests have already finished. A hard limit for that case is still
+pending. Details in the README, "Shutdown".
+
+Rollback: set `OTEL_SDK_DISABLED=true` on `ai` (or delete the `OTEL_*`
+variables; the application default is disabled) and let `ai` redeploy. With
+tracing disabled no instrumentation is installed and there is no export thread
+or telemetry network traffic. Nothing else depends on tracing, and no data
+migration is involved.
 
 ### Real-model evals (manual, paid)
 

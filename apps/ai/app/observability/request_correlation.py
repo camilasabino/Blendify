@@ -22,14 +22,14 @@ class RequestCorrelationMiddleware:
             await self._app(scope, receive, send)
             return
 
-        token = _request_id.set(_incoming_request_id(scope))
+        token = _request_id.set(incoming_request_id(scope))
         try:
             await self._app(scope, receive, send)
         finally:
             _request_id.reset(token)
 
 
-def _incoming_request_id(scope: Scope) -> str | None:
+def incoming_request_id(scope: Scope) -> str | None:
     for name, value in scope["headers"]:
         if name.lower() == REQUEST_ID_HEADER:
             candidate = value.decode("latin-1")

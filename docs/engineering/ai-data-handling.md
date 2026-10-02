@@ -142,6 +142,24 @@ process lifetime.
 - `ai.model_call` — one per operation: the same identity fields plus `result`
   (`completed`, `failed`), `outcome`, `errorCode`, `modelRequests`, summed
   token counts and `usageComplete`.
+- Both events add `traceId` and `spanId` (lowercase hex) only when tracing is
+  enabled and a valid trace context is active; otherwise the keys are absent.
+  `spanId` is the model span for `ai.model_request` and the use-case span for
+  `ai.model_call`. Exported spans carry only allowlisted metadata: HTTP
+  method, route and status, the validated `blendify.request_id`, and the same
+  bounded fields as these events (operation, prompt version, attempt, result,
+  outcome, error code, validation error count, provider, requested and
+  response model, per-request token counts) plus `error.type`. Never prompts,
+  outputs, exception messages, or events (see the AI service README,
+  "Tracing").
+- When tracing exports, diagnostic logs from the OTel exporter, batch
+  processor, and urllib3 are redacted. A message is kept only if it exactly
+  matches a verified static OpenTelemetry template, with numbers and exception
+  class names as its only arguments; anything else (preformatted text,
+  messages without arguments, unknown templates) becomes a fixed
+  `Span export pipeline log redacted` plus exception class names. Tracebacks
+  are dropped, so the export endpoint (host, port, path, query), headers, and
+  exception messages are never logged.
 
 Token usage comes only from the SDK response. An invalid structured output
 still reports the usage of that request. A timeout or provider error has no

@@ -24,7 +24,14 @@ def is_provider_owned(path: Path) -> bool:
 def test_the_boundary_check_scans_the_generic_application() -> None:
     names = {path.name for path in GENERIC_SOURCES if not is_provider_owned(path)}
 
-    assert {"settings.py", "main.py", "run_intent_eval.py", "structured_model_call.py"} <= names
+    assert {
+        "settings.py",
+        "main.py",
+        "run_intent_eval.py",
+        "structured_model_call.py",
+        "model_call_tracing.py",
+        "span_privacy.py",
+    } <= names
 
 
 @pytest.mark.parametrize(

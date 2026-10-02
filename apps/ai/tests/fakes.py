@@ -1,11 +1,24 @@
 import asyncio
 from collections.abc import Mapping, Sequence
 
-from app.providers.model_provider import ModelIntentRequest, ModelIntentResult, ModelTokenUsage
+from app.providers.model_provider import (
+    ModelIntentRequest,
+    ModelIntentResult,
+    ModelInvocationMetadata,
+    ModelTokenUsage,
+)
 
 FAKE_MODEL = "fake-model"
+FAKE_REQUEST_MODEL = "fake-model-alias"
 FAKE_PROVIDER = "fake"
+FAKE_GEN_AI_PROVIDER = "fake.gen_ai"
+FAKE_GEN_AI_OPERATION = "chat"
 FAKE_USAGE = ModelTokenUsage(input_tokens=120, output_tokens=40, total_tokens=160)
+FAKE_INVOCATION_METADATA = ModelInvocationMetadata(
+    provider_name=FAKE_GEN_AI_PROVIDER,
+    operation_name=FAKE_GEN_AI_OPERATION,
+    request_model=FAKE_REQUEST_MODEL,
+)
 
 ScriptedOutput = Mapping[str, object] | Exception
 
@@ -26,6 +39,10 @@ class ScriptedModelProvider:
     def is_available(self) -> bool:
         return True
 
+    @property
+    def invocation_metadata(self) -> ModelInvocationMetadata | None:
+        return FAKE_INVOCATION_METADATA
+
     async def generate_intent(self, request: ModelIntentRequest) -> ModelIntentResult:
         self.requests.append(request)
         output = self._outputs.pop(0)
@@ -42,6 +59,10 @@ class HangingModelProvider:
     @property
     def is_available(self) -> bool:
         return True
+
+    @property
+    def invocation_metadata(self) -> ModelInvocationMetadata | None:
+        return FAKE_INVOCATION_METADATA
 
     async def generate_intent(self, request: ModelIntentRequest) -> ModelIntentResult:
         await asyncio.sleep(60)

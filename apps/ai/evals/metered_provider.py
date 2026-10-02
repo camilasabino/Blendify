@@ -6,6 +6,7 @@ from app.providers.model_provider import (
     ModelIntentRequest,
     ModelIntentResult,
     ModelInvalidOutputError,
+    ModelInvocationMetadata,
     ModelTokenUsage,
 )
 
@@ -35,6 +36,10 @@ class MeteredModelProvider:
     @property
     def is_available(self) -> bool:
         return self._provider.is_available
+
+    @property
+    def invocation_metadata(self) -> ModelInvocationMetadata | None:
+        return self._provider.invocation_metadata
 
     async def generate_intent(self, request: ModelIntentRequest) -> ModelIntentResult:
         if self.request_count >= self._request_budget:
