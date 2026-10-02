@@ -1,11 +1,14 @@
 import logging
 import threading
-from collections.abc import Callable, Iterator, Sequence
+from collections import Counter
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
+from http import HTTPStatus
+from typing import cast
 
 import pytest
 from fastapi.testclient import TestClient
-from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.trace import SpanKind
 
@@ -27,7 +30,10 @@ from tests.conftest import AUTH_HEADERS
 from tests.fakes import ScriptedModelProvider, ScriptedOutput, interpreted_output
 from tests.telemetry_fakes import (
     ENABLED,
+    FAKE_LANGFUSE_SECRETS,
     closed_loopback_port,
+    langfuse_otlp_environ,
+    loopback_otlp_receiver,
     record_spans,
     unresponsive_otlp_destination,
 )
@@ -45,9 +51,12 @@ LOG_SENTINELS = (
     ENDPOINT_PATH_SENTINEL,
     ENDPOINT_QUERY_SENTINEL,
     HEADER_SENTINEL,
+    *FAKE_LANGFUSE_SECRETS,
     "127.0.0.1",
 )
 PORT_SENTINEL = 47831
+OTLP_EXPORTER_MAX_ATTEMPTS_PER_BATCH = 6
+OTLP_RETRIES_EXHAUSTED_LOG = "Failed to export spans batch due to timeout, max retries or shutdown."
 OTLP_LOGGER = "opentelemetry.exporter.otlp.proto.http.trace_exporter"
 BATCH_LOGGER = "opentelemetry.sdk._shared_internal"
 TRANSPORT_LOGGER = "urllib3.connectionpool"
@@ -172,6 +181,17 @@ def _unresponsive_otlp() -> Iterator[tuple[TelemetryRuntime, Callable[[], bool]]
         yield _otlp_runtime(_sentinel_endpoint(port)), lambda: bool(accepted)
 
 
+def _langfuse_runtime(port: int, timeout: str = OTLP_FAILURE_TIMEOUT) -> TelemetryRuntime:
+    return build_telemetry_runtime(
+        load_telemetry_config(langfuse_otlp_environ(port, timeout)), "development"
+    )
+
+
+@contextmanager
+def _refused_langfuse_otlp() -> Iterator[tuple[TelemetryRuntime, Callable[[], bool]]]:
+    yield _langfuse_runtime(closed_loopback_port()), lambda: True
+
+
 def _logged_text(caplog: pytest.LogCaptureFixture) -> str:
     return caplog.text + "\n".join(record.getMessage() for record in caplog.records)
 
@@ -183,8 +203,15 @@ def _logged_text(caplog: pytest.LogCaptureFixture) -> str:
         (_raising_exporter, BATCH_LOGGER),
         (_refused_otlp, OTLP_LOGGER),
         (_unresponsive_otlp, OTLP_LOGGER),
+        (_refused_langfuse_otlp, OTLP_LOGGER),
     ],
-    ids=["failure-result", "exporter-exception", "otlp-refused", "otlp-unresponsive"],
+    ids=[
+        "failure-result",
+        "exporter-exception",
+        "otlp-refused",
+        "otlp-unresponsive",
+        "langfuse-otlp-refused",
+    ],
 )
 def test_export_failures_leave_responses_readiness_and_provider_calls_unchanged(
     settings: Settings,
@@ -203,6 +230,75 @@ def test_export_failures_leave_responses_readiness_and_provider_calls_unchanged(
     assert attempted
     if failure_logger is not None:
         assert any(record.name == failure_logger for record in caplog.records)
+    logged = _logged_text(caplog)
+    for sentinel in LOG_SENTINELS:
+        assert sentinel not in logged
+
+
+@pytest.mark.parametrize(
+    ("status", "response_headers", "timeout", "attempts_per_batch", "final_log"),
+    [
+        (
+            HTTPStatus.UNAUTHORIZED,
+            {},
+            OTLP_FAILURE_TIMEOUT,
+            1,
+            "Failed to export spans batch code: 401, reason: [redacted]",
+        ),
+        (
+            HTTPStatus.FORBIDDEN,
+            {},
+            OTLP_FAILURE_TIMEOUT,
+            1,
+            "Failed to export spans batch code: 403, reason: [redacted]",
+        ),
+        (
+            HTTPStatus.TOO_MANY_REQUESTS,
+            {"Retry-After": "0"},
+            OTLP_RETRYING_TIMEOUT,
+            OTLP_EXPORTER_MAX_ATTEMPTS_PER_BATCH,
+            OTLP_RETRIES_EXHAUSTED_LOG,
+        ),
+        (
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            {},
+            OTLP_FAILURE_TIMEOUT,
+            1,
+            OTLP_RETRIES_EXHAUSTED_LOG,
+        ),
+    ],
+    ids=["unauthorized", "forbidden", "rate-limited", "unavailable"],
+)
+def test_langfuse_rejections_leave_responses_readiness_and_model_calls_unchanged(
+    settings: Settings,
+    caplog: pytest.LogCaptureFixture,
+    status: HTTPStatus,
+    response_headers: Mapping[str, str],
+    timeout: str,
+    attempts_per_batch: int,
+    final_log: str,
+) -> None:
+    baseline_outcomes, baseline_model_calls = _baseline(settings)
+    caplog.set_level(logging.DEBUG)
+    provider = ScriptedModelProvider(list(INTERPRET_OUTPUTS))
+
+    with loopback_otlp_receiver(status, response_headers) as (port, received):
+        runtime = _langfuse_runtime(port, timeout)
+        app = create_app(settings, provider, telemetry=runtime)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            outcomes = _exercise(client)
+            cast(TracerProvider, runtime.tracer_provider).force_flush()
+            readiness = client.get("/health")
+
+    attempts = Counter(export.body for export in received)
+    messages = [record.getMessage() for record in caplog.records if record.name == OTLP_LOGGER]
+    assert outcomes == baseline_outcomes
+    assert len(provider.requests) == baseline_model_calls
+    assert (readiness.status_code, readiness.json()) == baseline_outcomes[-1]
+    assert attempts
+    assert set(attempts.values()) == {attempts_per_batch}
+    assert messages.count(final_log) == len(attempts)
+    assert len(messages) == attempts_per_batch * len(attempts)
     logged = _logged_text(caplog)
     for sentinel in LOG_SENTINELS:
         assert sentinel not in logged

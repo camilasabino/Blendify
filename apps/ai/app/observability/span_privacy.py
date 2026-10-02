@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -11,6 +11,7 @@ from opentelemetry.semconv._incubating.attributes.http_attributes import (
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.semconv.attributes.http_attributes import HTTP_ROUTE
 from opentelemetry.trace import Link, Status
+from opentelemetry.util.types import AttributeValue
 
 REQUEST_ID_ATTRIBUTE = "blendify.request_id"
 
@@ -60,7 +61,7 @@ class PrivacySpanExporter(SpanExporter):
         self._exporter = exporter
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
-        return self._exporter.export([_exportable(span) for span in spans])
+        return self._exporter.export([exportable_copy(span) for span in spans])
 
     def shutdown(self) -> None:
         self._exporter.shutdown()
@@ -69,16 +70,21 @@ class PrivacySpanExporter(SpanExporter):
         return self._exporter.force_flush(timeout_millis)
 
 
-def _exportable(span: ReadableSpan) -> ReadableSpan:
+def exportable_copy(
+    span: ReadableSpan, destination_attributes: Mapping[str, AttributeValue] | None = None
+) -> ReadableSpan:
     return ReadableSpan(
         name=span.name,
         context=span.context,
         parent=span.parent,
         resource=span.resource,
         attributes={
-            key: value
-            for key, value in (span.attributes or {}).items()
-            if key in EXPORTABLE_SPAN_ATTRIBUTES
+            **{
+                key: value
+                for key, value in (span.attributes or {}).items()
+                if key in EXPORTABLE_SPAN_ATTRIBUTES
+            },
+            **(destination_attributes or {}),
         },
         events=(),
         links=tuple(Link(link.context) for link in span.links),

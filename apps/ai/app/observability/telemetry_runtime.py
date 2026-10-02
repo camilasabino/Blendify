@@ -15,6 +15,7 @@ from opentelemetry.semconv._incubating.attributes.deployment_attributes import (
 )
 from opentelemetry.semconv.attributes.service_attributes import SERVICE_NAME
 
+from app.observability.langfuse_mapping import LangfuseSpanExporter
 from app.observability.span_export_safety import (
     Clock,
     ShutdownWindowSpanExporter,
@@ -101,11 +102,19 @@ def build_telemetry_runtime(
         span_limits=_span_limits(),
         meter_provider=_NO_OP_METER_PROVIDER,
     )
-    exporter_factory = (lambda: span_exporter) if span_exporter else _exporter_factory(config)
+    exporter_factory = (
+        (lambda: span_exporter) if span_exporter else configured_exporter_factory(config)
+    )
+    if exporter_factory is not None and config.backend == "langfuse":
+        exporter_factory = _with_langfuse_mapping(exporter_factory)
     return TelemetryRuntime(sdk_provider, exporter_factory, clock=clock)
 
 
-def _exporter_factory(config: TelemetryConfig) -> SpanExporterFactory | None:
+def _with_langfuse_mapping(exporter_factory: SpanExporterFactory) -> SpanExporterFactory:
+    return lambda: LangfuseSpanExporter(exporter_factory())
+
+
+def configured_exporter_factory(config: TelemetryConfig) -> SpanExporterFactory | None:
     otlp = config.otlp
     if config.exporter == "console":
         return lambda: ConsoleSpanExporter(out=sys.stdout)

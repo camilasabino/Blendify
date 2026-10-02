@@ -240,12 +240,19 @@ sink never fails an AI request. Missing usage is `null`.
 
 ## Decisions
 
-- **Langfuse: not adopted (deferred).** Structured logs already cover model,
-  prompt version, latency, requests, tokens, outcomes and errors. A tracing
-  vendor would add another processor for data the privacy design keeps out of
-  logs, and its value (prompt/output inspection) conflicts with that design.
-  Revisit only with a concrete need; it would have to stay optional and
-  receive metadata only.
+- **Langfuse: optional metadata-only destination, not enabled anywhere.**
+  `AI_TELEMETRY_BACKEND=langfuse` adds a destination mapping to the existing
+  OTLP export, after the span privacy allowlist (no Langfuse SDK, wrapper,
+  Collector or second processor). It adds observation types, the model name
+  and an exact set of bounded metadata keys; it never adds prompts, outputs,
+  user or session identifiers, baggage values, or anything removed by the
+  allowlist. Prompt and output inspection, managed prompts, scores and
+  datasets stay out of scope. Mapping, configuration and references:
+  `apps/ai/README.md`, "Langfuse destination mapping". No destination is
+  configured in any environment. The manual `npm run smoke:langfuse` sends
+  only the metadata of three synthetic requests answered by an in-process fake
+  model, never user content or a real model call; runbook in
+  `docs/deployment.md`, section 19.9.
 - **Browser analytics: no AI events.** The web app has no analytics
   abstraction; Cloudflare Web Analytics measures page views only. No vendor
   or event was added.

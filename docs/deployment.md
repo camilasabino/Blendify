@@ -1382,6 +1382,7 @@ backend and reviewing its data handling):
 | `OTEL_TRACES_SAMPLER_ARG` | No | Start at `0.1` and adjust (not a volume cap; see the README) |
 | `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` | No | Unset (2 s) unless the backend needs up to 3 s |
 | `OTEL_RESOURCE_ATTRIBUTES` | No | Optional `service.version=<release>`; `deployment.environment.name` already defaults to `AI_SERVICE_ENV` |
+| `AI_TELEMETRY_BACKEND` | No | Unset (`generic`). `langfuse` only together with the Langfuse traces endpoint and headers; see section 19.9 and the README, "Langfuse destination mapping" |
 
 A mistake in these variables (bad URL, malformed headers, an unsupported
 `OTEL_*` variable) stops startup with a message naming the variable, never its
@@ -1409,6 +1410,211 @@ variables; the application default is disabled) and let `ai` redeploy. With
 tracing disabled no instrumentation is installed and there is no export thread
 or telemetry network traffic. Nothing else depends on tracing, and no data
 migration is involved.
+
+### 19.9 Langfuse tracing destination (optional)
+
+Langfuse receives the same metadata-only spans through its OTLP endpoint
+(mapping and validation: [`apps/ai/README.md`](../apps/ai/README.md),
+"Langfuse destination mapping"). **Status: implemented, tested against a
+local loopback receiver, and verified once remotely with the synthetic smoke
+(Langfuse Cloud US, 2026-10-02, reviewed manually in the UI; see "What to check
+in Langfuse").** Production is not activated: no `OTEL_*` or
+`AI_TELEMETRY_BACKEND` variable is set on `ai`. Three steps, each authorized
+separately: project setup, one synthetic smoke, production activation.
+
+#### Project, region and keys
+
+1. Choose the Langfuse Cloud data region deliberately; nothing in the
+   repository picks one. Each region has its own host (per the Langfuse
+   OpenTelemetry documentation, read 2026-10-02): EU `cloud.langfuse.com`, US
+   `us.cloud.langfuse.com`, Japan `jp.cloud.langfuse.com`, HIPAA
+   `hipaa.cloud.langfuse.com`. The traces endpoint is
+   `https://<host of the project's region>/api/public/otel/v1/traces`; use the
+   host on which the chosen project was created.
+2. Check the current plan limits on the [pricing page](https://langfuse.com/pricing)
+   before activating. No paid plan, upgrade or self-hosted instance is part of
+   this setup. The smoke adds three traces and ten observations.
+3. Create the project's API key pair (public `pk-lf-…`, secret `sk-lf-…`); the
+   Langfuse documentation places API keys under the project's settings. Never
+   paste the keys into a chat, an issue, a commit, `apps/ai/.env.example`, or a
+   command line, and never print them.
+
+#### Local synthetic smoke (`npm run smoke:langfuse`)
+
+Mechanics, budget and guarantees: [`apps/ai/README.md`](../apps/ai/README.md),
+"Langfuse synthetic smoke". In short, it builds the real application and
+telemetry pipeline in process with a synthetic model provider (never a real
+one, whatever `AI_PROVIDER`, `AI_MODEL` or `AI_PROVIDER_API_KEY` say), sends
+three requests, and exports ten observations once.
+
+The smoke reads its destination only from the current shell; it does not load
+`apps/ai/.env`. In a terminal you control (not a shared screen or a recorded
+session), in zsh or bash:
+
+```bash
+printf 'Langfuse public key: '; read -rs lf_public; echo
+printf 'Langfuse secret key: '; read -rs lf_secret; echo
+export OTEL_EXPORTER_OTLP_TRACES_HEADERS="Authorization=Basic%20$(printf '%s:%s' "$lf_public" "$lf_secret" | base64 | tr -d '\n'),x-langfuse-ingestion-version=4"
+unset lf_public lf_secret
+export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="https://<host of the project's region>/api/public/otel/v1/traces"
+```
+
+`read -s` keeps the keys off the screen and out of the shell history, `printf`
+is a shell builtin so the keys never appear in a process list, and `tr -d '\n'`
+removes the line wrapping that GNU `base64` adds to long input. Do not run
+`env`, `set -x`, or `echo` on these variables.
+
+| Variable | Set by | Value |
+|---|---|---|
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Operator shell | Complete traces URL above (https; plain http only for loopback) |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | Operator shell, secret | `Authorization=Basic%20<base64(pk:sk)>,x-langfuse-ingestion-version=4` |
+| `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` | Optional | Seconds; default 2, at most 3 |
+| `OTEL_SDK_DISABLED`, `OTEL_TRACES_EXPORTER`, `AI_TELEMETRY_BACKEND` | Forced by the smoke | `false`, `otlp`, `langfuse` |
+| `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | Forced by the smoke | `parentbased_traceidratio`, `1` (requests carry no `traceparent`, so all three traces are sampled) |
+| `OTEL_RESOURCE_ATTRIBUTES` | Forced by the smoke | `deployment.environment.name=telemetry-smoke` (Langfuse environment `telemetry-smoke`, separate from `production`) |
+
+Forced values replace whatever the shell has. `OTEL_SERVICE_NAME` is read as
+usual (default `blendify-ai`). The unsupported variables listed in the README
+(for example `OTEL_EXPORTER_OTLP_HEADERS`) stop the smoke before anything runs.
+
+1. `npm run smoke:langfuse` validates the configuration, prints the plan and
+   budget, and exits with status 1 without sending anything. Errors name the
+   variable, never its value.
+2. Only with explicit authorization for that run (LF4):
+   `npm run smoke:langfuse -- --confirm`. It prints the responses, the
+   synthetic model calls, the observations handed to the exporter, how many
+   export calls Langfuse acknowledged with HTTP 2xx, and the three trace IDs
+   (Langfuse uses the OpenTelemetry trace ID, in hex, as its trace ID). Exit
+   status 0 means every export call was acknowledged; it does not prove
+   ingestion. On failure it exits with status 1 and is not retried: a rerun is
+   a new, separately authorized command that creates three new traces.
+3. Afterwards: `unset OTEL_EXPORTER_OTLP_TRACES_HEADERS OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`
+   or close the terminal.
+
+One `WARNING` line from `app.observability.model_call_log` with
+`"result": "invalid_output"` is expected: it is the first, deliberately invalid
+synthetic attempt of the recovered retry.
+
+#### What to check in Langfuse (LF4)
+
+Check in the UI or an authorized read API. The single remote smoke run
+reported 3 HTTP 200 responses, 4 synthetic model calls, 10 observations (6
+`span`, 4 `generation`) and one acknowledged export call. In the UI all 10
+observations and 3 root observations were seen, and the recovered-retry trace
+was inspected in detail (hierarchy, per-attempt level and tokens, 784-token
+trace total as the sum of both generations, metadata, model, empty input and
+output). The interpretation and refinement traces were not inspected
+observation by observation, nor were trace names, cost display, resource
+attributes or the filter recipes below; treat those rows as expectations.
+
+| Area | Expected for the three printed trace IDs |
+|---|---|
+| Grouping | Three traces, environment `telemetry-smoke`, trace names from the root spans: `POST /v1/intent/interpret`, `POST /v1/refinement/plan`, `POST /v1/intent/interpret` |
+| Hierarchy | 10 observations: each trace is request span → use-case span (`blendify.ai.interpret` or `blendify.ai.refine`) → generations; 1, 1 and 2 generations |
+| Types | 6 `span`, 4 `generation`; the use-case span is not a generation |
+| Model | Every generation shows `synthetic-smoke-model-v1` (the response model); `gen_ai.request.model` = `synthetic-smoke-model` only under `metadata.attributes` |
+| Tokens | Input/output per generation: interpretation 101/11, refinement 202/22, recovered retry 303/33 then 404/44. No usage on request or use-case spans; any trace total equals the sum of its generations (707/77 for the retry), never double |
+| Metadata | `operation`, `prompt_version` (current `intent-v6` and `refinement-v5`), `provider` = `blendify.synthetic`, `attempt`, `result`; use cases add `outcome` = `interpreted`. Other allowlisted attributes under `metadata.attributes`, resource under `metadata.resourceAttributes` (`service.name`, `deployment.environment.name`) |
+| Recovered error | Retry trace: attempt 1 level `ERROR`, `result` and `error_type` = `invalid_output`, with its own tokens; attempt 2 not an error, `result` = `ok`; the use case `completed`/`interpreted` and the request status 200, neither an error. No status message anywhere |
+| Content | Input and output empty on every observation; no user, session, tags, prompt text, headers or keys |
+| Cost | Usually empty: `synthetic-smoke-model-v1` matches no Langfuse model definition, and Langfuse computes cost only when usage exists and the model matches a definition ([token and cost tracking](https://langfuse.com/docs/observability/features/token-and-cost-tracking)). Missing cost here is expected and not an integration failure; do not add a model definition for the fictitious model. For real models, cost is Langfuse's estimate from recorded usage, not provider billing |
+
+If traces are missing, report the smoke's acknowledgement counts and the
+redacted exporter log lines; do not rerun, switch region or project, or extend
+the budget without new authorization.
+
+Filter recipes for later analysis (verify that each filter exists in LF4;
+denominators are always sampled traffic, not all traffic):
+
+- Use-case outcomes: observations named `blendify.ai.interpret` or
+  `blendify.ai.refine`, grouped by metadata `result`, `outcome`,
+  `error_code`. Denominator: sampled requests that reached the use case
+  (401/422 requests have none).
+- Attempt outcomes: generations grouped by metadata `result` and `attempt`.
+  Denominator: sampled model invocations; a recovered retry contributes two
+  generations to one successful use case, so attempt failure rates are not
+  request failure rates.
+- Latency: request spans for end-to-end time, generations for model time.
+- Tokens: usage per generation; never average trace totals as per-call usage.
+- Comparisons: by metadata `prompt_version` and by environment. Traces cannot
+  show that one prompt version is more accurate.
+
+#### Limitations that remain
+
+- Sampling is head-based and not a volume cap (README, "Sampling"): the
+  application default ratio is 1.0, errors are sampled at the same ratio, and
+  callers with sampled `traceparent` headers are always exported. Langfuse
+  totals are sampled totals.
+- Shutdown (section 19.8): the timeout is a socket timeout, not a wall-clock
+  bound; DNS resolution and slow responses are not covered. The smoke exports
+  at application shutdown through the same window, so a hung export can keep
+  it waiting up to the SDK's 30 s join, and it then reports the export as
+  missing.
+- Delivery is never guaranteed and not exactly once: a failed batch is dropped,
+  and the exporter can resend a request after a connection error or a retryable
+  status even if Langfuse had already received it.
+- Unchanged OTel limitations: the process-wide `BackgroundTask` patch and its
+  per-app isolation, parsed-but-unused caller baggage, the unverified real
+  OpenAI cancellation path, legacy HTTP attribute names.
+- Smoke coverage is three paths (interpretation, refinement, one invalid-output
+  retry) with a fictitious model. Timeouts, rate limits, unavailable or
+  disabled providers, clarifications, rejected requests, upstream
+  `traceparent`, real model names and cost are covered only by local tests or
+  not at all. Langfuse-side behavior beyond the single smoke (handling of
+  resent spans, rate limits, retention, real-model cost) is unverified.
+
+#### Production activation (separate, after a verified smoke)
+
+Prepared for review, not executed. Enabling it exports the metadata of every
+sampled real request from then on (never prompts or outputs). No real model
+request is needed to validate the transport.
+
+1. Confirm the smoke result in Langfuse, the plan limits, the data-handling
+   decision in `docs/engineering/ai-data-handling.md`, and the sample ratio.
+   Confirm too that the `ai` deployment already runs the release containing
+   the Langfuse mapping with tracing still disabled; the variables below must
+   never be set on an image without it (it would ignore
+   `AI_TELEMETRY_BACKEND` and export unmapped spans).
+2. One staged change on `ai`, in this order (section 19.7: explicit dashboard
+   or CLI change; never put a secret on a command line, and never run
+   `railway variable list`, `--kv` or `--json` against `ai`, which print raw
+   values):
+
+   1. Set every variable below without deploying: each
+      `railway variable set --service ai --skip-deploys` call (or the
+      dashboard's staged changes). The header goes in through
+      `railway variable set OTEL_EXPORTER_OTLP_TRACES_HEADERS --stdin --skip-deploys`
+      with the value piped from the recipe above (built with
+      `printf 'Authorization=Basic%%20%s,x-langfuse-ingestion-version=4'`).
+   2. Seal `OTEL_EXPORTER_OTLP_TRACES_HEADERS` in the dashboard.
+   3. Trigger exactly one deploy explicitly (the dashboard's Deploy button for
+      the staged changes, or `railway redeploy --service ai`). Do not let any
+      individual `variable set` deploy, and do not trigger a second deploy
+      while the first is building.
+
+   | Variable | Secret | Value |
+   |---|---|---|
+   | `OTEL_SDK_DISABLED` | No | `false` (application default `true`) |
+   | `OTEL_TRACES_EXPORTER` | No | `otlp` (default `none`) |
+   | `AI_TELEMETRY_BACKEND` | No | `langfuse` (default `generic`) |
+   | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | No | `https://<host>/api/public/otel/v1/traces` |
+   | `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | Yes, sealed | Same shape as the smoke, preferably from a production-only key pair |
+   | `OTEL_TRACES_SAMPLER_ARG` | No | Reviewed ratio, for example `0.1` (default `1.0` exports every request) |
+   | `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` | No | Unset (2 s) |
+   | `OTEL_RESOURCE_ATTRIBUTES` | No | Unset or `service.version=<release>`; the environment defaults to `production` |
+
+3. Declare the non-secret values and `preserve()` for the headers in
+   `.railway/railway.ts`; `npm run check:railway` passes.
+4. After the deploy: the health check passed (a configuration mistake stops
+   startup and Railway keeps the previous deployment), `ai` logs show no export
+   errors, and traces of real requests appear under environment `production`.
+   Do not send prompts to production to test telemetry.
+
+Rollback: `OTEL_SDK_DISABLED=true` on `ai` (or delete the variables above) and
+let it redeploy; with tracing disabled there is no instrumentation, export
+thread or telemetry traffic. A leaked key: revoke it in the Langfuse project
+settings, then set a new sealed header. Rollback stops new exports; data
+already in Langfuse stays there until it is deleted in Langfuse.
 
 ### Real-model evals (manual, paid)
 

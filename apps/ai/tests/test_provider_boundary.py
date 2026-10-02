@@ -6,7 +6,7 @@ import pytest
 APP_ROOT = Path(__file__).resolve().parents[1]
 GENERIC_SOURCES = sorted(
     path
-    for root in ("app", "evals")
+    for root in ("app", "evals", "smoke")
     for path in (APP_ROOT / root).rglob("*.py")
     if "__pycache__" not in path.parts
 )
@@ -31,6 +31,8 @@ def test_the_boundary_check_scans_the_generic_application() -> None:
         "structured_model_call.py",
         "model_call_tracing.py",
         "span_privacy.py",
+        "langfuse_smoke.py",
+        "synthetic_provider.py",
     } <= names
 
 

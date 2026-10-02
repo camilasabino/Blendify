@@ -1,8 +1,6 @@
 import logging
 import threading
-from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from collections.abc import Mapping
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,11 +15,10 @@ from app.observability.telemetry_config import load_telemetry_config
 from app.observability.telemetry_runtime import TelemetryRuntime, build_telemetry_runtime
 from tests.conftest import AUTH_HEADERS
 from tests.fakes import ScriptedModelProvider
+from tests.telemetry_fakes import LOOPBACK_HOST, loopback_otlp_receiver
 
 HEADER_SECRET = "otlp-header-secret-never-rendered"
 ENABLED = {"OTEL_SDK_DISABLED": "false"}
-
-ReceivedRequest = tuple[Mapping[str, str], bytes]
 
 
 class ShutdownCountingExporter(InMemorySpanExporter):
@@ -57,31 +54,8 @@ def _app_client(settings: Settings, runtime: TelemetryRuntime) -> TestClient:
     return TestClient(app, raise_server_exceptions=False)
 
 
-@contextmanager
-def _local_otlp_destination() -> Iterator[tuple[str, list[ReceivedRequest]]]:
-    received: list[ReceivedRequest] = []
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_POST(self) -> None:
-            body = self.rfile.read(int(self.headers["Content-Length"]))
-            received.append(({key.lower(): value for key, value in self.headers.items()}, body))
-            self.send_response(200)
-            self.send_header("Content-Type", "application/x-protobuf")
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-
-        def log_message(self, format: str, *args: object) -> None:
-            return
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}/v1/traces", received
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()
+def _traces_endpoint(port: int) -> str:
+    return f"http://{LOOPBACK_HOST}:{port}/v1/traces"
 
 
 def test_disabled_runtime_is_a_no_op_without_threads() -> None:
@@ -216,12 +190,12 @@ def test_otlp_exports_to_the_explicit_local_destination(
 ) -> None:
     caplog.set_level(logging.DEBUG)
 
-    with _local_otlp_destination() as (endpoint, received):
+    with loopback_otlp_receiver() as (port, received):
         config = load_telemetry_config(
             {
                 **ENABLED,
                 "OTEL_TRACES_EXPORTER": "otlp",
-                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": endpoint,
+                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": _traces_endpoint(port),
                 "OTEL_EXPORTER_OTLP_TRACES_HEADERS": f"authorization=Bearer%20{HEADER_SECRET}",
                 "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT": "2",
             }
@@ -234,11 +208,10 @@ def test_otlp_exports_to_the_explicit_local_destination(
             _record_span(runtime, "otlp.check")
             assert HEADER_SECRET not in repr(app.state._state)
 
-    (headers, body), *_ = received
-    assert len(received) == 1
-    assert headers["authorization"] == f"Bearer {HEADER_SECRET}"
-    assert headers["content-type"] == "application/x-protobuf"
-    (resource_spans,) = ExportTraceServiceRequest.FromString(body).resource_spans
+    (export,) = received
+    assert export.headers["authorization"] == f"Bearer {HEADER_SECRET}"
+    assert export.headers["content-type"] == "application/x-protobuf"
+    (resource_spans,) = ExportTraceServiceRequest.FromString(export.body).resource_spans
     resource = {item.key: item.value.string_value for item in resource_spans.resource.attributes}
     assert resource["service.name"] == "blendify-ai"
     assert [span.name for scope in resource_spans.scope_spans for span in scope.spans] == [
@@ -250,12 +223,12 @@ def test_otlp_exports_to_the_explicit_local_destination(
 def test_otlp_exporter_ignores_generic_and_compression_variables_from_the_process(
     settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    with _local_otlp_destination() as (endpoint, received):
+    with loopback_otlp_receiver() as (port, received):
         config = load_telemetry_config(
             {
                 **ENABLED,
                 "OTEL_TRACES_EXPORTER": "otlp",
-                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": endpoint,
+                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": _traces_endpoint(port),
             }
         )
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9/elsewhere")
@@ -267,9 +240,9 @@ def test_otlp_exporter_ignores_generic_and_compression_variables_from_the_proces
         with _app_client(settings, runtime):
             _record_span(runtime, "otlp.neutralized")
 
-    ((headers, body),) = received
-    assert "content-encoding" not in headers
-    (resource_spans,) = ExportTraceServiceRequest.FromString(body).resource_spans
+    (export,) = received
+    assert "content-encoding" not in export.headers
+    (resource_spans,) = ExportTraceServiceRequest.FromString(export.body).resource_spans
     assert [span.name for scope in resource_spans.scope_spans for span in scope.spans] == [
         "otlp.neutralized"
     ]

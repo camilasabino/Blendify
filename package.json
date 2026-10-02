@@ -32,6 +32,7 @@
     "format:check": "npm run format:check --workspaces --if-present",
     "ai:sync": "uv sync --directory apps/ai --locked",
     "eval:ai": "uv run --directory apps/ai --env-file .env python -m evals.run_intent_eval",
+    "smoke:langfuse": "uv run --directory apps/ai python -m smoke.langfuse_smoke",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "db:migrate": "npm run prisma:migrate -w @blendify/api",

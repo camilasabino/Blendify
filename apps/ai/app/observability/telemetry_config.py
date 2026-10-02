@@ -7,11 +7,20 @@ from types import MappingProxyType
 from typing import Literal, cast
 from urllib.parse import unquote, urlsplit
 
+from app.observability.langfuse_config import (
+    langfuse_endpoint_problem,
+    langfuse_environment_problem,
+    langfuse_headers_problem,
+)
+
 TracesExporter = Literal["none", "console", "otlp"]
+TelemetryBackend = Literal["generic", "langfuse"]
 
 SUPPORTED_TRACES_EXPORTERS: tuple[TracesExporter, ...] = ("none", "console", "otlp")
+SUPPORTED_TELEMETRY_BACKENDS: tuple[TelemetryBackend, ...] = ("generic", "langfuse")
 SUPPORTED_SAMPLER = "parentbased_traceidratio"
-SUPPORTED_RESOURCE_ATTRIBUTES = ("deployment.environment.name", "service.version")
+DEPLOYMENT_ENVIRONMENT_ATTRIBUTE = "deployment.environment.name"
+SUPPORTED_RESOURCE_ATTRIBUTES = (DEPLOYMENT_ENVIRONMENT_ATTRIBUTE, "service.version")
 DEFAULT_SERVICE_NAME = "blendify-ai"
 DEFAULT_SAMPLER_RATIO = 1.0
 DEFAULT_OTLP_TIMEOUT_SECONDS = 2.0
@@ -55,6 +64,7 @@ class OtlpTracesExporterConfig:
 class TelemetryConfig:
     enabled: bool
     exporter: TracesExporter = "none"
+    backend: TelemetryBackend = "generic"
     service_name: str = DEFAULT_SERVICE_NAME
     resource_attributes: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
     sampler_ratio: float = DEFAULT_SAMPLER_RATIO
@@ -72,14 +82,18 @@ def load_telemetry_config(environ: Mapping[str, str] | None = None) -> Telemetry
 
     _reject_unsupported_variables(source)
     exporter = _traces_exporter(source)
-    return TelemetryConfig(
+    config = TelemetryConfig(
         enabled=True,
         exporter=exporter,
+        backend=_telemetry_backend(source),
         service_name=_value(source, "OTEL_SERVICE_NAME") or DEFAULT_SERVICE_NAME,
         resource_attributes=_resource_attributes(source),
         sampler_ratio=_sampler_ratio(source),
         otlp=_otlp_exporter(source) if exporter == "otlp" else None,
     )
+    if config.backend == "langfuse":
+        _validate_langfuse_destination(config)
+    return config
 
 
 def _sdk_disabled(source: Mapping[str, str]) -> bool:
@@ -108,6 +122,28 @@ def _traces_exporter(source: Mapping[str, str]) -> TracesExporter:
         supported = ", ".join(SUPPORTED_TRACES_EXPORTERS)
         raise _invalid(f"OTEL_TRACES_EXPORTER must be a single value: one of {supported}")
     return cast(TracesExporter, value)
+
+
+def _telemetry_backend(source: Mapping[str, str]) -> TelemetryBackend:
+    value = _value(source, "AI_TELEMETRY_BACKEND").lower() or "generic"
+    if value not in SUPPORTED_TELEMETRY_BACKENDS:
+        supported = ", ".join(SUPPORTED_TELEMETRY_BACKENDS)
+        raise _invalid(f"AI_TELEMETRY_BACKEND must be one of {supported}")
+    return cast(TelemetryBackend, value)
+
+
+def _validate_langfuse_destination(config: TelemetryConfig) -> None:
+    if config.otlp is None:
+        raise _invalid("AI_TELEMETRY_BACKEND=langfuse requires OTEL_TRACES_EXPORTER=otlp")
+
+    environment = config.resource_attributes.get(DEPLOYMENT_ENVIRONMENT_ATTRIBUTE)
+    problem = (
+        langfuse_endpoint_problem(config.otlp.endpoint)
+        or langfuse_headers_problem(config.otlp.headers)
+        or (langfuse_environment_problem(environment) if environment is not None else None)
+    )
+    if problem is not None:
+        raise _invalid(problem)
 
 
 def _sampler_ratio(source: Mapping[str, str]) -> float:

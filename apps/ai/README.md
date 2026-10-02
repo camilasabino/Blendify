@@ -140,7 +140,8 @@ Tests use fake providers; none may make a real model or provider call, and CI
 needs no `AI_PROVIDER_API_KEY`. Layout follows concepts: `models/`, `providers/`
 (generic contract and registry; one subpackage per provider adapter),
 `prompts/` (versioned), `interpretation/`, `api/`, `config/`, `observability/`;
-`evals/` holds the eval datasets and runner.
+`evals/` holds the eval datasets and runner; `smoke/` holds the manual
+Langfuse telemetry smoke.
 
 ## Real-model evals (manual, paid)
 
@@ -204,6 +205,7 @@ headers:
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Required for `otlp`: the complete traces URL (no `/v1/traces` is appended). `https` only, without credentials or fragment; plain `http` only for `localhost`/`127.0.0.1`/`::1`. |
 | `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | Optional secret `name=value` pairs (URL-encoded values). Never logged or rendered. |
 | `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` | **Seconds** (the Python SDK's unit, not milliseconds); default 2, greater than 0 and at most 3 (the cap comes from the shutdown budget, see "Shutdown"). One deadline for each export including the exporter's own retries; it is a socket timeout, not a wall-clock limit (DNS resolution and slow-drip reads are not covered). |
+| `AI_TELEMETRY_BACKEND` | `generic` (default) or `langfuse`; selects the destination mapping (see "Langfuse destination mapping"). Never inferred from the endpoint, and never enables tracing by itself. |
 
 OTLP uses HTTP/protobuf. Batch processor and span limits are fixed in code
 rather than read from `OTEL_BSP_*`/`OTEL_SPAN_*`: queue 1,024 spans, batches
@@ -328,8 +330,142 @@ SERVER span status follows the HTTP rule: 5xx is `ERROR`, while a handled 4xx
 such as 401 stays unset.
 
 **Export pipeline.** `BatchSpanProcessor` → `ShutdownWindowSpanExporter`
-(`app/observability/span_export_safety.py`) → `PrivacySpanExporter` → the
-console or OTLP exporter. It is the only processor on the runtime's provider.
+(`app/observability/span_export_safety.py`) → `PrivacySpanExporter` → (only
+with `AI_TELEMETRY_BACKEND=langfuse`: `LangfuseSpanExporter`) → the console or
+OTLP exporter. It is the only processor on the runtime's provider.
+
+**Langfuse destination mapping** (`app/observability/langfuse_mapping.py`,
+`app/observability/langfuse_config.py`). Optional; off unless
+`AI_TELEMETRY_BACKEND=langfuse`. Langfuse is reached through its native OTLP
+endpoint with the existing OTLP/HTTP protobuf exporter. Langfuse recommends its
+Python SDK for Python applications; it is deliberately not used, nor its
+OpenAI wrapper, decorators, a Collector, or a second processor or exporter, so
+that the existing ownership, sampling, queue bounds, shutdown window, log
+redaction and privacy allowlist keep applying unchanged. The mapping is an
+exporter wrapper placed after `PrivacySpanExporter`: it receives only the
+sanitized copies, makes its own copy (originals are never mutated), and adds a
+fixed set of destination attributes computed from that copy alone. It reads no
+request context, baggage or cache, and runs on the existing export thread.
+Console output and `generic` OTLP never carry `langfuse.*` attributes.
+
+| Configuration (tracing enabled) | Result |
+|---|---|
+| `AI_TELEMETRY_BACKEND` unset or `generic` | Existing behavior, any exporter. |
+| `langfuse` + `OTEL_TRACES_EXPORTER=otlp` + valid endpoint and headers | Langfuse mapping on the OTLP export. |
+| `langfuse` with exporter `none` or `console` | Startup fails: requires `OTEL_TRACES_EXPORTER=otlp`. |
+| `langfuse` and an endpoint whose path does not end in `/api/public/otel/v1/traces`, or that has a query | Startup fails. |
+| `langfuse` without `x-langfuse-ingestion-version=4` | Startup fails. |
+| `langfuse` without `Authorization=Basic <base64(pk-lf-…:sk-lf-…)>` (strict base64 with padding; wrong scheme, missing or swapped keys, extra text) | Startup fails. |
+| `langfuse` with a `deployment.environment.name` override that is not 1–40 of `a-z`, `0-9`, `-`, `_`, or starts with `langfuse` | Startup fails (Langfuse would otherwise silently rewrite it, or file it under `default`). |
+| Any other value of `AI_TELEMETRY_BACKEND` | Startup fails. |
+| `OTEL_SDK_DISABLED=true` (default) | No-op; `AI_TELEMETRY_BACKEND` and credentials are not read. |
+
+Errors name the variable and the expected shape, never the value. Endpoint
+rules (https; plain http only for loopback) and the header syntax
+(`OTEL_EXPORTER_OTLP_TRACES_HEADERS` only, comma-separated `name=value`,
+percent-decoded) are the generic ones; the Basic value may use a literal or
+percent-encoded space, and `+`, `/`, `=` may be percent-encoded. The region is
+the host of the Langfuse project that was chosen (for example
+`cloud.langfuse.com`, `us.cloud.langfuse.com`); nothing selects it by default.
+No `LANGFUSE_*` variables exist, and no network check is made at startup or in
+`/health`.
+
+Destination attributes (exact keys; nothing is forwarded by prefix):
+
+| Destination attribute | Source (on the same span) | Spans |
+|---|---|---|
+| `langfuse.observation.type` | `generation` for a CLIENT span with `gen_ai.operation.name`; `span` otherwise | Every span |
+| `langfuse.observation.model.name` | `gen_ai.response.model`, else `gen_ai.request.model`; omitted when neither is known | Generations |
+| `langfuse.observation.metadata.operation` | `blendify.ai.operation` | Use case, generation |
+| `langfuse.observation.metadata.prompt_version` | `blendify.ai.prompt.version` | Use case, generation |
+| `langfuse.observation.metadata.provider` | `gen_ai.provider.name` | Generation |
+| `langfuse.observation.metadata.attempt` | `blendify.ai.attempt` | Generation |
+| `langfuse.observation.metadata.result` | `blendify.ai.result` | Use case, generation |
+| `langfuse.observation.metadata.outcome` | `blendify.ai.outcome` | Use case |
+| `langfuse.observation.metadata.error_code` | `blendify.ai.error_code` | Use case |
+| `langfuse.observation.metadata.error_type` | `error.type` | Failed use case or generation |
+
+Metadata values are strings (integers are converted), copied only when they
+match `[A-Za-z0-9_.:-]{1,64}`; anything else is omitted, never replaced.
+Values are never inferred from a parent or sibling: a failed attempt keeps its
+own `result` and `error_type` under a successful use case. The request span
+gets only its type; `blendify.request_id` stays a plain attribute (correlation,
+not a dashboard dimension). No user, session, tag, input, output, prompt link,
+usage, cost or environment attribute is added. Langfuse's own mapping is relied
+on for the rest: `gen_ai.usage.input_tokens`/`output_tokens` → usage
+`input`/`output` of that generation only (missing usage stays unknown, never
+zero; cost is Langfuse's estimate for models it recognizes, not provider
+billing); the resource `deployment.environment.name` → environment;
+`service.version` → version; span status `ERROR` → level `ERROR` (status
+descriptions are cleared, so there is no status message); the root span name →
+trace name. The prompt version is local metadata, not a Langfuse-managed
+prompt, so `langfuse.observation.prompt.*` is never set. Unmapped allowlisted
+attributes appear under Langfuse's `metadata.attributes` and resource
+attributes under `metadata.resourceAttributes`.
+
+Pinned references (read 2026-10-02): the
+[OTLP endpoint and attribute mapping](https://langfuse.com/integrations/native/opentelemetry),
+the [v4 custom-ingestion guide](https://langfuse.com/integrations/native/opentelemetry/migration-to-v4),
+[environments](https://langfuse.com/docs/observability/features/environments),
+and the ingestion source at `langfuse/langfuse@9a29212e855c60ffb86d1989b62918b3781d9652`
+(`packages/shared/src/server/otel/OtelIngestionProcessor.ts`,
+`ObservationTypeMapper.ts`, `attributes.ts`;
+`packages/shared/src/server/ingestion/types.ts` for environment
+normalization). The model name is set explicitly because the documentation
+lists `gen_ai.request.model` before `gen_ai.response.model` while that source
+prefers the response model. Local tests verify the mapping, the configuration
+and the serialized OTLP request (`tests/test_langfuse_transport.py`: real
+runtime and exporter, fake keys, loopback receiver decoding protobuf). Export
+rejections never reach requests, readiness or model calls: 401/403 fail the
+batch without retry; 429/502/503/504 are retried only inside the installed
+exporter (at most 6 attempts within `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT`,
+honoring `Retry-After`), independently of model-call attempts; the service adds
+no retry of its own. Remote ingestion and the Langfuse UI are not verified.
+
+**Langfuse synthetic smoke** (`smoke/langfuse_smoke.py`,
+`npm run smoke:langfuse`). A manual, opt-in command for the first remote check
+(project setup, secure key handling, what to check in Langfuse, production
+activation and rollback: [`docs/deployment.md`](../../docs/deployment.md),
+section 19.9). Without `--confirm` (written in full) it only validates the
+configuration and prints the plan; nothing is built or sent. With it, it runs
+once:
+
+- It builds the real application (`create_app`) and the real telemetry runtime
+  from `load_telemetry_config`, so the request, use-case and model tracing,
+  the privacy allowlist, the Langfuse mapping, the shutdown window, the log
+  redaction and the installed `OTLPSpanExporter` are the production ones.
+- The model provider is `smoke/synthetic_provider.py`: four scripted replies in
+  process, with fixed per-attempt token usage and the fictitious model
+  `synthetic-smoke-model-v1`. It fails closed when its script runs out. The
+  registry is never called, so no real provider is built even when
+  `AI_PROVIDER`, `AI_MODEL` and `AI_PROVIDER_API_KEY` are set, and
+  `apps/ai/.env` is not loaded.
+- It reads `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_TRACES_HEADERS`
+  and optionally `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` from the environment and
+  forces tracing on, `otlp`, `langfuse`, ratio 1 and
+  `deployment.environment.name=telemetry-smoke`. The same validation as the
+  service applies, with the same sanitized errors.
+- Requests carry synthetic text only, which never leaves the process (spans
+  carry no content). The output contains the plan, results and trace IDs, but
+  never the endpoint, headers, keys or the per-run service token.
+
+| Budget | Count | Notes |
+|---|---|---|
+| Functional requests | 3 | Interpretation, refinement, interpretation whose first output is invalid; in process (`TestClient`), no network |
+| Synthetic model calls | 4 | In process, no network |
+| Unique observations | 10 | 3 + 3 + 4 spans; 6 `span`, 4 `generation` |
+| OTLP export calls | Normally 1 | Exported at application shutdown; a run slower than the 5 s schedule delay can split the same 10 spans across calls |
+| HTTP POSTs per export call | 1 when accepted | The installed exporter (not the smoke) retries 429/502/503/504 and connection errors, up to 6 rounds within the export timeout, resending a connection error once immediately; 401/403 are not retried |
+
+Delivery is not guaranteed (a failed batch is dropped) and not exactly once (an
+exporter retry can resend spans the destination already received). The smoke
+records only what the OTLP exporter returns for each export call: HTTP 2xx is
+an acknowledgement, not proof of ingestion. It never repeats itself, polls or
+re-exports; exit status 1 reports any non-200 response, wrong model call
+count, wrong observation count per trace, or unacknowledged export call. It is
+validated only against loopback receivers with fake keys
+(`tests/test_langfuse_smoke.py`), and no workflow, hook or script may invoke it
+(`tests/test_paid_eval_isolation.py`).
 
 **Sampling.** `parentbased_traceidratio`: a request without a parent is
 sampled when its trace ID falls under `OTEL_TRACES_SAMPLER_ARG`; a request with
@@ -492,9 +628,10 @@ step is not automated; the tests use an in-process loopback receiver instead.
 **No remote destination.** Nothing exports anywhere today. Traces cannot be
 viewed remotely until an explicit backend is configured in a later,
 authorized step (production setup and rollback:
-[`docs/deployment.md`](../../docs/deployment.md), section 19.8).
+[`docs/deployment.md`](../../docs/deployment.md), section 19.8; Langfuse smoke
+and activation: section 19.9).
 
-**Future processors (for example Langfuse).** Privacy is applied by an
+**Future processors.** Privacy is applied by an
 exporter wrapper inside this runtime's single batch pipeline, not by a span
 processor. A processor or exporter added directly to the `TracerProvider`
 would receive raw spans, with URLs, query strings, user agent, peer address,
@@ -504,4 +641,6 @@ path (or an equivalent filter applied before any data leaves the process),
 review context propagation (caller baggage is present in the request context,
 see above), and fit its own shutdown inside the same budget: the SDK shuts
 processors down one after another, so a second processor's flush adds to the
-total.
+total. The Langfuse mapping above follows this rule: it is an exporter wrapper
+inside the same pipeline, after the privacy filter, and copies nothing from
+baggage.

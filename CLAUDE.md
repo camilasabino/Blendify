@@ -41,6 +41,7 @@ npm run db:migrate        # create/apply a local Prisma migration
 
 npm run ai:sync / dev:ai / test:ai / lint:ai   # AI service (uv; port 8000)
 ALLOW_PAID_AI_EVALS=true npm run eval:ai -- --confirm   # paid real-model intent eval (manual only, never in CI)
+npm run smoke:langfuse -- --confirm   # remote Langfuse telemetry export of 3 synthetic traces (manual only, explicit authorization per run; docs/deployment.md 19.9)
 
 npm run docker:up          # start PostgreSQL + Redis
 npm run start                 # start infra + both apps (logs in .blendify/logs/)
