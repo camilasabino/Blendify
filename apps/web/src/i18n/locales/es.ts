@@ -589,18 +589,15 @@ export const es: Record<MessageKey, string> = {
   'ai.requestTitle': 'Tu pedido',
   'ai.promptLabel': 'Pedido de playlist',
   'ai.promptPlaceholder':
-    'Por ejemplo: 25 canciones de indie rock británico entre 2000 y 2015, mezcla de éxitos y temas menos conocidos, en orden aleatorio',
+    'Por ejemplo: 25 canciones de indie rock británico entre 2000 y 2015, sin Oasis, en orden aleatorio',
   'ai.promptHint': 'Presiona Ctrl+Enter o ⌘+Enter para enviar.',
   'ai.promptRequired': 'Primero describe la playlist que quieres.',
   'ai.suggestionsLabel': 'Prueba un ejemplo',
   'ai.suggestion.artists':
-    '30 canciones menos conocidas de Soda Stereo y Los Fabulosos Cadillacs, sin Maná',
-  'ai.suggestion.genres':
-    'Rock argentino de los 80 y 90, voces femeninas, sin versiones en vivo',
-  'ai.suggestion.discoverArtist':
-    'Música parecida a Björk, menos conocida, de los 90 y los 2000',
-  'ai.suggestion.discoverTrack':
-    '20 canciones parecidas a Teardrop de Massive Attack, sin versiones en vivo',
+    '30 canciones de Radiohead e Interpol, con una mezcla equilibrada de éxitos y temas menos obvios',
+  'ai.suggestion.genres': 'Pop de los 2000 y 2010, voces femeninas, sin versiones en vivo',
+  'ai.suggestion.discoverArtist': 'Música parecida a Björk, de los 90 y los 2000',
+  'ai.suggestion.discoverTrack': '20 canciones parecidas a Teardrop de Massive Attack',
   'ai.submit': 'Revisar pedido',
   'ai.submitting': 'Leyendo tu pedido…',
   'ai.interpreting': 'Leyendo tu pedido…',
