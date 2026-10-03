@@ -1,6 +1,16 @@
-import type { AiGenerationFailureDto, AiGenerationUnmetConstraint } from '@blendify/contracts'
+import type {
+  AiGenerationFailureDto,
+  AiGenerationUnmetConstraint,
+  PlaylistKind,
+} from '@blendify/contracts'
 import type { MessageKey } from '@/i18n/messages'
-import { formatSpotifyLimitMessage, getApiErrorMessage, isRequestLimited } from '@/lib/api-error'
+import {
+  ApiError,
+  formatSpotifyLimitMessage,
+  getApiErrorMessage,
+  isRequestLimited,
+  type EmptyResultFamily,
+} from '@/lib/api-error'
 import { formatListeningTime } from '@/lib/utils'
 
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string
@@ -15,7 +25,39 @@ export type AiFailureView = Readonly<{
 }>
 
 const PROVIDER_CATALOG_UNAVAILABLE_CODE = 'CATALOG_UNAVAILABLE'
+const SPOTIFY_UNAVAILABLE_CODE = 'SPOTIFY_UNAVAILABLE'
 const GENERATION_INTERRUPTED_CODE = 'AI_GENERATION_INTERRUPTED'
+const DISCOVER_EMPTY_RESULT_CODES = new Set([
+  'DISCOVER_NOT_ENOUGH_SIMILAR',
+  'DISCOVER_RESOLVE_FAILED',
+])
+
+function emptyResultFamilyFor(kind: PlaylistKind): EmptyResultFamily {
+  return kind === 'discover_artist' || kind === 'discover_track' ? 'discover' : 'mix'
+}
+
+function insufficientMessageKey(code: string, kind: PlaylistKind): MessageKey {
+  if (DISCOVER_EMPTY_RESULT_CODES.has(code) || emptyResultFamilyFor(kind) === 'discover') {
+    return 'discover.noTracksFound'
+  }
+  return 'create.noTracksFound'
+}
+
+function persistedFailureError(failure: AiGenerationFailureDto): ApiError {
+  const details: Record<string, unknown> = {}
+  if (typeof failure.retryAfterSeconds === 'number') {
+    details.retryAfterSeconds = failure.retryAfterSeconds
+  }
+  if (failure.retryAfterSource) {
+    details.retryAfterSource = failure.retryAfterSource
+  }
+  return new ApiError(failure.code, 500, {
+    statusCode: 500,
+    code: failure.code,
+    message: failure.code,
+    ...(Object.keys(details).length > 0 ? { details } : {}),
+  })
+}
 
 function seedNotFoundView(failure: AiGenerationFailureDto, t: Translate): AiFailureView {
   const names = failure.seedNotFound?.names ?? []
@@ -38,16 +80,32 @@ function rateLimitedView(failure: AiGenerationFailureDto, t: Translate): AiFailu
 
 function providerUnavailableView(failure: AiGenerationFailureDto, t: Translate): AiFailureView {
   const key: MessageKey =
-    failure.code === PROVIDER_CATALOG_UNAVAILABLE_CODE
+    failure.code === PROVIDER_CATALOG_UNAVAILABLE_CODE || failure.code === SPOTIFY_UNAVAILABLE_CODE
       ? 'ai.generationError.spotifyUnavailable'
       : 'ai.generationError.discoveryUnavailable'
   return { message: t(key), hint: null, recovery: 'retry' }
+}
+
+function failedGenerationView(
+  failure: AiGenerationFailureDto,
+  t: Translate,
+  family: EmptyResultFamily,
+): AiFailureView {
+  if (failure.code === GENERATION_INTERRUPTED_CODE) {
+    return { message: t('ai.generationError.interrupted'), hint: null, recovery: 'retry' }
+  }
+  return {
+    message: getApiErrorMessage(persistedFailureError(failure), t, 'ai.generationError.failed', family),
+    hint: null,
+    recovery: 'retry',
+  }
 }
 
 export function generationFailureView(
   failure: AiGenerationFailureDto,
   liveError: unknown,
   t: Translate,
+  kind: PlaylistKind = 'artist_mix',
 ): AiFailureView {
   if (isRequestLimited(liveError)) {
     return {
@@ -66,27 +124,26 @@ export function generationFailureView(
       return providerUnavailableView(failure, t)
     case 'insufficient_results':
       return {
-        message: t('ai.generationError.insufficient'),
+        message: t(insufficientMessageKey(failure.code, kind)),
         hint: null,
         recovery: 'edit_or_retry',
       }
     case 'failed':
-      return {
-        message:
-          failure.code === GENERATION_INTERRUPTED_CODE
-            ? t('ai.generationError.interrupted')
-            : t('ai.generationError.failed'),
-        hint: null,
-        recovery: 'retry',
-      }
+      return failedGenerationView(failure, t, emptyResultFamilyFor(kind))
   }
 }
 
-export function generationRequestErrorMessage(error: unknown, t: Translate): string {
-  if (isRequestLimited(error)) {
-    return getApiErrorMessage(error, t, 'ai.generationError.failed')
-  }
-  return t('ai.generationError.failed')
+export function generationRequestErrorMessage(
+  error: unknown,
+  t: Translate,
+  kind: PlaylistKind = 'artist_mix',
+): string {
+  return getApiErrorMessage(
+    error,
+    t,
+    'ai.generationError.failed',
+    emptyResultFamilyFor(kind),
+  )
 }
 
 export type UnmetConstraintView = Readonly<{ key: string; label: string; message: string }>

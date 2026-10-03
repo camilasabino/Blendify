@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AiGenerationFailureDto, MusicRegion } from '@blendify/contracts'
+import type { AiGenerationFailureDto, AiIntentSummary, MusicRegion } from '@blendify/contracts'
 import { useLocaleStore } from '@/i18n/use-locale'
 import {
   jsonResponse,
@@ -86,11 +86,12 @@ function failureError(code: string, message: string, statusCode: number, details
 async function failGeneration(
   streamError: ReturnType<typeof failureError>,
   persisted: AiGenerationFailureDto,
+  intent: AiIntentSummary = aiIntent,
 ) {
   const user = userEvent.setup()
-  const sessionStates = [failedAiSessionState(persisted)]
+  const sessionStates = [failedAiSessionState(persisted, intent)]
   const { calls } = stubApi({
-    [CREATE_ROUTE]: () => jsonResponse(createdAiSession(), 201),
+    [CREATE_ROUTE]: () => jsonResponse(createdAiSession(intent), 201),
     [GENERATE_ROUTE]: () => ndjsonResponse(streamError),
     [SESSION_ROUTE]: () => jsonResponse(sessionStates[0]),
   })
@@ -372,6 +373,38 @@ describe('Create with AI generation failures', () => {
     expect(promptField()).toHaveValue(AI_PROMPT)
     expect(promptField()).toHaveFocus()
     expect(generateCalls(calls)).toHaveLength(1)
+  })
+
+  it.each([
+    ['artist_mix', 'We couldn’t find songs for this mix'],
+    ['genre_mix', 'We couldn’t find songs for this mix'],
+    ['discover_artist', 'Try a different starting point'],
+    ['discover_track', 'Try a different starting point'],
+  ] as const)('explains an empty %s result without blaming familiarity', async (kind, copy) => {
+    const intent: AiIntentSummary = {
+      ...aiIntent,
+      kind,
+      artists: kind === 'genre_mix' ? [] : ['Radiohead'],
+      genres: kind === 'genre_mix' ? ['Jazz'] : [],
+      seedTrack:
+        kind === 'discover_track' ? { title: 'Karma Police', artist: 'Radiohead' } : null,
+    }
+    const { heading } = await failGeneration(
+      failureError('NO_TRACKS_FOUND', 'No tracks', 422),
+      {
+        code: 'NO_TRACKS_FOUND',
+        category: 'insufficient_results',
+        retryAfterSeconds: null,
+        seedNotFound: null,
+      },
+      intent,
+    )
+
+    const alert = within(heading.closest('section') as HTMLElement).getByRole('alert')
+    expect(alert).toHaveTextContent(copy)
+    expect(alert).toHaveTextContent('Refine results')
+    expect(alert.textContent).not.toMatch(/familiarity/i)
+    expect(alert.textContent).not.toMatch(/try again later|isn’t responding/i)
   })
 
   it('shows the Spotify limit with the normalized wait and offers a retry', async () => {

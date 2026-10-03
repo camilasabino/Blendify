@@ -72,10 +72,10 @@ export const es: Record<MessageKey, string> = {
   'discover.working': 'Creando tu playlist',
   'discover.workingHint': 'Buscando canciones relacionadas…',
   'discover.failed': 'No se pudo crear la playlist. Vuelve a intentarlo.',
-  'discover.notEnoughSimilar':
-    'No hay suficiente música relacionada. Prueba con otro artista o canción.',
+  'discover.noTracksFound':
+    'No encontramos canciones que cumplan con esta selección. Prueba con otro punto de partida o ajusta los filtros en Refinar resultados.',
   'discover.resolveFailed':
-    'No encontramos suficiente música relacionada en Spotify. Prueba con otro artista o canción.',
+    'No encontramos esa canción en Spotify. Prueba con otra.',
   'create.eyebrow': 'Mezclar',
   'create.title': 'Crea tu mezcla',
   'create.subtitle':
@@ -190,7 +190,7 @@ export const es: Record<MessageKey, string> = {
   'create.partialTracks':
     'Encontramos {count} de {requested} canciones. Prueba con otros artistas, géneros u otra opción de familiaridad.',
   'create.noTracksFound':
-    'No encontramos canciones para esta mezcla. Prueba con otros artistas, géneros u otra opción de familiaridad.',
+    'No encontramos canciones para esta mezcla. Prueba con otros artistas, géneros o ajusta los filtros en Refinar resultados.',
   'create.openSpotify': 'Abrir en Spotify',
   'create.copyLink': 'Copiar enlace',
   'create.copied': 'Copiado',
@@ -742,7 +742,6 @@ export const es: Record<MessageKey, string> = {
   'ai.generationError.seedNotFoundHint': 'Revisa cómo lo escribiste en tu pedido y vuelve a enviarlo.',
   'ai.generationError.spotifyUnavailable': 'Spotify no está respondiendo en este momento. Vuelve a intentarlo en unos minutos.',
   'ai.generationError.discoveryUnavailable': 'Los datos de música relacionada no están disponibles en este momento. Vuelve a intentarlo en unos minutos.',
-  'ai.generationError.insufficient': 'Blendify no encontró suficiente música para este pedido. Prueba con otros artistas, géneros u otra canción.',
   'ai.generationError.interrupted': 'Se interrumpió la creación de tu playlist. Vuelve a intentarlo.',
   'ai.generationError.failed': 'No se pudo terminar de crear tu playlist. Vuelve a intentarlo.',
   'ai.destination.spotifyTitle': 'Guardar en Spotify',

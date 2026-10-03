@@ -438,6 +438,7 @@ export function DiscoverPlaylistForm() {
     libraryAvailable,
     t,
     'discover.failed',
+    'discover',
   )
   const coverError = runCoverError(spec?.coverFailed, result, t)
   let disabledReason: string | null = t('common.loading')

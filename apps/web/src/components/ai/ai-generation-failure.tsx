@@ -1,6 +1,6 @@
 import type { RefObject } from 'react'
 import { Pencil, RotateCcw } from 'lucide-react'
-import type { AiGenerationFailureDto } from '@blendify/contracts'
+import type { AiGenerationFailureDto, PlaylistKind } from '@blendify/contracts'
 import { SpotifyLimitExplanation } from '@/components/brand/spotify-limit-explanation'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/i18n/use-t'
@@ -9,6 +9,7 @@ import { generationFailureView } from './ai-generation-copy'
 type AiGenerationFailureProps = Readonly<{
   failure: AiGenerationFailureDto
   liveError: unknown
+  kind: PlaylistKind
   headingRef: RefObject<HTMLHeadingElement | null>
   onEdit: () => void
   onRetry: () => void
@@ -18,13 +19,14 @@ type AiGenerationFailureProps = Readonly<{
 export function AiGenerationFailure({
   failure,
   liveError,
+  kind,
   headingRef,
   onEdit,
   onRetry,
   onStartOver,
 }: AiGenerationFailureProps) {
   const t = useT()
-  const view = generationFailureView(failure, liveError, t)
+  const view = generationFailureView(failure, liveError, t, kind)
   const editFirst = view.recovery !== 'retry'
   const canRetry = view.recovery !== 'edit'
 

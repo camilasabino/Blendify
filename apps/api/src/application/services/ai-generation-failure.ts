@@ -7,6 +7,9 @@ import type { AiGenerationFailure } from '@/domain/ai/ai-session';
 import { AiGenerationError } from '@/domain/errors/ai-generation.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-unknown.error';
+import { SpotifyProviderError } from '@/domain/errors/spotify-provider.error';
+import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import { isSpotifyQuotaError } from '@/domain/genre/catalog-resolve';
 
 const INSUFFICIENT_RESULT_CODES = new Set([
@@ -52,6 +55,18 @@ export function describeAiGenerationFailure(
     if (PROVIDER_UNAVAILABLE_CODES.has(error.code)) {
       return failure(error.code, 'provider_unavailable');
     }
+    return failure(error.code, 'failed');
+  }
+  if (error instanceof SpotifyProviderError) {
+    return failure(
+      error.code,
+      error.code === 'SPOTIFY_UNAVAILABLE' ? 'provider_unavailable' : 'failed',
+    );
+  }
+  if (
+    error instanceof SpotifyReauthRequiredError ||
+    error instanceof ProviderOutcomeUnknownError
+  ) {
     return failure(error.code, 'failed');
   }
   return failure('INTERNAL_ERROR', 'failed');

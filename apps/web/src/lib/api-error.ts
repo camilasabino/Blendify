@@ -51,6 +51,13 @@ export function interruptedGenerationError(): ApiError {
 export const SPOTIFY_OUTCOME_UNKNOWN = 'SPOTIFY_OUTCOME_UNKNOWN'
 export const SPOTIFY_PLAYLIST_INCOMPLETE = 'SPOTIFY_PLAYLIST_INCOMPLETE'
 
+export type EmptyResultFamily = 'mix' | 'discover'
+
+const DISCOVER_EMPTY_RESULT_CODES = new Set([
+  'DISCOVER_NOT_ENOUGH_SIMILAR',
+  'DISCOVER_RESOLVE_FAILED',
+])
+
 const SERVER_RETRIED_PROVIDER_CODES = new Set([
   'SPOTIFY_UNAVAILABLE',
   'SPOTIFY_REQUEST_REJECTED',
@@ -258,14 +265,11 @@ function mapNamedResolveMessage(
 const STATIC_ERROR_MESSAGES: Record<string, MessageKey> = {
   LASTFM_NOT_CONFIGURED: 'errors.lastfmMissing',
   LASTFM_SIMILAR_FAILED: 'errors.lastfmSimilar',
-  DISCOVER_NOT_ENOUGH_SIMILAR: 'discover.notEnoughSimilar',
-  DISCOVER_RESOLVE_FAILED: 'discover.resolveFailed',
   GENRE_LOOKUP_UNAVAILABLE: 'errors.genreLookupUnavailable',
   REGION_LOOKUP_UNAVAILABLE: 'errors.regionLookupUnavailable',
   ARTIST_FILTER_LOOKUP_UNAVAILABLE: 'errors.artistFilterLookupUnavailable',
   EMPTY_ARTIST_SELECTION: 'create.addArtist',
   EMPTY_GENRE_SELECTION: 'create.addGenre',
-  NO_TRACKS_FOUND: 'create.noTracksFound',
   PREMIUM_REQUIRED: 'preview.premiumRequired',
   PLAYBACK_UNAUTHORIZED: 'preview.sessionExpired',
   PLAYBACK_INVALID: 'preview.invalidPlayback',
@@ -306,10 +310,28 @@ function mapStaticCodeMessage(
   return key ? t(key) : null
 }
 
+function mapEmptySelectionMessage(
+  error: ApiError,
+  t: Translate,
+  family: EmptyResultFamily,
+): string | null {
+  if (!error.code) {
+    return null
+  }
+  if (DISCOVER_EMPTY_RESULT_CODES.has(error.code)) {
+    return t('discover.noTracksFound')
+  }
+  if (error.code === 'NO_TRACKS_FOUND') {
+    return t(family === 'discover' ? 'discover.noTracksFound' : 'create.noTracksFound')
+  }
+  return null
+}
+
 export function getApiErrorMessage(
   error: unknown,
   t: Translate,
   fallbackKey: MessageKey = 'create.failed',
+  emptyResult: EmptyResultFamily = 'mix',
 ): string {
   if (!(error instanceof ApiError)) {
     return t(fallbackKey)
@@ -322,6 +344,7 @@ export function getApiErrorMessage(
     mapProviderWaitMessage(error, t) ??
     mapMaxSelectionMessage(error, t, fallbackKey) ??
     mapNamedResolveMessage(error, t) ??
+    mapEmptySelectionMessage(error, t, emptyResult) ??
     mapStaticCodeMessage(error.code, t) ??
     t(fallbackKey)
   )

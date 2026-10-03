@@ -52,6 +52,7 @@ export {
   isSpotifyProviderFailure,
   isSpotifyRateLimited,
 } from '@/lib/api-error'
+export type { EmptyResultFamily } from '@/lib/api-error'
 import { ApiError, invalidGenerationResponseError } from '@/lib/api-error'
 import {
   readGenerationStream,

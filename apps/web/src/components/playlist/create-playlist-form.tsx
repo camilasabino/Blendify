@@ -685,6 +685,7 @@ export function MixPlaylistForm() {
     libraryAvailable,
     t,
     'create.failed',
+    'mix',
   )
   const coverError = runCoverError(spec?.coverFailed, result, t)
   let disabledReason: string | null = t('common.loading')

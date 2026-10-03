@@ -253,7 +253,7 @@ function CandidateFailure({
   refinement: Extract<AiRefinementDto, { status: 'candidate_failed' }>
 }) {
   const t = useT()
-  const view = generationFailureView(refinement.error, null, t)
+  const view = generationFailureView(refinement.error, null, t, refinement.intent.kind)
 
   return (
     <ReviewPanel title={t('ai.refine.failed.title')} headingRef={headingRef} tone="danger">

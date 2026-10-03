@@ -88,6 +88,45 @@ describe('generationFailureView', () => {
     }
   })
 
+  it.each([
+    ['artist_mix', 'create.noTracksFound'],
+    ['genre_mix', 'create.noTracksFound'],
+    ['discover_artist', 'discover.noTracksFound'],
+    ['discover_track', 'discover.noTracksFound'],
+  ] as const)('uses the %s empty-result copy for NO_TRACKS_FOUND', (kind, key) => {
+    const view = generationFailureView(
+      {
+        code: 'NO_TRACKS_FOUND',
+        category: 'insufficient_results',
+        retryAfterSeconds: null,
+        seedNotFound: null,
+      },
+      null,
+      t,
+      kind,
+    )
+
+    expect(view.message).toBe(messages.en[key])
+    expect(view.message).not.toMatch(/familiarity/i)
+    expect(view.recovery).toBe('edit_or_retry')
+  })
+
+  it('keeps a known Spotify rejection out of the generic failure', () => {
+    const view = generationFailureView(
+      {
+        code: 'SPOTIFY_REQUEST_REJECTED',
+        category: 'failed',
+        retryAfterSeconds: null,
+        seedNotFound: null,
+      },
+      null,
+      t,
+    )
+
+    expect(view.message).toBe(messages.en['errors.spotifyRequestRejected'])
+    expect(view.message).not.toBe(messages.en['ai.generationError.failed'])
+  })
+
   it('names Spotify only for the catalog outage', () => {
     const spotify = generationFailureView(
       { code: 'CATALOG_UNAVAILABLE', category: 'provider_unavailable', retryAfterSeconds: null, seedNotFound: null },
@@ -102,5 +141,21 @@ describe('generationFailureView', () => {
 
     expect(spotify.message).toContain('Spotify isn’t responding')
     expect(discovery.message).not.toContain('Spotify')
+  })
+
+  it('treats a Spotify read timeout as a temporary Spotify outage', () => {
+    const view = generationFailureView(
+      {
+        code: 'SPOTIFY_UNAVAILABLE',
+        category: 'provider_unavailable',
+        retryAfterSeconds: null,
+        seedNotFound: null,
+      },
+      null,
+      t,
+    )
+
+    expect(view.message).toBe(messages.en['ai.generationError.spotifyUnavailable'])
+    expect(view.message).not.toMatch(/couldn’t find songs|no songs/i)
   })
 })

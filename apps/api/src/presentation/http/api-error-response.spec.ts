@@ -2,6 +2,7 @@ import { AiGenerationError } from '@/domain/errors/ai-generation.error';
 import { AiSessionError } from '@/domain/errors/ai-session.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
 import { BusinessRuleError } from '@/domain/errors/business-rule.error';
+import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-unknown.error';
 import { SpotifyProviderError } from '@/domain/errors/spotify-provider.error';
 import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import { TransferError } from '@/domain/errors/transfer.error';
@@ -79,6 +80,84 @@ describe('toApiErrorResponse', () => {
     expect(toApiErrorResponse(BusinessRuleError.noTracksFound())).toMatchObject(
       { statusCode: 422, code: 'NO_TRACKS_FOUND' },
     );
+  });
+
+  it.each([
+    [
+      'empty mix or discover selection',
+      BusinessRuleError.noTracksFound(),
+      422,
+      'NO_TRACKS_FOUND',
+    ],
+    [
+      'not enough related music',
+      new BusinessRuleError('similar', 'DISCOVER_NOT_ENOUGH_SIMILAR'),
+      422,
+      'DISCOVER_NOT_ENOUGH_SIMILAR',
+    ],
+    [
+      'related music that did not resolve',
+      new BusinessRuleError('resolve', 'DISCOVER_RESOLVE_FAILED'),
+      422,
+      'DISCOVER_RESOLVE_FAILED',
+    ],
+    [
+      'Spotify rate limit',
+      new BusinessRuleError('rate', 'SPOTIFY_RATE_LIMITED'),
+      429,
+      'SPOTIFY_RATE_LIMITED',
+    ],
+    [
+      'Spotify quota',
+      new BusinessRuleError('quota', 'SPOTIFY_QUOTA_EXCEEDED'),
+      429,
+      'SPOTIFY_QUOTA_EXCEEDED',
+    ],
+    [
+      'catalog unavailable',
+      new CatalogUnavailableError(),
+      503,
+      'CATALOG_UNAVAILABLE',
+    ],
+    [
+      'Spotify timeout on a read',
+      new SpotifyProviderError('SPOTIFY_UNAVAILABLE', {
+        operation: 'searchTracks',
+        category: 'timeout',
+        status: null,
+      }),
+      503,
+      'SPOTIFY_UNAVAILABLE',
+    ],
+    [
+      'Spotify rejected request',
+      new SpotifyProviderError('SPOTIFY_REQUEST_REJECTED', {
+        operation: 'searchTracks',
+        category: 'rejected',
+        status: 400,
+      }),
+      502,
+      'SPOTIFY_REQUEST_REJECTED',
+    ],
+    [
+      'Spotify reauth',
+      new SpotifyReauthRequiredError(),
+      401,
+      'SPOTIFY_REAUTH_REQUIRED',
+    ],
+    [
+      'unconfirmed Spotify write',
+      new ProviderOutcomeUnknownError('timeout', {
+        operation: 'createPlaylist',
+        category: 'timeout',
+        status: null,
+      }),
+      502,
+      'SPOTIFY_OUTCOME_UNKNOWN',
+    ],
+    ['unexpected failure', new Error('boom'), 500, 'INTERNAL_ERROR'],
+  ] as const)('maps %s', (_label, error, statusCode, code) => {
+    expect(toApiErrorResponse(error)).toMatchObject({ statusCode, code });
   });
 
   it.each([

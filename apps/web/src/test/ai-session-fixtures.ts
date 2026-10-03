@@ -124,9 +124,12 @@ export function generatedAiSessionState(
   }
 }
 
-export function failedAiSessionState(error: AiGenerationFailureDto): AiSessionStateDto {
+export function failedAiSessionState(
+  error: AiGenerationFailureDto,
+  intent: AiIntentSummary = aiIntent,
+): AiSessionStateDto {
   return {
-    ...reviewedAiSession(),
+    ...reviewedAiSession(intent),
     execution: { status: 'generation_failed', error },
     destination: null,
     preservation: null,

@@ -285,6 +285,7 @@ export function AiPlaylistPage() {
         <AiGenerationFailure
           failure={flow.failure}
           liveError={flow.liveError}
+          kind={flow.intent.kind}
           headingRef={targets.failure}
           onEdit={editRequest}
           onRetry={generate}
@@ -301,7 +302,9 @@ export function AiPlaylistPage() {
             flow.phase === 'reviewed' ? (
               <AiReviewActions
                 requestError={
-                  flow.requestError ? generationRequestErrorMessage(flow.requestError, t) : null
+                  flow.requestError
+                    ? generationRequestErrorMessage(flow.requestError, t, flow.intent.kind)
+                    : null
                 }
                 onCreate={generate}
                 onStartOver={startOver}

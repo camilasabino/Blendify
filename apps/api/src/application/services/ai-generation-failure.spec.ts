@@ -1,6 +1,9 @@
 import { MAX_ARTISTS } from '@blendify/contracts';
 import { AiGenerationError } from '@/domain/errors/ai-generation.error';
 import { CatalogUnavailableError } from '@/domain/errors/catalog-unavailable.error';
+import { ProviderOutcomeUnknownError } from '@/domain/errors/provider-outcome-unknown.error';
+import { SpotifyProviderError } from '@/domain/errors/spotify-provider.error';
+import { SpotifyReauthRequiredError } from '@/domain/errors/spotify-reauth-required.error';
 import { createSpotifyQuotaError } from '@/infrastructure/spotify/spotify-quota-error';
 import { describeAiGenerationFailure } from './ai-generation-failure';
 
@@ -66,5 +69,68 @@ describe('describeAiGenerationFailure', () => {
 
     expect(failure.retryAfterSeconds).toBeNull();
     expect(failure).not.toHaveProperty('retryAfterSource');
+  });
+
+  it('keeps a rejected Spotify request instead of an internal error', () => {
+    expect(
+      describeAiGenerationFailure(
+        new SpotifyProviderError('SPOTIFY_REQUEST_REJECTED', {
+          operation: 'searchTracks',
+          category: 'rejected',
+          status: 400,
+        }),
+      ),
+    ).toMatchObject({
+      code: 'SPOTIFY_REQUEST_REJECTED',
+      category: 'failed',
+      seedNotFound: null,
+    });
+  });
+
+  it('keeps a Spotify read timeout as a provider outage', () => {
+    expect(
+      describeAiGenerationFailure(
+        new SpotifyProviderError('SPOTIFY_UNAVAILABLE', {
+          operation: 'searchTracks',
+          category: 'timeout',
+          status: null,
+        }),
+      ),
+    ).toMatchObject({
+      code: 'SPOTIFY_UNAVAILABLE',
+      category: 'provider_unavailable',
+      seedNotFound: null,
+    });
+  });
+
+  it.each([
+    [
+      'a revoked Spotify session',
+      new SpotifyReauthRequiredError(),
+      'SPOTIFY_REAUTH_REQUIRED',
+    ],
+    [
+      'an unconfirmed Spotify write',
+      new ProviderOutcomeUnknownError('timeout', {
+        operation: 'createPlaylist',
+        category: 'timeout',
+        status: null,
+      }),
+      'SPOTIFY_OUTCOME_UNKNOWN',
+    ],
+  ])('keeps %s', (_label, error, code) => {
+    expect(describeAiGenerationFailure(error)).toMatchObject({
+      code,
+      category: 'failed',
+      seedNotFound: null,
+    });
+  });
+
+  it('leaves an unexpected error unclassified', () => {
+    expect(describeAiGenerationFailure(new Error('boom'))).toMatchObject({
+      code: 'INTERNAL_ERROR',
+      category: 'failed',
+      seedNotFound: null,
+    });
   });
 });

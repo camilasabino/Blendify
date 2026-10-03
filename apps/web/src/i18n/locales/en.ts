@@ -71,10 +71,10 @@ export const en = {
   'discover.working': 'Creating your playlist',
   'discover.workingHint': 'Finding related songs for your playlist…',
   'discover.failed': 'Couldn’t create the playlist. Please try again.',
-  'discover.notEnoughSimilar':
-    'There isn’t enough related music for this choice. Try another artist or song.',
+  'discover.noTracksFound':
+    'We couldn’t find songs that match this selection. Try a different starting point, or adjust the filters in Refine results.',
   'discover.resolveFailed':
-    'Couldn’t find enough related music on Spotify. Try another artist or song.',
+    'Couldn’t find that song on Spotify. Try another one.',
   'create.eyebrow': 'Mix',
   'create.title': 'Create your mix',
   'create.subtitle':
@@ -186,7 +186,7 @@ export const en = {
   'create.partialTracks':
     'Found {count} of {requested} songs. Try different artists, genres, or a broader Familiarity setting.',
   'create.noTracksFound':
-    'Couldn’t find songs for this mix. Try different artists, genres, or a broader Familiarity setting.',
+    'We couldn’t find songs for this mix. Try different artists or genres, or adjust the filters in Refine results.',
   'create.openSpotify': 'Open in Spotify',
   'create.copyLink': 'Copy link',
   'create.copied': 'Copied',
@@ -731,7 +731,6 @@ export const en = {
   'ai.generationError.seedNotFoundHint': 'Check the spelling in your request and review it again.',
   'ai.generationError.spotifyUnavailable': 'Spotify isn’t responding right now. Try again in a few minutes.',
   'ai.generationError.discoveryUnavailable': 'Related-music data isn’t available right now. Try again in a few minutes.',
-  'ai.generationError.insufficient': 'Blendify couldn’t find enough music for this request. Try different artists, genres or another song.',
   'ai.generationError.interrupted': 'Creating your playlist was interrupted. Try again.',
   'ai.generationError.failed': 'Couldn’t finish creating your playlist. Try again.',
   'ai.destination.spotifyTitle': 'Save to Spotify',

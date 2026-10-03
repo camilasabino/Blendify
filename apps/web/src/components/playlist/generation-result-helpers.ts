@@ -3,7 +3,7 @@ import type { MessageKey } from '@/i18n/messages'
 import type { useT } from '@/i18n/use-t'
 import type { PlaylistRunFailure } from '@/hooks/use-playlist-run'
 import type { GenerationOutcome } from '@/lib/playlist-generation'
-import { getApiErrorMessage, isSpotifyRateLimited } from '@/lib/api'
+import { getApiErrorMessage, isSpotifyRateLimited, type EmptyResultFamily } from '@/lib/api'
 import {
   classifyGenerationFailure,
   isWriteOutcomeUnknown,
@@ -80,6 +80,7 @@ export function runFailureView(
   libraryAvailable: boolean,
   t: ReturnType<typeof useT>,
   fallbackKey: MessageKey,
+  emptyResult: EmptyResultFamily = 'mix',
 ): RunFailureView | null {
   if (!failure) {
     return null
@@ -120,7 +121,7 @@ export function runFailureView(
     case 'retryable':
       return {
         kind: 'failed',
-        message: getApiErrorMessage(failure.error, t, fallbackKey),
+        message: getApiErrorMessage(failure.error, t, fallbackKey, emptyResult),
         recovery: RECOVERY_BY_KIND[classified.kind],
         playlistUrl: null,
         offersNewCreation: false,
