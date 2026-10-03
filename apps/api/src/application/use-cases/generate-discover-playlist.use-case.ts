@@ -67,7 +67,6 @@ import { ARTIST_MIX_WORK_POLICY } from './artist-mix-work-policy';
 import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import {
   GenerationProgressTracker,
-  monotonicProgressReporter,
   type ProgressReporter,
 } from '@/application/services/generation-progress.tracker';
 import {
@@ -84,6 +83,7 @@ import {
 } from '@/domain/selection-filters/track-selection-filters';
 
 const SEED_ARTIST_MATCH_CANDIDATES = 10;
+const DISCOVER_TRACK_PREPARATION_STEPS = 2;
 
 type DiscoverInput = z.output<typeof GenerateDiscoverPlaylistSchema>;
 type ArtistDiscoverInput = Extract<DiscoverInput, { kind: 'discover_artist' }>;
@@ -113,7 +113,7 @@ export class GenerateDiscoverPlaylistUseCase {
     options?: { onProgress?: ProgressReporter; acceptTrack?: TrackAcceptance },
   ): Promise<GeneratedPlaylist> {
     const input = GenerateDiscoverPlaylistSchema.parse(raw);
-    const onProgress = monotonicProgressReporter(options?.onProgress);
+    const onProgress = options?.onProgress;
 
     if (!this.discoveryCatalog.isConfigured()) {
       throw new BusinessRuleError(
@@ -142,9 +142,15 @@ export class GenerateDiscoverPlaylistUseCase {
   ): Promise<GeneratedPlaylist> {
     const tracker = new GenerationProgressTracker(onProgress);
     const catalog = this.catalogs.forMarket(input.market);
-    tracker.report('resolving_seeds', 0, 1);
+    const similarTarget = discoverSimilarTargetForTracks(
+      input.targetTrackCount,
+    );
+    // The seed is one unit. Each similar artist still to resolve is another.
+    // Last.fm has no progress unit, so the band stays on the seed until artists match.
+    const preparationTotal = 1 + similarTarget;
+    tracker.report('resolving_seeds', 0, preparationTotal);
     const seed = await this.resolveSeedArtist(catalog, input);
-    tracker.report('resolving_seeds', 1, 1);
+    tracker.report('resolving_seeds', 1, preparationTotal);
 
     let similarArtists: SimilarArtistCandidate[];
     try {
@@ -176,16 +182,15 @@ export class GenerateDiscoverPlaylistUseCase {
       );
     }
 
-    const similarTarget = discoverSimilarTargetForTracks(
-      input.targetTrackCount,
-    );
     const artistQualifier = this.artistQualifier(input);
     const resolvedSimilar = await this.resolveSimilarArtists(
       catalog,
       similarArtists,
       seed.id.getValue(),
       similarTarget,
-      tracker,
+      (resolvedCount) => {
+        tracker.report('resolving_seeds', 1 + resolvedCount, preparationTotal);
+      },
       artistQualifier,
     );
     artistQualifier?.assertEnforceable();
@@ -272,15 +277,22 @@ export class GenerateDiscoverPlaylistUseCase {
     this.quota.assertAvailable();
 
     const catalog = this.catalogs.forMarket(input.market);
-    tracker.report('resolving_seeds', 0, 1);
+    // Two checkpoints: the seed track, then the similar-candidate list.
+    // Last.fm sits between them and does not move the band.
+    tracker.report('resolving_seeds', 0, DISCOVER_TRACK_PREPARATION_STEPS);
     const seedTrack = await this.resolveSeedTrack(catalog, input);
-    tracker.report('resolving_seeds', 1, 1);
+    tracker.report('resolving_seeds', 1, DISCOVER_TRACK_PREPARATION_STEPS);
 
     let similarRaw: SimilarTrackCandidateList;
     try {
       similarRaw = await this.collectSimilarTrackCandidates(
         seedTrack,
         DISCOVER_SIMILAR_TRACK_FETCH,
+      );
+      tracker.report(
+        'resolving_seeds',
+        DISCOVER_TRACK_PREPARATION_STEPS,
+        DISCOVER_TRACK_PREPARATION_STEPS,
       );
     } catch (error) {
       this.logger.warn(
@@ -666,7 +678,7 @@ export class GenerateDiscoverPlaylistUseCase {
     candidates: SimilarArtistCandidate[],
     seedId: string,
     limit: number,
-    tracker?: GenerationProgressTracker,
+    onResolved?: (resolvedCount: number) => void,
     artistQualifier?: ArtistFilterQualifier | null,
   ): Promise<Array<{ id: string; name: string; imageUrl?: string | null }>> {
     const resolved: Array<{
@@ -675,7 +687,6 @@ export class GenerateDiscoverPlaylistUseCase {
       imageUrl?: string | null;
     }> = [];
     const seen = new Set<string>([seedId]);
-    tracker?.report('resolving_seeds', 0, Math.max(1, limit));
 
     for (const [index, candidate] of candidates.entries()) {
       if (resolved.length >= limit) {
@@ -694,7 +705,6 @@ export class GenerateDiscoverPlaylistUseCase {
       );
       const best = pickUniqueArtistMatch(name, matches);
       if (!best) {
-        tracker?.report('resolving_seeds', resolved.length, Math.max(1, limit));
         continue;
       }
       const id = best.id.getValue();
@@ -707,7 +717,7 @@ export class GenerateDiscoverPlaylistUseCase {
         name: best.name,
         imageUrl: best.imageUrl ?? null,
       });
-      tracker?.report('resolving_seeds', resolved.length, Math.max(1, limit));
+      onResolved?.(resolved.length);
     }
 
     return resolved;

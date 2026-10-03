@@ -184,10 +184,7 @@ export const es: Record<MessageKey, string> = {
   'create.progressResolving': 'Preparando tu selección',
   'create.progressMatching': 'Buscando canciones',
   'create.progressPublishing': 'Creando la playlist en Spotify',
-  'create.progressCount': '{current} de {total}',
-  'create.etaLessThanMinute': 'Menos de 1 min restante',
-  'create.etaOneMinute': 'Aprox. 1 min restante',
-  'create.etaMinutes': 'Aprox. {minutes} min restantes',
+  'create.progressCount': '{current} de {total} canciones',
   'create.nearCompleteTracks':
     'Agregamos {count} de {requested} canciones: casi el total solicitado.',
   'create.partialTracks':

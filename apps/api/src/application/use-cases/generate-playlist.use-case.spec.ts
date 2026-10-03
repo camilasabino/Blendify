@@ -147,35 +147,21 @@ describe('GeneratePlaylistUseCase', () => {
     }
   });
 
-  it.each(['discover_artist', 'discover_track'] as const)(
-    'keeps %s progress monotonic',
-    async (kind) => {
-      const context = setup([10, 60, 20, 90]);
-      const onProgress = jest.fn();
+  it.each([
+    'artist_mix',
+    'genre_mix',
+    'discover_artist',
+    'discover_track',
+  ] as const)('forwards %s progress unchanged', async (kind) => {
+    const context = setup([60, 40]);
+    const onProgress = jest.fn();
 
-      await context.useCase.execute(requests[kind], { onProgress });
+    await context.useCase.execute(requests[kind], { onProgress });
 
-      expect(
-        onProgress.mock.calls.map(
-          ([event]: [GenerationProgress]) => event.percent,
-        ),
-      ).toEqual([10, 60, 90]);
-    },
-  );
-
-  it.each(['artist_mix', 'genre_mix'] as const)(
-    'forwards %s progress unchanged',
-    async (kind) => {
-      const context = setup([60, 40]);
-      const onProgress = jest.fn();
-
-      await context.useCase.execute(requests[kind], { onProgress });
-
-      expect(
-        onProgress.mock.calls.map(
-          ([event]: [GenerationProgress]) => event.percent,
-        ),
-      ).toEqual([60, 40]);
-    },
-  );
+    expect(
+      onProgress.mock.calls.map(
+        ([event]: [GenerationProgress]) => event.percent,
+      ),
+    ).toEqual([60, 40]);
+  });
 });

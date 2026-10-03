@@ -35,24 +35,20 @@ describe('GenerationProgressTracker', () => {
     });
   });
 
-  it('estimates eta after a few matching steps', async () => {
+  it('does not estimate eta from time between matching reports', () => {
     const updates: GenerationProgress[] = [];
     const tracker = new GenerationProgressTracker((progress) => {
       updates.push(progress);
     });
 
-    tracker.report('matching_tracks', 0, 5);
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    tracker.report('matching_tracks', 1, 5);
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    tracker.report('matching_tracks', 2, 5);
+    tracker.report('matching_tracks', 0, 10);
+    tracker.report('matching_tracks', 0, 10);
+    tracker.report('matching_tracks', 3, 10);
 
-    const last = updates[updates.length - 1];
-    expect(last?.etaSeconds).toEqual(expect.any(Number));
-    expect(last?.etaSeconds).toBeGreaterThan(0);
+    expect(updates.every((update) => update.etaSeconds === null)).toBe(true);
   });
 
-  it('reports zero eta once the phase reaches its total', () => {
+  it('keeps eta null when matching reaches its target', () => {
     const updates: GenerationProgress[] = [];
     const tracker = new GenerationProgressTracker((progress) => {
       updates.push(progress);
@@ -62,21 +58,28 @@ describe('GenerationProgressTracker', () => {
     tracker.report('matching_tracks', 2, 5);
     tracker.report('matching_tracks', 5, 5);
 
-    expect(updates[updates.length - 1]?.etaSeconds).toBe(0);
+    expect(updates.every((update) => update.etaSeconds === null)).toBe(true);
+    expect(updates.at(-1)).toMatchObject({
+      current: 5,
+      total: 5,
+      percent: 90,
+    });
   });
 
-  it('caps the ETA sample window so it keeps tracking long-running phases', () => {
+  it('measures matching percent by accepted tracks over the requested target', () => {
     const updates: GenerationProgress[] = [];
     const tracker = new GenerationProgressTracker((progress) => {
       updates.push(progress);
     });
 
-    for (let i = 0; i < 25; i += 1) {
-      tracker.report('matching_tracks', i, 100);
-    }
+    tracker.report('matching_tracks', 0, 10);
+    tracker.report('matching_tracks', 3, 10);
+    tracker.report('matching_tracks', 6, 10);
 
-    const last = updates[updates.length - 1];
-    expect(last?.etaSeconds).toEqual(expect.any(Number));
+    expect(updates.map((update) => update.percent)).toEqual([10, 34, 58]);
+    expect(updates.map((update) => update.current)).toEqual([0, 3, 6]);
+    expect(updates.at(-1)?.total).toBe(10);
+    expect(updates.every((update) => update.etaSeconds === null)).toBe(true);
   });
 
   it('is a no-op without a reporter', () => {

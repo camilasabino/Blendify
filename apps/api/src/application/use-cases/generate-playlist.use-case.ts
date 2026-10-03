@@ -6,10 +6,7 @@ import {
 import type { z } from 'zod';
 import { GeneratedPlaylist } from '@/domain/playlist/generated-playlist';
 import type { TrackAcceptance } from '@/domain/services/accepted-track-pool';
-import {
-  monotonicProgressReporter,
-  type ProgressReporter,
-} from '@/application/services/generation-progress.tracker';
+import type { ProgressReporter } from '@/application/services/generation-progress.tracker';
 import { GenerateArtistMixUseCase } from './generate-artist-mix.use-case';
 import { GenerateGenreMixUseCase } from './generate-genre-mix.use-case';
 import { GenerateDiscoverPlaylistUseCase } from './generate-discover-playlist.use-case';
@@ -41,13 +38,7 @@ export class GeneratePlaylistUseCase {
       case 'genre_mix':
         return this.genreMix.execute(request, generationOptions(options));
       default:
-        return this.discover.execute(
-          request,
-          generationOptions({
-            ...options,
-            onProgress: monotonicProgressReporter(options?.onProgress),
-          }),
-        );
+        return this.discover.execute(request, generationOptions(options));
     }
   }
 }

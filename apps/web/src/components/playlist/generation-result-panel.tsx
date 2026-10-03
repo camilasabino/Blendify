@@ -51,21 +51,17 @@ import {
   formatListeningTime,
 } from '@/lib/utils'
 
-function etaMessage(
-  seconds: number | null | undefined,
+function songProgressLabel(
+  progress: GenerationProgress,
   t: ReturnType<typeof useT>,
 ): string | null {
-  if (seconds == null || seconds <= 0) {
+  if (progress.phase !== 'matching_tracks') {
     return null
   }
-  if (seconds < 60) {
-    return t('create.etaLessThanMinute')
-  }
-
-  const minutes = Math.max(1, Math.ceil(seconds / 60))
-  return minutes === 1
-    ? t('create.etaOneMinute')
-    : t('create.etaMinutes', { minutes })
+  return t('create.progressCount', {
+    current: progress.current,
+    total: progress.total,
+  })
 }
 
 function progressAnnouncement(
@@ -76,11 +72,9 @@ function progressAnnouncement(
   if (!progress) {
     return t(workingHintKey)
   }
-  const count = t('create.progressCount', {
-    current: progress.current,
-    total: progress.total,
-  })
-  return `${t(phaseMessageKey(progress.phase))}, ${count}`
+  const label = t(phaseMessageKey(progress.phase))
+  const count = songProgressLabel(progress, t)
+  return count ? `${label}, ${count}` : label
 }
 
 export function GenerationProgressBar({
@@ -146,14 +140,8 @@ function GeneratingState({
   const progressLabel = progress
     ? t(phaseMessageKey(progress.phase))
     : t(workingHintKey)
-  const progressCount = progress
-    ? t('create.progressCount', {
-        current: progress.current,
-        total: progress.total,
-      })
-    : null
-  const etaLabel = etaMessage(progress?.etaSeconds, t)
-  const metaLine = [progressCount, etaLabel].filter(Boolean).join(' · ')
+  const progressCount = progress ? songProgressLabel(progress, t) : null
+  const metaLine = progressCount ?? ''
 
   return (
     <div className="space-y-3">

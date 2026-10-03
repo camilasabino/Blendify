@@ -1,5 +1,6 @@
 import type { ApiErrorResponse, GenerationProgress } from '@blendify/contracts';
 import type { Request, Response } from 'express';
+import { monotonicProgressReporter } from '@/application/services/generation-progress.tracker';
 import { toApiErrorResponse } from './api-error-response';
 
 const NDJSON = 'application/x-ndjson';
@@ -28,9 +29,13 @@ export async function writeNdjsonGeneration<TPlaylist>(
     res.write(`${JSON.stringify(event)}\n`);
   };
 
+  const emitProgress = monotonicProgressReporter((progress) => {
+    write({ type: 'progress', ...progress });
+  });
+
   try {
     const playlist = await run((progress) => {
-      write({ type: 'progress', ...progress });
+      emitProgress?.(progress);
     });
     write({ type: 'result', playlist });
   } catch (error) {

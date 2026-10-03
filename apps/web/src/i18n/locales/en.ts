@@ -180,10 +180,7 @@ export const en = {
   'create.progressResolving': 'Preparing your selection',
   'create.progressMatching': 'Finding songs',
   'create.progressPublishing': 'Creating the playlist in Spotify',
-  'create.progressCount': '{current} of {total}',
-  'create.etaLessThanMinute': 'Less than 1 min remaining',
-  'create.etaOneMinute': 'About 1 min remaining',
-  'create.etaMinutes': 'About {minutes} min remaining',
+  'create.progressCount': '{current} of {total} songs',
   'create.nearCompleteTracks':
     'Added {count} of {requested} songs — almost the full amount.',
   'create.partialTracks':

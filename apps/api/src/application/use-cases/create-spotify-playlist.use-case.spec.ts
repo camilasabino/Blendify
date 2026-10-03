@@ -410,7 +410,7 @@ describe('CreateSpotifyPlaylistUseCase', () => {
     expect(context.recordMix).not.toHaveBeenCalled();
   });
 
-  it('keeps Discover progress monotonic across generation and publication', async () => {
+  it('forwards Discover progress unchanged to generation and publication', async () => {
     const context = setup();
     context.discover.mockImplementation(
       (_request: unknown, options?: { onProgress?: ProgressReporter }) => {
@@ -436,7 +436,7 @@ describe('CreateSpotifyPlaylistUseCase', () => {
       onProgress.mock.calls.map(
         ([event]: [GenerationProgress]) => event.percent,
       ),
-    ).toEqual([60, 90, 95, 100]);
+    ).toEqual([60, 20, 90, 95, 100]);
   });
 
   it('forwards Mix progress unchanged to generation and publication', async () => {

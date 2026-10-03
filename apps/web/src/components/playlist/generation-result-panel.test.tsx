@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Sparkles } from 'lucide-react'
 import { MemoryRouter } from 'react-router-dom'
-import type { PlaylistDetail } from '@blendify/contracts'
+import type { GenerationProgress, PlaylistDetail } from '@blendify/contracts'
 import { GenerationResultPanel } from './generation-result-panel'
 import { GenerationSubmitBar } from './generation-form-shared'
 import { guestJazzPlaylist, jazzTrack } from '@/test/playlist-fixtures'
@@ -41,6 +41,26 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
     </MemoryRouter>,
   )
   return { props, container }
+}
+
+function progressPanel(progress: GenerationProgress): PanelProps {
+  return {
+    mode: 'spotify',
+    isGenerating: true,
+    result: null,
+    progress,
+    failure: null,
+    coverError: null,
+    requestedTrackCount: 10,
+    workingTitleKey: 'create.working',
+    workingHintKey: 'create.workingHint',
+    copied: false,
+    onCopy: vi.fn(),
+    onRetry: vi.fn(),
+    onCreateNew: vi.fn(),
+    onAdjust: vi.fn(),
+    onCreateAnother: vi.fn(),
+  }
 }
 
 const readyPlaylist: PlaylistDetail = {
@@ -248,11 +268,131 @@ describe('GenerationResultPanel', () => {
     })
 
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Finding songs, 2 of 10',
+      'Finding songs, 2 of 10 songs',
     )
     expect(
       screen.getByRole('region', { name: 'Creating your playlist' }),
     ).not.toHaveAttribute('aria-live')
+    expect(screen.getByText('2 of 10 songs', { selector: 'p' })).toBeVisible()
+  })
+
+  it('shows preparation and publishing without a counter or an ETA', () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <GenerationResultPanel
+            {...progressPanel({
+              phase: 'resolving_seeds',
+              current: 1,
+              total: 11,
+              percent: 1,
+              etaSeconds: 12,
+            })}
+          />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Preparing your selection',
+    )
+    expect(screen.getByRole('status')).not.toHaveTextContent(/of /)
+    expect(screen.getByText('1%')).toBeVisible()
+    expect(screen.queryByText(/of 11/)).toBeNull()
+    expect(screen.queryByText(/min remaining/i)).toBeNull()
+
+    rerender(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <GenerationResultPanel
+            {...progressPanel({
+              phase: 'publishing',
+              current: 0,
+              total: 3,
+              percent: 90,
+              etaSeconds: 40,
+            })}
+          />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Creating the playlist in Spotify',
+    )
+    expect(screen.getByRole('status')).not.toHaveTextContent(/of /)
+    expect(screen.getByText('90%')).toBeVisible()
+    expect(screen.queryByText(/of 3/)).toBeNull()
+    expect(screen.queryByText(/min remaining/i)).toBeNull()
+  })
+
+  it('counts songs found during search, including a partial fill', () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <GenerationResultPanel
+            {...progressPanel({
+              phase: 'matching_tracks',
+              current: 0,
+              total: 10,
+              percent: 10,
+              etaSeconds: 20,
+            })}
+          />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Finding songs, 0 of 10 songs',
+    )
+    expect(screen.getByText('0 of 10 songs', { selector: 'p' })).toBeVisible()
+    expect(screen.getByText('10%')).toBeVisible()
+    expect(screen.queryByText(/min remaining/i)).toBeNull()
+
+    rerender(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <GenerationResultPanel
+            {...progressPanel({
+              phase: 'matching_tracks',
+              current: 3,
+              total: 10,
+              percent: 34,
+            })}
+          />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Finding songs, 3 of 10 songs',
+    )
+    expect(screen.getByText('3 of 10 songs', { selector: 'p' })).toBeVisible()
+
+    rerender(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <GenerationResultPanel
+            {...progressPanel({
+              phase: 'matching_tracks',
+              current: 6,
+              total: 10,
+              percent: 58,
+              etaSeconds: 15,
+            })}
+          />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Finding songs, 6 of 10 songs',
+    )
+    expect(screen.getByText('6 of 10 songs', { selector: 'p' })).toBeVisible()
+    expect(screen.getByText('58%')).toBeVisible()
+    expect(screen.queryByText('10 of 10 songs')).toBeNull()
+    expect(screen.queryByText(/min remaining/i)).toBeNull()
   })
 
   it('shows generation errors in place of the progress with a retry', async () => {
@@ -302,6 +442,37 @@ describe('GenerationResultPanel in Guest Mode', () => {
       requestedTrackCount: 1,
     })
   }
+
+  it('closes a short fill as a finished playlist', () => {
+    renderPanel({
+      mode: 'guest',
+      isGenerating: false,
+      workingTitleKey: 'create.workingGuest',
+      requestedTrackCount: 10,
+      result: {
+        mode: 'guest',
+        playlist: {
+          ...guestJazzPlaylist,
+          tracks: Array.from({ length: 6 }, (_, index) => ({
+            ...jazzTrack,
+            id: `track-${index}`,
+            uri: `spotify:track:track-${index}`,
+            externalUrl: `https://open.spotify.com/track/track-${index}`,
+          })),
+        },
+      },
+    })
+
+    expect(
+      screen.getByRole('heading', { name: 'Blendify · Mix · Jazz' }),
+    ).toBeVisible()
+    expect(screen.getByText(/Found 6 of 10 songs/)).toBeVisible()
+    expect(screen.queryByText('Finding songs')).toBeNull()
+    expect(screen.queryByText('58%')).toBeNull()
+    expect(screen.queryByText(/10 of 10/)).toBeNull()
+    expect(screen.queryByText(/min remaining/i)).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
 
   it('shows the generated tracks with credited artists and no Spotify publication state', () => {
     renderGuest()
